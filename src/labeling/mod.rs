@@ -19,6 +19,32 @@ pub const NO_ROUTE_COST: f64 = 1e12;
 pub(crate) fn equality_resource_dominates(a: f64, b: f64) -> bool {
     b - EPSILON <= a && a <= b + EPSILON
 }
+
+/// Join standard-resource states in value or consumption coordinates.
+pub(crate) fn standard_resources_join<const D: usize>(
+    graph: &Graph<D>,
+    forward: &[f64],
+    backward: &[f64],
+    consumption: bool,
+) -> bool {
+    graph
+        .resources
+        .iter()
+        .enumerate()
+        .all(|(r, kind)| match kind {
+            ResourceKind::Disposable => {
+                if consumption {
+                    !(graph.vertices[graph.sink].bounds[r].upper + EPSILON
+                        < forward[r] + backward[r]
+                            - graph.initial[r]
+                                .unwrap_or(graph.vertices[graph.source].bounds[r].lower))
+                } else {
+                    !(backward[r] + EPSILON < forward[r])
+                }
+            }
+            ResourceKind::Equality => consumption || forward[r] == backward[r],
+        })
+}
 #[derive(Clone, Debug)]
 pub struct Controls {
     pub max_labels: usize,
@@ -60,8 +86,6 @@ impl Controls {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Route {
-    /// Independently certified source choices, separate from minimum-front metadata.
-    pub coupled_controls: Vec<crate::graph::coupled::PairedControl>,
     /// Descriptor-indexed selected paired dependent values. These accompany
     /// the scalar schedule; they are not objective charges or certificates.
     pub coupled_values: Vec<(usize, f64)>,
@@ -75,21 +99,33 @@ pub struct Route {
     pub resource_profile: Vec<Vec<f64>>,
 }
 impl Route {
-    /// Match the minimum-front choice or independently proved source controls.
+    /// Match a selected paired value against the retained split joins.
     /// Full physical/scalar/other-resource feasibility is checked separately.
     pub(crate) fn selected_values_match<const D: usize>(
         &self,
         graph: &Graph<D>,
         positions: &[usize],
     ) -> Result<bool> {
-        if self.coupled_controls.is_empty() {
-            return Ok(graph.coupled_paired_values(positions)? == self.coupled_values);
-        }
-        Ok(graph
+        if let Some(kernel) = graph
             .coupled_kernel()
-            .ok_or_else(|| invalid("paired controls require a resource kernel"))?
-            .replay_with_controls(positions, &self.coupled_controls)?
-            .is_some_and(|selection| selection.paired_values == self.coupled_values))
+            .filter(|kernel| kernel.machine_paired_join_complete())
+        {
+            if self.coupled_values.is_empty() {
+                return Ok(kernel
+                    .joined_machine_path_matching(positions, None)?
+                    .is_some_and(|(_, value)| value.is_none()));
+            }
+            let [(resource, value)] = self.coupled_values.as_slice() else {
+                return Ok(false);
+            };
+            if kernel.retained_paired_machine_resource() != Some(*resource) {
+                return Ok(false);
+            }
+            return Ok(kernel
+                .joined_machine_path_matching(positions, Some(*value))?
+                .is_some());
+        }
+        Ok(graph.coupled_paired_values(positions)? == self.coupled_values)
     }
 
     pub(crate) fn coupled_cost<const D: usize>(
@@ -97,54 +133,26 @@ impl Route {
         graph: &Graph<D>,
         positions: &[usize],
     ) -> Result<Option<f64>> {
-        if self.coupled_controls.is_empty() {
-            return graph.coupled_path_cost(positions);
-        }
-        let selection = graph
+        if let Some(kernel) = graph
             .coupled_kernel()
-            .ok_or_else(|| invalid("paired controls require a resource kernel"))?
-            .replay_with_controls(positions, &self.coupled_controls)?;
-        Ok(selection
-            .filter(|selection| selection.paired_values == self.coupled_values)
-            .map(|selection| selection.cost))
-    }
-
-    /// Assign independently proved source choices to an existing physical route.
-    /// Recompute original cost and selected values for the supplied graph; full
-    /// recipient validation still checks physical/scalar/master constraints.
-    pub fn with_paired_controls<const D: usize>(
-        mut self,
-        graph: &Graph<D>,
-        mut controls: Vec<crate::graph::coupled::PairedControl>,
-    ) -> Result<Self> {
-        controls.sort_by_key(|control| control.resource);
-        let positions = self
-            .arcs
-            .iter()
-            .map(|id| {
-                graph
-                    .arcs
-                    .iter()
-                    .position(|arc| arc.id == *id)
-                    .ok_or_else(|| invalid("unknown controlled route arc"))
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let selection = graph
-            .coupled_kernel()
-            .ok_or_else(|| invalid("paired controls require a resource kernel"))?
-            .replay_with_controls(&positions, &controls)?
-            .ok_or_else(|| invalid("paired source control is infeasible or uncertified"))?;
-        let mut sorted = positions;
-        sorted.sort_by_key(|&p| graph.arcs[p].id);
-        let cost = sorted.iter().map(|&p| graph.arcs[p].cost).sum::<f64>() + selection.cost;
-        if !cost.is_finite() {
-            return Err(invalid("controlled route cost overflow"));
+            .filter(|kernel| kernel.machine_paired_join_complete())
+        {
+            let selected = match self.coupled_values.as_slice() {
+                [] => None,
+                [(resource, value)]
+                    if kernel.retained_paired_machine_resource() == Some(*resource) =>
+                {
+                    Some(*value)
+                }
+                _ => return Ok(None),
+            };
+            return Ok(kernel
+                .joined_associated_machine_path_matching(positions, selected)?
+                .and_then(|(cost, value)| {
+                    (selected.is_some() || value.is_none()).then_some(cost)
+                }));
         }
-        self.coupled_controls = controls;
-        self.coupled_values = selection.paired_values;
-        self.original_cost = cost;
-        self.cost = cost;
-        Ok(self)
+        graph.coupled_route_cost(positions)
     }
 
     pub(crate) fn identity(&self) -> String {
@@ -357,9 +365,41 @@ fn reconstruct<const D: usize>(
     for &a in &arcs {
         nodes.push(g.arcs[a].head as i32);
     }
+    let paired_values = if let Some(kernel) = g
+        .coupled_kernel()
+        .filter(|kernel| kernel.machine_paired_join_complete())
+    {
+        use crate::graph::coupled::descriptor::{FrontierBudget, FrontierOutcome};
+        let resource = kernel
+            .retained_paired_machine_resource()
+            .ok_or_else(|| incomplete("paired resource unavailable"))?;
+        let forward = terminal
+            .coupled_state
+            .as_deref()
+            .ok_or_else(|| incomplete("paired terminal state unavailable"))?;
+        let backward = kernel.root(false);
+        match kernel.paired_machine_resource_join(
+            resource,
+            forward,
+            &backward,
+            FrontierBudget::default(),
+        ) {
+            FrontierOutcome::Complete(selection) => selection
+                .dependent
+                .map(|value| vec![(resource, value)])
+                .unwrap_or_default(),
+            FrontierOutcome::Empty => return Err(incomplete("paired terminal join is infeasible")),
+            FrontierOutcome::Unknown(reason) => {
+                return Err(incomplete(format!(
+                    "paired terminal join unavailable: {reason:?}"
+                )))
+            }
+        }
+    } else {
+        g.coupled_paired_values(&arcs)?
+    };
     Ok(Route {
-        coupled_controls: Vec::new(),
-        coupled_values: g.coupled_paired_values(&arcs)?,
+        coupled_values: paired_values,
         nodes,
         arcs: arcs.iter().map(|&a| g.arcs[a].id).collect(),
         cost: terminal.cost,
@@ -481,7 +521,7 @@ pub fn reference_price<const D: usize>(g: &Graph<D>, controls: &Controls) -> Res
                     from.original_cost + a.cost,
                 )
             };
-            let next = Label {
+            let mut next = Label {
                 coupled_state,
                 vertex: a.head,
                 cost,
@@ -501,6 +541,31 @@ pub fn reference_price<const D: usize>(g: &Graph<D>, controls: &Controls) -> Res
             }
             stats.generated += 1;
             if a.head == g.sink {
+                if let Some(kernel) = g
+                    .coupled_kernel()
+                    .filter(|kernel| kernel.machine_paired_join_complete())
+                {
+                    let state = next
+                        .coupled_state
+                        .as_deref()
+                        .ok_or_else(|| invalid("missing coupled reference terminal state"))?;
+                    let Some((pricing, original)) =
+                        kernel.join_objective_costs(state, &kernel.root(false))?
+                    else {
+                        continue;
+                    };
+                    next.cost = state
+                        .scalar_reduced_cost()
+                        .ok_or_else(|| invalid("missing reference scalar cost"))?
+                        + pricing;
+                    next.original_cost = state
+                        .scalar_original_cost()
+                        .ok_or_else(|| invalid("missing reference scalar cost"))?
+                        + original;
+                    if !next.cost.is_finite() || !next.original_cost.is_finite() {
+                        return Err(incomplete("route cost overflow"));
+                    }
+                }
                 minimum = minimum.min(next.cost);
                 if !controls.negative_only || next.cost < controls.zero_threshold - EPSILON {
                     let route = reconstruct(g, &labels, &next)?;

@@ -18,7 +18,8 @@ impl CoupledKernel {
             reversed_use: false,
             numeric: StateValues::from_slice(&self.initial),
             custom_machine: vec![Default::default(); self.custom_indices.len()],
-            custom_machine_identity: (!self.custom_indices.is_empty()).then(|| self.machine_identity.clone()),
+            custom_machine_identity: (!self.custom_indices.is_empty())
+                .then(|| self.machine_identity.clone()),
             slope_fronts: self
                 .slope_roots
                 .iter()
@@ -30,9 +31,6 @@ impl CoupledKernel {
                             front: None,
                             upper_negative: None,
                             minimum: 0.,
-                            upper: None,
-                            bounded_cost: None,
-                            raw_upper: None,
                             machine_history: None,
                         }
                     }
@@ -41,7 +39,7 @@ impl CoupledKernel {
             slope_relations: self
                 .slope_paired
                 .iter()
-                .map(|paired| paired.root(forward, self.front_program_domain))
+                .map(|paired| paired.root(forward))
                 .collect(),
             pricing_activities: (!self.pricing_activities.is_empty()).then(|| {
                 self.pricing_activities
@@ -51,8 +49,12 @@ impl CoupledKernel {
             }),
             numeric_cost: 0.,
             resource_objective: 0.,
+            paired_ordered_key: self.machine_paired_join_complete()
+                && self.paired_objective_is_only_charge()
+                && self.cost_scale == 1.
+                && self.pricing_activities.is_empty()
+                && self.slope_paired[0].uses_unscaled_final_value(),
             accounting: Some(accounting::ScalarCosts::default()),
-            relations: self.paired.iter().map(|p| p.root(forward)).collect(),
             plugins: self.plugins.iter().map(|p| p.0.root(forward)).collect(),
             fronts: self
                 .front_indices
@@ -96,7 +98,6 @@ impl CoupledKernel {
                     && a.fronts == b.fronts
                     && a.slope_fronts == b.slope_fronts
                     && a.slope_relations == b.slope_relations
-                    && a.relations == b.relations
                     && a.plugins == b.plugins
                     && a.pricing_activities == b.pricing_activities
                     && a.numeric == b.numeric
@@ -169,24 +170,36 @@ impl CoupledKernel {
             fronts: Vec::with_capacity(state.fronts.len()),
             slope_fronts: Vec::with_capacity(state.slope_fronts.len()),
             slope_relations: Vec::with_capacity(state.slope_relations.len()),
-            relations: Vec::with_capacity(state.relations.len()),
             plugins: Vec::with_capacity(state.plugins.len()),
             pricing_activities: None,
             numeric_cost: 0.,
             resource_objective: 0.,
+            paired_ordered_key: state.paired_ordered_key,
             accounting: None,
         };
         for (trace, &index) in next.custom_machine.iter_mut().zip(&self.custom_indices) {
             let resource = &self.definitions[index];
-            let CoupledResource::CustomResource { increments, weights, .. } = resource else { unreachable!() };
+            let CoupledResource::CustomResource {
+                increments,
+                weights,
+                ..
+            } = resource
+            else {
+                unreachable!()
+            };
             if trace.accepted {
                 let contribution = if forward {
                     trace.state.extend_forward(increments[arc], weights[arc])
                 } else {
                     trace.state.extend_backward(increments[arc], weights[arc])
                 };
-                trace.accepted = crate::graph::coupled::CustomMachineState::contribution_accepted(contribution);
-                trace.wrapper_cost = if trace.accepted { contribution + trace.wrapper_cost } else { 1e12 };
+                trace.accepted =
+                    crate::graph::coupled::CustomMachineState::contribution_accepted(contribution);
+                trace.wrapper_cost = if trace.accepted {
+                    contribution + trace.wrapper_cost
+                } else {
+                    1e12
+                };
             }
         }
         let prepared = &self.transitions.arcs[arc];
@@ -294,18 +307,6 @@ impl CoupledKernel {
             };
             next.slope_relations.push(front);
         }
-        let first_backward = state
-            .suffix
-            .as_ref()
-            .is_some_and(|s| s.program.iter().next().is_none());
-        for (old, prepared) in state.relations.iter().zip(&self.paired) {
-            let Some(label) =
-                prepared.extend(old, arc, forward, first_backward, &mut workspace.relation)?
-            else {
-                return Ok(None);
-            };
-            next.relations.push(label);
-        }
         for (old, plugin) in state.plugins.iter().zip(&self.plugins) {
             let Some(label) = plugin.0.extend(old, arc, forward)? else {
                 return Ok(None);
@@ -371,7 +372,6 @@ impl CoupledKernel {
                 coefficients,
                 constant,
                 program: if self.transitions.deferred
-                    || !self.relation_indices.is_empty()
                     || self.cost_resource
                     || !self.slope_paired.is_empty()
                     || !self.plugins.is_empty()
@@ -384,7 +384,7 @@ impl CoupledKernel {
             new_cost
         };
         next.numeric_cost = cost;
-        next.resource_objective = self.final_resource_objective(&next, &[])?;
+        next.resource_objective = self.final_resource_objective(&next)?;
         if let Some(states) = &state.pricing_activities {
             let mut prices = Vec::with_capacity(states.len());
             for (kernel, previous) in self.pricing_activities.iter().zip(states.iter()) {
@@ -400,11 +400,7 @@ impl CoupledKernel {
         let increment = finite(next.pricing_objective()? - state.pricing_objective()?)?;
         Ok(Some((Box::new(next), increment)))
     }
-    pub(super) fn final_resource_objective(
-        &self,
-        state: &CoupledLabelState,
-        selected: &[(usize, f64)],
-    ) -> Result<f64> {
+    pub(super) fn final_resource_objective(&self, state: &CoupledLabelState) -> Result<f64> {
         let mut objective = state.numeric_cost;
         for front in &state.fronts {
             objective = finite(objective + front.minimum())?;
@@ -412,38 +408,8 @@ impl CoupledKernel {
         for front in &state.slope_fronts {
             objective = finite(objective + front.minimum)?;
         }
-        // Controls replace charges in place; they do not reorder arithmetic.
-        if selected.is_empty() {
-            for front in &state.slope_relations {
-                objective = finite(objective + front.minimum)?;
-            }
-        } else {
-            for (((resource, _), prepared), front) in self
-                .definitions
-                .iter()
-                .enumerate()
-                .filter(|(_, d)| matches!(d, CoupledResource::SlopePaired { .. }))
-                .zip(&self.slope_paired)
-                .zip(&state.slope_relations)
-            {
-                let charge = match selected.iter().find(|(index, _)| *index == resource) {
-                    Some((_, value)) => prepared.final_objective(*value, self.cost_scale)?,
-                    None => front.minimum,
-                };
-                objective = finite(objective + charge)?;
-            }
-        }
-        for ((&resource, prepared), label) in self
-            .relation_indices
-            .iter()
-            .zip(&self.paired)
-            .zip(&state.relations)
-        {
-            let charge = match selected.iter().find(|(index, _)| *index == resource) {
-                Some((_, value)) => prepared.final_objective(*value, self.cost_scale)?,
-                None => prepared.objective(label, self.cost_scale)?,
-            };
-            objective = finite(objective + charge)?;
+        for front in &state.slope_relations {
+            objective = finite(objective + front.minimum)?;
         }
         if self.cost_scale != 0. {
             for (plugin, label) in self.plugins.iter().zip(&state.plugins) {
@@ -461,8 +427,13 @@ impl CoupledKernel {
         Ok(objective)
     }
 
-    /// Join at one physical vertex. All arc services are accounted for once.
+    /// Replay a partial path or join a complete paired route.
     pub fn replay(&self, arcs: &[usize]) -> Result<Option<f64>> {
+        if self.machine_paired_join_complete() && self.paired_path_is_complete(arcs)? {
+            return Ok(self
+                .joined_associated_machine_path_matching(arcs, None)?
+                .map(|(cost, _)| cost));
+        }
         Ok(self.replay_state(arcs)?.map(|(_, cost)| cost))
     }
     /// Replay a physical arc-position path and return its final coupled state.

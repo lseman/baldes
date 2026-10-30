@@ -72,6 +72,11 @@ impl<const D: usize> StoredLabel<D> {
     /// Bucket ordering key, (0.5 potential + additional) + (0 + reduced);
     /// the rank-one potential is zero. Equals the standard key without cuts.
     pub fn key(&self) -> f64 {
+        if let Some(key) = self.coupled_state.as_deref().and_then(|state| {
+            state.paired_completion_key(self.half_potential, self.additional_cost)
+        }) {
+            return key;
+        }
         (self.half_potential + self.additional_cost) + (0.0 + self.cost)
     }
 }

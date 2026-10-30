@@ -112,7 +112,7 @@ impl<const D: usize> NodeSnapshot<D> {
         let mut seen: std::collections::HashSet<_> =
             routes.iter().map(|r| r.arcs.clone()).collect();
         for route in &self.routes {
-            if let Some(checked) = self.problem.elementary_route(&route.arcs) {
+            if let Some(checked) = self.problem.elementary_route_checked(&route.arcs)? {
                 if seen.insert(checked.arcs.clone()) {
                     routes.push(checked);
                 }
@@ -159,7 +159,7 @@ impl<const D: usize> NodeSnapshot<D> {
             let mut entries = self.problem.base_entries(&route)?;
             entries.extend(self.cut.entries(&self.pricing, &route, true)?);
             entries.sort_by_key(|&(r, _)| r);
-            let (cost, _) = self.problem.route_cost(&route);
+            let (cost, _) = self.problem.route_cost(&route)?;
             let c = model.add_column(cost, &entries)?;
             if let Some(&upper) = upper_by_path.get(&route.arcs) {
                 model.set_upper(c, upper)?;

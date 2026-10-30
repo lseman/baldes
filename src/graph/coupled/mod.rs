@@ -5,25 +5,22 @@
 use super::{Graph, Window};
 use crate::{invalid, Result};
 
+mod custom_machine;
 pub mod descriptor;
 mod encoded;
-mod custom_machine;
 mod kernel;
 pub mod plugin;
 mod pwl;
-pub use descriptor::{
-    EvaluationPolicy, FrontOperationPolicy, PairedCostNormalization, PreparedSlopeFunction,
-    SlopeRelationArc,
-};
-pub use encoded::EncodedFunction;
 pub use custom_machine::{CustomMachineState, CustomMachineTrace};
+pub use descriptor::{EvaluationPolicy, FrontOperationPolicy, PreparedSlopeFunction};
+pub use encoded::EncodedFunction;
+pub use kernel::FrontProgramCertificate;
 pub use kernel::{
-    BoundMachinePathHistory, CoupledKernel, CoupledLabelState, CoupledPathCosts, CoupledPathValues,
-    CoupledWorkspace, MachineArcFunctionInput, MachineArcPreparationInput, PairedControl,
-    PreparedMachineArc, PreparedMachineBackwardInputs,
+    BoundMachinePathHistory, CoupledKernel, CoupledLabelState, CoupledPathCosts, CoupledWorkspace,
+    MachineArcFunctionInput, MachineArcPreparationInput, PairedBaseDomains, PreparedMachineArc,
+    PreparedMachineBackwardInputs,
 };
 pub(crate) use kernel::{CoupledPairSummary, CoupledStateBounds};
-pub use kernel::{FrontProgramCertificate, PairedControlCertificate};
 pub use plugin::{CoupledPlugin, PluginResource, PluginState};
 pub use pwl::PiecewiseLinearFunction;
 
@@ -47,23 +44,6 @@ pub enum PairedResourceMode {
     CostUnbounded,
     /// Constant bounds, positive increments and nonnegative waiting slopes.
     CostBounded,
-}
-
-/// One physical arc's function-valued base/dependent relation.
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "clp", derive(serde::Deserialize, serde::Serialize))]
-#[cfg_attr(feature = "clp", serde(deny_unknown_fields))]
-pub struct PairedResourceArc {
-    /// Total base arrival q(t), strictly increasing, with q(t)>=t.
-    pub arrival: PiecewiseLinearFunction,
-    /// Dependent increment phi(t), evaluated at the departure base value.
-    pub increment: PiecewiseLinearFunction,
-    /// Lower dependent bound as a function of the head base value.
-    pub lower: PiecewiseLinearFunction,
-    /// Upper dependent bound as a function of the head base value.
-    pub upper: PiecewiseLinearFunction,
-    /// Dependent increment per unit of waiting after base arrival.
-    pub waiting: i32,
 }
 
 /// Default pickup/delivery capacity tolerance.
@@ -118,32 +98,8 @@ pub enum CoupledResource {
         functions: Vec<PreparedSlopeFunction>,
         policy: FrontOperationPolicy,
     },
-    /// Paired resource using raw slope operators and an explicit objective
-    /// normalization. Unsupported operators fail; no knot conversion is made.
-    SlopePaired {
-        initial: PreparedSlopeFunction,
-        initial_base: Window,
-        arcs: Vec<SlopeRelationArc>,
-        mode: PairedResourceMode,
-        normalization: PairedCostNormalization,
-        policy: FrontOperationPolicy,
-    },
-    /// A general paired base/dependent frontier. For departure t and head x,
-    /// x>=arrival(t), and the next dependent value is at least
-    /// max(previous+increment(t)+waiting*(x-arrival(t)),lower(x)), subject to
-    /// upper(x). All waiting choices and disconnected feasible domains survive.
-    /// Cost modes use the explicit dependent objective normalization.
-    /// An empty path costs zero under either convention.
-    /// This independent relation cannot be used as a numeric dependency parent.
-    PairedPiecewiseLinear {
-        initial: PiecewiseLinearFunction,
-        initial_base: Window,
-        arcs: Vec<PairedResourceArc>,
-        mode: PairedResourceMode,
-        #[cfg_attr(feature = "clp", serde(default))]
-        normalization: PairedCostNormalization,
-    },
-
+    /// Paired resource whose roots and arc functions are supplied as a front program.
+    PairedFront { mode: PairedResourceMode },
     /// Minimize total piecewise-linear charges over one shared free initial
     /// value. On each arc x += increment, then charge function(x). The full
     /// cost frontier is retained; no locally optimal point is substituted.
@@ -323,60 +279,7 @@ impl CoupledResource {
         let n = g.arcs.len();
         match self {
             Self::Plugin(plugin) => plugin.0.validate(n)?,
-            Self::SlopePaired {
-                initial,
-                initial_base,
-                arcs,
-                mode,
-                normalization,
-                policy,
-            } => {
-                Window::new(initial_base.lower, initial_base.upper)?;
-                let domain = initial.domain();
-                if !initial_base.lower.is_finite()
-                    || !initial_base.upper.is_finite()
-                    || initial_base.lower < domain.0
-                    || initial_base.upper > domain.1
-                    || arcs.len() != n
-                {
-                    return Err(invalid("raw paired resource requires an initial interval inside its descriptor and one relation per physical arc"));
-                }
-                // Mode/operator validation is performed by the prepared
-                // paired constructor below, before kernel installation. Do
-                // not construct every inverse/front twice at this boundary.
-                let _ = (mode, normalization, policy);
-            }
-            Self::PairedPiecewiseLinear {
-                initial,
-                initial_base,
-                arcs,
-                mode,
-                ..
-            } => {
-                initial.validate()?;
-                Window::new(initial_base.lower, initial_base.upper)?;
-                if !initial_base.lower.is_finite()
-                    || !initial_base.upper.is_finite()
-                    || arcs.len() != n
-                    || initial_base.lower < initial.prepared_domain().lower
-                    || initial_base.upper > initial.prepared_domain().upper
-                {
-                    return Err(invalid("paired resource needs a finite initial base interval inside its initial front and one relation per arc"));
-                }
-                for arc in arcs {
-                    arc.validate()?;
-                }
-                if *mode != PairedResourceMode::Feasibility {
-                    kernel::relation::validate_cost_mode(
-                        arcs,
-                        kernel::relation::RelationFront::initial(initial, *initial_base)?
-                            .ok_or_else(|| invalid("empty paired initial front"))?
-                            .minimum(),
-                        *mode == PairedResourceMode::CostBounded,
-                    )?;
-                }
-            }
-
+            Self::PairedFront { .. } => {}
             Self::SlopeIntervalCost {
                 initial,
                 bounds,

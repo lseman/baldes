@@ -27,9 +27,9 @@ fn rank_one_order_is_signed_not_absolute() {
 
 fn cut_lifecycle_graph(fixture: &serde_json::Value, paired: bool) -> Graph<2> {
     use crate::graph::coupled::descriptor::{
-        FrontOperationPolicy, PairedCostNormalization, PreparedSlopeFunction, SlopeRelationArc,
+        FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
     };
-    use crate::graph::coupled::{CoupledResource, PairedResourceMode};
+    use crate::graph::coupled::{CoupledResource, MachineArcFunctionInput, PairedResourceMode};
     let network = &fixture["model"]["networks"][0];
     let mut graph = Graph::<2>::new(5, if paired { 0 } else { 1 }).unwrap();
     graph.graph_id = 7;
@@ -52,13 +52,7 @@ fn cut_lifecycle_graph(fixture: &serde_json::Value, paired: bool) -> Graph<2> {
             .unwrap();
         let consumption = arc["consumption"][0].as_f64().unwrap();
         if paired {
-            paired_arcs.push(SlopeRelationArc {
-                arrival: function(consumption, 1.),
-                increment: function(0., 0.),
-                lower: function(0., 0.),
-                upper: function(8., 0.),
-                waiting: 0,
-            });
+            paired_arcs.push(function(consumption, 0.));
         } else {
             graph.arc_mut(id).unwrap().consumption[0] = consumption;
         }
@@ -67,16 +61,38 @@ fn cut_lifecycle_graph(fixture: &serde_json::Value, paired: bool) -> Graph<2> {
         // Match the successful paired public control. Integer unit demands
         // make base capacity 2.5 admit exactly singleton and pair routes.
         graph
-            .set_coupled_resources(&[CoupledResource::SlopePaired {
-                initial: function(0., 0.),
-                initial_base: crate::graph::Window::new(0., 2.5).unwrap(),
-                arcs: paired_arcs,
+            .set_coupled_resources(&[CoupledResource::PairedFront {
                 mode: PairedResourceMode::CostUnbounded,
-                normalization: PairedCostNormalization::AbsoluteFinalValue,
-                policy: FrontOperationPolicy::FrontAlgebra,
             }])
             .unwrap();
-        graph.set_front_program_domain(true).unwrap();
+        let bounds = crate::graph::Window::new(0., 2.5).unwrap();
+        let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+        let inputs: Vec<_> = paired_arcs
+            .iter()
+            .enumerate()
+            .map(|(physical_arc, base)| MachineArcFunctionInput {
+                physical_arc,
+                tail_bounds: bounds,
+                waiting_bounds: bounds,
+                waiting_rate: 0,
+                base,
+                dependent: affine(0.),
+                dependent_lower: affine(0.),
+                dependent_upper: affine(8.),
+            })
+            .collect();
+        let result = graph.prepare_paired_front_program(
+            0,
+            &inputs,
+            affine(0.),
+            bounds,
+            bounds,
+            FrontierBudget::default(),
+        );
+        assert!(
+            matches!(result, FrontierOutcome::Complete(())),
+            "{result:?}"
+        );
     }
     graph
 }

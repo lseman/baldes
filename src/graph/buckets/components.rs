@@ -133,7 +133,8 @@ impl BucketGraph {
                         }
                     }
                 }
-                let Some(start) = self.bucket_id_checked(forward, target, if forward { low } else { high })
+                let Some(start) = self
+                    .bucket_id_checked(forward, target, if forward { low } else { high })
                     .map_err(|()| crate::incomplete("bucket graph index overflow"))?
                 else {
                     continue;

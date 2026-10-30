@@ -3,15 +3,31 @@ use super::*;
 impl<const D: usize> Graph<D> {
     /// Retain original per-arc waiting coefficients for machine solution
     /// recording. Their integer truncations must match installed transitions.
-    pub fn set_paired_machine_waiting_rates(&mut self, resource: usize, rates: &[f64]) -> Result<()> {
-        let kernel = self.coupled.as_mut().ok_or_else(|| invalid("no coupled resources"))?;
-        if !matches!(kernel.definitions.get(resource), Some(CoupledResource::SlopePaired { .. })) {
-            return Err(invalid("machine waiting rates require a paired slope resource"));
+    pub fn set_paired_machine_waiting_rates(
+        &mut self,
+        resource: usize,
+        rates: &[f64],
+    ) -> Result<()> {
+        let kernel = self
+            .coupled
+            .as_mut()
+            .ok_or_else(|| invalid("no coupled resources"))?;
+        if !matches!(
+            kernel.definitions.get(resource),
+            Some(CoupledResource::PairedFront { .. })
+        ) {
+            return Err(invalid(
+                "machine waiting rates require a paired slope resource",
+            ));
         }
-        let index = kernel.definitions[..resource].iter()
-            .filter(|item| matches!(item, CoupledResource::SlopePaired { .. })).count();
+        let index = kernel.definitions[..resource]
+            .iter()
+            .filter(|item| matches!(item, CoupledResource::PairedFront { .. }))
+            .count();
         if kernel.slope_paired[index].machine_mode() == 6 && rates.len() > 1 && rates[0] < 0. {
-            return Err(invalid("bounded paired machine cost requires a nonnegative first waiting rate"));
+            return Err(invalid(
+                "bounded paired machine cost requires a nonnegative first waiting rate",
+            ));
         }
         if kernel.slope_paired[index].set_machine_waiting_rates(rates)? {
             kernel.identity = std::sync::Arc::new(());
@@ -35,32 +51,56 @@ impl<const D: usize> Graph<D> {
     ) -> descriptor::FrontierOutcome<()> {
         use descriptor::{FrontierOutcome, FrontierUnknown};
         let started = std::time::Instant::now();
-        if waiting_rates.len() != inputs.len() || waiting_rates.iter().zip(inputs).any(|(rate, input)| {
-            !rate.is_finite() || rate.trunc() != f64::from(input.waiting_rate)
-        }) {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired machine waiting rate mismatch"));
+        if waiting_rates.len() != inputs.len()
+            || waiting_rates.iter().zip(inputs).any(|(rate, input)| {
+                !rate.is_finite() || rate.trunc() != f64::from(input.waiting_rate)
+            })
+        {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired machine waiting rate mismatch",
+            ));
         }
         let original = self.coupled.clone();
-        let remaining = budget.max_elapsed.map(|limit| limit.saturating_sub(started.elapsed()));
+        let remaining = budget
+            .max_elapsed
+            .map(|limit| limit.saturating_sub(started.elapsed()));
         if remaining.is_some_and(|time| time.is_zero()) {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
-        let result = self.prepare_paired_front_program(resource, inputs, root_input, source_bounds, terminal_bounds, descriptor::FrontierBudget {
-            max_elapsed: remaining,
-            ..budget
-        });
+        let result = self.prepare_paired_front_program(
+            resource,
+            inputs,
+            root_input,
+            source_bounds,
+            terminal_bounds,
+            descriptor::FrontierBudget {
+                max_elapsed: remaining,
+                ..budget
+            },
+        );
         if !matches!(result, FrontierOutcome::Complete(())) {
             return result;
         }
-        if budget.max_elapsed.is_some_and(|limit| started.elapsed() >= limit) {
+        if budget
+            .max_elapsed
+            .is_some_and(|limit| started.elapsed() >= limit)
+        {
             self.coupled = original;
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
-        if self.set_paired_machine_waiting_rates(resource, waiting_rates).is_err() {
+        if self
+            .set_paired_machine_waiting_rates(resource, waiting_rates)
+            .is_err()
+        {
             self.coupled = original;
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired machine waiting rate installation"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired machine waiting rate installation",
+            ));
         }
-        if budget.max_elapsed.is_some_and(|limit| started.elapsed() >= limit) {
+        if budget
+            .max_elapsed
+            .is_some_and(|limit| started.elapsed() >= limit)
+        {
             self.coupled = original;
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
@@ -107,7 +147,10 @@ impl<const D: usize> Graph<D> {
             *slot = Some(bounds);
         }
         for (arc, input) in self.arcs.iter().zip(inputs) {
-            if budget.max_elapsed.is_some_and(|limit| started.elapsed() >= limit) {
+            if budget
+                .max_elapsed
+                .is_some_and(|limit| started.elapsed() >= limit)
+            {
                 return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
             }
             let Some(slot) = vertex_bounds.get_mut(arc.tail) else {
@@ -127,10 +170,17 @@ impl<const D: usize> Graph<D> {
         // Truncation cannot add pairs to a valid source vector.
         let forward_work = match root_input {
             descriptor::MachineRootInput::Affine(_) => Some(10usize),
-            descriptor::MachineRootInput::Vector(vector) => vector.pairs().len()
-                .checked_mul(17).and_then(|work| work.checked_add(34)),
+            descriptor::MachineRootInput::Vector(vector) => vector
+                .pairs()
+                .len()
+                .checked_mul(17)
+                .and_then(|work| work.checked_add(34)),
         };
-        let backward_work = self.arcs.iter().zip(inputs).filter(|(arc, _)| arc.head == self.sink)
+        let backward_work = self
+            .arcs
+            .iter()
+            .zip(inputs)
+            .filter(|(arc, _)| arc.head == self.sink)
             .try_fold(0usize, |work, (_, input)| {
                 let pairs = match input.dependent_upper {
                     descriptor::MachineRootInput::Affine(_) => 2,
@@ -138,7 +188,12 @@ impl<const D: usize> Graph<D> {
                 };
                 pairs.checked_mul(4).and_then(|scan| work.checked_add(scan))
             })
-            .and_then(|work| self.arcs.len().checked_mul(2).and_then(|scan| work.checked_add(scan)))
+            .and_then(|work| {
+                self.arcs
+                    .len()
+                    .checked_mul(2)
+                    .and_then(|scan| work.checked_add(scan))
+            })
             .and_then(|work| work.checked_add(resource))
             .and_then(|work| work.checked_add(5));
         let (Some(forward_work), Some(backward_work)) = (forward_work, backward_work) else {
@@ -149,11 +204,16 @@ impl<const D: usize> Graph<D> {
         // size, and supported low-budget calls must not become narrower.
         let forward_work = forward_work.min(budget.max_operations / 4);
         let backward_work = backward_work.min(budget.max_operations / 4);
-        let Some(arc_work) = budget.max_operations.checked_sub(forward_work)
-            .and_then(|work| work.checked_sub(backward_work)) else {
+        let Some(arc_work) = budget
+            .max_operations
+            .checked_sub(forward_work)
+            .and_then(|work| work.checked_sub(backward_work))
+        else {
             return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
         };
-        let root_time = budget.max_elapsed.map(|limit| limit.saturating_sub(started.elapsed()));
+        let root_time = budget
+            .max_elapsed
+            .map(|limit| limit.saturating_sub(started.elapsed()));
         if root_time.is_some_and(|time| time.is_zero()) {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
@@ -178,9 +238,11 @@ impl<const D: usize> Graph<D> {
                 .check_machine_domain(source_bounds.lower, source_bounds.upper)
             {
                 Ok(true) => {}
-                Ok(false) => return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                    "machine initial root domain check failed",
-                )),
+                Ok(false) => {
+                    return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                        "machine initial root domain check failed",
+                    ))
+                }
                 Err(error) => return FrontierOutcome::Unknown(FrontierUnknown::Arithmetic(error)),
             }
         }
@@ -214,22 +276,32 @@ impl<const D: usize> Graph<D> {
             // two-pair constant encoding. Its later-arc loop reuses that
             // first record, so do not infer an all-arcs machine check here.
             let Some(kernel) = self.coupled.as_ref() else {
-                return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("no coupled resources"));
+                return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                    "no coupled resources",
+                ));
             };
-            let index = kernel.definitions[..resource].iter()
-                .filter(|item| matches!(item, CoupledResource::SlopePaired { .. })).count();
+            let index = kernel.definitions[..resource]
+                .iter()
+                .filter(|item| matches!(item, CoupledResource::PairedFront { .. }))
+                .count();
             let paired = &kernel.slope_paired[index];
             if paired.machine_mode() != 4 {
                 let Some(inputs) = paired.machine_input_handle() else {
-                    return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired machine inputs unavailable"));
+                    return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                        "paired machine inputs unavailable",
+                    ));
                 };
                 let Some(first) = inputs.first() else {
-                    return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired machine cost needs an arc"));
+                    return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                        "paired machine cost needs an arc",
+                    ));
                 };
                 for function in [&first.dependent_lower, &first.dependent_upper] {
                     let pairs = function.pairs();
                     if pairs.len() != 2 || pairs[1].0 != 0. {
-                        return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired machine cost bound is not constant"));
+                        return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                            "paired machine cost bound is not constant",
+                        ));
                     }
                 }
                 if paired.machine_mode() == 6 {
@@ -238,26 +310,38 @@ impl<const D: usize> Graph<D> {
                     for pair in root.front().components()[0].pairs().windows(2) {
                         value += (pair[1].1 - pair[0].1) * pair[1].0;
                         if !value.is_finite() {
-                            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired machine initial minimum unavailable"));
+                            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                                "paired machine initial minimum unavailable",
+                            ));
                         }
-                        if value < minimum { minimum = value; }
+                        if value < minimum {
+                            minimum = value;
+                        }
                     }
                     if minimum < first.dependent_lower.pairs()[0].0 {
-                        return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired machine initial minimum below lower bound"));
+                        return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                            "paired machine initial minimum below lower bound",
+                        ));
                     }
                     if inputs.len() > 1 {
                         if first.waiting_rate < 0 {
-                            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("bounded paired machine cost has negative waiting"));
+                            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                                "bounded paired machine cost has negative waiting",
+                            ));
                         }
                         let Some(backward) = first.backward.as_ref() else {
-                            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired machine dependent input unavailable"));
+                            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                                "paired machine dependent input unavailable",
+                            ));
                         };
                         let pairs = backward.dependent.pairs();
                         let mut value = pairs[0].0;
                         for pair in pairs.windows(2) {
                             value += (pair[1].1 - pair[0].1) * pair[1].0;
                             if !value.is_finite() || value < 0. {
-                                return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("bounded paired machine increment check failed"));
+                                return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                                    "bounded paired machine increment check failed",
+                                ));
                             }
                         }
                     }
@@ -286,9 +370,20 @@ impl<const D: usize> Graph<D> {
             )
         })();
         let result = if matches!(result, FrontierOutcome::Complete(()))
-            && budget.max_elapsed.is_some_and(|limit| started.elapsed() >= limit)
+            && budget
+                .max_elapsed
+                .is_some_and(|limit| started.elapsed() >= limit)
         {
             FrontierOutcome::Unknown(FrontierUnknown::Deadline)
+        } else {
+            result
+        };
+        let result = if matches!(result, FrontierOutcome::Complete(()))
+            && self.set_front_program_domain(true).is_err()
+        {
+            FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired native domain cannot be enabled",
+            ))
         } else {
             result
         };
@@ -450,13 +545,13 @@ impl<const D: usize> Graph<D> {
             .ok_or_else(|| invalid("no coupled resources"))?;
         if !matches!(
             kernel.definitions.get(resource),
-            Some(CoupledResource::SlopePaired { .. })
+            Some(CoupledResource::PairedFront { .. })
         ) {
             return Err(invalid("machine inputs require a paired slope resource"));
         }
         let index = kernel.definitions[..resource]
             .iter()
-            .filter(|r| matches!(r, CoupledResource::SlopePaired { .. }))
+            .filter(|r| matches!(r, CoupledResource::PairedFront { .. }))
             .count();
         if kernel.slope_paired[index].set_machine_inputs(inputs, topology)? {
             kernel.identity = std::sync::Arc::new(());
@@ -481,13 +576,13 @@ impl<const D: usize> Graph<D> {
             .ok_or_else(|| invalid("no coupled resources"))?;
         if !matches!(
             kernel.definitions.get(resource),
-            Some(CoupledResource::SlopePaired { .. })
+            Some(CoupledResource::PairedFront { .. })
         ) {
             return Err(invalid("machine root requires a paired slope resource"));
         }
         let index = kernel.definitions[..resource]
             .iter()
-            .filter(|r| matches!(r, CoupledResource::SlopePaired { .. }))
+            .filter(|r| matches!(r, CoupledResource::PairedFront { .. }))
             .count();
         if kernel.slope_paired[index].set_machine_root_input(root)? {
             kernel.identity = std::sync::Arc::new(());
@@ -522,10 +617,7 @@ impl<const D: usize> Graph<D> {
         };
         if !matches!(
             kernel.definitions.get(resource),
-            Some(CoupledResource::SlopePaired {
-                policy: FrontOperationPolicy::FrontAlgebra,
-                ..
-            })
+            Some(CoupledResource::PairedFront { .. })
         ) {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
                 "machine preparation requires a front-algebra paired resource",
@@ -538,7 +630,7 @@ impl<const D: usize> Graph<D> {
         }
         let index = kernel.definitions[..resource]
             .iter()
-            .filter(|definition| matches!(definition, CoupledResource::SlopePaired { .. }))
+            .filter(|definition| matches!(definition, CoupledResource::PairedFront { .. }))
             .count();
         let Some(scans) = inputs.len().checked_add(self.vertices.len()) else {
             return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
@@ -737,7 +829,7 @@ impl<const D: usize> Graph<D> {
         };
         if !matches!(
             kernel.definitions.get(resource),
-            Some(CoupledResource::SlopePaired { .. })
+            Some(CoupledResource::PairedFront { .. })
         ) {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
                 "machine backward root requires a paired slope resource",
@@ -745,7 +837,7 @@ impl<const D: usize> Graph<D> {
         }
         let index = kernel.definitions[..resource]
             .iter()
-            .filter(|item| matches!(item, CoupledResource::SlopePaired { .. }))
+            .filter(|item| matches!(item, CoupledResource::PairedFront { .. }))
             .count();
         let paired = &kernel.slope_paired[index];
         let Some(inputs) = paired.machine_input_handle() else {
@@ -822,7 +914,7 @@ impl<const D: usize> Graph<D> {
         };
         let index = kernel.definitions[..resource]
             .iter()
-            .filter(|item| matches!(item, CoupledResource::SlopePaired { .. }))
+            .filter(|item| matches!(item, CoupledResource::PairedFront { .. }))
             .count();
         let remaining_time = budget
             .max_elapsed

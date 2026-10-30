@@ -1,0 +1,424 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "scope": "Actual registered native paired plus two standard-resource dispatch and LP objectives. The scalar base projection uses graph coordinate zero; ordinary resources use coordinates one and two.",
+  "cases": [
+    {
+      "name": "two-standard-first-tight",
+      "profiles": [
+        {
+          "bounds": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              1.0
+            ]
+          ]
+        },
+        {
+          "bounds": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.0
+            ]
+          ]
+        }
+      ],
+      "factory": {
+        "kind": "factory",
+        "caller": "BcRCSPFunctor::prepareSolver()",
+        "resources": [
+          {
+            "id": 0,
+            "type": 3
+          },
+          {
+            "id": 1,
+            "type": 5
+          },
+          {
+            "id": 2,
+            "type": 1
+          },
+          {
+            "id": 3,
+            "type": 1
+          }
+        ],
+        "returned_nonnull": true
+      },
+      "prepare": {
+        "kind": "pair-standard-prepare",
+        "caller": "bcp_rcsp::createAndPrepareMetaSolver(bcp_rcsp::Data&)",
+        "returned": true,
+        "owner_mode_field_354": 5
+      },
+      "preprocess": {
+        "kind": "paired-preprocess",
+        "caller": "bcp_rcsp::MetaSolver<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> >::prepareSolver(bcp_rcsp::Data&)",
+        "resources": [
+          {
+            "id": 0,
+            "type": 3
+          },
+          {
+            "id": 1,
+            "type": 5
+          },
+          {
+            "id": 2,
+            "type": 1
+          },
+          {
+            "id": 3,
+            "type": 1
+          }
+        ],
+        "returned": true
+      },
+      "native_result": {
+        "bcRecRootDb": 7.5,
+        "bcRecRootLpVal": 7.5,
+        "bcRecBestDb": 7.5,
+        "bcRecBestInc": 7.5,
+        "calls": 3,
+        "processed_nodes": 1
+      },
+      "command": [
+        "gdb",
+        "-q",
+        "-batch",
+        "-x",
+        "/data/dev/baldes/internal/reference/metasolver_composite_dispatch.gdb",
+        "--args",
+        "/usr/bin/python3",
+        "/data/dev/baldes/internal/reference/metasolver_cut_lifecycle.py",
+        "--binary",
+        "/data/dev/vrpsolve-re/libbapcod-shared.so",
+        "--output",
+        "/data/dev/baldes/internal/audits/paired-gap-20261030/composite-dispatch/two-standard-first-tight",
+        "--paired",
+        "--paired-initial",
+        "2",
+        "--paired-increment",
+        "-0.25",
+        "--paired-extra-standards",
+        "/data/dev/baldes/internal/audits/paired-gap-20261030/composite-dispatch/two-standard-first-tight/ordinary-profiles.json",
+        "--rank-one",
+        "0",
+        "--nodes",
+        "1"
+      ],
+      "warning_continued_into_pair_preprocess": false
+    },
+    {
+      "name": "two-standard-second-tight",
+      "profiles": [
+        {
+          "bounds": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.0
+            ]
+          ]
+        },
+        {
+          "bounds": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              1.0
+            ]
+          ]
+        }
+      ],
+      "factory": {
+        "kind": "factory",
+        "caller": "BcRCSPFunctor::prepareSolver()",
+        "resources": [
+          {
+            "id": 0,
+            "type": 3
+          },
+          {
+            "id": 1,
+            "type": 5
+          },
+          {
+            "id": 2,
+            "type": 1
+          },
+          {
+            "id": 3,
+            "type": 1
+          }
+        ],
+        "returned_nonnull": true
+      },
+      "prepare": {
+        "kind": "pair-standard-prepare",
+        "caller": "bcp_rcsp::createAndPrepareMetaSolver(bcp_rcsp::Data&)",
+        "returned": true,
+        "owner_mode_field_354": 5
+      },
+      "preprocess": {
+        "kind": "paired-preprocess",
+        "caller": "bcp_rcsp::MetaSolver<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> >::prepareSolver(bcp_rcsp::Data&)",
+        "resources": [
+          {
+            "id": 0,
+            "type": 3
+          },
+          {
+            "id": 1,
+            "type": 5
+          },
+          {
+            "id": 2,
+            "type": 1
+          },
+          {
+            "id": 3,
+            "type": 1
+          }
+        ],
+        "returned": true
+      },
+      "native_result": {
+        "bcRecRootDb": 7.5,
+        "bcRecRootLpVal": 7.5,
+        "bcRecBestDb": 7.5,
+        "bcRecBestInc": 7.5,
+        "calls": 3,
+        "processed_nodes": 1
+      },
+      "command": [
+        "gdb",
+        "-q",
+        "-batch",
+        "-x",
+        "/data/dev/baldes/internal/reference/metasolver_composite_dispatch.gdb",
+        "--args",
+        "/usr/bin/python3",
+        "/data/dev/baldes/internal/reference/metasolver_cut_lifecycle.py",
+        "--binary",
+        "/data/dev/vrpsolve-re/libbapcod-shared.so",
+        "--output",
+        "/data/dev/baldes/internal/audits/paired-gap-20261030/composite-dispatch/two-standard-second-tight",
+        "--paired",
+        "--paired-initial",
+        "2",
+        "--paired-increment",
+        "-0.25",
+        "--paired-extra-standards",
+        "/data/dev/baldes/internal/audits/paired-gap-20261030/composite-dispatch/two-standard-second-tight/ordinary-profiles.json",
+        "--rank-one",
+        "0",
+        "--nodes",
+        "1"
+      ],
+      "warning_continued_into_pair_preprocess": false
+    },
+    {
+      "name": "two-standard-equality",
+      "profiles": [
+        {
+          "bounds": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.0
+            ]
+          ]
+        },
+        {
+          "bounds": [
+            [
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.0
+            ],
+            [
+              2.0,
+              2.0
+            ]
+          ],
+          "non_disposable": true
+        }
+      ],
+      "factory": {
+        "kind": "factory",
+        "caller": "BcRCSPFunctor::prepareSolver()",
+        "resources": [
+          {
+            "id": 0,
+            "type": 3
+          },
+          {
+            "id": 1,
+            "type": 5
+          },
+          {
+            "id": 2,
+            "type": 1
+          },
+          {
+            "id": 3,
+            "type": 2
+          }
+        ],
+        "returned_nonnull": true
+      },
+      "prepare": {
+        "kind": "pair-standard-prepare",
+        "caller": "bcp_rcsp::createAndPrepareMetaSolver(bcp_rcsp::Data&)",
+        "returned": true,
+        "owner_mode_field_354": 5
+      },
+      "preprocess": {
+        "kind": "paired-preprocess",
+        "caller": "bcp_rcsp::MetaSolver<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> >::prepareSolver(bcp_rcsp::Data&)",
+        "resources": [
+          {
+            "id": 0,
+            "type": 3
+          },
+          {
+            "id": 1,
+            "type": 5
+          },
+          {
+            "id": 2,
+            "type": 1
+          },
+          {
+            "id": 3,
+            "type": 2
+          }
+        ],
+        "returned": true
+      },
+      "native_result": {
+        "bcRecRootDb": 3.375,
+        "bcRecRootLpVal": 3.375,
+        "bcRecBestDb": 3.375,
+        "bcRecBestInc": 1000000000000.0,
+        "calls": 5,
+        "processed_nodes": 1
+      },
+      "command": [
+        "gdb",
+        "-q",
+        "-batch",
+        "-x",
+        "/data/dev/baldes/internal/reference/metasolver_composite_dispatch.gdb",
+        "--args",
+        "/usr/bin/python3",
+        "/data/dev/baldes/internal/reference/metasolver_cut_lifecycle.py",
+        "--binary",
+        "/data/dev/vrpsolve-re/libbapcod-shared.so",
+        "--output",
+        "/data/dev/baldes/internal/audits/paired-gap-20261030/composite-dispatch/two-standard-equality",
+        "--paired",
+        "--paired-initial",
+        "2",
+        "--paired-increment",
+        "-0.25",
+        "--paired-extra-standards",
+        "/data/dev/baldes/internal/audits/paired-gap-20261030/composite-dispatch/two-standard-equality/ordinary-profiles.json",
+        "--rank-one",
+        "0",
+        "--nodes",
+        "1"
+      ],
+      "warning_continued_into_pair_preprocess": false
+    }
+  ]
+}

@@ -13,156 +13,83 @@ pub struct CoupledPathCosts {
     pub resources: Vec<f64>,
 }
 
-/// Explicit base coordinates for one paired descriptor on a physical arc path.
-/// Coordinates include the initial base and one head coordinate per arc.
-/// They select a source control, including choices discarded by minimum-front
-/// optimization. The descriptor index is scoped to the recipient kernel.
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "clp", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "clp", serde(deny_unknown_fields))]
-pub struct PairedControl {
-    pub resource: usize,
-    pub base: Vec<f64>,
-}
-
-/// Original resource charge and selected physical paired values for a path.
-#[derive(Clone, Debug, PartialEq)]
-pub struct CoupledPathValues {
-    pub cost: f64,
-    pub paired_values: Vec<(usize, f64)>,
-}
-
 impl CoupledKernel {
-    /// Replay supplied source controls and retain their selected physical values.
-    /// Controls are strictly descriptor-ordered and require singleton independent
-    /// source certificates. Machine-front model controls remain unsupported.
-    /// Empty controls preserve ordinary minimum-front replay without proof work.
-    pub fn replay_with_controls(
-        &self,
-        arcs: &[usize],
-        controls: &[PairedControl],
-    ) -> Result<Option<CoupledPathValues>> {
-        self.replay_with_controls_using(arcs, controls, &mut 1_000_000, None)
-    }
-
-    pub(crate) fn replay_with_controls_using(
-        &self,
-        arcs: &[usize],
-        controls: &[PairedControl],
-        _work: &mut usize,
-        _deadline: Option<std::time::Instant>,
-    ) -> Result<Option<CoupledPathValues>> {
-        if !controls.is_empty() {
-            let Some(remaining) = arcs
-                .len()
-                .checked_add(1)
-                .and_then(|width| width.checked_mul(self.definitions.len().max(1)))
-                .and_then(|required| _work.checked_sub(required))
-            else {
-                return Ok(None);
-            };
-            *_work = remaining;
-        }
-        if _deadline.is_some_and(|end| std::time::Instant::now() >= end) {
-            return Ok(None);
-        }
-        let Some((state, cost)) = self.replay_state(arcs)? else {
-            return Ok(None);
-        };
-        let values = self.selected_values_from_state(&state)?;
-        if controls.is_empty() {
-            return Ok(Some(CoupledPathValues {
-                cost,
-                paired_values: values,
-            }));
-        }
-        {
-            if self.front_program_domain {
-                return Err(invalid(
-                    "source controls cannot replace machine-front model choices",
-                ));
-            }
-            let mut values = values;
-            let mut previous = None;
-            let mut selected = Vec::with_capacity(controls.len());
-            for control in controls {
-                if previous.is_some_and(|index| index >= control.resource) {
-                    return Err(invalid(
-                        "paired controls must be unique and descriptor ordered",
-                    ));
-                }
-                previous = Some(control.resource);
-                let Some(certificate) =
-                    self.certify_paired_control(arcs, control, _work, _deadline)?
-                else {
-                    return Ok(None);
-                };
-                let value = certificate.dependent[0];
-                if !certificate.certifies_value(value) {
-                    return Ok(None);
-                }
-                if let Some((_, saved)) = values
-                    .iter_mut()
-                    .find(|(index, _)| *index == control.resource)
-                {
-                    *saved = value;
-                }
-                selected.push((control.resource, value));
-            }
-            let cost = if arcs.is_empty() {
-                0.
-            } else {
-                self.final_resource_objective(&state, &selected)?
-            };
-            if _deadline.is_some_and(|end| std::time::Instant::now() >= end) {
-                return Ok(None);
-            }
-            Ok(Some(CoupledPathValues {
-                cost,
-                paired_values: values,
-            }))
-        }
-    }
-
     /// Selected physical dependent values for cost-bearing paired descriptors.
     /// Values are descriptor-indexed and independent of cost suppression and
-    /// normalization. This replays the current minimum-front choice; it is
+    /// objective scaling. This replays the current minimum-front choice; it is
     /// not a control trajectory or an independent feasibility certificate.
     pub fn selected_paired_values(&self, arcs: &[usize]) -> Result<Option<Vec<(usize, f64)>>> {
-        if !self.slope_paired.iter().any(|p| p.has_costs())
-            && !self.paired.iter().any(|p| p.has_costs())
-        {
+        if !self.slope_paired.iter().any(|p| p.has_costs()) {
             return Ok(Some(Vec::new()));
+        }
+        if self.machine_paired_join_complete() {
+            let Some((_, selected)) = self.joined_machine_path(arcs)? else {
+                return Ok(None);
+            };
+            let resource = self
+                .definitions
+                .iter()
+                .position(|definition| matches!(definition, CoupledResource::PairedFront { .. }))
+                .ok_or_else(|| invalid("paired native resource is unavailable"))?;
+            return Ok(Some(vec![(
+                resource,
+                selected.ok_or_else(|| {
+                    crate::incomplete("paired native selected value is unavailable")
+                })?,
+            )]));
         }
         let Some((state, _)) = self.replay_state(arcs)? else {
             return Ok(None);
         };
-        Ok(Some(self.selected_values_from_state(&state)?))
+        let mut values = self.selected_values_from_state(&state)?;
+        if self.front_program_domain
+            && self
+                .slope_paired
+                .iter()
+                .any(|paired| paired.has_machine_program_input())
+        {
+            let root = self.root(false);
+            if self.join_original_objective(&state, &root)?.is_none() {
+                return Ok(None);
+            }
+            for (resource, value) in &mut values {
+                if !matches!(
+                    self.definitions.get(*resource),
+                    Some(CoupledResource::PairedFront { .. })
+                ) {
+                    continue;
+                }
+                match self.paired_machine_resource_join(
+                    *resource,
+                    &state,
+                    &root,
+                    descriptor::FrontierBudget::default(),
+                ) {
+                    descriptor::FrontierOutcome::Complete(selection) => {
+                        *value = selection.dependent.ok_or_else(|| {
+                            crate::incomplete("paired native selected value is unavailable")
+                        })?;
+                    }
+                    descriptor::FrontierOutcome::Empty => return Ok(None),
+                    descriptor::FrontierOutcome::Unknown(reason) => {
+                        return Err(crate::incomplete(format!(
+                            "paired native selection is unavailable: {reason:?}"
+                        )));
+                    }
+                }
+            }
+        }
+        Ok(Some(values))
     }
     fn selected_values_from_state(&self, state: &CoupledLabelState) -> Result<Vec<(usize, f64)>> {
         let mut values = Vec::new();
         let mut slopes = state.slope_relations.iter().zip(&self.slope_paired);
-        let mut relations = state.relations.iter().zip(&self.paired);
         for (resource, definition) in self.definitions.iter().enumerate() {
             match definition {
-                CoupledResource::SlopePaired { .. } => {
+                CoupledResource::PairedFront { .. } => {
                     let (label, prepared) = slopes.next().expect("prepared paired shape");
                     if prepared.has_costs() {
                         values.push((resource, prepared.selected_value(label, self.cost_scale)?));
-                    }
-                }
-                CoupledResource::PairedPiecewiseLinear { .. } => {
-                    let (label, prepared) = relations.next().expect("prepared paired shape");
-                    if prepared.has_costs() {
-                        values.push((
-                            resource,
-                            finite(
-                                label
-                                    .forward()
-                                    .ok_or_else(|| invalid("missing paired front"))?
-                                    .minimum(),
-                            )?,
-                        ));
                     }
                 }
                 _ => {}
@@ -212,9 +139,36 @@ impl CoupledKernel {
     /// constraints remain active, including cost-function domains when costs
     /// are suppressed. Returns None for a numerically infeasible path; errors
     /// and unsupported operations remain errors. A free-initial-value front
-    /// contributes its current minimum, with the descriptor's normalization.
+    /// contributes its current minimum.
     /// This does not assert a source-domain or exact-real feasibility proof.
     pub fn replay_cost_components(&self, arcs: &[usize]) -> Result<Option<CoupledPathCosts>> {
+        if !arcs.is_empty()
+            && self.machine_paired_join_complete()
+            && self.paired_path_is_complete(arcs)?
+        {
+            let Some((total, selected)) =
+                self.joined_associated_machine_path_matching(arcs, None)?
+            else {
+                return Ok(None);
+            };
+            let resource = self
+                .retained_paired_machine_resource()
+                .ok_or_else(|| invalid("paired resource is unavailable"))?;
+            let mut resources = vec![0.; self.definitions.len()];
+            resources[resource] = if self.slope_paired[0].machine_mode() == 4 {
+                0.
+            } else {
+                finite(
+                    self.cost_scale
+                        * finite(
+                            self.paired_associated_coefficient()
+                                * selected
+                                    .ok_or_else(|| invalid("paired selected value unavailable"))?,
+                        )?,
+                )?
+            };
+            return Ok(Some(CoupledPathCosts { total, resources }));
+        }
         let mut state = self.root(true);
         let mut workspace = CoupledWorkspace::default();
         let mut resources = vec![0.; self.definitions.len()];
@@ -257,17 +211,9 @@ impl CoupledKernel {
         }
         let mut slope = state.slope_relations.iter();
         for (resource, definition) in self.definitions.iter().enumerate() {
-            if matches!(definition, CoupledResource::SlopePaired { .. }) {
+            if matches!(definition, CoupledResource::PairedFront { .. }) {
                 resources[resource] = slope.next().expect("prepared slope resource shape").minimum;
             }
-        }
-        for ((&resource, prepared), label) in self
-            .relation_indices
-            .iter()
-            .zip(&self.paired)
-            .zip(&state.relations)
-        {
-            resources[resource] = prepared.objective(label, self.cost_scale)?;
         }
         let mut plugins = state.plugins.iter();
         for (resource, definition) in self.definitions.iter().enumerate() {

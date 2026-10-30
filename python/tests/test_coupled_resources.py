@@ -105,40 +105,6 @@ def test_interval_front_keeps_one_shared_initial_choice_across_all_arcs():
     assert routes[0].nodes() == [0, 1, 2]
 
 
-def test_paired_relation_optimizes_waiting_and_retains_original_cost():
-    solver = Solver(3, 0)
-    solver.new_arc(0, 1, -20.0)
-    solver.new_arc(1, 2, -20.0)
-    model = ResourceModel()
-    model.add_paired_piecewise_linear(
-        0.0, 0.0, [(0.0, 0.0), (1.0, 0.0)],
-        arrivals=[[(0.0, 1.0), (8.0, 9.0)]] * 2,
-        increments=[[(0.0, 2.0), (8.0, 2.0)],
-                    [(0.0, 1.0), (8.0, 1.0)]],
-        lowers=[[(3.0, 0.0), (8.0, 0.0)], [(6.0, 0.0), (10.0, 0.0)]],
-        uppers=[[(3.0, 100.0), (8.0, 100.0)], [(6.0, 100.0), (10.0, 100.0)]],
-        waiting=[3, 2], mode="cost_bounded",
-    )
-    model.install(solver)
-    minimum, routes = solver.price(10)
-    # Wait two units on each arc: 2 + 3*2 + 1 + 2*2 = 13.
-    assert minimum == -27.0
-    assert routes[0].original_cost == -27.0
-    assert routes[0].nodes() == [0, 1, 2]
-
-
-def test_paired_relation_rejects_mismatched_vectors_and_unknown_modes():
-    import pytest
-    model = ResourceModel()
-    common = dict(initial_lower=0.0, initial_upper=0.0,
-                  initial=[(0.0, 0.0), (1.0, 0.0)], arrivals=[],
-                  increments=[], lowers=[], uppers=[], waiting=[])
-    with pytest.raises(RuntimeError, match="vector lengths differ"):
-        model.add_paired_piecewise_linear(**(common | {"waiting": [0]}))
-    with pytest.raises(RuntimeError, match="unknown paired resource mode"):
-        model.add_paired_piecewise_linear(**common, mode="unknown")
-
-
 def test_computed_front_domain_is_an_explicit_installation_choice():
     import pytest
     from pybaldes import EncodedFunction
@@ -163,23 +129,17 @@ def test_computed_front_domain_is_an_explicit_installation_choice():
     assert solver.price(10)[0] == pytest.approx(-17.)
 
 
-@pytest.mark.parametrize("normalization,charge", [
-    ("absolute_final_value", 5.0), ("final_minus_initial_minimum", 3.0),
-])
-def test_control_point_builder_normalization_preserves_nonzero_selected_value(normalization, charge):
+def test_paired_front_install_rejects_missing_arc_operands_and_preserves_the_live_solver():
     solver = Solver(2, 0)
-    solver.new_arc(0, 1, -20.0)
+    solver.new_arc(0, 1, -10.0)
+    assert solver.price(10)[0] == -10.0
     model = ResourceModel()
-    model.add_paired_piecewise_linear(
-        0.0, 0.0, [(0.0, 2.0), (1.0, 2.0)],
-        arrivals=[[(0.0, 1.0), (1.0, 2.0)]],
-        increments=[[(0.0, 3.0), (1.0, 3.0)]],
-        lowers=[[(1.0, 0.0), (2.0, 0.0)]],
-        uppers=[[(1.0, 100.0), (2.0, 100.0)]], waiting=[0],
-        mode="cost_bounded", normalization=normalization,
-    )
-    model.install(solver)
-    minimum, routes = solver.price(10)
-    assert minimum == -20.0 + charge
-    assert routes[0].original_cost == minimum
-    assert routes[0].coupled_values == [(0, 5.0)]
+    paired = model.add_paired_front(mode="cost_bounded")
+    model.set_paired_front_program(paired, {
+        "source_bounds": [0.0, 1.0], "terminal_bounds": [0.0, 1.0],
+        "root": {"encoding": "affine", "intercept": 0.0, "slope": 0.0},
+        "arcs": [],
+    })
+    with pytest.raises(RuntimeError):
+        model.install(solver)
+    assert solver.price(10)[0] == -10.0

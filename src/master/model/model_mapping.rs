@@ -13,7 +13,7 @@ pub struct MappedNetworkVariable {
     pub network: i32,
     #[serde(default)]
     pub arcs: Vec<(i32, f64)>,
-    /// Intrinsic custom/cumulative or selected source paired terms. Each descriptor must have
+    /// Intrinsic deterministic custom/cumulative terms. Each descriptor must have
     /// a complete exact-integer path proof in this graph domain.
     #[serde(default)]
     pub activities: Vec<(usize, f64)>,

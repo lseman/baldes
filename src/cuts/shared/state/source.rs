@@ -153,7 +153,9 @@ impl CutInputSource {
                 return None;
             }
         }
-        self.rows[0].iter().chain(&self.rows[1])
+        self.rows[0]
+            .iter()
+            .chain(&self.rows[1])
             .map(|cut| rows.get(cut).copied())
             .collect()
     }

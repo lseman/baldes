@@ -19,6 +19,18 @@ impl CoupledKernel {
     /// Original resource charge plus explicit pricing-only activity adjustments.
     /// Unlike `replay`, this value is not the original model objective.
     pub fn replay_pricing(&self, arcs: &[usize]) -> Result<Option<f64>> {
+        if self.machine_paired_join_complete() && self.paired_path_is_complete(arcs)? {
+            let Some((mut cost, _)) = self.joined_machine_path(arcs)? else {
+                return Ok(None);
+            };
+            for activity in self.pricing_activities.iter() {
+                let Some(extra) = activity.replay(arcs)? else {
+                    return Ok(None);
+                };
+                cost = finite(cost + extra)?;
+            }
+            return Ok(Some(cost));
+        }
         self.replay_state(arcs)?
             .map(|(state, _)| state.pricing_objective())
             .transpose()
@@ -57,10 +69,12 @@ impl CoupledKernel {
         f: &CoupledLabelState,
         b: &CoupledLabelState,
     ) -> Result<Option<(f64, f64)>> {
-        let Some(original) = self.join_original_objective(f, b)? else {
+        let Some(original) = self.join_associated_objective(f, b)? else {
             return Ok(None);
         };
-        let mut pricing = original;
+        let Some(mut pricing) = self.join_original_objective(f, b)? else {
+            return Ok(None);
+        };
         if let (Some(front), Some(back)) = (&f.pricing_activities, &b.pricing_activities) {
             for ((kernel, front), back) in self
                 .pricing_activities
@@ -86,7 +100,15 @@ impl CoupledKernel {
         work: &mut usize,
         deadline: Option<std::time::Instant>,
     ) -> Option<(bool, [f64; 2])> {
-        let (valid, mut cost) = self.certify_with_budget(arcs, work, deadline)?;
+        let mut raw;
+        let kernel = if self.paired_associated_costs.is_empty() {
+            self
+        } else {
+            raw = self.clone();
+            raw.paired_associated_costs = Default::default();
+            &raw
+        };
+        let (valid, mut cost) = kernel.certify_with_budget(arcs, work, deadline)?;
         if !valid {
             return Some((false, [0.; 2]));
         }
@@ -206,6 +228,24 @@ impl<const D: usize> Graph<D> {
     /// Replay the pricing resource objective; original charges use
     /// `coupled_path_cost`. Arguments are physical arc positions.
     pub fn coupled_pricing_path_cost(&self, arcs: &[usize]) -> Result<Option<f64>> {
+        // A complete feasibility-only paired route is decided by joining
+        // directional states. Replaying only its forward state can disagree
+        // with the retained enumeration split. Partial paths keep the
+        // forward-replay contract.
+        if self.coupled_kernel().is_some_and(|kernel| {
+            kernel.machine_paired_join_complete()
+                && kernel.has_complete_machine_inspection_contribution()
+        }) && arcs
+            .first()
+            .and_then(|&index| self.arcs.get(index))
+            .is_some_and(|arc| arc.tail == self.source)
+            && arcs
+                .last()
+                .and_then(|&index| self.arcs.get(index))
+                .is_some_and(|arc| arc.head == self.sink)
+        {
+            return self.coupled_kernel().unwrap().replay_pricing(arcs);
+        }
         self.coupled_kernel()
             .map_or(Ok(Some(0.)), |kernel| kernel.replay_pricing(arcs))
     }

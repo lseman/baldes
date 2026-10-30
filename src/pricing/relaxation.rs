@@ -96,7 +96,14 @@ impl<const D: usize> Solver<D> {
                 .map(|&id| self.graph.arcs.iter().position(|a| a.id == id))
                 .collect::<Option<Vec<_>>>()
                 .ok_or_else(|| invalid("route arc out of range"))?;
-            return Ok(self.graph.coupled_path_cost(&positions)?.is_some());
+            let complete = vertices.first() == Some(&(self.graph.source as i32))
+                && vertices.last() == Some(&(self.graph.sink as i32));
+            return Ok(if complete {
+                self.graph.coupled_route_cost(&positions)?
+            } else {
+                self.graph.coupled_path_cost(&positions)?
+            }
+            .is_some());
         }
         Ok(true)
     }

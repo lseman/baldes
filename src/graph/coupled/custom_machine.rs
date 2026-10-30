@@ -20,7 +20,11 @@ pub struct CustomMachineTrace {
 
 impl Default for CustomMachineTrace {
     fn default() -> Self {
-        Self { state: CustomMachineState::default(), accepted: true, wrapper_cost: 0. }
+        Self {
+            state: CustomMachineState::default(),
+            accepted: true,
+            wrapper_cost: 0.,
+        }
     }
 }
 
@@ -53,8 +57,7 @@ impl CustomMachineState {
     /// Label wrapper accumulators can differ and are retained separately.
     pub fn concatenate_cost(&self, backward: &Self, previous: f64) -> Option<f64> {
         let cross = self.concatenate(backward);
-        Self::contribution_accepted(cross)
-            .then(|| ((cross + self.cost) + backward.cost) + previous)
+        Self::contribution_accepted(cross).then(|| ((cross + self.cost) + backward.cost) + previous)
     }
 
     /// The forward/forward overload contributes zero.

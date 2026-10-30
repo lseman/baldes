@@ -21,10 +21,9 @@ the prior option values, controls, phases and prepared engine.
 
 ## Configuration and runtime overrides
 
-- `BALDESlabelDominanceStrategy` accepts 0 or 1 and reaches labeling through
-  `Solver::dominance_mode`. The dedicated C strategy setter uses the same
-  path, so its value agrees with the named option getter. Full-label fixing
-  still selects its required dominance behavior.
+- `BALDESlabelDominanceStrategy` selects strategy 1, partial dominance, which
+  is not implemented, so the setter rejects 1. Every other integer keeps
+  ordinary dominance. The option does not set `Solver::dominance_mode`.
 - `BALDESuseCapacityCuts` and `BALDEScapCutsMaxNumPerRound` override an explicitly
   configured root capacity separator and apply after inherited cut state is
   installed. Omitting an override preserves the configuration or parent's
@@ -68,7 +67,7 @@ reconfigure its existing separator.
 | `BALDESmaxNumOfLabelsInHeurEnumeration` | Int | `0.0` | [src/pricing/fixing_workflow.rs](../../src/pricing/fixing_workflow.rs) |
 | `BALDEScheckDominInOtherBuckets` | Bool | `1.0` | [src/pricing/mod.rs](../../src/pricing/mod.rs) |
 | `BALDESheurLabelingStrategy` | Int | `0.0` | [src/pricing/mod.rs](../../src/pricing/mod.rs) |
-| `BALDESlabelDominanceStrategy` | Int | `0.0` | [src/pricing/mod.rs](../../src/pricing/mod.rs); label dominance mode (0 or 1), shared with the C strategy setter |
+| `BALDESlabelDominanceStrategy` | Int | `0.0` | [src/pricing/configuration.rs](../../src/pricing/configuration.rs); 1 (partial dominance) is rejected, other integers use ordinary dominance |
 | `BALDESdynBuckStepAdjustRatioThreshold` | Double | `500.0` | [src/pricing/controller.rs](../../src/pricing/controller.rs) |
 | `BALDESdynBuckStepAdjustNumBuckArcsThreshold` | Double | `10000.0` | [src/pricing/controller.rs](../../src/pricing/controller.rs) |
 | `BALDESdynamicNGmode` | Int | `-1.0` | [src/master/routing/controller/relaxation.rs](../../src/master/routing/controller/relaxation.rs) |
@@ -115,7 +114,7 @@ use baldes::{core::options::Options, pricing::Solver};
 fn main() -> baldes::Result<()> {
     println!("{:?}", Options::support("BALDESlabelDominanceStrategy")?);
     let mut solver = Solver::<2>::new(3, 1)?;
-    solver.set_option("BALDESlabelDominanceStrategy", 1.0)?;
+    solver.set_option("BALDESnumberOfBucketsPerVertex", 20.0)?;
     Ok(())
 }
 ```
@@ -128,7 +127,7 @@ from pybaldes import Solver
 names = Solver.option_names()
 implemented, scope = Solver.option_support("BALDESlabelDominanceStrategy")
 solver = Solver(3, 1)
-solver.set_option("BALDESlabelDominanceStrategy", 1.0)
+solver.set_option("BALDESnumberOfBucketsPerVertex", 20.0)
 ```
 
 CLI overrides are repeatable:
@@ -136,7 +135,7 @@ CLI overrides are repeatable:
 ```sh
 cargo run --release --features clp --bin baldes -- \
   solve instances/Solomon/R101.txt --customers 10 \
-  --option BALDESlabelDominanceStrategy=1 --time 60
+  --option BALDESnumberOfBucketsPerVertex=20 --time 60
 ```
 
 [`OPTION_TABLE`](../../src/core/options.rs) is the source of truth for names,

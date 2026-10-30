@@ -24,7 +24,9 @@ impl<const D: usize> Enumeration<D> {
         let effective = controls.for_graph(g)?;
         let controls = &effective;
         if let Some(walk) = g.walk_memory_relaxation() {
-            return Self::run_forward_with_completion(&walk, grid, controls, cuts, branching, completion);
+            return Self::run_forward_with_completion(
+                &walk, grid, controls, cuts, branching, completion,
+            );
         }
         if controls.label_limit == 0 || controls.path_limit == 0 || !controls.cutoff.is_finite() {
             return Err(invalid("invalid enumeration controls"));
@@ -32,14 +34,20 @@ impl<const D: usize> Enumeration<D> {
         let preserve = controls.preserve_arc_paths
             || g.has_coupled_resources()
             || cuts.and_then(|c| c.presence).is_some_and(|p| p.active());
+        let preserve_paths = controls.preserve_arc_paths
+            || cuts.and_then(|c| c.presence).is_some_and(|p| p.active())
+            || (g.has_coupled_resources()
+                && !g
+                    .coupled_kernel()
+                    .is_some_and(|kernel| kernel.machine_paired_join_complete()));
         let mut labels = Storage::new(controls.partitions)?;
         labels.preserve_arc_paths = preserve;
         if let Some(cuts) = cuts {
             labels.protected_resources = cuts.knapsack.dominance_protected_resources();
         }
-        let mut pruning = PruningFrontier::for_run(preserve);
+        let mut pruning = PruningFrontier::for_run(preserve && preserve_paths);
         let mut paths = PathStorage::new(controls.partitions)?;
-        paths.preserve_arc_paths = preserve;
+        paths.preserve_arc_paths = preserve_paths;
         if let Some(presence) = cuts.and_then(|c| c.presence) {
             presence.validate_engine(g.arcs.len())?;
         }
@@ -100,8 +108,10 @@ impl<const D: usize> Enumeration<D> {
                 continue;
             }
             let v = grid.internal[from.vertex];
-            let Some(bucket) = grid.bucket_id_checked(true, v, grid.coordinate(&from.resources))
-                .map_err(|()| incomplete("enumeration bucket index overflow"))? else {
+            let Some(bucket) = grid
+                .bucket_id_checked(true, v, grid.coordinate(&from.resources))
+                .map_err(|()| incomplete("enumeration bucket index overflow"))?
+            else {
                 continue;
             };
             for arc in &grid.forward.buckets[v][bucket].arcs {
@@ -217,7 +227,13 @@ impl<const D: usize> Enumeration<D> {
                         let contribution = kernel.machine_join_contribution(state, &root);
                         let paired_resource = kernel.retained_paired_machine_resource();
                         if paired_resource.is_some() || kernel.has_custom_machine_resource() {
-                            machine_contribution = Some((kernel.machine_identity().clone(), contribution, paired_resource, Box::new(state.clone()), root.clone()));
+                            machine_contribution = Some((
+                                kernel.machine_identity().clone(),
+                                contribution,
+                                paired_resource,
+                                Box::new(state.clone()),
+                                root.clone(),
+                            ));
                         }
                         if kernel.has_costs() {
                             let Some((reduced, original)) =

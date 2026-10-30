@@ -147,7 +147,7 @@ fn infeasibility_and_arithmetic_errors_do_not_publish_partial_activities() {
 }
 
 #[test]
-fn independent_front_families_keep_their_declared_objective_normalizations() {
+fn independent_interval_front_families_keep_their_objectives() {
     let window = Window::new(0., 4.).unwrap();
     let line = |y: f64, slope: f64| {
         PiecewiseLinearFunction::new(vec![[0., y], [4., y + 4. * slope]]).unwrap()
@@ -169,47 +169,14 @@ fn independent_front_families_keep_their_declared_objective_normalizations() {
             functions: vec![raw(0., 1.), raw(5., -1.), raw(0., 0.), raw(0., 0.)],
             policy: FrontOperationPolicy::StrictDomain,
         },
-        CoupledResource::PairedPiecewiseLinear {
-            normalization: crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
-            initial: line(2., 0.),
-            initial_base: window,
-            arcs: vec![
-                PairedResourceArc {
-                    arrival: line(0., 1.),
-                    increment: line(3., 0.),
-                    lower: line(0., 0.),
-                    upper: line(20., 0.),
-                    waiting: 0,
-                };
-                4
-            ],
-            mode: PairedResourceMode::CostUnbounded,
-        },
-        CoupledResource::SlopePaired {
-            initial: raw(2., 0.),
-            initial_base: window,
-            arcs: vec![
-                SlopeRelationArc {
-                    arrival: raw(0., 1.),
-                    increment: raw(3., 0.),
-                    lower: raw(0., 0.),
-                    upper: raw(20., 0.),
-                    waiting: 0,
-                };
-                4
-            ],
-            mode: PairedResourceMode::CostUnbounded,
-            normalization: PairedCostNormalization::AbsoluteFinalValue,
-            policy: FrontOperationPolicy::StrictDomain,
-        },
     ]);
     let k = g.coupled_kernel().unwrap();
     let costs = k.replay_cost_components(&[0, 1]).unwrap().unwrap();
-    assert_eq!(costs.resources, [6., 6., 6., 8.]);
-    assert_eq!(costs.total, 26.);
-    assert_eq!(k.replay(&[0, 1]).unwrap(), Some(26.));
+    assert_eq!(costs.resources, [6., 6.]);
+    assert_eq!(costs.total, 12.);
+    assert_eq!(k.replay(&[0, 1]).unwrap(), Some(12.));
     let empty = k.replay_cost_components(&[]).unwrap().unwrap();
-    assert_eq!(empty.resources, [0.; 4]);
+    assert_eq!(empty.resources, [0.; 2]);
     assert_eq!(empty.total, 0.);
 }
 
@@ -353,17 +320,17 @@ fn accumulated_activity_proofs_keep_unknown_budgets_and_source_domain_gates() {
 
 #[cfg(feature = "clp")]
 #[test]
-fn selected_paired_values_are_physical_and_survive_normalization_and_phase_one() {
+fn selected_paired_values_are_physical_and_survive_cost_suppression() {
     let corpus: serde_json::Value = serde_json::from_str(include_str!(
         "../../../../fixtures/coupled/metasolver-paired-preparation.json"
     ))
     .unwrap();
-    let mut problem =
+    let problem =
         crate::master::model::format::Model::from_json(&corpus["cases"][36]["model"].to_string())
             .unwrap()
             .problem::<2>()
             .unwrap();
-    let graph = &mut problem.networks[0].graph;
+    let graph = &problem.networks[0].graph;
     assert_eq!(graph.coupled_paired_values(&[1, 2]).unwrap(), vec![(0, 5.)]);
     let mut kernel = graph.coupled_kernel().unwrap().clone();
     kernel.suppress_costs();
@@ -372,12 +339,4 @@ fn selected_paired_values_are_physical_and_survive_normalization_and_phase_one()
         kernel.selected_paired_values(&[1, 2]).unwrap(),
         Some(vec![(0, 5.)])
     );
-    let mut definitions = graph.coupled_kernel().unwrap().definitions().to_vec();
-    let CoupledResource::SlopePaired { normalization, .. } = &mut definitions[0] else {
-        panic!()
-    };
-    *normalization = descriptor::PairedCostNormalization::FinalMinusInitialMinimum;
-    graph.set_coupled_resources(&definitions).unwrap();
-    assert_eq!(graph.coupled_path_cost(&[1, 2]).unwrap(), Some(3.));
-    assert_eq!(graph.coupled_paired_values(&[1, 2]).unwrap(), vec![(0, 5.)]);
 }

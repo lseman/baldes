@@ -18,7 +18,11 @@ impl<const D: usize> NodeSnapshot<D> {
             master: self.master.export_for_worker()?,
             problem: self.problem.clone(),
             cut: self.cut.clone(),
-            pricing: self.pricing.fork_for_node(),
+            pricing: {
+                let mut pricing = self.pricing.fork_for_node();
+                pricing.detach_step_versions();
+                pricing
+            },
             incumbent: self.incumbent,
             routes: self.routes.clone(),
             warm: self.warm.clone(),

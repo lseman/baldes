@@ -65,7 +65,6 @@ fn coupled_envelope_admission_encloses_original_columns_under_signed_duals() {
                     .unwrap();
             for arcs in [vec![0, 1], vec![2, 3]] {
                 let route = Route {
-                    coupled_controls: Vec::new(),
                     coupled_values: Vec::new(),
                     nodes: vec![],
                     arcs,

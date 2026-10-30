@@ -1,7 +1,6 @@
 use super::*;
 fn route(id: i32, cost: f64) -> crate::Route {
     crate::Route {
-        coupled_controls: Vec::new(),
         coupled_values: Vec::new(),
         arcs: vec![id],
         nodes: vec![],

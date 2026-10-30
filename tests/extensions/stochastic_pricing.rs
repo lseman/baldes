@@ -16,6 +16,37 @@ fn close(a: f64, b: f64) {
     );
 }
 
+#[test]
+fn theta_graph_reweights_negative_rounded_arcs_without_changing_route_costs() {
+    let p = Problem::new(
+        10,
+        vec![Demand::new(vec![(1, 1.)]).unwrap(); 3],
+        vec![
+            vec![0., 1., 1., 1.],
+            vec![1., 0., 1., 1.],
+            vec![1., 1., 0., 1.],
+            vec![1., 1., 3., 0.],
+        ],
+    )
+    .unwrap();
+    let graph = p.theta_cut_graph(3).unwrap();
+    assert!(graph.arcs.iter().all(|arc| arc.cost >= 0.));
+    for route in [vec![1, 2, 3], vec![3, 2, 1], vec![2], vec![1, 3]] {
+        let mut from = graph.source;
+        let mut cost = 0.;
+        for to in route.iter().copied().chain(std::iter::once(graph.sink)) {
+            let arc = graph
+                .arcs
+                .iter()
+                .find(|a| a.tail == from && a.head == to)
+                .unwrap();
+            cost += arc.cost;
+            from = to;
+        }
+        close(cost, p.relaxed_route_cost(&route));
+    }
+}
+
 #[cfg(feature = "clp")]
 fn capacity_tight_problem() -> Problem {
     let demands = (0..7)

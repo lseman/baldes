@@ -10,134 +10,26 @@ Paired pickup-before-delivery constraints are outside the requested scope.
 
 ## Resource definitions
 
-Absolute nonnegative objective coefficients are supported for cost-bearing
-paired descriptors through `set_coupled_objective_coefficients`. Extension,
-canonical joins and independent cost certificates use the same coefficient;
-physical selected values and feasibility remain unchanged, including at zero
-weight. With Clp, the graph setter also accepts negative coefficients
-under either normalization in source-domain models. JSON/Python networks use
-`coupled_objective_coefficients` pairs to invoke the same setter; a resource
-bound to an original pricing variable takes its cost from that variable instead. Relative costs subtract
-the global initial-front minimum before scaling; they do not subtract the
-initial value chosen by a route witness. The shared master independently
-encloses this baseline and prices alternative controls, including maxima.
-Ordinary minimum-front pricing and physical-path cutoff inspection reject
-negative models. Negative machine-front coefficients remain unsupported.
-Tiny coefficients are applied directly, without a `q - 1` adjustment that could erase them.
+Paired resources use `CoupledResource::PairedFront { mode }` with an explicit
+prepared front program. Cost-bearing paired resources accept finite nonnegative
+objective coefficients through `set_coupled_objective_coefficients`; the default
+is one. Their objective is the selected joined dependent value, without an
+initial-minimum subtraction. Phase I suppresses the charge and retains the
+resource transitions and feasibility checks.
 
-Control-point `PairedPiecewiseLinear` descriptors accept an explicit
-`normalization`, using the same conventions as raw slopes. The default is
-`final_minus_initial_minimum`; select `absolute_final_value` for a physical
-terminal-value objective. The Python `add_paired_piecewise_linear` builder
-accepts the same keyword. Empty paths have zero charge under either convention.
+An original `accumulated_resource` variable can bind a cost-bearing paired
+resource with a nonnegative cost. Its selected value is reported independently
+of that cost. Paired activity rows, integer activity registrations, negative
+objective coefficients and explicit source-control choices are unsupported.
+Custom/cumulative registrations retain their own row and branch contracts.
 
-An original variable can bind an absolute-final-value paired descriptor (raw slopes or control points)
-with a finite cost (negative costs require a source model). Reporting reads the column's selected value through
-`OriginalColumn`; arc-only reporting rejects such bindings. Source-domain paired
-shared rows accept signed coefficients. Pricing bounds minimum/maximum terminal
-controls and retains row-boundary proposals through the common coordinator.
-Bounded terminal LPs also propose joint row targets across resources, physical
-paths and networks, retaining fixed routes and signed master contributions.
-Each target requires its own replayed source control. Integer witness recovery
-can replace fractional control mixtures with registered or newly queried points
-and integer copy blocks. It validates the entire
-solution, including other networks, fixed routes, master variables and column
-caps. With simultaneous service, recovery returns the jointly certified scalar
-schedule and checks the resulting column identities against caps and retained
-coverage. Proposal failure supplies no infeasibility proof or enumeration coverage.
-Source paired bindings also support verified variable envelopes and integer
-activity registration. Integer proofs must cover every control: a bounded
-integer recurrence or singleton integral terminal enclosures on every covered
-path suffice. Integral minimum/maximum endpoints alone do not. These bindings
-use the existing mapped branch rows and tree replay; ambiguous proofs reject
-registration. Custom/cumulative registrations keep their signed row/branch contracts.
-
-Reconstructed routes retain `coupled_values`, ordered pairs of coupled
-descriptor index and selected physical dependent value for cost-bearing paired
-resources. These values participate in route identity and survive snapshots,
-canonical schedule copies and model/Python output. They stay physical under
-objective normalization or phase-I cost suppression. Without explicit source
-controls they describe the minimum-front choice; selected values alone are not
-an independent control certificate. Paired shared-row pricing generates explicit
-source controls for alternative terminal values.
-With the Clp feature, `PairedControl { resource, base }` retains one explicit
-source trajectory: the initial base coordinate and one head coordinate per
-physical arc. `CoupledKernel::certify_paired_control` checks that descriptor's
-strict source domains, arrivals, waiting, clamping and dependent bounds using
-a shared work budget and deadline. Its physical terminal enclosure is independent
-of objective coefficients, normalization and phase-I suppression. It can certify
-a nonminimal control on a path whose optimized front selects another value.
-Knot functions use their real linear interpolants; a verified exact affine
-identity may tighten a point enclosure. This does not claim reproduction of
-the numerical evaluator's rounded interpolation sequence.
-`PairedControlCertificate::certifies_value` accepts only singleton enclosures;
-being inside a wider enclosure does not prove attainability.
-
-A rejected control does not prove the path infeasible. Arithmetic ambiguity or
-budget exhaustion returns unknown. This certificate covers one source descriptor,
-not other resources, graph continuity/scalar windows, master rows, a global
-minimum or the alternate machine-front domain.
-
-`Route.coupled_controls` retains explicit source choices alongside
-`coupled_values`. Selected values determine identity alongside scalar schedules;
-controls retain the witness and survive pool transfer,
-snapshots, fixed routes, tree import and Rust/JSON/Python reporting. Ordinary
-pricing still emits minimum-front choices. `Route::with_paired_controls` proves
-and reprices a supplied control; `NodeSnapshot::with_route_controls` retains
-an alternative for an existing physical route through the shared pool. A
-complete/cutoff universe cannot be widened this way. Explicit route controls
-require singleton source certificates and are rejected for machine-front model
-domains; the standalone source verifier remains a separate contract.
-`certify_with_controls` checks supplied choices on controlled descriptors and
-ordinary independent certificates on the remaining resources.
-
-With Clp, `master::controls::optimize_paired_control` generates source choices
-for a fixed path by covering all declared PWL regions and growth/clamp branches.
-`NodeSnapshot::optimize_route_control` applies the same search to a registered
-route. It supports minimizing/maximizing physical dependent value and an optional
-terminal window. LP primal points are proposals; independent source replay checks
-every returned control. Finite-matrix dual bounds cover regions, and a separate
-phase-I bound is required to reject a numerically infeasible region. Exact guarded
-coefficient construction avoids silently rounding a different source model.
-
-`ControlOptimization.complete` reports full region coverage with a feasible
-control or proved emptiness. A complete feasible result can retain a nonzero
-primal/dual gap: `lower_bound` bounds Gamma for minimization and -Gamma for
-maximization. Limits and unsupported arithmetic leave the result incomplete;
-a partial result may still contain a valid control. `work_used` and
-`lp_iterations` let callers share budgets across queries. This bounds one descriptor
-on one path. Paired shared-row pricing combines these bounds with the physical
-path relaxation, other resource certificates and correlated objective/row
-expressions to bound the whole original column. It shares a work/iteration
-budget and deadline across paths and returns incomplete when coverage fails.
-Paired envelopes cover every source control, independently of the current
-objective or shared rows. Declared terminal bounds can tighten outward LP
-bounds without a tolerance. Bounded integer recurrences can also supply
-conservative envelopes when path enumeration is unavailable. General continuous
-paired integrality, machine-front controls and larger unproved domains remain open.
-Enumeration can retain invariant terminal values or an independently certified
-attained endpoint that weakly improves both cost and every row. Negative costs
-favor maxima, positive costs favor minima, and zero costs allow either direction.
-Row signs and inequality senses must agree with that direction: increasing
-Gamma helps a positive lower-bound row or a negative upper-bound row. Equality
-rows and opposing requirements still need invariant values. Identity-specific
-column caps disable endpoint projection. Base controls may vary continuously;
-pricing, envelopes and enumeration share their min/max and recurrence proofs.
-Uncertain or unattained endpoints leave transfer incomplete without a partial
-universe. Exact common factors in source LP rows are removed only when every
-coefficient and the right-hand side divide exactly, allowing tight endpoint
-certificates without a numerical tolerance.
-A new paired row can reuse a full universe after proving either invariant
-matching values or that every retained value remains a certified dominating
-endpoint for the objective and all old/new rows. The entire new row is checked
-together, including repeated terms. Restrictive caps on retained identities
-block endpoint replacement; fixed copies require point certificates. Cutoff
-universes and rows requiring discarded controls remain rejected.
-
-Pool and incumbent validation require stored paired values to match canonical
-numerical replay or supplied independently verified source controls. Scalar/path-only
-helpers ignore that metadata for auxiliary proof columns; budgeted full-resource
-replay honors supplied controls. Canonical metadata alone does not certify the selected control independently.
+Routes retain `coupled_values`, pairs of resource index and selected dependent
+value. These values participate in identity and survive snapshots and reporting.
+Pool and incumbent validation check them against the retained front program.
+Different forward/backward splits can produce different values on the same
+physical path; a stored selected value must match a successful split join.
+A path-only certificate encloses the successful split values rather than
+claiming an optimum over continuous source controls.
 
 For graphs containing only custom/cumulative coupled descriptors, forward
 dominance also uses a finite-horizon signed proof when the physical graph is
@@ -179,10 +71,9 @@ Multiple resources compose in declaration order.
 | Resource | Transition |
 | --- | --- |
 | `Charging` | Retain continuous earliest-departure time over remaining energy, consume travel energy, enforce service windows, and optimize partial charging with station-specific PWL curves. |
-| `PairedPiecewiseLinear` | Retain a dependent front over a base coordinate, compose strictly FIFO total-arrival functions, optimize waiting, enforce function-valued dependent bounds. Feasibility and two restricted cost modes are explicit. |
+| `PairedFront` | Prepare and execute an explicit paired base/dependent front program with directional extension, waiting, bounds and split joins. |
 | `IntervalCost` | Choose one shared initial value in the initial interval; on every arc add its increment, enforce state/charge domains, and charge the PWL function. Minimize the full route sum over that choice. |
 | `SlopeIntervalCost` | Retain prepared slope segments through translation, restriction and addition, with an explicit front-operation policy. |
-| `SlopePaired` | Retain prepared slope relations with general arrival composition, waiting and function-valued bounds, explicit operation policy and absolute-final or final-minus-initial cost normalization. Runtime validation is deferred. |
 | `Selection` | Intersect the remaining value domain with arc and vertex masks; reject an empty domain. Up to 64 values are supported. Optional `vertices` gives one mask per vertex. Forward extension checks the head; backward extension checks the tail. With `relaxed`, an unremembered vertex resets the domain to `initial` after checking feasibility, forgetting earlier arc and vertex eliminations. By default (`BALDESselectionTighteningSchedule` 1) the routing master follows the reference schedule: per resource it takes the minimal violating interval ending at an improper path's first violation, remembers those no longer than `BALDESmaxNGaverNeighbourhoodSize` (or else the path's shortest one), and skips tightening while `BALDESmaxNGneighbourhoodSize` is negative. Schedule 0 remembers all minimal violating intervals. Remembered intervals include both endpoints. This also applies with omitted vertex masks. Incumbents always use the exact rule. |
 | `SimultaneousPickupDelivery` | Deliver before picking up at each stop, with all route deliveries loaded at departure. Enforce capacity at departure and between all stops, admitting loads up to `capacity + tolerance` (default 1e-6, also used by load dominance; 0 is exact). |
 | `CumulativeCost` | Update `x += increment[arc]`, then add `x * weight[arc]` to the objective. Optional `sink_upper` and `source_upper` are the resource's upper bounds at the sink and source. With nonnegative data, dominance reads `sink_upper` as a bound on the weight of any completion (a forward label with a larger `x` pays `(x_a - x_b) * sink_upper`) and `source_upper` as a bound on the increments of any prefix (backward labels). |
@@ -368,209 +259,138 @@ model.add_interval_cost(
 # Install on a two-arc physical graph: the joint resource charge is zero.
 ```
 
-## Paired function relations and waiting
+## Paired front programs and waiting
 
-`PairedPiecewiseLinear { initial, initial_base, arcs, mode }` retains the least
-attainable dependent value at every feasible base coordinate. The initial
-function describes the dependent value over the initial base window. Every
-`PairedResourceArc` supplies total base `arrival(t)`, departure-dependent
-`increment(t)`, head-dependent `lower(x)` and `upper(x)`, and an integer
-`waiting` slope. Arrival must be strictly increasing and satisfy
-`arrival(t) >= t`. It is the total arrival coordinate, not the consumption alone.
+Declare `CoupledResource::PairedFront { mode }`, then call
+`Graph::prepare_paired_front_program` with one `MachineArcFunctionInput` per
+physical arc, a `MachineRootInput`, and source/terminal base windows. The
+preparation builds both directional operands. All per-arc inputs use insertion
+order. Replacing resource definitions or topology requires reinstallation.
 
-For departure base `t` and a chosen head base `x >= arrival(t)`, the least next
-dependent value is
+The program contains:
 
+| Field | Meaning |
+| --- | --- |
+| `source_bounds`, `terminal_bounds` | Finite ordered base-coordinate windows |
+| `root` | Initial dependent function |
+| `arcs[].tail_bounds` | Base window at the arc's tail |
+| `arcs[].waiting_bounds` | Waiting window at its head |
+| `arcs[].waiting_rate` | Finite coefficient converted toward zero to a signed 32-bit runtime rate |
+| `arcs[].base` | Prepared base-consumption function, not a total-arrival function |
+| `arcs[].dependent` | Dependent increment function |
+| `arcs[].dependent_lower`, `arcs[].dependent_upper` | Dependent bound functions |
+
+`base` uses `{"pairs": [[value, coordinate], [slope, end], ...]}`.
+The first pair anchors a value; subsequent pairs give segment slopes and ending
+coordinates. `root`, `dependent` and both bound functions use either
+`{"encoding": "affine", "intercept": value, "slope": slope}` or
+`{"encoding": "vector", "function": {"pairs": [...]}}`.
+These pairs are not `(argument, value)` knots. Preparation restricts functions
+to their declared windows and returns an explicit unknown/error for unsupported
+arithmetic or exhausted work.
+
+The modes are `feasibility`, `cost_unbounded` and `cost_bounded`. Feasibility
+mode contributes no dependent objective; both cost modes retain their literal
+joined dependent cost. Forward and backward extension execute distinct front
+recurrences. A joined value depends on the meeting split, including on some
+waiting programs. It must not be substituted with the minimum of a separate
+continuous-control problem. `replay` selects the split-zero join; forward
+`replay_state` executes the all-forward recurrence. Phase I preserves the
+program while suppressing its objective contribution.
+
+Python declares and installs the same program:
+
+```python
+from pybaldes import ResourceModel
+
+model = ResourceModel()
+resource = model.add_paired_front(mode="cost_unbounded")
+affine = lambda value: {"encoding": "affine", "intercept": value, "slope": 0.0}
+arc = {
+    "tail_bounds": [0.0, 8.0], "waiting_bounds": [0.0, 8.0],
+    "waiting_rate": 0.0, "base": {"pairs": [[1.0, 0.0], [0.0, 8.0]]},
+    "dependent": affine(1.0), "dependent_lower": affine(0.0),
+    "dependent_upper": affine(10.0),
+}
+model.set_paired_front_program(resource, {
+    "source_bounds": [0.0, 8.0], "terminal_bounds": [0.0, 8.0],
+    "root": affine(0.0), "arcs": [arc, arc],
+})
+# Install on a physical graph with exactly two arcs.
+# model.install(solver)
 ```
-max(previous(t) + increment(t) + waiting * (x - arrival(t)), lower(x))
-```
 
-It must not exceed `upper(x)`. Function domains also constrain the departure
-and head coordinates. Waiting choices, lower-bound clamping and disconnected
-feasible intervals are retained in the front; choosing one locally cheapest
-arrival would lose valid routes. Waiting provenance is retained per piece.
+Network JSON declares `{"kind": "paired_front", "mode": "cost_unbounded"}`
+in `coupled_resources` and supplies `paired_front_programs` as a list of the
+same program dictionaries, each with an additional `resource` index. Python
+`PricingNetwork` accepts the same field. See the complete
+[paired example](../../examples/networks/paired_piecewise_linear.json), whose two
+required routes have selected values 3 and 5 and total LP cost 8.
 
-`PairedResourceMode::Feasibility` adds no objective and permits function-valued
-bounds. `CostUnbounded` permits signed increments and waiting slopes but requires
-constant dependent bounds shared across arcs; its name does not remove those
-bounds or the finite base domains. `CostBounded` additionally requires positive
-increments, nonnegative waiting slopes, and an initial function no lower than
-the shared lower bound. Both cost modes use `normalization`: the default
-`final_minus_initial_minimum` subtracts the initial minimum;
-`absolute_final_value` charges the physical terminal minimum. An empty path costs zero. These restrictions
-do not apply to the existing signed `IntervalCost` contract.
+For precomputed operands, the lower-level `paired_machine_inputs`,
+`paired_machine_roots` and `paired_machine_terminal_bounds` fields remain
+available. A complete program cannot coexist with separate operands for the
+same resource. `paired_waiting_base_resources` derives head waiting windows
+from scalar vertex/arc bounds; use it only when that scalar coordinate represents
+the paired base state. Disconnected scalar time windows are unsupported here.
 
-Forward extension builds the full relation. Backward labels retain an ordered
-physical suffix program; joins apply that suffix to the actual forward relation.
-This preserves lower-bound clamping and waiting without assuming that they have
-an additive inverse. A feasibility adjoint is available internally, but backward
-cost joins currently use replay and can cost more than a specialized suffix
-envelope. Completion bounds remain conservative. Forward feasibility dominance
-requires a front that covers the other front and stays below it; backward
-feasibility dominance compares known upper fronts by coverage and the opposite
-value order. Numerical comparisons use absolute tolerance `1e-4` or relative
-`2.22e-10`. Cost-unbounded fronts with an upper bound of at least `1e12` can
-compensate a higher front through a cost penalty, provided the independent
-scalar and resource cost orders also hold. Reversal reuse is disabled.
+Paired fronts automatically select the front-program domain during preparation.
+They have no alternate source-control or normalization API. Raw interval fronts
+retain their separate `front_program_domain` switch and policies.
+A successful numerical join and an independent bound certificate remain
+different contracts. Unknown arithmetic, stale preparation and exhausted work
+must not be interpreted as infeasibility.
 
-This is a numerical resource contract. Arithmetic ambiguity or excessive
-front work produces an error; it is never converted to infeasibility or a
-complete-pricing claim. Directed path certification uses an independent outward
-reachability relaxation and checked control witnesses. A proved witness gives
-feasibility and an enclosure of the optimum charge; an empty outer relaxation
-proves infeasibility. A failed witness search, uncertain boundary or exhausted
-shared budget remains unknown. Numerical optimized fronts are not proof inputs.
-A non-singleton objective enclosure can bound a column but does not establish
-exact finite-MIP objective encoding. Raw external descriptor compatibility is
-not claimed. Phase I suppresses objective charges while retaining dependent
-transitions and feasibility.
+Raw paired-base domains can be processed explicitly before installing the
+front program. Bind the scalar base with
+`set_paired_waiting_windows_from_resource`, then call
+`Graph::preprocess_paired_base_domains` with the raw arc functions. Its
+`PairedBaseDomains` result exposes the derived vertex and arc windows and can
+install them together with the front program through `install_front_program`.
+Installation is atomic and rejects changed base inputs or topology.
 
-Python exposes the same contract through
-`ResourceModel.add_paired_piecewise_linear(initial_lower, initial_upper, initial,
-arrivals, increments, lowers, uppers, waiting, mode="feasibility",
-normalization="final_minus_initial_minimum")`. Function
-arguments are lists of `(base, dependent)` knots; each per-arc vector uses the
-original arc order. `waiting` contains signed 32-bit integers. Mode strings are
-`"feasibility"`, `"cost_unbounded"`, and `"cost_bounded"`.
-The complete network example is
-[`examples/networks/paired_piecewise_linear.json`](../../examples/networks/paired_piecewise_linear.json).
-Its two required physical routes contribute paired costs 7 and 5.
+This raw step currently requires a disposable scalar base whose additive
+consumption matches the supplied arrival functions. It returns removed arc
+indices as data; automatic installation declines a result requiring physical
+arc exclusions. Existing prepared-input APIs keep their supplied geometry.
+Do not preprocess already prepared windows again: the recovered backward pass
+reads the original arc caps while staging its updates, so another pass can
+produce a different domain.
 
-Waiting coefficients represent signed 32-bit runtime values. In the retained
-modern MetaSolver artifact, registration stores a binary64 coefficient, then
-both directional extension wrappers truncate it toward zero to that integer
-type. BALDES exposes the integer runtime parameter directly. Retained comparison
-fixtures include nonlinear functions and cases where this conversion changes
-the optimum.
+A paired program can run alone or with standard graph resources within the
+configured compile-time resource capacity. The reference binary has at most
+two ordinary standard slots; that is a native comparison boundary rather than
+a limit on BALDES scalar resource composition. A second
+paired program and combinations with other coupled descriptors (including
+`CumulativeCost`, `CustomResource`, selection, pickup/delivery, plugins and
+other fronts) are rejected with an `unsupported paired resource combination`
+error. Rejected installation leaves the previous program intact. These are
+solver composition limitations; additional resource families are not installed
+as extension-only substitutes.
 
-For `FrontAlgebra`, aligned affine fronts can retain a single rounded crossing
-with a nonconstant lower bound using the observed encoded-continuity ordering.
-Strict-domain crossing checks remain separate. A feasibility-only raw paired
-resource can also prove a preserved first-endpoint witness across unit FIFO
-translations when its full-front certificate is unavailable. This proves
-existence with zero objective charge; it does not certify an objective minimum
-or widen the default source-domain proof.
+Paired fixing retains its reduced bucket domain when enumeration times out.
+Repricing that retained domain can omit a route accepted at another front split,
+as in the reference implementation. Call `Solver::restore_arcs` to rebuild the
+original pricing domain. An interrupted enumeration does not install a complete
+retained route universe.
 
-The separate raw `SlopePaired` variant uses prepared slope functions for every
-function role. Python exposes
-`add_slope_paired(initial_lower, initial_upper, initial, arrivals, increments,
-lowers, uppers, waiting, mode="feasibility", policy="strict_domain",
-normalization="absolute_final_value")`. All functions must be `EncodedFunction`
-slope encodings with leaf policies matching the operation policy, as for
-`SlopeIntervalCost`. The existing knot builder retains its stated delta cost.
+Paired owner objective coefficients accept every finite sign. Raw front pricing
+keeps its unit charge and minimum-front selection; original route costs apply
+the owner coefficient to the recorded selected activity. Activity rows likewise
+use that selected activity without changing the raw front callback. When these
+owner terms differ from raw pricing, raw completion alone cannot certify the
+owner objective, and the solve may report `Stalled` with an unknown bound.
 
-Rust callers using `front_algebra` can supply per-arc accumulated-base waiting
-windows with `Graph::set_paired_waiting_windows`. Supply one finite ordered
-window per physical arc, already intersected with its destination vertex's
-base-resource window. The bounds are distinct from the domains of the
-dependent lower and upper functions. Reinstall them after replacing the
-resource definitions or changing graph topology. The recovered zero-length
-waiting path remains limited to the supported bound and provenance cases.
-When a physical scalar resource represents that base coordinate,
-`Graph::set_paired_waiting_windows_from_resource` constructs the intersection
-from the destination and arc bounds. It rejects empty or disconnected
-multi-time windows and uses finite `-1e12`/`1e12` defaults for absent arc bounds.
-For the modern CLI/Python network model, supply
-`paired_waiting_base_resources` as `(coupled_resource_index,
-scalar_resource_index)` pairs instead. For example, JSON accepts
-`"paired_waiting_base_resources": [[0, 1]]` and Python accepts
-`paired_waiting_base_resources=((0, 1),)`. The field defaults to empty;
-duplicate paired indices are rejected.
+Integer owner registration is retained as metadata. It does not impose integer
+values on each path's paired activity or provide a projected integer branching
+rule. Owner registration bounds are separate from resource windows and shared
+activity rows. Positive propagated lower bounds can fail the pricing callback
+with an explicit unsupported-bound error.
 
-Backward raw paired labels also retain a numerical upper front when the
-prepared adjoint can compute one. Rust callers can inspect these fronts with
-`CoupledLabelState::slope_relation_backward_fronts`; an absent front means the
-adjoint was unavailable or empty. The adjoint applies the dependent bounds,
-reverse waiting envelope, base map and dependent increment using the raw slope
-representation. Its result is advisory: it does not certify source-control
-feasibility or replace ordered suffix replay when joining labels.
-`slope_relation_backward_outcomes_with_budget` can recompute the outcomes with
-a caller-supplied work and time budget instead of reusing a cached unknown.
-
-For a nonempty raw cost route, `absolute_final_value` charges the final dependent
-minimum, including the initial value. The alternate
-`final_minus_initial_minimum` subtracts the initial minimum. A fresh root charges
-zero under both conventions. Phase I suppresses this objective while keeping
-dependent transitions and bounds.
-
-Raw paired forward dominance compares covering fronts under the selected policy.
-In `cost_unbounded` mode with `front_algebra` and no reachable upper bound
-(every upper at or above the `1e12` marker), a front may instead exceed the other
-by delta and pay `scale * delta` plus the objective difference, following the
-reference's shifted-front comparison. This is a parity rule under the recovered
-tolerance, not a binary64 proof; `strict_domain` keeps exact coverage.
-In feasibility mode with `strict_domain`, backward labels also retain an upper
-front when the slope functions can be converted into knot functions without
-changing their stored segment slopes. Unsupported conversions, singleton
-function domains, terminal upper bounds above the `1e12` numerical infinity
-marker, and failed adjoints leave that upper front unknown; joins
-continue to replay the physical suffix. Different suffix programs can dominate
-only when every active feasibility relation has a known upper front and no
-other resource requires replay-dependent comparison. `front_algebra`
-continues to use suffix replay without this backward dominance optimization.
-
-The raw implementation retains front-operation provenance and uses a correct
-running-minimum waiting envelope. The name `front_algebra` selects
-recovered arithmetic/comparison choices where supported; it does not promise
-reproduction of the reference's underpricing on accepted nonconvex waiting
-fixtures. A computed front minimum, a source replay and a directed global pricing
-certificate remain distinct. Strict-domain paired slopes can use the independent
-directed control certificate described above, preserving their ordered slope
-encoding. Exact dyadic standalone slope fronts also have independent operator
-certificates under the strict policy.
-
-Native raw interval certificates independently interpret the declared machine
-front program from the original descriptors. Software binary64 arithmetic
-checks translation, reanchoring, native coordinate alignment and summed-slope
-merges, topology and the full endpoint scan. Native addition retains the first
-near-equal summed slope and extends its endpoint; the strict policy retains
-separate pieces. Production optimized minima are never proof inputs.
-
-Default raw interval feasibility additionally requires an independent shared
-source-control witness, replayed with outward arithmetic inside the hard and
-source domains. Failure to find that witness is unknown. A computed empty
-front alone cannot prove default source infeasibility; only an independent
-empty source-domain relaxation can do so. Native paired defaults retain their
-independent source-domain certificates where supported.
-
-Rust callers can explicitly select a different original model with
-`graph.set_front_program_domain(true)?`. For native raw interval and
-paired resources, this defines feasibility by the checked ordered IEEE front
-program. It is a **model-domain change**, not a proof hint or an assertion of
-source-control/exact-real equivalence. Strict and other resource families keep
-their stated semantics. The default is false. Graph clones, node forks and
-cost suppression preserve the choice; replacing resource descriptors resets
-it. The graph and kernel getters expose it.
-
-`kernel.certify_front_program(arcs, &mut work, deadline)` checks that alternate
-model and returns a `FrontProgramCertificate` without changing a default
-graph's domain. Its result cannot replace the default source-feasibility
-guard. `has_machine_front_contracts()` identifies native raw resources;
-`has_machine_cost_contracts()` identifies objectives for which a source-control
-abstract bound is insufficient. Per-route certificates and complete finite
-collectors remain available independently.
-
-A checked component machine value is not a minimum of sequential source-control
-replay or of an exact-real control problem. Other resource and arc contributions
-still require outward aggregate bounds, and exact finite-MIP cost encoding
-retains its separate guard. Unproved operations, arithmetic overflow,
-unsupported topology and exhausted proof budgets remain unknown.
-
-The native-front composition policy handles in-domain start snapping,
-tolerance-sized constant intervals, near-knot segment advancement, and the
-separate near-equal-slope merge rules for outer knots and inner endpoints.
-These choices do not change `strict_domain` arithmetic. A point front already
-satisfying constant bounds can retain nearby bound-domain endpoints when it
-lies inside their exact intersection. Tolerance does not extend a disjoint domain.
-
-Runtime checks include direct coupled/paired route tests and selected original
-binary helpers. The October 24 comparison matched 1,600 finite composition cases
-and 36,872 extended-label insertions with nonempty cut descriptors. These are
-bounded operator/consumer checks, not complete resource or solver equivalence.
-Near-disjoint domains, unproved bound crossings and other unsupported numerical
-cases still return explicit incomplete outcomes. Evidence and reproduction
-artifacts are retained locally under
-`results/metasolver-parity-fixes-20261024/`.
+Recovered degenerate backward compositions retain generated zero-width NaN
+slopes internally; public input descriptors still require finite values.
+Unresolved retained shapes report unknown. Captured operator and path-split
+tests validate bounded cases, not general solver parity.
 
 ## Rust
 
@@ -859,13 +679,76 @@ are not claimed to match the reference binary.
 The earlier state-expansion compiler and its public adapters have been removed.
 The direct kernel is the only coupled-resource implementation.
 
-Implementation was completed before executing runtime tests. The direct-resource
-integration cases cover both directions, all split joins, standalone replay,
+The direct-resource integration cases cover both directions, all split joins, standalone replay,
 base maps, signed state-dependent objectives, function domains, complete-route
 reduction, fixing/enumeration, node forks and root phase-I cost restoration.
 Independent physical-load/path and numerical-interval oracles supplement those
-integration cases. A freshly built native Python wheel exercises the public
-resource methods. Commands, source/wheel hashes and results are recorded in the
-current validation manifest.
+integration cases. Python validation must use a wheel built from the same resource API revision.
+Operator captures and integration checks cover specific retained programs;
+they do not close every paired-resource boundary listed above.
 Earlier expansion smoke results do not validate these kernels, and the current
 regressions do not claim exact native descriptor, tolerance or performance parity.
+
+## Raw paired base-domain preparation
+
+Raw graph registration and prepared machine installation are separate stages.
+`Graph::preprocess_paired_base_domains` takes raw arc functions and returns a
+`PairedBaseDomains` artifact with derived vertex domains, arc domains and removed
+physical arc indices. It requires the existing explicit scalar base binding;
+matching an independent scalar resource by function shape is insufficient.
+The bound coordinate must be disposable and its consumption must match the
+raw arrival mapping. Other mappings return an explicit unsupported outcome.
+
+For a graph with one scalar base resource, the complete installation pipeline is:
+
+```rust
+use baldes::{Graph, graph::Window};
+use baldes::graph::coupled::{CoupledResource, MachineArcFunctionInput,
+    PairedResourceMode, PreparedSlopeFunction};
+use baldes::graph::coupled::descriptor::{FrontierBudget, FrontierOutcome,
+    MachineRootInput, RawAffine};
+
+let mut graph = Graph::<2>::new(3, 1)?;
+let bounds = Window::new(0., 4.)?;
+for vertex in 0..3 { graph.set_bounds(vertex, 0, 0., 4.)?; }
+for (tail, head) in [(0, 1), (1, 2)] {
+    let arc = graph.add_arc(tail, head, -1.)?;
+    graph.arc_mut(arc)?.consumption[0] = 1.;
+}
+graph.set_coupled_resources(&[CoupledResource::PairedFront {
+    mode: PairedResourceMode::CostUnbounded,
+}])?;
+graph.set_paired_waiting_windows_from_resource(0, 0)?;
+let base = PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (0., 4.)]).unwrap();
+let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+let inputs: Vec<_> = (0..2).map(|physical_arc| MachineArcFunctionInput {
+    physical_arc, tail_bounds: bounds, waiting_bounds: bounds, waiting_rate: 0,
+    base: &base, dependent: affine(0.25),
+    dependent_lower: affine(0.), dependent_upper: affine(8.),
+}).collect();
+let domains = match graph.preprocess_paired_base_domains(
+    0, &inputs, FrontierBudget::default(),
+) {
+    FrontierOutcome::Complete(domains) => domains,
+    other => panic!("raw base preprocessing unavailable: {other:?}"),
+};
+assert_eq!(domains.vertex_bounds()[1], Window::new(1., 3.)?);
+assert!(matches!(domains.install_front_program(
+    &mut graph, &inputs, affine(0.), FrontierBudget::default(),
+), FrontierOutcome::Complete(())));
+```
+
+Installation is atomic and rejects changed raw inputs, topology or bound scalar
+state. Objective associations, owner registration bounds and compatible retained
+waiting rates survive installation. Removed arcs are reported by the artifact;
+its installer currently declines them until explicit topology exclusions can be
+installed. Work or deadline limits return unknown without publishing partial
+state.
+
+Already prepared models continue to use `prepare_paired_front_program` or the
+lower-level prepared setters directly. They are not automatically reprocessed:
+the staged backward rule reads original arc upper bounds, so preprocessing its
+own output again can produce a different domain. An explicitly bound prepared
+base keeps its supplied source upper in bucket indexing instead of widening it
+to the terminal upper. This is numerical domain preparation, not an original
+objective certificate or a continuous source-control optimization.

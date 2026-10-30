@@ -3,17 +3,14 @@ use super::*;
 
 /// Exact-real scalar feasibility of a nonempty physically elementary path.
 /// Stored floating resource profiles are not used as feasibility proofs.
-/// Selected paired values match canonical replay or independently proved
-/// source controls. Other resource and physical-path proofs remain separate.
+/// Selected paired values match retained split joins. Other resource and
+/// physical-path proofs remain separate.
 pub(crate) fn exact_route_feasible<const D: usize>(
     problem: &RoutingContext<D>,
     route: &Route,
 ) -> Option<()> {
     let graph = &problem.model.networks[0].graph;
-    if graph.has_coupled_resources()
-        || !route.coupled_values.is_empty()
-        || !route.coupled_controls.is_empty()
-    {
+    if graph.has_coupled_resources() || !route.coupled_values.is_empty() {
         let positions = route
             .arcs
             .iter()
@@ -25,18 +22,10 @@ pub(crate) fn exact_route_feasible<const D: usize>(
     }
     exact_route_feasibility_using(problem, route, |kernel, arcs| {
         kernel
-            .certify_with_controls(arcs, &route.coupled_controls, &mut 1_000_000, None)
+            .certify_with_budget(arcs, &mut 1_000_000, None)
             .map(|result| result.0)
     })?
     .then_some(())
-}
-
-/// Exact scalar/physical path scope; callers separately certify every coupled resource.
-pub(crate) fn exact_scalar_path_feasibility<const D: usize>(
-    problem: &RoutingContext<D>,
-    route: &Route,
-) -> Option<bool> {
-    exact_route_feasibility_using(problem, route, |_, _| Some(true))
 }
 
 /// Distinguish a proved invalid path from unsupported arithmetic/resource rules.
@@ -62,7 +51,7 @@ pub(crate) fn exact_route_feasibility_with_budget<const D: usize>(
     }
     let result = exact_route_feasibility_using(problem, route, |kernel, arcs| {
         kernel
-            .certify_with_controls(arcs, &route.coupled_controls, work, Some(deadline))
+            .certify_with_budget(arcs, work, Some(deadline))
             .map(|result| result.0)
     });
     if std::time::Instant::now() >= deadline {
@@ -248,12 +237,7 @@ pub(super) fn validated_upper<const D: usize>(
                 .iter()
                 .map(|id| problem.arc_position(*id))
                 .collect::<Option<Vec<_>>>()?;
-            let (valid, cost) = kernel.certify_with_controls(
-                &arcs,
-                &route.coupled_controls,
-                &mut 1_000_000,
-                None,
-            )?;
+            let (valid, cost) = kernel.certify_with_budget(&arcs, &mut 1_000_000, None)?;
             if !valid {
                 return None;
             }
@@ -268,6 +252,9 @@ pub(super) fn validated_upper<const D: usize>(
             for &(row, coefficient) in &problem.model.networks[0].arc_entries[arc] {
                 rows.get_mut(row)?.product(coefficient, quantity)?;
             }
+        }
+        for (row, coefficient) in problem.activity_entries(route).ok()? {
+            rows.get_mut(row)?.product(coefficient, quantity)?;
         }
         for (row, constraint) in &problem.branch_constraints {
             if constraint.nonlinear() {
@@ -302,12 +289,7 @@ pub(super) fn validated_upper<const D: usize>(
                 .iter()
                 .map(|id| problem.arc_position(*id))
                 .collect::<Option<Vec<_>>>()?;
-            let (valid, cost) = kernel.certify_with_controls(
-                &arcs,
-                &route.coupled_controls,
-                &mut 1_000_000,
-                None,
-            )?;
+            let (valid, cost) = kernel.certify_with_budget(&arcs, &mut 1_000_000, None)?;
             if !valid {
                 return None;
             }

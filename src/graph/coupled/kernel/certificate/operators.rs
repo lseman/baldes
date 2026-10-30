@@ -6,7 +6,7 @@
 //! greater than its absolute tolerance; the scaled magnitude bound keeps the
 //! relative tolerance below one lattice step.
 use super::*;
-use crate::graph::coupled::descriptor::{PairedCostNormalization, PreparedSlopeFunction};
+use crate::graph::coupled::descriptor::PreparedSlopeFunction;
 
 const LIMIT: f64 = 1_000_000.;
 
@@ -124,121 +124,6 @@ fn shape(
         slope_magnitude = slope_magnitude.max(slope.abs());
     }
     Some((magnitude, slope_magnitude))
-}
-
-fn constant(
-    function: &PreparedSlopeFunction,
-    work: &mut usize,
-    deadline: Option<Instant>,
-) -> Option<f64> {
-    shape(function, true, 1., 1., work, deadline)?;
-    function
-        .pairs()
-        .iter()
-        .skip(1)
-        .all(|p| p.0 == 0.)
-        .then_some(function.pairs()[0].0)
-}
-
-pub(super) fn front_algebra_pair(
-    definition: &CoupledResource,
-    path: &[usize],
-    scale: f64,
-    work: &mut usize,
-    deadline: Option<Instant>,
-) -> Option<(bool, [f64; 2])> {
-    constant_pair(definition, path, scale, work, deadline)
-        .or_else(|| super::lattice::front_algebra_pair(definition, path, scale, work, deadline))
-}
-
-fn constant_pair(
-    definition: &CoupledResource,
-    path: &[usize],
-    scale: f64,
-    work: &mut usize,
-    deadline: Option<Instant>,
-) -> Option<(bool, [f64; 2])> {
-    let CoupledResource::SlopePaired {
-        initial,
-        initial_base,
-        arcs,
-        mode,
-        normalization,
-        ..
-    } = definition
-    else {
-        return None;
-    };
-    let baseline = constant(initial, work, deadline)?;
-    if ![initial_base.lower, initial_base.upper]
-        .into_iter()
-        .all(small)
-        || scale < 0.
-    {
-        return None;
-    }
-    let domain = initial.domain();
-    let (mut lo, mut hi) = (
-        domain.0.max(initial_base.lower),
-        domain.1.min(initial_base.upper),
-    );
-    if lo > hi {
-        return Some((false, [0.; 2]));
-    }
-    let mut dependent = baseline;
-    for &i in path {
-        debit(work, 1, deadline)?;
-        let arc = arcs.get(i)?;
-        if arc.waiting != 0 {
-            return None;
-        }
-        shape(&arc.arrival, true, 1., 1., work, deadline)?;
-        if !arc.arrival.pairs().iter().skip(1).all(|p| p.0 == 1.) {
-            return None;
-        }
-        let increment = constant(&arc.increment, work, deadline)?;
-        let lower = constant(&arc.lower, work, deadline)?;
-        let upper = constant(&arc.upper, work, deadline)?;
-        let ad = arc.arrival.domain();
-        let id = arc.increment.domain();
-        lo = lo.max(ad.0).max(id.0);
-        hi = hi.min(ad.1).min(id.1);
-        if lo > hi {
-            return Some((false, [0.; 2]));
-        }
-        let delta = arc.arrival.pairs()[0].0 - ad.0;
-        if !small(delta) || delta < 0. {
-            return None;
-        }
-        let ld = arc.lower.domain();
-        let ud = arc.upper.domain();
-        lo = (lo + delta).max(ld.0).max(ud.0);
-        hi = ld.1.min(ud.1);
-        if !small(lo) || !small(hi) {
-            return None;
-        }
-        if lo > hi {
-            return Some((false, [0.; 2]));
-        }
-        dependent = (dependent + increment).max(lower);
-        if !small(dependent) {
-            return None;
-        }
-        if dependent > upper {
-            return Some((false, [0.; 2]));
-        }
-    }
-    if path.is_empty() || *mode == PairedResourceMode::Feasibility || scale == 0. {
-        return Some((true, [0.; 2]));
-    }
-    let baseline = match normalization {
-        PairedCostNormalization::AbsoluteFinalValue => 0.,
-        PairedCostNormalization::FinalMinusInitialMinimum => baseline,
-    };
-    let cost = bounds::Range::point(dependent)
-        .subtract(bounds::Range::point(baseline))
-        .multiply(bounds::Range::point(scale));
-    cost.finite().then_some((true, [cost.lo, cost.hi]))
 }
 
 impl CoupledKernel {

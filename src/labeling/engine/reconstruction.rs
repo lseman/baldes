@@ -85,12 +85,85 @@ impl<const D: usize> LabelingEngine<D> {
         if nodes.last().copied() != Some(g.sink as i32) {
             return Err(invalid("labeling predecessor chain does not reach sink"));
         }
-        original_cost += g
-            .coupled_path_cost(&arcs)?
-            .ok_or_else(|| incomplete(RESOURCE_REPLAY_MISMATCH))?;
+        let retained = if !self.consumption_joins {
+            if let Some(kernel) = g
+                .coupled_kernel()
+                .filter(|kernel| kernel.machine_paired_join_complete())
+            {
+                use crate::graph::coupled::descriptor::{FrontierBudget, FrontierOutcome};
+                let forward_label = pair.0.map(|id| self.forward.labels.view(id));
+                let backward_label = pair.1.map(|id| self.backward.labels.view(id));
+                let forward_root = pair.0.is_none().then(|| kernel.root(true));
+                let backward_root = pair.1.is_none().then(|| kernel.root(false));
+                let forward = forward_label
+                    .as_ref()
+                    .and_then(|label| label.coupled_state())
+                    .or(forward_root.as_deref())
+                    .ok_or_else(|| incomplete(RESOURCE_REPLAY_MISMATCH))?;
+                let backward = backward_label
+                    .as_ref()
+                    .and_then(|label| label.coupled_state())
+                    .or(backward_root.as_deref())
+                    .ok_or_else(|| incomplete(RESOURCE_REPLAY_MISMATCH))?;
+                let resource = kernel
+                    .retained_paired_machine_resource()
+                    .ok_or_else(|| incomplete(RESOURCE_REPLAY_MISMATCH))?;
+                let selection = match kernel.paired_machine_resource_join(
+                    resource,
+                    forward,
+                    backward,
+                    FrontierBudget::default(),
+                ) {
+                    FrontierOutcome::Complete(value) => value,
+                    FrontierOutcome::Empty => return Err(incomplete(RESOURCE_REPLAY_MISMATCH)),
+                    FrontierOutcome::Unknown(reason) => {
+                        return Err(incomplete(format!(
+                            "paired retained join unavailable: {reason:?}"
+                        )))
+                    }
+                };
+                let (_, coupled) = kernel
+                    .join_objective_costs(forward, backward)?
+                    .ok_or_else(|| incomplete(RESOURCE_REPLAY_MISMATCH))?;
+                let left = forward
+                    .scalar_original_cost()
+                    .ok_or_else(|| incomplete(RESOURCE_REPLAY_MISMATCH))?;
+                let right = backward
+                    .scalar_original_cost()
+                    .ok_or_else(|| incomplete(RESOURCE_REPLAY_MISMATCH))?;
+                Some((
+                    (left + right) + coupled,
+                    selection
+                        .dependent
+                        .map(|value| vec![(resource, value)])
+                        .unwrap_or_default(),
+                ))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let paired_values = if let Some((retained_cost, values)) = retained {
+            original_cost = retained_cost;
+            values
+        } else {
+            original_cost += g
+                .coupled_route_cost(&arcs)?
+                .ok_or_else(|| incomplete(RESOURCE_REPLAY_MISMATCH))?;
+            if g.coupled_kernel()
+                .is_some_and(|kernel| kernel.uses_zero_paired_inspection_cost())
+            {
+                Vec::new()
+            } else {
+                g.coupled_paired_values(&arcs)?
+            }
+        };
+        if !original_cost.is_finite() {
+            return Err(incomplete("reconstructed route objective is nonfinite"));
+        }
         Ok(Some(Route {
-            coupled_controls: Vec::new(),
-            coupled_values: g.coupled_paired_values(&arcs)?,
+            coupled_values: paired_values,
             nodes,
             arcs: arcs.into_iter().map(|i| g.arcs[i].id).collect(),
             cost,

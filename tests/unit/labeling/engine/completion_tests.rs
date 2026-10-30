@@ -20,9 +20,9 @@ fn model() -> Graph<2> {
 #[test]
 fn stored_paired_completion_scans_only_after_labels_are_complete() {
     use crate::graph::coupled::descriptor::{
-        FrontOperationPolicy, PairedCostNormalization, PreparedSlopeFunction, SlopeRelationArc,
+        FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
     };
-    use crate::graph::coupled::PairedResourceMode;
+    use crate::graph::coupled::{MachineArcFunctionInput, PairedResourceMode};
     use crate::graph::Window;
 
     let mut graph = Graph::<2>::new(3, 1).unwrap();
@@ -35,25 +35,40 @@ fn stored_paired_completion_scans_only_after_labels_are_complete() {
         let id = graph.add_arc(tail, head, -1.).unwrap();
         graph.arc_mut(id).unwrap().consumption[0] = 1.;
     }
-    let line = |value, slope| {
-        PreparedSlopeFunction::from_prepared_pairs(vec![(value, 0.), (slope, 4.)]).unwrap()
-    };
-    let arc = SlopeRelationArc {
-        arrival: line(1., 1.),
-        increment: line(0.25, 0.),
-        lower: line(0., 0.),
-        upper: line(8., 0.),
-        waiting: 0,
-    };
     graph
-        .set_coupled_resources(&[CoupledResource::SlopePaired {
-            initial: line(0., 0.),
-            initial_base: Window::new(0., 4.).unwrap(),
-            arcs: vec![arc; 2],
+        .set_coupled_resources(&[CoupledResource::PairedFront {
             mode: PairedResourceMode::CostUnbounded,
-            normalization: PairedCostNormalization::AbsoluteFinalValue,
-            policy: FrontOperationPolicy::StrictDomain,
         }])
+        .unwrap();
+    let window = Window::new(0., 4.).unwrap();
+    let base = PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (0., 4.)]).unwrap();
+    let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+    let inputs: Vec<_> = (0..2)
+        .map(|physical_arc| MachineArcFunctionInput {
+            physical_arc,
+            tail_bounds: window,
+            waiting_bounds: window,
+            waiting_rate: 0,
+            base: &base,
+            dependent: affine(0.25),
+            dependent_lower: affine(0.),
+            dependent_upper: affine(8.),
+        })
+        .collect();
+    let result = graph.prepare_paired_front_program(
+        0,
+        &inputs,
+        affine(0.),
+        window,
+        window,
+        FrontierBudget::default(),
+    );
+    assert!(
+        matches!(result, FrontierOutcome::Complete(())),
+        "{result:?}"
+    );
+    graph
+        .set_paired_waiting_windows_from_resource(0, 0)
         .unwrap();
     let mut engine = engine(&graph);
     engine

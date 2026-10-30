@@ -164,7 +164,7 @@ impl BucketGraph {
                 };
             }
         }
-        self.version += 1;
+        self.issue_step_version();
         if self.bidirectional {
             self.backward_version += 1;
         }

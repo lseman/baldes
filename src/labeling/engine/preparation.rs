@@ -54,12 +54,9 @@ impl<const D: usize> LabelingEngine<D> {
 
     pub fn prepare(g: &Graph<D>, controls: EngineControls<D>, phase: Phase) -> Result<Self> {
         phase.validate()?;
-        let mut grid = BucketGraph::prepare(
-            g,
-            &controls.steps,
-            controls.target_buckets,
-            controls.bidirectional,
-        )?;
+        // The symmetry test reads only grid bounds, so build the backward grid
+        // afterwards and only when the symmetric forward-only path is not taken.
+        let mut grid = BucketGraph::prepare(g, &controls.steps, controls.target_buckets, false)?;
         let reverse = crate::graph::symmetry::reverse_arcs(g).unwrap_or_default();
         let consumption_joins = controls.bidirectional
             && g.max_route_arcs().is_none()
@@ -68,8 +65,11 @@ impl<const D: usize> LabelingEngine<D> {
             && controls.use_symmetric_execution
             && !reverse.is_empty()
             && crate::graph::symmetry::consumption_symmetric(g, &grid, &reverse);
+        if controls.bidirectional && !consumption_joins {
+            grid.bidirectional = true;
+            grid.ensure_backward(g)?;
+        }
         if consumption_joins {
-            grid.bidirectional = false;
             grid.middle = (grid.lower[0][0] + grid.upper[grid.order.len() - 1][0]) * 0.5;
             for v in 0..grid.forward.buckets.len() {
                 for k in 0..grid.forward.buckets[v].len() {
@@ -225,9 +225,13 @@ impl<const D: usize> LabelingEngine<D> {
     }
     pub(super) fn labels_match_graph(&self, g: &Graph<D>) -> bool {
         self.costs_unchanged(g)
-            && self.forward.protected_resources == self.cuts.knapsack.dominance_protected_resources()
+            && self.forward.protected_resources
+                == self.cuts.knapsack.dominance_protected_resources()
             && self.backward.protected_resources == self.forward.protected_resources
-            && self.last_original_costs.iter().map(|cost| cost.to_bits())
+            && self
+                .last_original_costs
+                .iter()
+                .map(|cost| cost.to_bits())
                 .eq(g.arcs.iter().map(|arc| arc.cost.to_bits()))
             && match (&self.coupled_identity, g.coupled_kernel()) {
                 (None, None) => true,

@@ -46,6 +46,94 @@ impl<const D: usize> RoutingContext<D> {
                 // already violated this nonnegative violation row.
             }
         }
+        let graph = &self.model.networks[0].graph;
+        let mut owner_coordinates = std::collections::BTreeMap::new();
+        let mut owner_limits = vec![];
+        let mut owner_states = std::collections::BTreeMap::new();
+        let quantity = graph.arcs.len();
+        let quantity_bounds = Bounds {
+            lower: self.model.networks[0].multiplicity.lower,
+            upper: self.model.networks[0].multiplicity.upper,
+        };
+        if let Some(kernel) = graph.coupled_kernel() {
+            let resources: std::collections::BTreeSet<_> = kernel
+                .paired_owner_registration_bounds()
+                .iter()
+                .map(|&(resource, _)| resource)
+                .chain(
+                    kernel
+                        .paired_associated_costs()
+                        .iter()
+                        .map(|&(resource, _)| resource),
+                )
+                .chain(
+                    self.model.networks[0]
+                        .activity_entries
+                        .iter()
+                        .map(|entry| entry.resource),
+                )
+                .collect();
+            for resource in resources {
+                if !matches!(
+                    kernel.definitions().get(resource),
+                    Some(crate::graph::coupled::CoupledResource::PairedFront { .. })
+                ) {
+                    continue;
+                }
+                let input = kernel
+                    .paired_owner_registration_bounds()
+                    .iter()
+                    .find(|&&(index, _)| index == resource)
+                    .map(|&(_, bounds)| bounds);
+                let mut fixed_upper = ExactSum::default();
+                let mut negative_fixed_lower = ExactSum::default();
+                for (route, count) in &self.fixed_routes {
+                    let arcs = route
+                        .arcs
+                        .iter()
+                        .map(|id| {
+                            self.arc_position(*id)
+                                .ok_or_else(|| invalid("unknown fixed owner arc"))
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+                    let value = crate::master::model::accumulated_activity_column_value(
+                        graph, route, &arcs, resource,
+                    )?;
+                    if fixed_upper.product(value, f64::from(*count)).is_none()
+                        || negative_fixed_lower
+                            .product(-value, f64::from(*count))
+                            .is_none()
+                    {
+                        return Err(invalid("fixed owner activity overflow"));
+                    }
+                }
+                let fixed = [
+                    -negative_fixed_lower
+                        .upper()
+                        .ok_or_else(|| invalid("fixed owner activity overflow"))?,
+                    fixed_upper
+                        .upper()
+                        .ok_or_else(|| invalid("fixed owner activity overflow"))?,
+                ];
+                let owner = crate::master::preprocessing::paired_owner::OwnerBounds::new(
+                    input,
+                    quantity_bounds,
+                    fixed,
+                );
+                let index = quantity + 1 + owner_limits.len();
+                owner_coordinates.insert(resource, index);
+                owner_limits.push(owner.aggregate);
+                owner_states.insert(resource, owner);
+            }
+        }
+        for entry in &self.model.networks[0].activity_entries {
+            let Some(&index) = owner_coordinates.get(&entry.resource) else {
+                return Err(invalid(
+                    "routing owner preprocessing requires represented paired activities",
+                ));
+            };
+            rows[entry.row].entries.push((index, entry.coefficient));
+        }
         rows.extend_from_slice(additional);
         // Rewrite pure incoming-flow rows on outgoing flow as well. This is
         // conservation substitution, not an assumption of elementarity: a
@@ -55,7 +143,10 @@ impl<const D: usize> RoutingContext<D> {
             let Some(&(first, coefficient)) = row.entries.first() else {
                 continue;
             };
-            let vertex = self.model.networks[0].graph.arcs[first].head;
+            let Some(first_arc) = self.model.networks[0].graph.arcs.get(first) else {
+                continue;
+            };
+            let vertex = first_arc.head;
             if vertex == self.model.networks[0].graph.source
                 || vertex == self.model.networks[0].graph.sink
             {
@@ -94,7 +185,7 @@ impl<const D: usize> RoutingContext<D> {
         rows.extend(crate::master::preprocessing::flow::conservation(
             &self.model.networks[0].graph,
             0,
-            None,
+            (!owner_states.is_empty()).then_some(quantity),
         ));
         let mut bounds = vec![
             Bounds {
@@ -107,7 +198,46 @@ impl<const D: usize> RoutingContext<D> {
         // asymptotically convergent continuous constraints.
         let work = rows.len().saturating_mul(100).max(1000);
         let fixed = self.propagate_ryan_foster(&mut bounds);
-        let mut report = propagate(&mut bounds, &rows, 1e-8, work)?;
+        if !owner_states.is_empty() {
+            bounds.push(quantity_bounds);
+        }
+        bounds.extend(owner_limits);
+        let mut report = Report::default();
+        loop {
+            if report.work_used >= work {
+                break;
+            }
+            let pass = propagate(&mut bounds, &rows, 1e-8, work - report.work_used)?;
+            report.work_used += pass.work_used;
+            report.rows_processed += pass.rows_processed;
+            report.bound_updates += pass.bound_updates;
+            report.infeasible |= pass.infeasible;
+            report.complete = pass.complete;
+            if report.infeasible || !pass.complete {
+                break;
+            }
+            let mut changed = false;
+            for (&resource, owner) in &mut owner_states {
+                let index = owner_coordinates[&resource];
+                changed |= owner.update(bounds[index], bounds[quantity]);
+                bounds[index] = owner.aggregate;
+            }
+            if !changed {
+                break;
+            }
+        }
+        if !report.infeasible && (!owner_states.is_empty() && bounds[quantity].upper > 0.) {
+            for &resource in owner_coordinates.keys() {
+                let current = owner_states[&resource].local;
+                if crate::graph::coupled::CoupledKernel::owner_registration_bound_is_unsupported([
+                    current.lower,
+                    current.upper,
+                ]) {
+                    return Err(invalid(format!("non-zero lower bounds on variables associated to arcs are not supported (paired resource {resource}, propagated owner bounds [{}, {}])",current.lower,current.upper)));
+                }
+            }
+        }
+        bounds.truncate(graph.arcs.len());
         report.bound_updates += fixed;
         Ok((report, bounds))
     }

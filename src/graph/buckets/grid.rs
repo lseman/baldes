@@ -89,10 +89,17 @@ impl BucketGraph {
                     upper[h][r].min(a.bounds[slot].map_or(f64::INFINITY, |w| w.upper));
             }
         }
-        // Incoming arc windows tighten each
-        // vertex; retain terminal upper seeds before widening source resources.
+        let paired_base = g
+            .coupled_kernel()
+            .and_then(|kernel| kernel.bound_paired_base_resource(g));
+        // Prepared paired vertex domains are independent of their arc windows:
+        // in particular, native reduction leaves the sink lower bound intact.
+        // Other axes use the incoming window hull before source widening.
         for v in 0..n {
             for r in 0..resource_slots.len() {
+                if paired_base == Some(resource_slots[r]) {
+                    continue;
+                }
                 let mut incoming_lower = f64::INFINITY;
                 let mut incoming_upper = f64::NEG_INFINITY;
                 for (i, a) in g.arcs.iter().enumerate() {
@@ -137,8 +144,12 @@ impl BucketGraph {
                 }
             }
         }
-        for r in 0..resource_slots.len() {
-            upper[0][r] = upper[n - 1][r];
+        for (r, &slot) in resource_slots.iter().enumerate() {
+            // A paired base has its own explicit preprocessed source domain;
+            // copying the terminal upper would discard that supplied geometry.
+            if paired_base != Some(slot) {
+                upper[0][r] = upper[n - 1][r];
+            }
         }
         let mut arc_order: Vec<_> = (0..g.arcs.len()).collect();
         arc_order.sort_by_key(|&a| {
@@ -169,6 +180,7 @@ impl BucketGraph {
             jump_arcs: true,
             version: 0,
             backward_version: 0,
+            versions: Default::default(),
             target_buckets,
             resource_slots,
             order,
@@ -278,7 +290,10 @@ impl BucketGraph {
     /// Distinguish an unrepresentable lookup from a coordinate outside the
     /// grid, so completion queries do not treat arithmetic failure as proof.
     pub(crate) fn bucket_id_checked(
-        &self, forward: bool, vertex: usize, q: [f64; 2],
+        &self,
+        forward: bool,
+        vertex: usize,
+        q: [f64; 2],
     ) -> std::result::Result<Option<usize>, ()> {
         let mut index = 0isize;
         for (r, &coordinate) in q.iter().enumerate().take(self.dimensions) {
@@ -299,7 +314,10 @@ impl BucketGraph {
             index = index.checked_add(term).ok_or(())?;
         }
         Ok(usize::try_from(index).ok().filter(|&i| {
-            self.direction(forward).buckets.get(vertex).is_some_and(|row| i < row.len())
+            self.direction(forward)
+                .buckets
+                .get(vertex)
+                .is_some_and(|row| i < row.len())
         }))
     }
 }

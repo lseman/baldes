@@ -129,12 +129,29 @@ fn machine_kpath_exit_layout_preserves_recovered_destination_shift() {
         .collect();
     let mut source = CutResourceInfo::default();
     let mut machine = CutResourceInfo::default();
-    assert!(prepare_full_memory(&mut source, &mut FullPreparation::default(), &graph, &[], &inputs, true));
-    assert!(prepare_full_memory_machine(&mut machine, &mut FullPreparation::default(), &graph, &[], &inputs, true));
+    assert!(prepare_full_memory(
+        &mut source,
+        &mut FullPreparation::default(),
+        &graph,
+        &[],
+        &inputs,
+        true
+    ));
+    assert!(prepare_full_memory_machine(
+        &mut machine,
+        &mut FullPreparation::default(),
+        &graph,
+        &[],
+        &inputs,
+        true
+    ));
     let source_exit = &source.forward[0].full_memory[0];
     let machine_exit = &machine.forward[0].full_memory[0];
     assert_eq!((source_exit.source_shift, source_exit.target_shift), (1, 1));
-    assert_eq!((machine_exit.source_shift, machine_exit.target_shift), (1, 0));
+    assert_eq!(
+        (machine_exit.source_shift, machine_exit.target_shift),
+        (1, 0)
+    );
     // The pinned helper produces these packed words in both directions for
     // the corresponding descriptor; its additional cost remains zero.
     for (initial, expected) in [(0, 1), (1, 1), (2, 2), (3, 2)] {

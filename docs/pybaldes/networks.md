@@ -54,7 +54,7 @@ print(root.routes[0].network, root.routes[0].nodes)
 
 `NetworkRoute.coupled_values` is an immutable tuple of paired descriptor/value
 pairs retained with the scalar `resource_profile`. Values describe the current
-selected physical dependent state, independently of objective normalization;
+selected physical dependent state, independently of the objective coefficient;
 they are not full control trajectories or standalone feasibility certificates.
 
 The only covering route costs 3, contributes one unit to shared row 0, consumes
@@ -69,7 +69,7 @@ Both require Clp.
 | `SharedRow` | `sense`, `rhs`; sense is `"eq"`, `"le"`, or `"ge"` |
 | `PricingResource` | `kind="disposable"`, `initial=None`, `bounds=None`, `time_windows=None` |
 | `PricingArc` | `tail`, `head`, `cost`, `consumption=()`, `bounds=()`, `entries=()` |
-| `PricingNetwork` | `id`, `vertices`, `multiplicity`, `arcs`, `resources=()`, `source=0`, `sink=None`, `route_entries=()`, `activity_entries=()`, `ng=None`, `coupled_resources=()`, `coupled_objective_coefficients=()`, `paired_waiting_base_resources=()`, `paired_machine_inputs=()`, `paired_machine_roots=()`, `paired_machine_terminal_bounds=()`, `elementary=False`, `route_domain=None`, `front_program_domain=False` |
+| `PricingNetwork` | `id`, `vertices`, `multiplicity`, `arcs`, `resources=()`, `source=0`, `sink=None`, `route_entries=()`, `activity_entries=()`, `ng=None`, `coupled_resources=()`, `coupled_objective_coefficients=()`, `paired_waiting_base_resources=()`, `paired_machine_inputs=()`, `paired_machine_roots=()`, `paired_machine_terminal_bounds=()`, `paired_machine_waiting_rates=()`, `paired_front_programs=()`, `paired_owner_registration_bounds=()`, `elementary=False`, `route_domain=None`, `front_program_domain=False` |
 | `NetworkProblem` | `rows`, scalar/array `networks`, optional `pricing_variables` |
 
 Scalar `kind` accepts `"disposable"` or `"equality"`. Resource `bounds` has one
@@ -86,49 +86,30 @@ fleet multiplicity are different constraints. `sink=None` selects the last
 vertex. `ng` supplies per-vertex neighborhoods; `elementary=True` selects an
 elementary network domain. `coupled_resources` accepts tagged descriptors.
 
-`paired_waiting_base_resources=((coupled_index, scalar_index), ...)` opts a
-`slope_paired` resource into waiting windows derived from the corresponding
-scalar resource. Each physical arc's window intersects its head vertex bounds
-with the arc bounds; absent arc bounds use -1e12 and 1e12. Indices refer to
-`coupled_resources` and `resources`, respectively. Duplicate coupled indices,
-invalid indices, empty intersections, and scalar resources with multi-time
-windows are rejected. The equivalent CLI JSON field uses arrays of pairs,
-for example `"paired_waiting_base_resources": [[0, 1]]`. An omitted or empty
-field leaves the paired resource's existing waiting behavior unchanged.
+`paired_front_programs` supplies a sequence of complete program dictionaries,
+with one `resource` index per entry. Declare the corresponding coupled resource
+as `{"kind": "paired_front", "mode": "cost_unbounded"}` (or `feasibility` /
+`cost_bounded`). Each program supplies source/terminal windows, a root and one
+arc mapping per physical arc. See [paired front programs](../extensions/coupled-resources.md#paired-front-programs-and-waiting)
+for the complete schema. Preparation selects the front-program domain.
 
-`paired_machine_inputs=((coupled_index, arc_inputs), ...)` attaches exact
-prepared machine operands to a `slope_paired` resource using `front_algebra`.
-`arc_inputs` contains one mapping per physical arc in insertion order. Each
-mapping supplies finite `tail_limit`, `head_limit`, `waiting_lower`,
-`waiting_upper`, integer `waiting_rate`, and `forward_mapping`, `inverse`,
-`sum_vector`, `dependent_lower`, and `dependent_upper` functions. Encode each
-function as `{"pairs": [[value, coordinate], [slope, end], ...]}`. The
-machine decoder also accepts a zero-width two-pair vector and a three-pair
-vector with a zero-width first segment. The waiting limits must be ordered. Resource
-indices must be unique and each arc vector must match the graph's arc count.
-An arc may also include a `backward` mapping with `tail_lower`, `tail_upper`,
-`forward_at_tail_lower`, `mapped_upper`, and `dependent` (a prepared function
-in the same `pairs` format). These are the separate operands needed by the
-backward recurrence, which remains incomplete.
-These inputs invalidate prepared pricing state when changed. When
-`front_program_domain` is enabled, the incomplete machine path uses them and
-also requires `paired_machine_roots=((coupled_index, {"pairs": [...]}), ...)`
-with the separately prepared dependent root vector. The equivalent JSON field is
-an array of `[coupled_index, arc_inputs]` pairs. An omitted field defaults to
-empty. To initialize backward machine labels, supply
-`paired_machine_terminal_bounds=((coupled_index, (lower, upper)), ...)` with
-the prepared terminal base window. The associated arc operands must already
-be supplied in `paired_machine_inputs`.
+`paired_waiting_base_resources=((coupled_index, scalar_index), ...)` derives
+head waiting windows from the intersection of scalar vertex and arc bounds.
+Invalid indices, duplicate coupled indices, empty intersections and disconnected
+scalar time windows are rejected.
+
+The lower-level `paired_machine_inputs`, `paired_machine_roots` and
+`paired_machine_terminal_bounds` fields accept separately prepared operands.
+Do not combine those fields with a complete program for the same resource.
+Changing preparation invalidates existing pricing state.
 
 `coupled_objective_coefficients=((resource_index, coefficient), ...)` sets
-graph-level costs using each descriptor's declared normalization. With Clp,
-negative source paired costs support both absolute and final-minus-initial
-normalization. A relative objective subtracts the global initial-front minimum,
-independently of the witness's initial coordinate. Each resource has one cost
-owner: omit its graph coefficient when an original `pricing_variables` entry
-binds that resource. Duplicate indices, unsupported descriptors and nonfinite
-coefficients are rejected by the common graph setter. Omitted resources keep
-coefficient one. The field works for one network and arrays of networks.
+finite paired owner objective coefficients of either sign; omitted resources
+use one. Raw front pricing keeps its unit charge and minimum-front selection.
+Original route costs apply the owner coefficient to the recorded selected
+dependent value without initial-minimum subtraction. Each resource has one
+objective owner: omit a graph coefficient when an original `pricing_variables`
+entry binds that resource.
 
 The Rust interface additionally supports independent master variables and
 imported-column domains. Those registrations are not fields in the CLI/Python
@@ -149,19 +130,27 @@ over the complete bounded graph relaxation. Direct network
 See [original variable compilation](../solver/models.md#original-pricing-variable-compilation-rust)
 for the shared contract.
 
-`accumulated_resource` also accepts cost-bearing paired descriptors (raw slopes or control points) with
-`absolute_final_value` normalization and a finite `cost`. Negative costs require
-a source-domain model and use maximum-control pricing. The reported
-value comes from the selected column, independently of the cost coefficient.
-For this paired binding, `entries` supports signed shared-row coefficients in
-source-domain models. `integer=True` is accepted when a program or complete
-control-domain proof establishes integral terminal activity for every control.
-Continuous ranges with integral endpoints are rejected. Verified
-`original_variable_boxes` enclose all controls, including nonminimum choices;
-they are envelopes, not new model restrictions. Automatic pricing covers finite
-physical paths and independently bounds alternative source controls. Incomplete
-coverage remains explicit. Machine-front integer activities/negative objectives
-and rows remain unsupported.
+`accumulated_resource` also accepts cost-bearing paired fronts with any finite
+`cost`. The reported value comes from the selected column, independently of the
+objective coefficient. Paired `entries` and network `activity_entries` use that
+selected value. Their dual terms do not change raw front pricing. When owner
+terms differ from raw pricing, completion alone cannot certify the owner
+objective; a solve may report `Stalled` with an unknown bound.
+
+Paired integer registration is retained as metadata. It does not constrain each
+path's selected activity to an integer or supply a projected integer branching
+rule. Feasibility-only paired fronts cannot bind an original variable.
+
+`paired_owner_registration_bounds=((resource_index, (lower, upper)), ...)`
+supplies owner preprocessing bounds, with `None` for an unbounded endpoint.
+These inputs are separate from per-path resource windows and shared activity
+rows. A positive propagated lower bound can fail the pricing callback with an
+explicit unsupported-bound error. They do not truncate individual path values.
+
+Only one paired program can be installed, alone or with standard graph
+resources. Combinations with other coupled descriptors, including custom and
+cumulative resources, and a second paired program return explicit unsupported
+composition errors. These combinations are solver limitations.
 
 ## Model JSON
 
@@ -266,11 +255,11 @@ assert parent.solve().lp == root.lp
 
 `NetworkRowCoefficients(network, arcs, per_route=0.0, activities=())` supplies
 one coefficient per physical arc and optional `(coupled_descriptor, coefficient)`
-activity terms. The constant is charged once per route. Deterministic activities
-and selected source paired values use the same `with_row` lifecycle, including
-`dynamic=True`. These terms apply to existing and future columns. An existing
-complete universe accepts a paired term only after an all-control invariance
-proof confirms that its retained coefficients remain valid.
+activity terms. The constant is charged once per route. Supported deterministic
+custom/cumulative activities use the same `with_row` lifecycle, including
+`dynamic=True`, for existing and future columns. Paired front activities are
+rejected because their selected split-dependent values do not define this
+shared-row contract.
 
 `parent.fractional_assignments(tolerance=1e-6)` returns `NetworkAssignment`
 objects with `shared_row`, `network`, and `value`. A candidate can be branched:
@@ -412,47 +401,6 @@ variable costs remain separate during this calculation even if they cancel on
 shared physical arcs. See the [compilation contract](../solver/models.md#original-pricing-variable-compilation-rust).
 
 
-Explicit source choices can be retained for an existing route with
-`node.with_route_controls(route_index, (PairedControl(resource, base), ...))`.
-`base` contains the initial coordinate and one head coordinate per arc. The
-result is a new node; duplicate identities are reused. Controls need independent
-singleton source certificates, and complete/cutoff universes and machine-front
-model domains reject this operation. `route.coupled_controls` is an immutable
-tuple of `PairedControl` objects. Values and costs survive resume, fixing and
-tree solving; original-variable reporting reads the supplied selected value.
-Models without paired rows retain ordinary minimum-front pricing. Paired rows
-use the same master coordinator with bounded source-control generation, including
-reversed reduced weights and row-boundary proposals. Complete enumeration retains invariant terminal values or a certified attained
-endpoint that weakly improves both the objective and every row. Negative costs
-favor maxima, positive costs minima, and zero costs either direction, subject
-to all row signs and inequality senses. Equality rows, opposing requirements,
-identity-specific column caps, and uncertain/unattained bounds remain guarded.
-A new Gamma row may reuse invariant matching values or the same certified
-endpoints when they still favor the objective and every old/new row. Repeated
-terms are checked together; restrictive retained-column caps and fixed-copy
-certificates remain part of the proof. Opposing/equality rows requiring other
-controls cannot widen the projected universe. Negative model costs use the same bounded source-control optimizer;
-machine-front negative models remain unsupported.
-
-
-`node.optimize_route_control(route_index, resource, maximize=False,
-terminal=None, max_cells=4096, max_work=1_000_000,
-max_lp_iterations=10000, time_limit=1.0)` generates a source control on one
-registered path. `terminal=(lower, upper)` restricts its physical dependent
-value. It returns an immutable `ControlOptimization` with `control`, `dependent`,
-`work_used`, `lp_iterations`,
-`lower_bound`, `complete`, `maximize` and `cells`.
-
-```python
-choice = node.optimize_route_control(route_index, 0, terminal=(4.0, 4.0))
-if choice.control is not None:
-    node = node.with_route_controls(route_index, (choice.control,))
-```
-
-Every returned control has an independent source certificate. `complete=True`
-means all regions were bounded/rejected and a feasible control was found, or
-all regions were proved empty. It does not assert a zero primal/dual gap.
-`lower_bound` applies to Gamma, or -Gamma when maximizing. An incomplete result
-can retain a useful feasible control; it cannot assert infeasibility. This is a
-fixed-path descriptor search, not a whole-model pricing certificate. Its limits
-are shared across LP regions. Machine-front models reject the source search.
+Paired front routes retain their selected `coupled_values`. The selected value
+must match a successful split join of the retained program. Explicit source
+controls and route-control optimization are unsupported.

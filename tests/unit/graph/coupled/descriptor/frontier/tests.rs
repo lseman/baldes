@@ -1,4 +1,4 @@
-use super::super::PreparedSlopeRelationArc;
+use super::super::PairedFrontOperations;
 use super::*;
 
 fn function(pairs: &[(f64, f64)]) -> PreparedSlopeFunction {
@@ -133,7 +133,7 @@ fn machine_history_backtracks_through_a_multisegment_inverse() {
         max_states: 2,
     };
     let inverse = function(&[(0., 0.), (0.5, 1.), (0.5, 3.)]);
-    let coordinates = complete(PreparedSlopeRelationArc::machine_backtrack_coordinates(
+    let coordinates = complete(PairedFrontOperations::machine_backtrack_coordinates(
         &history,
         2.,
         &[(7, &inverse)],
@@ -141,7 +141,7 @@ fn machine_history_backtracks_through_a_multisegment_inverse() {
     ));
     assert_eq!(coordinates, vec![1., 2.]);
     assert!(matches!(
-        PreparedSlopeRelationArc::machine_backtrack_coordinates(
+        PairedFrontOperations::machine_backtrack_coordinates(
             &history,
             2.,
             &[(8, &inverse)],
@@ -421,6 +421,17 @@ fn machine_dependent_bounds_match_reference_crossings_and_waiting_bits() {
         assert_eq!(actual.function().pairs(), expected);
         assert_eq!(actual.waiting_bits(), 2);
     }
+    // A front entirely above the bound is an empty (infeasible) state, as
+    // the native filter's count -1, not an unknown status.
+    let above = MachineWaitingEnvelope {
+        function: function(&[(6., 0.), (0., 2.)]),
+        waiting_bits: 0,
+        predecessor: None,
+    };
+    assert!(matches!(
+        above.apply_upper_bound(&function(&[(5.5, 0.), (0., 2.)]), FrontierBudget::default()),
+        FrontierOutcome::Empty
+    ));
 }
 
 #[test]

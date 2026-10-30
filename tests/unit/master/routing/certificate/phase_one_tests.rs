@@ -1,7 +1,9 @@
 use super::*;
+use crate::graph::coupled::descriptor::{
+    FrontierBudget, FrontierOutcome, MachineRootInput, RawAffine,
+};
 use crate::graph::coupled::{
-    CoupledResource, FrontOperationPolicy, PairedCostNormalization, PairedResourceMode,
-    PreparedSlopeFunction, SlopeRelationArc,
+    CoupledResource, MachineArcFunctionInput, PairedResourceMode, PreparedSlopeFunction,
 };
 
 fn problem(customers: usize, capacity: f64) -> (RoutingContext<2>, ClpMaster, Vec<f64>) {
@@ -17,26 +19,42 @@ fn problem(customers: usize, capacity: f64) -> (RoutingContext<2>, ClpMaster, Ve
                 continue;
             }
             graph.add_arc(tail, head, 0.).unwrap();
-            arcs.push(SlopeRelationArc {
-                arrival: function(if head == sink { 0. } else { 1. }, 1.),
-                increment: function(0., 0.),
-                lower: function(0., 0.),
-                upper: function(8., 0.),
-                waiting: 0,
-            });
+            arcs.push(function(if head == sink { 0. } else { 1. }, 0.));
         }
     }
     graph
-        .set_coupled_resources(&[CoupledResource::SlopePaired {
-            initial: function(0., 0.),
-            initial_base: crate::graph::Window::new(0., capacity).unwrap(),
-            arcs,
+        .set_coupled_resources(&[CoupledResource::PairedFront {
             mode: PairedResourceMode::CostUnbounded,
-            normalization: PairedCostNormalization::AbsoluteFinalValue,
-            policy: FrontOperationPolicy::FrontAlgebra,
         }])
         .unwrap();
-    graph.set_front_program_domain(true).unwrap();
+    let bounds = crate::graph::Window::new(0., capacity).unwrap();
+    let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+    let inputs: Vec<_> = arcs
+        .iter()
+        .enumerate()
+        .map(|(physical_arc, base)| MachineArcFunctionInput {
+            physical_arc,
+            tail_bounds: bounds,
+            waiting_bounds: bounds,
+            waiting_rate: 0,
+            base,
+            dependent: affine(0.),
+            dependent_lower: affine(0.),
+            dependent_upper: affine(8.),
+        })
+        .collect();
+    let result = graph.prepare_paired_front_program(
+        0,
+        &inputs,
+        affine(0.),
+        bounds,
+        bounds,
+        FrontierBudget::default(),
+    );
+    assert!(
+        matches!(result, FrontierOutcome::Complete(())),
+        "{result:?}"
+    );
     graph.suppress_coupled_costs();
     let problem = RoutingContext::set_partitioning(graph, 1.).unwrap();
     let mut master = ClpMaster::new().unwrap();

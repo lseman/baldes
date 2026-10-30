@@ -1,0 +1,25 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "initial": 0.0,
+  "base_bounds": [
+    0.0,
+    8.0
+  ],
+  "dependent_bounds": [
+    0.0,
+    10.0
+  ],
+  "base_consumption": 1.0,
+  "dependent_increments": [
+    -0.25,
+    -0.25,
+    0.25
+  ],
+  "waiting_rate": 0,
+  "split_dependent_values": [
+    -0.25,
+    0.0,
+    0.25,
+    0.25
+  ]
+}

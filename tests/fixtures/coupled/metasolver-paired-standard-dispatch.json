@@ -1,0 +1,1847 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "scope": "Registered paired plus ordinary standard native factory and recursive resource joins; no generic charged plugin composition.",
+  "factory": {
+    "kind": "factory",
+    "caller": "BcRCSPFunctor::prepareSolver()",
+    "resources": [
+      {
+        "id": 0,
+        "type": 3
+      },
+      {
+        "id": 1,
+        "type": 5
+      },
+      {
+        "id": 2,
+        "type": 1
+      }
+    ],
+    "returned_nonnull": true
+  },
+  "resource_joins": [
+    {
+      "kind": "pair-standard-resource-join",
+      "caller": "bool bcp_rcsp::labelsCanBeConcatenated<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> >(bcp_rcsp::MsResources<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bool, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, double&, double&)",
+      "vertex": 0,
+      "left": {
+        "paired": [
+          [
+            2.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "standard": [
+          0.0,
+          0.0
+        ]
+      },
+      "right": {
+        "paired": [
+          [
+            8.25,
+            0.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "standard": [
+          1.0,
+          0.0
+        ]
+      },
+      "accumulator_before": 0.0,
+      "returned": true,
+      "accumulator_after": 1.75
+    },
+    {
+      "kind": "pair-standard-resource-join",
+      "caller": "bool bcp_rcsp::labelsCanBeConcatenated<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> >(bcp_rcsp::MsResources<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bool, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, double&, double&)",
+      "vertex": 0,
+      "left": {
+        "paired": [
+          [
+            2.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "standard": [
+          0.0,
+          0.0
+        ]
+      },
+      "right": {
+        "paired": [
+          [
+            8.25,
+            0.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "standard": [
+          1.0,
+          0.0
+        ]
+      },
+      "accumulator_before": 0.0,
+      "returned": true,
+      "accumulator_after": 1.75
+    },
+    {
+      "kind": "pair-standard-resource-join",
+      "caller": "bool bcp_rcsp::labelsCanBeConcatenated<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> >(bcp_rcsp::MsResources<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bool, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, double&, double&)",
+      "vertex": 0,
+      "left": {
+        "paired": [
+          [
+            2.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "standard": [
+          0.0,
+          0.0
+        ]
+      },
+      "right": {
+        "paired": [
+          [
+            8.25,
+            0.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "standard": [
+          1.0,
+          0.0
+        ]
+      },
+      "accumulator_before": 0.0,
+      "returned": true,
+      "accumulator_after": 1.75
+    },
+    {
+      "kind": "pair-standard-resource-join",
+      "caller": "bool bcp_rcsp::labelsCanBeConcatenated<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> >(bcp_rcsp::MsResources<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bool, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, double&, double&)",
+      "vertex": 1,
+      "left": {
+        "paired": [
+          [
+            1.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "standard": [
+          2.0,
+          0.0
+        ]
+      },
+      "right": {
+        "paired": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "standard": [
+          2.0,
+          0.0
+        ]
+      },
+      "accumulator_before": 0.0,
+      "returned": true,
+      "accumulator_after": 1.25
+    },
+    {
+      "kind": "pair-standard-resource-join",
+      "caller": "bool bcp_rcsp::labelsCanBeConcatenated<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> >(bcp_rcsp::MsResources<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bool, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, double&, double&)",
+      "vertex": 1,
+      "left": {
+        "paired": [
+          [
+            1.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "standard": [
+          2.0,
+          0.0
+        ]
+      },
+      "right": {
+        "paired": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "standard": [
+          2.0,
+          0.0
+        ]
+      },
+      "accumulator_before": 0.0,
+      "returned": true,
+      "accumulator_after": 1.25
+    },
+    {
+      "kind": "pair-standard-resource-join",
+      "caller": "bool bcp_rcsp::labelsCanBeConcatenated<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> >(bcp_rcsp::MsResources<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bool, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, double&, double&)",
+      "vertex": 2,
+      "left": {
+        "paired": [
+          [
+            1.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "standard": [
+          2.0,
+          0.0
+        ]
+      },
+      "right": {
+        "paired": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "standard": [
+          2.0,
+          0.0
+        ]
+      },
+      "accumulator_before": 0.0,
+      "returned": true,
+      "accumulator_after": 1.25
+    },
+    {
+      "kind": "pair-standard-resource-join",
+      "caller": "bool bcp_rcsp::labelsCanBeConcatenated<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> >(bcp_rcsp::MsResources<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bool, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, double&, double&)",
+      "vertex": 2,
+      "left": {
+        "paired": [
+          [
+            1.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "standard": [
+          2.0,
+          0.0
+        ]
+      },
+      "right": {
+        "paired": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "standard": [
+          2.0,
+          0.0
+        ]
+      },
+      "accumulator_before": 0.0,
+      "returned": true,
+      "accumulator_after": 1.25
+    },
+    {
+      "kind": "pair-standard-resource-join",
+      "caller": "bool bcp_rcsp::labelsCanBeConcatenated<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> >(bcp_rcsp::MsResources<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bool, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, double&, double&)",
+      "vertex": 3,
+      "left": {
+        "paired": [
+          [
+            1.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "standard": [
+          2.0,
+          0.0
+        ]
+      },
+      "right": {
+        "paired": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "standard": [
+          2.0,
+          0.0
+        ]
+      },
+      "accumulator_before": 0.0,
+      "returned": true,
+      "accumulator_after": 1.25
+    },
+    {
+      "kind": "pair-standard-resource-join",
+      "caller": "bool bcp_rcsp::labelsCanBeConcatenated<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> >(bcp_rcsp::MsResources<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bool, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, bcp_rcsp::MsEnumExtLabel<bcp_rcsp::BaseDepResourcePair<12ul>, bcp_rcsp::StdResources<2ul> > const&, double&, double&)",
+      "vertex": 3,
+      "left": {
+        "paired": [
+          [
+            1.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "standard": [
+          2.0,
+          0.0
+        ]
+      },
+      "right": {
+        "paired": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "standard": [
+          2.0,
+          0.0
+        ]
+      },
+      "accumulator_before": 0.0,
+      "returned": true,
+      "accumulator_after": 1.25
+    }
+  ],
+  "cases": [
+    {
+      "name": "standard",
+      "model": {
+        "rows": [
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          }
+        ],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              3
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    0,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 1,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  0.0,
+                  0.0
+                ]
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    1,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 1,
+                "head": 3,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    2,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    1,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  0.0,
+                  0.0
+                ]
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    0,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    2,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    2,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  0.0,
+                  0.0
+                ]
+              },
+              {
+                "tail": 3,
+                "head": 1,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    0,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 3,
+                "head": 2,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    1,
+                    1.0
+                  ]
+                ]
+              }
+            ],
+            "resources": [
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    2.5
+                  ],
+                  [
+                    0.0,
+                    2.5
+                  ],
+                  [
+                    0.0,
+                    2.5
+                  ],
+                  [
+                    0.0,
+                    2.5
+                  ],
+                  [
+                    0.0,
+                    2.5
+                  ]
+                ]
+              },
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    2.0
+                  ],
+                  [
+                    0.0,
+                    2.0
+                  ],
+                  [
+                    0.0,
+                    2.0
+                  ],
+                  [
+                    0.0,
+                    2.0
+                  ],
+                  [
+                    0.0,
+                    2.0
+                  ]
+                ]
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "paired_front",
+                "mode": "cost_unbounded"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  1.5
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  2.5
+                ],
+                "root": {
+                  "encoding": "affine",
+                  "intercept": 2.0,
+                  "slope": 0.0
+                },
+                "arcs": [
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      1.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          1.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      1.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          1.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      1.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          1.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "native_root_lp": 3.375
+    },
+    {
+      "name": "standard-restrictive",
+      "model": {
+        "rows": [
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          }
+        ],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              3
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    0,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 1,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  0.0,
+                  0.0
+                ]
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    1,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 1,
+                "head": 3,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    2,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    1,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  0.0,
+                  0.0
+                ]
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    0,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    2,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    2,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  0.0,
+                  0.0
+                ]
+              },
+              {
+                "tail": 3,
+                "head": 1,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    0,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 3,
+                "head": 2,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  1.0
+                ],
+                "entries": [
+                  [
+                    1,
+                    1.0
+                  ]
+                ]
+              }
+            ],
+            "resources": [
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    2.5
+                  ],
+                  [
+                    0.0,
+                    2.5
+                  ],
+                  [
+                    0.0,
+                    2.5
+                  ],
+                  [
+                    0.0,
+                    2.5
+                  ],
+                  [
+                    0.0,
+                    2.5
+                  ]
+                ]
+              },
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    1.0
+                  ],
+                  [
+                    0.0,
+                    1.0
+                  ],
+                  [
+                    0.0,
+                    1.0
+                  ],
+                  [
+                    0.0,
+                    1.0
+                  ],
+                  [
+                    0.0,
+                    1.0
+                  ]
+                ]
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "paired_front",
+                "mode": "cost_unbounded"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  1.5
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  2.5
+                ],
+                "root": {
+                  "encoding": "affine",
+                  "intercept": 2.0,
+                  "slope": 0.0
+                },
+                "arcs": [
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      1.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          1.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      1.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          1.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      1.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          1.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      2.5
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          2.5
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "affine",
+                      "intercept": -0.25,
+                      "slope": 0.0
+                    },
+                    "dependent_lower": {
+                      "encoding": "affine",
+                      "intercept": 0.0,
+                      "slope": 0.0
+                    },
+                    "dependent_upper": {
+                      "encoding": "affine",
+                      "intercept": 8.0,
+                      "slope": 0.0
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "native_root_lp": 7.5
+    }
+  ]
+}

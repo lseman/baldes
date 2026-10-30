@@ -14,7 +14,9 @@ impl<const D: usize> LabelStorage<D> {
         b: &HotLabel<D>,
     ) -> bool {
         protected.iter().all(|&resource| {
-            a.resources.get(resource).zip(b.resources.get(resource))
+            a.resources
+                .get(resource)
+                .zip(b.resources.get(resource))
                 .is_some_and(|(a, b)| a.to_bits() == b.to_bits())
         })
     }

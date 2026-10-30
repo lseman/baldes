@@ -7,6 +7,7 @@ use crate::core::rounding::{add_down as add, multiply_down as multiply};
 pub(super) mod columns;
 mod coupled;
 mod cutoff;
+mod interval;
 mod presence;
 mod resource;
 mod resource_groups;
@@ -80,7 +81,7 @@ fn network_minimum<const D: usize>(
     resource_work: &mut usize,
     deadline: Instant,
 ) -> Option<Option<f64>> {
-    if super::control_pricing::needed(oracle) || !oracle.activity_rows.is_empty() {
+    if !oracle.activity_rows.is_empty() {
         return columns::minimum(oracle, offset, duals, resource_work, deadline);
     }
     // Pickup/delivery feasibility depends on the whole route's departure load.
@@ -359,6 +360,9 @@ fn certificate_inner<const D: usize>(
     duals: &[f64],
     allow_projection: bool,
 ) -> Option<f64> {
+    if state.has_unpriced_paired_terms(duals) {
+        return None;
+    }
     let mut value = master_dual_base(state, master, duals, allow_projection)?;
     if state.universe.is_some() {
         return add(value, super::route_bounds::certificate(state, duals)?);
@@ -471,12 +475,7 @@ fn exact_contributions_in_domain<const D: usize>(
                 .iter()
                 .map(|id| oracle.index[id])
                 .collect();
-            let Some((true, cost)) = kernel.certify_with_controls(
-                &arcs,
-                &fixed.route.route.coupled_controls,
-                &mut 1_000_000,
-                None,
-            ) else {
+            let Some((true, cost)) = kernel.certify_with_budget(&arcs, &mut 1_000_000, None) else {
                 return Ok(None);
             };
             if cost[0] != cost[1] || objective.product(cost[0], fixed.quantity).is_none() {

@@ -91,228 +91,178 @@
       ],
       "coupled_resources": [
         {
-          "kind": "paired_piecewise_linear",
-          "initial": {
-            "points": [
-              [
-                0,
-                10
-              ],
-              [
-                1,
-                10
-              ]
-            ]
+          "kind": "paired_front",
+          "mode": "cost_bounded"
+        }
+      ],
+      "paired_front_programs": [
+        {
+          "resource": 0,
+          "source_bounds": [
+            0,
+            8
+          ],
+          "terminal_bounds": [
+            0,
+            8
+          ],
+          "root": {
+            "encoding": "affine",
+            "intercept": 0,
+            "slope": 0
           },
-          "initial_base": {
-            "lower": 0,
-            "upper": 0
-          },
-          "mode": "cost_bounded",
           "arcs": [
             {
-              "arrival": {
-                "points": [
+              "tail_bounds": [
+                0,
+                8
+              ],
+              "waiting_bounds": [
+                0,
+                8
+              ],
+              "waiting_rate": 0,
+              "base": {
+                "pairs": [
                   [
-                    0,
-                    1
-                  ],
-                  [
-                    8,
-                    9
-                  ]
-                ]
-              },
-              "increment": {
-                "points": [
-                  [
-                    0,
-                    2
-                  ],
-                  [
-                    8,
-                    2
-                  ]
-                ]
-              },
-              "lower": {
-                "points": [
-                  [
-                    3,
+                    1,
                     0
                   ],
                   [
-                    8,
-                    0
+                    0,
+                    8
                   ]
                 ]
               },
-              "upper": {
-                "points": [
-                  [
-                    3,
-                    100
-                  ],
-                  [
-                    8,
-                    100
-                  ]
-                ]
+              "dependent": {
+                "encoding": "affine",
+                "intercept": 2,
+                "slope": 0
               },
-              "waiting": 1
+              "dependent_lower": {
+                "encoding": "affine",
+                "intercept": 0,
+                "slope": 0
+              },
+              "dependent_upper": {
+                "encoding": "affine",
+                "intercept": 100,
+                "slope": 0
+              }
             },
             {
-              "arrival": {
-                "points": [
+              "tail_bounds": [
+                0,
+                8
+              ],
+              "waiting_bounds": [
+                0,
+                8
+              ],
+              "waiting_rate": 0,
+              "base": {
+                "pairs": [
                   [
-                    0,
-                    1
-                  ],
-                  [
-                    8,
-                    9
-                  ]
-                ]
-              },
-              "increment": {
-                "points": [
-                  [
-                    0,
-                    1
-                  ],
-                  [
-                    8,
-                    1
-                  ]
-                ]
-              },
-              "lower": {
-                "points": [
-                  [
-                    6,
+                    1,
                     0
                   ],
                   [
-                    10,
-                    0
+                    0,
+                    8
                   ]
                 ]
               },
-              "upper": {
-                "points": [
-                  [
-                    6,
-                    100
-                  ],
-                  [
-                    10,
-                    100
-                  ]
-                ]
+              "dependent": {
+                "encoding": "affine",
+                "intercept": 1,
+                "slope": 0
               },
-              "waiting": 2
+              "dependent_lower": {
+                "encoding": "affine",
+                "intercept": 0,
+                "slope": 0
+              },
+              "dependent_upper": {
+                "encoding": "affine",
+                "intercept": 100,
+                "slope": 0
+              }
             },
             {
-              "arrival": {
-                "points": [
+              "tail_bounds": [
+                0,
+                8
+              ],
+              "waiting_bounds": [
+                0,
+                8
+              ],
+              "waiting_rate": 0,
+              "base": {
+                "pairs": [
                   [
-                    0,
-                    1
-                  ],
-                  [
-                    8,
-                    9
-                  ]
-                ]
-              },
-              "increment": {
-                "points": [
-                  [
-                    0,
-                    3
-                  ],
-                  [
-                    8,
-                    3
-                  ]
-                ]
-              },
-              "lower": {
-                "points": [
-                  [
-                    3,
+                    1,
                     0
                   ],
                   [
-                    8,
-                    0
+                    0,
+                    8
                   ]
                 ]
               },
-              "upper": {
-                "points": [
-                  [
-                    3,
-                    100
-                  ],
-                  [
-                    8,
-                    100
-                  ]
-                ]
+              "dependent": {
+                "encoding": "affine",
+                "intercept": 3,
+                "slope": 0
               },
-              "waiting": 0
+              "dependent_lower": {
+                "encoding": "affine",
+                "intercept": 0,
+                "slope": 0
+              },
+              "dependent_upper": {
+                "encoding": "affine",
+                "intercept": 100,
+                "slope": 0
+              }
             },
             {
-              "arrival": {
-                "points": [
+              "tail_bounds": [
+                0,
+                8
+              ],
+              "waiting_bounds": [
+                0,
+                8
+              ],
+              "waiting_rate": 0,
+              "base": {
+                "pairs": [
                   [
-                    0,
-                    1
-                  ],
-                  [
-                    8,
-                    9
-                  ]
-                ]
-              },
-              "increment": {
-                "points": [
-                  [
-                    0,
-                    2
-                  ],
-                  [
-                    8,
-                    2
-                  ]
-                ]
-              },
-              "lower": {
-                "points": [
-                  [
-                    6,
+                    1,
                     0
                   ],
                   [
-                    10,
-                    0
+                    0,
+                    8
                   ]
                 ]
               },
-              "upper": {
-                "points": [
-                  [
-                    6,
-                    100
-                  ],
-                  [
-                    10,
-                    100
-                  ]
-                ]
+              "dependent": {
+                "encoding": "affine",
+                "intercept": 2,
+                "slope": 0
               },
-              "waiting": 1
+              "dependent_lower": {
+                "encoding": "affine",
+                "intercept": 0,
+                "slope": 0
+              },
+              "dependent_upper": {
+                "encoding": "affine",
+                "intercept": 100,
+                "slope": 0
+              }
             }
           ]
         }

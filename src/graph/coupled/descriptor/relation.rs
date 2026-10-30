@@ -1,18 +1,8 @@
 //! Paired slope transitions. Unsupported arithmetic is never infeasibility.
 use super::*;
-use std::{sync::Arc, time::Instant};
+use std::time::Instant;
 mod backward_dominance;
-
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "clp", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "clp", serde(deny_unknown_fields))]
-pub struct SlopeRelationArc {
-    pub arrival: PreparedSlopeFunction,
-    pub increment: PreparedSlopeFunction,
-    pub lower: PreparedSlopeFunction,
-    pub upper: PreparedSlopeFunction,
-    pub waiting: i32,
-}
+mod forward_dominance;
 
 /// Explicit inputs to the recovered machine-front continuation. The forward
 /// lookup, inverse and sum vector are distinct prepared binary operands.
@@ -57,74 +47,13 @@ pub struct MachinePathReconstruction {
     pub waiting: Vec<f64>,
 }
 
-/// Immutable preparation is shared across labels; raw functions are not rebuilt.
-#[derive(Clone, Debug)]
-pub struct PreparedSlopeRelationArc {
-    source: Arc<SlopeRelationArc>,
-    policy: FrontOperationPolicy,
-    shape: Result<Translation, &'static str>,
-    inverse: FrontierOutcome<Arc<PreparedSlopeFunction>>,
-    composition: FrontierOutcome<PreparedCompositionMap>,
-    increment_front: FrontierOutcome<SlopeFront>,
-    bounds: PreparedClampFilter,
-}
-impl PartialEq for PreparedSlopeRelationArc {
-    fn eq(&self, other: &Self) -> bool {
-        self.source == other.source && self.policy == other.policy
-    }
-}
-#[derive(Clone, Debug, PartialEq)]
-struct Translation {
-    delta: f64,
-    phi: f64,
-    tail_lo: f64,
-    tail_hi: f64,
-    head_lo: f64,
-    head_hi: f64,
-}
-#[derive(Clone, Copy)]
-struct Segment {
-    lo: f64,
-    hi: f64,
-    y: f64,
-    slope: f64,
-}
+/// Operations on prepared paired front-program operands.
+pub struct PairedFrontOperations;
 
 mod backward;
 mod continuation;
-mod extension;
 mod minimum;
 mod reconstruction;
-// Retaining slopes through translation agrees with recovered secant
-// composition only when all intermediate endpoint arithmetic is exact.
-// Other geometry uses the general prepared composition operation instead.
-fn exact_translation(front: &SlopeFront, t: &Translation) -> bool {
-    let integer = |x: f64| x.is_finite() && x.abs() <= ((1u64 << 40) as f64) && x.fract() == 0.;
-    if !integer(t.delta) || !integer(t.phi) || !integer(t.tail_lo) || !integer(t.tail_hi) {
-        return false;
-    }
-    for f in front.components() {
-        let mut x = f.pairs()[0].1;
-        let mut y = f.pairs()[0].0 + t.phi;
-        if !integer(x) || !integer(x + t.delta) || !integer(f.pairs()[0].0) || !integer(y) {
-            return false;
-        }
-        for &(s, end) in &f.pairs()[1..] {
-            let product = s * (end - x);
-            y += product;
-            if !integer(s)
-                || !integer(end)
-                || !integer(end + t.delta)
-                || !integer(product)
-                || !integer(y)
-            {
-                return false;
-            }
-            x = end;
-        }
-    }
-    true
-}
 fn finite(x: f64) -> Result<f64, FrontierUnknown> {
     if x.is_finite() {
         Ok(x)
@@ -140,13 +69,6 @@ fn near(a: f64, b: f64) -> Result<bool, FrontierUnknown> {
 }
 fn value(y: f64, s: f64, dx: f64) -> Result<f64, FrontierUnknown> {
     finite(y + finite(s * dx)?)
-}
-fn push(out: &mut Vec<Segment>, s: Segment, b: FrontierBudget) -> Result<(), FrontierUnknown> {
-    if out.len() >= b.max_pairs || out.len() >= b.max_operations {
-        return Err(FrontierUnknown::PairLimit);
-    }
-    out.push(s);
-    Ok(())
 }
 
 #[cfg(test)]

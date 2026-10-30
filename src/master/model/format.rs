@@ -101,12 +101,16 @@ pub struct PricingNetwork {
     /// Unprepared front-program functions in physical arc order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub paired_front_programs: Vec<PairedFrontProgram>,
-    /// Graph-level costs, using each descriptor's declared normalization.
+    /// Graph-level resource costs.
     /// A resource bound to an original variable gets its cost from that variable.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub coupled_objective_coefficients: Vec<(usize, f64)>,
+    /// Optional owner registration input bounds, not path windows or shared rows.
+    /// Null endpoints mean unbounded. Omission supplies no bound parity claim.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub paired_owner_registration_bounds: Vec<(usize, [Option<f64>; 2])>,
     /// Explicitly use the computed-front program as the feasibility
-    /// domain for FrontAlgebra resources; defaults to source controls.
+    /// domain for FrontAlgebra resources; paired programs always use this domain.
     #[serde(default)]
     pub front_program_domain: bool,
     /// Integer-route domain; bounded walks require an explicit finite arc cap.
@@ -415,7 +419,9 @@ impl Model {
                             || truncated < f64::from(i32::MIN)
                             || truncated > f64::from(i32::MAX)
                         {
-                            return Err(invalid("paired waiting rate is outside the supported machine range"));
+                            return Err(invalid(
+                                "paired waiting rate is outside the supported machine range",
+                            ));
                         }
                         Ok(MachineArcFunctionInput {
                             physical_arc,
@@ -429,7 +435,8 @@ impl Model {
                         })
                     })
                     .collect::<Result<Vec<_>>>()?;
-                let waiting_rates: Vec<_> = program.arcs.iter().map(|arc| arc.waiting_rate).collect();
+                let waiting_rates: Vec<_> =
+                    program.arcs.iter().map(|arc| arc.waiting_rate).collect();
                 match graph.prepare_paired_front_program_with_rates(
                     program.resource,
                     &arcs,
@@ -447,9 +454,15 @@ impl Model {
                     }
                 }
             }
-            for (index, (resource, rates)) in input.paired_machine_waiting_rates.iter().enumerate() {
-                if input.paired_machine_waiting_rates[..index].iter().any(|(previous, _)| previous == resource)
-                    || input.paired_front_programs.iter().any(|program| program.resource == *resource)
+            for (index, (resource, rates)) in input.paired_machine_waiting_rates.iter().enumerate()
+            {
+                if input.paired_machine_waiting_rates[..index]
+                    .iter()
+                    .any(|(previous, _)| previous == resource)
+                    || input
+                        .paired_front_programs
+                        .iter()
+                        .any(|program| program.resource == *resource)
                 {
                     return Err(invalid("duplicate paired machine waiting rates"));
                 }
@@ -459,6 +472,23 @@ impl Model {
                 graph.set_front_program_domain(true)?;
             }
             graph.set_coupled_objective_coefficients(&input.coupled_objective_coefficients)?;
+            if !input.paired_owner_registration_bounds.is_empty() {
+                graph.set_paired_owner_registration_bounds(
+                    &input
+                        .paired_owner_registration_bounds
+                        .iter()
+                        .map(|&(resource, [lower, upper])| {
+                            (
+                                resource,
+                                [
+                                    lower.unwrap_or(f64::NEG_INFINITY),
+                                    upper.unwrap_or(f64::INFINITY),
+                                ],
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                )?;
+            }
             graph.validate()?;
             networks.push(Network {
                 id: input.id,
@@ -787,22 +817,8 @@ impl From<Coefficients> for RowCoefficients {
     }
 }
 
-/// Encode a descriptor-level source-control search for the shared frontends.
-pub fn control_optimization_json(
-    result: &crate::master::controls::ControlOptimization,
-) -> Result<String> {
-    serde_json::to_string(result)
-        .map_err(|error| invalid(format!("control optimization JSON: {error}")))
-}
-
-/// Decode explicit source controls through the shared model JSON boundary.
-pub fn parse_paired_controls(text: &str) -> Result<Vec<crate::graph::coupled::PairedControl>> {
-    serde_json::from_str(text).map_err(|error| invalid(format!("paired controls JSON: {error}")))
-}
-
 #[derive(Debug, Serialize)]
 pub struct RouteResult {
-    pub coupled_controls: Vec<crate::graph::coupled::PairedControl>,
     pub coupled_values: Vec<(usize, f64)>,
     pub network: i32,
     /// Stable registry index for fix_route; absent on fixed/tree witnesses.
@@ -818,7 +834,6 @@ impl RouteResult {
     fn new(route: &NetworkRoute, value: f64, index: Option<usize>) -> Self {
         Self {
             coupled_values: route.route.coupled_values.clone(),
-            coupled_controls: route.route.coupled_controls.clone(),
             network: route.network,
             route_index: index,
             value,
@@ -890,7 +905,6 @@ impl SolveResult {
                             network: r.network,
                             arcs: &r.arcs,
                             coupled_values: Some(&r.coupled_values),
-                            coupled_controls: Some(&r.coupled_controls),
                             quantity: r.value,
                         }),
                 )?;

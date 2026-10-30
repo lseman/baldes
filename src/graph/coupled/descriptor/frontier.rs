@@ -1,6 +1,6 @@
 //! Slope FRONT algebra; deliberately distinct from source-expression replay.
 use super::{
-    EvaluationPolicy, PreparedSlopeFunction, PreparedSlopeRelationArc, RawAffine, RawFunctionError,
+    EvaluationPolicy, PairedFrontOperations, PreparedSlopeFunction, RawAffine, RawFunctionError,
 };
 use std::{
     sync::Arc,
@@ -56,19 +56,10 @@ pub enum FrontierProvenance {
     MachineRoot {
         input: Arc<PreparedSlopeFunction>,
     },
-    /// Numerical backward paired adjoint, retaining its evaluated input
-    /// frontier rather than a recursive suffix-history chain. This is not a
-    /// source witness or a forward machine-program certificate.
-    PairedAdjoint {
-        input: Arc<[PreparedSlopeFunction]>,
-        arc: Arc<super::SlopeRelationArc>,
-        policy: FrontOperationPolicy,
-    },
     /// Bounded machine waiting path, retaining the reference predecessor bit.
     /// This is not a source-control witness or directed certificate.
     PairedMachineWaiting {
         input: Arc<Self>,
-        arc: Arc<super::SlopeRelationArc>,
         predecessor: Option<f64>,
         waiting_bits: u64,
     },
@@ -85,13 +76,6 @@ pub enum FrontierProvenance {
         lower: Arc<PreparedSlopeFunction>,
         upper: Arc<PreparedSlopeFunction>,
         policy: FrontOperationPolicy,
-    },
-    /// Paired transition retains the original raw descriptors and waiting rate.
-    Paired {
-        input: Arc<Self>,
-        arc: Arc<super::SlopeRelationArc>,
-        policy: FrontOperationPolicy,
-        intermediate_tolerant_alignment: bool,
     },
     Source(Arc<[PreparedSlopeFunction]>),
     Addition {

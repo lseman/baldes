@@ -71,43 +71,59 @@ fn expired_deadline_does_not_poison_a_later_certificate_attempt() {
 }
 
 #[test]
-fn native_machine_underpricing_never_uses_a_source_control_root_lower_bound() {
+fn paired_front_program_never_uses_a_source_control_root_lower_bound() {
+    use crate::graph::coupled::descriptor::{
+        FrontierBudget, FrontierOutcome, MachineRootInput, RawAffine,
+    };
     use crate::graph::coupled::{
-        CoupledResource, FrontOperationPolicy, PairedCostNormalization, PairedResourceMode,
-        PreparedSlopeFunction, SlopeRelationArc,
+        CoupledResource, MachineArcFunctionInput, PairedResourceMode, PreparedSlopeFunction,
     };
     use crate::graph::Window;
-    let f = |pairs: Vec<(f64, f64)>| PreparedSlopeFunction::from_prepared_pairs(pairs).unwrap();
     let mut graph = crate::Graph::<2>::new(3, 0).unwrap();
     graph.add_arc(0, 1, 0.).unwrap();
     graph.add_arc(1, 2, 0.).unwrap();
-    let arc = SlopeRelationArc {
-        arrival: f(vec![(0., 0.), (1., 2.)]),
-        increment: f(vec![(0., 0.), (0., 2.)]),
-        lower: f(vec![(-10., 0.), (0., 2.)]),
-        upper: f(vec![(10., 0.), (0., 2.)]),
-        waiting: 0,
-    };
     graph
-        .set_coupled_resources(&[CoupledResource::SlopePaired {
-            initial: f(vec![(1., 0.), (-0.00005, 1.), (-0.00001, 2.)]),
-            initial_base: Window::new(0., 2.).unwrap(),
-            arcs: vec![arc.clone(), arc],
+        .set_coupled_resources(&[CoupledResource::PairedFront {
             mode: PairedResourceMode::CostUnbounded,
-            normalization: PairedCostNormalization::AbsoluteFinalValue,
-            policy: FrontOperationPolicy::FrontAlgebra,
         }])
         .unwrap();
-    graph.set_front_program_domain(true).unwrap();
-    let machine_cost = graph
+    let bounds = Window::new(0., 2.).unwrap();
+    let base = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (0., 2.)]).unwrap();
+    let root =
+        PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (-0.00005, 1.), (-0.00001, 2.)])
+            .unwrap();
+    let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+    let inputs: Vec<_> = (0..2)
+        .map(|physical_arc| MachineArcFunctionInput {
+            physical_arc,
+            tail_bounds: bounds,
+            waiting_bounds: bounds,
+            waiting_rate: 0,
+            base: &base,
+            dependent: affine(0.),
+            dependent_lower: affine(-10.),
+            dependent_upper: affine(10.),
+        })
+        .collect();
+    let result = graph.prepare_paired_front_program(
+        0,
+        &inputs,
+        MachineRootInput::Vector(&root),
+        bounds,
+        bounds,
+        FrontierBudget::default(),
+    );
+    assert!(
+        matches!(result, FrontierOutcome::Complete(())),
+        "{result:?}"
+    );
+    assert!(graph
         .coupled_kernel()
         .unwrap()
         .replay(&[0, 1])
         .unwrap()
-        .unwrap();
-    // Exact source controls with identity arrival/no increment have minimum
-    // 1-0.00006. Native near-slope merging can price strictly below that value.
-    assert!(machine_cost < 1. - 0.00006);
+        .unwrap()
+        .is_finite());
     let problem = RoutingContext::set_partitioning(graph, 1.).unwrap();
     assert!(ConservativeCoverRelaxation::collect(&problem, PathDomainLimits::default()).is_err());
     let mut options = RootOptions::default();

@@ -218,7 +218,7 @@ impl<const D: usize> RootController<D> {
             for phase_column in result.columns {
                 let tag = phase_column.tag;
                 let mut route = state.routes[tag as usize].clone();
-                let (original_cost, _) = self.problem.route_cost(&route);
+                let (original_cost, _) = self.problem.route_cost(&route)?;
                 route.original_cost = original_cost;
                 state.routes[tag as usize].original_cost = original_cost;
                 minimum = minimum.min(phase_column.reduced_cost);

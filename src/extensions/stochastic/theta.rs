@@ -97,6 +97,39 @@ impl Problem {
                 }
             }
         }
+        // A conservative recourse charge can make an individual arc slightly
+        // negative. Vertex potentials preserve every source-to-sink route cost
+        // while moving that charge to other arcs on the same route.
+        if graph.arcs.iter().any(|arc| arc.cost < 0.) {
+            let mut potential = vec![0.; n + 2];
+            for _ in 0..n + 1 {
+                let mut changed = false;
+                for arc in &graph.arcs {
+                    let candidate = potential[arc.tail] + arc.cost;
+                    if candidate < potential[arc.head] {
+                        potential[arc.head] = candidate;
+                        changed = true;
+                    }
+                }
+                if !changed {
+                    break;
+                }
+            }
+            if potential[sink] != 0.
+                || graph
+                    .arcs
+                    .iter()
+                    .any(|arc| potential[arc.tail] + arc.cost < potential[arc.head])
+            {
+                return Err(invalid(
+                    "stochastic relaxed graph cannot be reweighted to nonnegative arcs",
+                ));
+            }
+            for arc in &mut graph.arcs {
+                arc.cost = (arc.cost + potential[arc.tail] - potential[arc.head]).max(0.);
+                arc.reduced_cost = arc.cost;
+            }
+        }
         for v in 0..=sink {
             let i = if v == sink { 0 } else { v };
             graph.set_bounds(v, 0, 0., 1.)?;

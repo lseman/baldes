@@ -51,18 +51,25 @@ pub(in crate::master::model) fn refresh<const D: usize>(
             let canonical = domain
                 .elementary_route(&fixed.route.route.arcs)
                 .ok_or_else(|| incomplete("fixed route canonical schedule reconstruction"))?;
-            let canonical = if fixed.route.route.coupled_controls.is_empty() {
-                canonical
-            } else {
-                canonical.with_paired_controls(
-                    &new_oracle.network.graph,
-                    fixed.route.route.coupled_controls.clone(),
-                )?
-            };
+            let positions = fixed
+                .route
+                .route
+                .arcs
+                .iter()
+                .map(|id| domain.arc_position(*id))
+                .collect::<Option<Vec<_>>>()
+                .ok_or_else(|| invalid("unknown fixed route arc"))?;
+            if !fixed
+                .route
+                .route
+                .selected_values_match(&domain.model.networks[0].graph, &positions)?
+            {
+                return Err(incomplete(
+                    "fixed route paired selection is unavailable in the refreshed domain",
+                ));
+            }
             fixed.route.route.resources = canonical.resources;
             fixed.route.route.resource_profile = canonical.resource_profile;
-            fixed.route.route.coupled_controls = canonical.coupled_controls;
-            fixed.route.route.coupled_values = canonical.coupled_values;
             let new_entries =
                 super::super::entries(new_oracle, &fixed.route.route, node.state.shared_offset)?;
             let old: BTreeMap<_, _> = old_entries.into_iter().collect();
@@ -121,17 +128,24 @@ pub(in crate::master::model) fn refresh<const D: usize>(
         let canonical = domain
             .elementary_route(&route.route.arcs)
             .ok_or_else(|| incomplete("resource branch canonical schedule reconstruction"))?;
-        let canonical = if route.route.coupled_controls.is_empty() {
-            canonical
-        } else {
-            canonical
-                .with_paired_controls(&oracle.network.graph, route.route.coupled_controls.clone())?
-        };
+        let positions = route
+            .route
+            .arcs
+            .iter()
+            .map(|id| domain.arc_position(*id))
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| invalid("unknown route arc"))?;
+        if !route
+            .route
+            .selected_values_match(&domain.model.networks[0].graph, &positions)?
+        {
+            return Err(incomplete(
+                "route paired selection is unavailable in the refreshed domain",
+            ));
+        }
         let route = Arc::make_mut(route);
         route.route.resources = canonical.resources;
         route.route.resource_profile = canonical.resource_profile;
-        route.route.coupled_controls = canonical.coupled_controls;
-        route.route.coupled_values = canonical.coupled_values;
     }
     node.state.tags.clear();
     for (tag, route) in node.state.routes.iter().enumerate() {

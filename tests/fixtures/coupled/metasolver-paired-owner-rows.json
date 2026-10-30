@@ -1,0 +1,4553 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "cases": [
+    {
+      "dependency": 0,
+      "case": "baseline",
+      "native_outcome": "matched",
+      "native_root_statistic": -17.0,
+      "native_incumbent": -17.0,
+      "native_restricted_master_lp": -17.0,
+      "native_selected_columns": [
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        }
+      ],
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "paired_front",
+                "mode": "cost_unbounded"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  7.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        0.0,
+                        0.0
+                      ],
+                      [
+                        0.0,
+                        8.0
+                      ]
+                    ]
+                  }
+                },
+                "arcs": [
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "paired_owner_registration_bounds": [
+              [
+                0,
+                [
+                  0.0,
+                  100.0
+                ]
+              ]
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": 1.0,
+            "accumulated_resource": 0,
+            "entries": []
+          }
+        ]
+      }
+    },
+    {
+      "dependency": 0,
+      "case": "nonbinding-upper",
+      "native_outcome": "matched",
+      "native_root_statistic": -17.0,
+      "native_incumbent": -17.0,
+      "native_restricted_master_lp": -17.0,
+      "native_selected_columns": [
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        }
+      ],
+      "model": {
+        "rows": [
+          {
+            "sense": "le",
+            "rhs": 8.0
+          }
+        ],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "paired_front",
+                "mode": "cost_unbounded"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  7.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        0.0,
+                        0.0
+                      ],
+                      [
+                        0.0,
+                        8.0
+                      ]
+                    ]
+                  }
+                },
+                "arcs": [
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "paired_owner_registration_bounds": [
+              [
+                0,
+                [
+                  0.0,
+                  100.0
+                ]
+              ]
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": 1.0,
+            "accumulated_resource": 0,
+            "entries": [
+              [
+                0,
+                1.0
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "dependency": 0,
+      "case": "singleton-lower",
+      "native_outcome": "adapter_rejects_propagated_lower_bound",
+      "native_root_statistic": 1000000000000.0,
+      "native_incumbent": 1000000000000.0,
+      "native_restricted_master_lp": null,
+      "native_selected_columns": [],
+      "model": {
+        "rows": [
+          {
+            "sense": "ge",
+            "rhs": 4.0
+          }
+        ],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "paired_front",
+                "mode": "cost_unbounded"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  7.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        0.0,
+                        0.0
+                      ],
+                      [
+                        0.0,
+                        8.0
+                      ]
+                    ]
+                  }
+                },
+                "arcs": [
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "paired_owner_registration_bounds": [
+              [
+                0,
+                [
+                  0.0,
+                  100.0
+                ]
+              ]
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": 1.0,
+            "accumulated_resource": 0,
+            "entries": [
+              [
+                0,
+                1.0
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "dependency": 0,
+      "case": "mixed-lower",
+      "native_outcome": "reference_ignores_negative_reduced_paired_weight",
+      "native_root_statistic": -9.000000000000002,
+      "native_incumbent": -14.999999999999998,
+      "native_restricted_master_lp": -15.0,
+      "native_selected_columns": [
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        }
+      ],
+      "model": {
+        "rows": [
+          {
+            "sense": "ge",
+            "rhs": 4.0
+          }
+        ],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": 0.0,
+                "entries": [
+                  [
+                    0,
+                    10.0
+                  ]
+                ]
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "paired_front",
+                "mode": "cost_unbounded"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  7.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        0.0,
+                        0.0
+                      ],
+                      [
+                        0.0,
+                        8.0
+                      ]
+                    ]
+                  }
+                },
+                "arcs": [
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "paired_owner_registration_bounds": [
+              [
+                0,
+                [
+                  0.0,
+                  100.0
+                ]
+              ]
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": 1.0,
+            "accumulated_resource": 0,
+            "entries": [
+              [
+                0,
+                1.0
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "dependency": 1,
+      "case": "baseline",
+      "native_outcome": "matched",
+      "native_root_statistic": -17.0,
+      "native_incumbent": -17.0,
+      "native_restricted_master_lp": -17.0,
+      "native_selected_columns": [
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        }
+      ],
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "paired_front",
+                "mode": "cost_bounded"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  7.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        0.0,
+                        0.0
+                      ],
+                      [
+                        0.0,
+                        8.0
+                      ]
+                    ]
+                  }
+                },
+                "arcs": [
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "paired_owner_registration_bounds": [
+              [
+                0,
+                [
+                  0.0,
+                  100.0
+                ]
+              ]
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": 1.0,
+            "accumulated_resource": 0,
+            "entries": []
+          }
+        ]
+      }
+    },
+    {
+      "dependency": 1,
+      "case": "nonbinding-upper",
+      "native_outcome": "matched",
+      "native_root_statistic": -17.0,
+      "native_incumbent": -17.0,
+      "native_restricted_master_lp": -17.0,
+      "native_selected_columns": [
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        }
+      ],
+      "model": {
+        "rows": [
+          {
+            "sense": "le",
+            "rhs": 8.0
+          }
+        ],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "paired_front",
+                "mode": "cost_bounded"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  7.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        0.0,
+                        0.0
+                      ],
+                      [
+                        0.0,
+                        8.0
+                      ]
+                    ]
+                  }
+                },
+                "arcs": [
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "paired_owner_registration_bounds": [
+              [
+                0,
+                [
+                  0.0,
+                  100.0
+                ]
+              ]
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": 1.0,
+            "accumulated_resource": 0,
+            "entries": [
+              [
+                0,
+                1.0
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "dependency": 1,
+      "case": "singleton-lower",
+      "native_outcome": "adapter_rejects_propagated_lower_bound",
+      "native_root_statistic": 1000000000000.0,
+      "native_incumbent": 1000000000000.0,
+      "native_restricted_master_lp": null,
+      "native_selected_columns": [],
+      "model": {
+        "rows": [
+          {
+            "sense": "ge",
+            "rhs": 4.0
+          }
+        ],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "paired_front",
+                "mode": "cost_bounded"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  7.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        0.0,
+                        0.0
+                      ],
+                      [
+                        0.0,
+                        8.0
+                      ]
+                    ]
+                  }
+                },
+                "arcs": [
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "paired_owner_registration_bounds": [
+              [
+                0,
+                [
+                  0.0,
+                  100.0
+                ]
+              ]
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": 1.0,
+            "accumulated_resource": 0,
+            "entries": [
+              [
+                0,
+                1.0
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "dependency": 1,
+      "case": "mixed-lower",
+      "native_outcome": "reference_ignores_negative_reduced_paired_weight",
+      "native_root_statistic": -9.000000000000002,
+      "native_incumbent": -14.999999999999998,
+      "native_restricted_master_lp": -15.0,
+      "native_selected_columns": [
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            1,
+            2
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            3,
+            4
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 3.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        },
+        {
+          "arcs": [
+            0
+          ],
+          "associations": [
+            {
+              "resource": 1,
+              "value": 1.0
+            }
+          ]
+        }
+      ],
+      "model": {
+        "rows": [
+          {
+            "sense": "ge",
+            "rhs": 4.0
+          }
+        ],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": 0.0,
+                "entries": [
+                  [
+                    0,
+                    10.0
+                  ]
+                ]
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "paired_front",
+                "mode": "cost_bounded"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  7.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        0.0,
+                        0.0
+                      ],
+                      [
+                        0.0,
+                        8.0
+                      ]
+                    ]
+                  }
+                },
+                "arcs": [
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "paired_owner_registration_bounds": [
+              [
+                0,
+                [
+                  0.0,
+                  100.0
+                ]
+              ]
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": 1.0,
+            "accumulated_resource": 0,
+            "entries": [
+              [
+                0,
+                1.0
+              ]
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

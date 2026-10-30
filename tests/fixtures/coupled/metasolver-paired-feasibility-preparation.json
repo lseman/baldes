@@ -256,7 +256,6 @@
               0,
               1
             ],
-            "front_program_domain": true,
             "arcs": [
               {
                 "tail": 0,
@@ -286,54 +285,52 @@
             ],
             "coupled_resources": [
               {
-                "kind": "slope_paired",
-                "initial": {
-                  "pairs": [
-                    [
-                      0.0,
-                      0.0
-                    ],
-                    [
-                      0.0,
-                      7.0
+                "kind": "paired_front",
+                "mode": "feasibility"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  7.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        0.0,
+                        0.0
+                      ],
+                      [
+                        0.0,
+                        8.0
+                      ]
                     ]
-                  ]
-                },
-                "initial_base": {
-                  "lower": 0.0,
-                  "upper": 7.0
+                  }
                 },
                 "arcs": [
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          0.0,
-                          1.0
                         ],
                         [
                           0.0,
@@ -341,203 +338,271 @@
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          8.0,
-                          1.0
-                        ],
-                        [
-                          0.0,
-                          8.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 0
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
                           0.0,
-                          1.0
-                        ],
-                        [
-                          0.0,
-                          7.0
+                          8.0
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          8.0,
-                          1.0
-                        ],
-                        [
-                          0.0,
-                          7.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 0
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
-                      "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          0.0,
-                          2.0
-                        ],
-                        [
-                          0.0,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          8.0,
-                          2.0
-                        ],
-                        [
-                          0.0,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "waiting": 0
-                  },
-                  {
-                    "arrival": {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          1.0,
-                          7.0
+                          0.0,
+                          8.0
                         ]
                       ]
                     },
-                    "increment": {
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          1.0,
-                          7.0
+                          0.0,
+                          8.0
                         ]
                       ]
                     },
-                    "lower": {
-                      "pairs": [
-                        [
-                          0.0,
-                          1.0
-                        ],
-                        [
-                          0.0,
-                          7.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          8.0,
-                          1.0
-                        ],
-                        [
-                          0.0,
-                          7.0
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 0
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
                       "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
                         [
                           1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          0.0,
-                          2.0
+                          0.0
                         ],
                         [
                           0.0,
@@ -545,24 +610,53 @@
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          8.0,
-                          2.0
-                        ],
-                        [
-                          0.0,
-                          8.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 0
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   }
-                ],
-                "mode": "feasibility",
-                "normalization": "absolute_final_value",
-                "policy": "front_algebra"
+                ]
               }
             ]
           }
@@ -824,7 +918,6 @@
               0,
               1
             ],
-            "front_program_domain": true,
             "arcs": [
               {
                 "tail": 0,
@@ -854,54 +947,52 @@
             ],
             "coupled_resources": [
               {
-                "kind": "slope_paired",
-                "initial": {
-                  "pairs": [
-                    [
-                      0.0,
-                      0.0
-                    ],
-                    [
-                      0.0,
-                      7.0
+                "kind": "paired_front",
+                "mode": "feasibility"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  7.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        0.0,
+                        0.0
+                      ],
+                      [
+                        0.0,
+                        8.0
+                      ]
                     ]
-                  ]
-                },
-                "initial_base": {
-                  "lower": 0.0,
-                  "upper": 7.0
+                  }
                 },
                 "arcs": [
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          0.0,
-                          1.0
                         ],
                         [
                           0.0,
@@ -909,203 +1000,271 @@
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          8.0,
-                          1.0
-                        ],
-                        [
-                          0.0,
-                          8.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 0
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
                           0.0,
-                          1.0
-                        ],
-                        [
-                          0.0,
-                          7.0
+                          8.0
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          8.0,
-                          1.0
-                        ],
-                        [
-                          0.0,
-                          7.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 0
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
-                      "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          0.0,
-                          2.0
-                        ],
-                        [
-                          0.0,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          8.0,
-                          2.0
-                        ],
-                        [
-                          0.0,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "waiting": 0
-                  },
-                  {
-                    "arrival": {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          1.0,
-                          7.0
+                          0.0,
+                          8.0
                         ]
                       ]
                     },
-                    "increment": {
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          1.0,
-                          7.0
+                          0.0,
+                          8.0
                         ]
                       ]
                     },
-                    "lower": {
-                      "pairs": [
-                        [
-                          0.0,
-                          1.0
-                        ],
-                        [
-                          0.0,
-                          7.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          8.0,
-                          1.0
-                        ],
-                        [
-                          0.0,
-                          7.0
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 0
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 0.0,
+                    "base": {
                       "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
                         [
                           1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          0.0,
-                          2.0
+                          0.0
                         ],
                         [
                           0.0,
@@ -1113,24 +1272,53 @@
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          8.0,
-                          2.0
-                        ],
-                        [
-                          0.0,
-                          8.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 0
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            0.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            8.0,
+                            0.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   }
-                ],
-                "mode": "feasibility",
-                "normalization": "absolute_final_value",
-                "policy": "front_algebra"
+                ]
               }
             ]
           }
@@ -1442,7 +1630,6 @@
               0,
               1
             ],
-            "front_program_domain": true,
             "arcs": [
               {
                 "tail": 0,
@@ -1472,290 +1659,360 @@
             ],
             "coupled_resources": [
               {
-                "kind": "slope_paired",
-                "initial": {
-                  "pairs": [
-                    [
-                      0.0,
-                      0.0
-                    ],
-                    [
-                      0.0,
-                      5.0
+                "kind": "paired_front",
+                "mode": "feasibility"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  5.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        0.0,
+                        0.0
+                      ],
+                      [
+                        0.0,
+                        8.0
+                      ]
                     ]
-                  ]
-                },
-                "initial_base": {
-                  "lower": 0.0,
-                  "upper": 5.0
+                  }
                 },
                 "arcs": [
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
-                        ],
-                        [
-                          1.25,
-                          2.0
-                        ],
-                        [
-                          1.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          0.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          2.5,
-                          1.0
-                        ],
-                        [
-                          0.5,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
                         ],
                         [
                           0.25,
+                          2.0
+                        ],
+                        [
+                          0.5,
                           8.0
                         ]
                       ]
                     },
-                    "waiting": 1
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
-                        ],
-                        [
-                          1.25,
-                          2.0
-                        ],
-                        [
-                          1.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          0.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          2.5,
-                          1.0
-                        ],
-                        [
-                          0.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
                         ],
                         [
                           0.25,
-                          5.0
+                          2.0
+                        ],
+                        [
+                          0.5,
+                          8.0
                         ]
                       ]
                     },
-                    "waiting": 1
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
-                      "pairs": [
-                        [
-                          2.25,
-                          1.0
-                        ],
-                        [
-                          1.25,
-                          2.0
-                        ],
-                        [
-                          1.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          3.125,
-                          2.25
-                        ],
-                        [
-                          0.5,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.5625,
-                          2.25
-                        ],
-                        [
-                          0.25,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "waiting": 1
-                  },
-                  {
-                    "arrival": {
+                    "tail_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          1.25,
+                          0.25,
                           2.0
                         ],
                         [
-                          1.5,
-                          5.0
+                          0.5,
+                          8.0
                         ]
                       ]
                     },
-                    "increment": {
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          0.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          2.5,
-                          1.0
-                        ],
-                        [
-                          0.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
-                        ],
-                        [
                           0.25,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "waiting": 1
-                  },
-                  {
-                    "arrival": {
-                      "pairs": [
-                        [
-                          2.25,
-                          1.0
-                        ],
-                        [
-                          1.25,
                           2.0
                         ],
                         [
-                          1.5,
-                          5.0
+                          0.5,
+                          8.0
                         ]
                       ]
                     },
-                    "increment": {
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
-                        [
-                          1.5,
-                          1.0
-                        ],
                         [
                           1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
+                          0.0
+                        ],
                         [
-                          3.125,
-                          2.25
+                          0.25,
+                          2.0
                         ],
                         [
                           0.5,
@@ -1763,24 +2020,57 @@
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.5625,
-                          2.25
-                        ],
-                        [
-                          0.25,
-                          8.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 1
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   }
-                ],
-                "mode": "feasibility",
-                "normalization": "absolute_final_value",
-                "policy": "front_algebra"
+                ]
               }
             ]
           }
@@ -2092,7 +2382,6 @@
               0,
               1
             ],
-            "front_program_domain": true,
             "arcs": [
               {
                 "tail": 0,
@@ -2122,290 +2411,360 @@
             ],
             "coupled_resources": [
               {
-                "kind": "slope_paired",
-                "initial": {
-                  "pairs": [
-                    [
-                      0.0,
-                      0.0
-                    ],
-                    [
-                      0.0,
-                      5.0
+                "kind": "paired_front",
+                "mode": "feasibility"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  5.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        0.0,
+                        0.0
+                      ],
+                      [
+                        0.0,
+                        8.0
+                      ]
                     ]
-                  ]
-                },
-                "initial_base": {
-                  "lower": 0.0,
-                  "upper": 5.0
+                  }
                 },
                 "arcs": [
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
-                        ],
-                        [
-                          1.25,
-                          2.0
-                        ],
-                        [
-                          1.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          0.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          2.5,
-                          1.0
-                        ],
-                        [
-                          0.5,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
                         ],
                         [
                           0.25,
+                          2.0
+                        ],
+                        [
+                          0.5,
                           8.0
                         ]
                       ]
                     },
-                    "waiting": 1
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
-                        ],
-                        [
-                          1.25,
-                          2.0
-                        ],
-                        [
-                          1.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          0.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          2.5,
-                          1.0
-                        ],
-                        [
-                          0.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
                         ],
                         [
                           0.25,
-                          5.0
+                          2.0
+                        ],
+                        [
+                          0.5,
+                          8.0
                         ]
                       ]
                     },
-                    "waiting": 1
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
-                      "pairs": [
-                        [
-                          2.25,
-                          1.0
-                        ],
-                        [
-                          1.25,
-                          2.0
-                        ],
-                        [
-                          1.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          3.125,
-                          2.25
-                        ],
-                        [
-                          0.5,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.5625,
-                          2.25
-                        ],
-                        [
-                          0.25,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "waiting": 1
-                  },
-                  {
-                    "arrival": {
+                    "tail_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          1.25,
+                          0.25,
                           2.0
                         ],
                         [
-                          1.5,
-                          5.0
+                          0.5,
+                          8.0
                         ]
                       ]
                     },
-                    "increment": {
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          0.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          2.5,
-                          1.0
-                        ],
-                        [
-                          0.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
-                        ],
-                        [
                           0.25,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "waiting": 1
-                  },
-                  {
-                    "arrival": {
-                      "pairs": [
-                        [
-                          2.25,
-                          1.0
-                        ],
-                        [
-                          1.25,
                           2.0
                         ],
                         [
-                          1.5,
-                          5.0
+                          0.5,
+                          8.0
                         ]
                       ]
                     },
-                    "increment": {
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
-                        [
-                          1.5,
-                          1.0
-                        ],
                         [
                           1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
+                          0.0
+                        ],
                         [
-                          3.125,
-                          2.25
+                          0.25,
+                          2.0
                         ],
                         [
                           0.5,
@@ -2413,24 +2772,57 @@
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.5625,
-                          2.25
-                        ],
-                        [
-                          0.25,
-                          8.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 1
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   }
-                ],
-                "mode": "feasibility",
-                "normalization": "absolute_final_value",
-                "policy": "front_algebra"
+                ]
               }
             ]
           }
@@ -2788,7 +3180,6 @@
               0,
               1
             ],
-            "front_program_domain": true,
             "arcs": [
               {
                 "tail": 0,
@@ -2818,294 +3209,364 @@
             ],
             "coupled_resources": [
               {
-                "kind": "slope_paired",
-                "initial": {
-                  "pairs": [
-                    [
-                      2.0,
-                      0.0
-                    ],
-                    [
-                      0.25,
-                      1.0
-                    ],
-                    [
-                      0.5,
-                      5.0
+                "kind": "paired_front",
+                "mode": "feasibility"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  5.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        2.0,
+                        0.0
+                      ],
+                      [
+                        0.25,
+                        1.0
+                      ],
+                      [
+                        0.5,
+                        8.0
+                      ]
                     ]
-                  ]
-                },
-                "initial_base": {
-                  "lower": 0.0,
-                  "upper": 5.0
+                  }
                 },
                 "arcs": [
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
-                        ],
-                        [
-                          1.25,
-                          2.0
-                        ],
-                        [
-                          1.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          0.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          2.5,
-                          1.0
-                        ],
-                        [
-                          0.5,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
                         ],
                         [
                           0.25,
+                          2.0
+                        ],
+                        [
+                          0.5,
                           8.0
                         ]
                       ]
                     },
-                    "waiting": 1
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
-                        ],
-                        [
-                          1.25,
-                          2.0
-                        ],
-                        [
-                          1.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          0.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          2.5,
-                          1.0
-                        ],
-                        [
-                          0.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
                         ],
                         [
                           0.25,
-                          5.0
+                          2.0
+                        ],
+                        [
+                          0.5,
+                          8.0
                         ]
                       ]
                     },
-                    "waiting": 1
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
-                      "pairs": [
-                        [
-                          2.25,
-                          1.0
-                        ],
-                        [
-                          1.25,
-                          2.0
-                        ],
-                        [
-                          1.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          3.125,
-                          2.25
-                        ],
-                        [
-                          0.5,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.5625,
-                          2.25
-                        ],
-                        [
-                          0.25,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "waiting": 1
-                  },
-                  {
-                    "arrival": {
+                    "tail_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          1.25,
+                          0.25,
                           2.0
                         ],
                         [
-                          1.5,
-                          5.0
+                          0.5,
+                          8.0
                         ]
                       ]
                     },
-                    "increment": {
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          0.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          2.5,
-                          1.0
-                        ],
-                        [
-                          0.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
-                        ],
-                        [
                           0.25,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "waiting": 1
-                  },
-                  {
-                    "arrival": {
-                      "pairs": [
-                        [
-                          2.25,
-                          1.0
-                        ],
-                        [
-                          1.25,
                           2.0
                         ],
                         [
-                          1.5,
-                          5.0
+                          0.5,
+                          8.0
                         ]
                       ]
                     },
-                    "increment": {
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
-                        [
-                          1.5,
-                          1.0
-                        ],
                         [
                           1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
+                          0.0
+                        ],
                         [
-                          3.125,
-                          2.25
+                          0.25,
+                          2.0
                         ],
                         [
                           0.5,
@@ -3113,24 +3574,57 @@
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.5625,
-                          2.25
-                        ],
-                        [
-                          0.25,
-                          8.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 1
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   }
-                ],
-                "mode": "feasibility",
-                "normalization": "absolute_final_value",
-                "policy": "front_algebra"
+                ]
               }
             ]
           }
@@ -3488,7 +3982,6 @@
               0,
               1
             ],
-            "front_program_domain": true,
             "arcs": [
               {
                 "tail": 0,
@@ -3518,294 +4011,364 @@
             ],
             "coupled_resources": [
               {
-                "kind": "slope_paired",
-                "initial": {
-                  "pairs": [
-                    [
-                      2.0,
-                      0.0
-                    ],
-                    [
-                      0.25,
-                      1.0
-                    ],
-                    [
-                      0.5,
-                      5.0
+                "kind": "paired_front",
+                "mode": "feasibility"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  5.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        2.0,
+                        0.0
+                      ],
+                      [
+                        0.25,
+                        1.0
+                      ],
+                      [
+                        0.5,
+                        8.0
+                      ]
                     ]
-                  ]
-                },
-                "initial_base": {
-                  "lower": 0.0,
-                  "upper": 5.0
+                  }
                 },
                 "arcs": [
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
-                        ],
-                        [
-                          1.25,
-                          2.0
-                        ],
-                        [
-                          1.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          0.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          2.5,
-                          1.0
-                        ],
-                        [
-                          0.5,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
                         ],
                         [
                           0.25,
+                          2.0
+                        ],
+                        [
+                          0.5,
                           8.0
                         ]
                       ]
                     },
-                    "waiting": 1
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
-                        ],
-                        [
-                          1.25,
-                          2.0
-                        ],
-                        [
-                          1.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          0.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          2.5,
-                          1.0
-                        ],
-                        [
-                          0.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
                         ],
                         [
                           0.25,
-                          5.0
+                          2.0
+                        ],
+                        [
+                          0.5,
+                          8.0
                         ]
                       ]
                     },
-                    "waiting": 1
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
-                      "pairs": [
-                        [
-                          2.25,
-                          1.0
-                        ],
-                        [
-                          1.25,
-                          2.0
-                        ],
-                        [
-                          1.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          3.125,
-                          2.25
-                        ],
-                        [
-                          0.5,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.5625,
-                          2.25
-                        ],
-                        [
-                          0.25,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "waiting": 1
-                  },
-                  {
-                    "arrival": {
+                    "tail_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          1.25,
+                          0.25,
                           2.0
                         ],
                         [
-                          1.5,
-                          5.0
+                          0.5,
+                          8.0
                         ]
                       ]
                     },
-                    "increment": {
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          0.5,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          2.5,
-                          1.0
-                        ],
-                        [
-                          0.5,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
-                        ],
-                        [
                           0.25,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "waiting": 1
-                  },
-                  {
-                    "arrival": {
-                      "pairs": [
-                        [
-                          2.25,
-                          1.0
-                        ],
-                        [
-                          1.25,
                           2.0
                         ],
                         [
-                          1.5,
-                          5.0
+                          0.5,
+                          8.0
                         ]
                       ]
                     },
-                    "increment": {
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      1.0,
+                      5.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 1.0,
+                    "base": {
                       "pairs": [
-                        [
-                          1.5,
-                          1.0
-                        ],
                         [
                           1.0,
-                          5.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
+                          0.0
+                        ],
                         [
-                          3.125,
-                          2.25
+                          0.25,
+                          2.0
                         ],
                         [
                           0.5,
@@ -3813,24 +4376,57 @@
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.5625,
-                          2.25
-                        ],
-                        [
-                          0.25,
-                          8.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            1.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 1
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            2.0,
+                            0.0
+                          ],
+                          [
+                            0.5,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   }
-                ],
-                "mode": "feasibility",
-                "normalization": "absolute_final_value",
-                "policy": "front_algebra"
+                ]
               }
             ]
           }
@@ -4138,7 +4734,6 @@
               0,
               1
             ],
-            "front_program_domain": true,
             "arcs": [
               {
                 "tail": 0,
@@ -4168,58 +4763,52 @@
             ],
             "coupled_resources": [
               {
-                "kind": "slope_paired",
-                "initial": {
-                  "pairs": [
-                    [
-                      0.0,
-                      0.0
-                    ],
-                    [
-                      0.0,
-                      7.0
+                "kind": "paired_front",
+                "mode": "feasibility"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  7.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        0.0,
+                        0.0
+                      ],
+                      [
+                        0.0,
+                        8.0
+                      ]
                     ]
-                  ]
-                },
-                "initial_base": {
-                  "lower": 0.0,
-                  "upper": 7.0
+                  }
                 },
                 "arcs": [
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 2.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          4.5,
-                          1.0
-                        ],
-                        [
-                          -0.5,
-                          4.0
                         ],
                         [
                           0.0,
@@ -4227,219 +4816,287 @@
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
-                        ],
-                        [
-                          0.25,
-                          8.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 2
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            5.0,
+                            0.0
+                          ],
+                          [
+                            -0.5,
+                            4.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 2.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          4.5,
-                          1.0
-                        ],
-                        [
-                          -0.5,
-                          4.0
                         ],
                         [
                           0.0,
-                          7.0
+                          8.0
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
-                        ],
-                        [
-                          0.25,
-                          7.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 2
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            5.0,
+                            0.0
+                          ],
+                          [
+                            -0.5,
+                            4.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
-                      "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          4.0,
-                          2.0
-                        ],
-                        [
-                          -0.5,
-                          4.0
-                        ],
-                        [
-                          0.0,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.5,
-                          2.0
-                        ],
-                        [
-                          0.25,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "waiting": 2
-                  },
-                  {
-                    "arrival": {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 2.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          1.0,
-                          7.0
+                          0.0,
+                          8.0
                         ]
                       ]
                     },
-                    "increment": {
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            5.0,
+                            0.0
+                          ],
+                          [
+                            -0.5,
+                            4.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 2.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          4.5,
-                          1.0
-                        ],
-                        [
-                          -0.5,
-                          4.0
-                        ],
-                        [
                           0.0,
-                          7.0
+                          8.0
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
-                        ],
-                        [
-                          0.25,
-                          7.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 2
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            5.0,
+                            0.0
+                          ],
+                          [
+                            -0.5,
+                            4.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 2.0,
+                    "base": {
                       "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
                         [
                           1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          4.0,
-                          2.0
-                        ],
-                        [
-                          -0.5,
-                          4.0
+                          0.0
                         ],
                         [
                           0.0,
@@ -4447,24 +5104,57 @@
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.5,
-                          2.0
-                        ],
-                        [
-                          0.25,
-                          8.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 2
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            5.0,
+                            0.0
+                          ],
+                          [
+                            -0.5,
+                            4.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   }
-                ],
-                "mode": "feasibility",
-                "normalization": "absolute_final_value",
-                "policy": "front_algebra"
+                ]
               }
             ]
           }
@@ -4772,7 +5462,6 @@
               0,
               1
             ],
-            "front_program_domain": true,
             "arcs": [
               {
                 "tail": 0,
@@ -4802,58 +5491,52 @@
             ],
             "coupled_resources": [
               {
-                "kind": "slope_paired",
-                "initial": {
-                  "pairs": [
-                    [
-                      0.0,
-                      0.0
-                    ],
-                    [
-                      0.0,
-                      7.0
+                "kind": "paired_front",
+                "mode": "feasibility"
+              }
+            ],
+            "paired_front_programs": [
+              {
+                "resource": 0,
+                "source_bounds": [
+                  0.0,
+                  7.0
+                ],
+                "terminal_bounds": [
+                  0.0,
+                  8.0
+                ],
+                "root": {
+                  "encoding": "vector",
+                  "function": {
+                    "pairs": [
+                      [
+                        0.0,
+                        0.0
+                      ],
+                      [
+                        0.0,
+                        8.0
+                      ]
                     ]
-                  ]
-                },
-                "initial_base": {
-                  "lower": 0.0,
-                  "upper": 7.0
+                  }
                 },
                 "arcs": [
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 2.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          4.5,
-                          1.0
-                        ],
-                        [
-                          -0.5,
-                          4.0
                         ],
                         [
                           0.0,
@@ -4861,219 +5544,287 @@
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
-                        ],
-                        [
-                          0.25,
-                          8.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 2
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            5.0,
+                            0.0
+                          ],
+                          [
+                            -0.5,
+                            4.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 2.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          1.0,
-                          0.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          4.5,
-                          1.0
-                        ],
-                        [
-                          -0.5,
-                          4.0
                         ],
                         [
                           0.0,
-                          7.0
+                          8.0
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
-                        ],
-                        [
-                          0.25,
-                          7.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 2
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            5.0,
+                            0.0
+                          ],
+                          [
+                            -0.5,
+                            4.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
-                      "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          4.0,
-                          2.0
-                        ],
-                        [
-                          -0.5,
-                          4.0
-                        ],
-                        [
-                          0.0,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.5,
-                          2.0
-                        ],
-                        [
-                          0.25,
-                          8.0
-                        ]
-                      ]
-                    },
-                    "waiting": 2
-                  },
-                  {
-                    "arrival": {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 2.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          1.0,
-                          7.0
+                          0.0,
+                          8.0
                         ]
                       ]
                     },
-                    "increment": {
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            5.0,
+                            0.0
+                          ],
+                          [
+                            -0.5,
+                            4.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "tail_bounds": [
+                      0.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_rate": 2.0,
+                    "base": {
                       "pairs": [
                         [
                           1.0,
                           0.0
                         ],
                         [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          4.5,
-                          1.0
-                        ],
-                        [
-                          -0.5,
-                          4.0
-                        ],
-                        [
                           0.0,
-                          7.0
+                          8.0
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.25,
-                          1.0
-                        ],
-                        [
-                          0.25,
-                          7.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 2
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            5.0,
+                            0.0
+                          ],
+                          [
+                            -0.5,
+                            4.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   },
                   {
-                    "arrival": {
+                    "tail_bounds": [
+                      1.0,
+                      7.0
+                    ],
+                    "waiting_bounds": [
+                      0.0,
+                      8.0
+                    ],
+                    "waiting_rate": 2.0,
+                    "base": {
                       "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
                         [
                           1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "increment": {
-                      "pairs": [
-                        [
-                          2.0,
-                          1.0
-                        ],
-                        [
-                          1.0,
-                          7.0
-                        ]
-                      ]
-                    },
-                    "lower": {
-                      "pairs": [
-                        [
-                          4.0,
-                          2.0
-                        ],
-                        [
-                          -0.5,
-                          4.0
+                          0.0
                         ],
                         [
                           0.0,
@@ -5081,24 +5832,57 @@
                         ]
                       ]
                     },
-                    "upper": {
-                      "pairs": [
-                        [
-                          6.5,
-                          2.0
-                        ],
-                        [
-                          0.25,
-                          8.0
+                    "dependent": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            1.0,
+                            0.0
+                          ],
+                          [
+                            1.0,
+                            8.0
+                          ]
                         ]
-                      ]
+                      }
                     },
-                    "waiting": 2
+                    "dependent_lower": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            5.0,
+                            0.0
+                          ],
+                          [
+                            -0.5,
+                            4.0
+                          ],
+                          [
+                            0.0,
+                            8.0
+                          ]
+                        ]
+                      }
+                    },
+                    "dependent_upper": {
+                      "encoding": "vector",
+                      "function": {
+                        "pairs": [
+                          [
+                            6.0,
+                            0.0
+                          ],
+                          [
+                            0.25,
+                            8.0
+                          ]
+                        ]
+                      }
+                    }
                   }
-                ],
-                "mode": "feasibility",
-                "normalization": "absolute_final_value",
-                "policy": "front_algebra"
+                ]
               }
             ]
           }

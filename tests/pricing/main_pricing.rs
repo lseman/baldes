@@ -880,6 +880,9 @@ fn rejected_bucket_refinement_preserves_both_grids_and_indexing() {
             grid.decrease_steps(&graph).unwrap();
             let mut expected = original.clone();
             expected.decrease_steps(&graph).unwrap();
+            // Clones share one lineage, so each refinement issues a fresh version.
+            assert_eq!(expected.version, grid.version + 1);
+            expected.version = grid.version;
             assert_eq!(format!("{grid:?}"), format!("{expected:?}"));
         }
     }

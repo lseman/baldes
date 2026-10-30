@@ -11,7 +11,6 @@ struct State {
     numeric: Vec<Range>,
     cost: Range,
     fronts: Vec<Range>,
-    paired: Vec<Range>,
 }
 
 fn take(work: &mut usize, count: usize, deadline: Instant) -> Option<()> {
@@ -41,9 +40,9 @@ impl State {
             a.lo.to_bits() == b.lo.to_bits() && a.hi.to_bits() == b.hi.to_bits()
         };
         same(&self.cost, &other.cost)
-            && [&self.numeric, &self.fronts, &self.paired]
+            && [&self.numeric, &self.fronts]
                 .into_iter()
-                .zip([&other.numeric, &other.fronts, &other.paired])
+                .zip([&other.numeric, &other.fronts])
                 .all(|(a, b)| a.len() == b.len() && a.iter().zip(b).all(|(a, b)| same(a, b)))
     }
     fn merge(&mut self, other: Self) {
@@ -54,18 +53,11 @@ impl State {
         for (a, b) in self.fronts.iter_mut().zip(other.fronts) {
             hull(a, b);
         }
-        for (a, b) in self.paired.iter_mut().zip(other.paired) {
-            hull(a, b);
-        }
     }
-    fn minimum(&self, paired_parameters: &[(Range, f64)]) -> Option<f64> {
+    fn minimum(&self) -> Option<f64> {
         let mut objective = self.cost;
         for &front in &self.fronts {
             objective = finite(objective.add(front))?;
-        }
-        for (&paired, &(baseline, scale)) in self.paired.iter().zip(paired_parameters) {
-            let charge = finite(finite(paired.subtract(baseline))?.multiply(Range::point(scale)))?;
-            objective = finite(objective.add(charge))?;
         }
         Some(objective.lo)
     }
@@ -130,75 +122,10 @@ impl CoupledKernel {
         if self.has_machine_cost_contracts() || self.plugins.iter().any(|p| p.0.has_costs()) {
             return None;
         }
-        // Keep the same family order as final_resource_objective: raw pairs
-        // precede knot pairs. Each nonempty walk's paired charge is its final
-        // value, normalized once, rather than a sum of per-arc minima.
-        let mut paired_resources = Vec::new();
-        take(work, self.definitions.len(), deadline)?;
-        for (resource, definition) in self.definitions.iter().enumerate() {
-            if let CoupledResource::SlopePaired { mode, policy, .. } = definition {
-                if *mode != PairedResourceMode::Feasibility
-                    && self.objective_coefficients[resource] != 0.
-                {
-                    // Front-algebra arithmetic needs its own directed proof.
-                    if *policy != FrontOperationPolicy::StrictDomain {
-                        return None;
-                    }
-                    paired_resources.push(resource);
-                }
-            }
-        }
-        for &resource in &self.relation_indices {
-            if self.objective_coefficients[resource] != 0.
-                && matches!(self.definitions[resource],
-                    CoupledResource::PairedPiecewiseLinear { mode, .. }
-                    if mode != PairedResourceMode::Feasibility)
-            {
-                paired_resources.push(resource);
-            }
-        }
-        let cache_size = if paired_resources.is_empty() {
-            0
-        } else {
-            graph.arcs.len()
-        };
-        take(
-            work,
-            paired_resources.len().checked_add(cache_size)?,
-            deadline,
-        )?;
-        let mut paired_parameters = Vec::with_capacity(paired_resources.len());
-        let mut paired_initial = Vec::with_capacity(paired_resources.len());
-        for &resource in &paired_resources {
-            let normalization = match &self.definitions[resource] {
-                CoupledResource::SlopePaired { normalization, .. }
-                | CoupledResource::PairedPiecewiseLinear { normalization, .. } => *normalization,
-                _ => return None,
-            };
-            let baseline = if normalization == PairedCostNormalization::FinalMinusInitialMinimum {
-                let [lo, hi] = self.paired_initial_minimum(resource, work, Some(deadline))?;
-                finite(Range { lo, hi })?
-            } else {
-                Range::point(0.)
-            };
-            let scale = self.cost_scale * self.objective_coefficients[resource];
-            if !scale.is_finite() {
-                return None;
-            }
-            paired_parameters.push((baseline, scale));
-            let [lo, hi] = self.paired_terminal_bounds(resource, &[], work, Some(deadline))?;
-            paired_initial.push(finite(Range { lo, hi })?);
-        }
-        // Transfer bounds depend only on the physical arc, not the hop count.
-        // Populate lazily so unreachable physical arcs consume no function
-        // scans, then share the same enclosure across all cyclic revisits.
-        let mut paired_by_arc: Vec<Option<Vec<certificate::PairedArcBounds>>> =
-            vec![None; cache_size];
         let root = State {
             numeric: self.initial.iter().copied().map(Range::point).collect(),
             cost: Range::point(0.),
             fronts: vec![Range::point(0.); self.front_indices.len()],
-            paired: paired_initial,
         };
         let mut previous = vec![None; graph.vertices.len()];
         previous[graph.source] = Some(root);
@@ -216,7 +143,6 @@ impl CoupledKernel {
                     old.numeric
                         .len()
                         .checked_add(old.fronts.len())?
-                        .checked_add(old.paired.len())?
                         .checked_add(1)?,
                     deadline,
                 )?;
@@ -329,33 +255,6 @@ impl CoupledKernel {
                     *front =
                         finite(front.add(finite(charge.multiply(Range::point(self.cost_scale)))?))?;
                 }
-                if !paired_resources.is_empty() {
-                    if paired_by_arc[index].is_none() {
-                        take(work, paired_resources.len(), deadline)?;
-                        let mut transfers = Vec::with_capacity(paired_resources.len());
-                        for &resource in &paired_resources {
-                            transfers.push(self.paired_arc_source_bounds(
-                                resource,
-                                index,
-                                work,
-                                Some(deadline),
-                            )?);
-                        }
-                        paired_by_arc[index] = Some(transfers);
-                    }
-                    take(work, paired_resources.len(), deadline)?;
-                    for (value, transfer) in
-                        state.paired.iter_mut().zip(paired_by_arc[index].as_ref()?)
-                    {
-                        match transfer.apply(*value)? {
-                            Some(next) => *value = next,
-                            None => {
-                                possible = false;
-                                break;
-                            }
-                        }
-                    }
-                }
                 if !possible {
                     continue;
                 }
@@ -366,8 +265,7 @@ impl CoupledKernel {
                 }
             }
             if let Some(state) = &next[graph.sink] {
-                take(work, paired_resources.len(), deadline)?;
-                let lower = state.minimum(&paired_parameters)?;
+                let lower = state.minimum()?;
                 minimum = Some(minimum.map_or(lower, |old: f64| old.min(lower)));
             }
             if next.iter().all(Option::is_none) {
@@ -385,7 +283,6 @@ impl CoupledKernel {
                                 a.numeric
                                     .len()
                                     .checked_add(a.fronts.len())?
-                                    .checked_add(a.paired.len())?
                                     .checked_add(1)?,
                                 deadline,
                             )?;

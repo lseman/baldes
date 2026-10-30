@@ -8,14 +8,6 @@ pub(super) struct Pool {
 }
 
 impl Pool {
-    pub(super) fn from_route(route: NetworkRoute) -> Self {
-        let identity = (route.network, route.route.identity());
-        Self {
-            identities: HashSet::from([identity]),
-            routes: vec![Arc::new(route)],
-        }
-    }
-
     pub fn absorb<const D: usize>(&mut self, node: &NodeSnapshot<D>) {
         // Only retain paths represented by an actual donor column. The route
         // registry can also contain paths that were enumerated or registered
@@ -149,17 +141,7 @@ impl Pool {
                 continue;
             }
             let coefficients = entries(oracle, &route, node.state.shared_offset)?;
-            let mut ids = route.arcs.clone();
-            ids.sort_unstable();
-            let physical: Vec<_> = route.arcs.iter().map(|id| oracle.index[id]).collect();
-            let Some(coupled) = route.coupled_cost(&oracle.network.graph, &physical)? else {
-                continue;
-            };
-            let cost = ids
-                .iter()
-                .map(|id| oracle.network.graph.arcs[oracle.index[id]].cost)
-                .sum::<f64>()
-                + coupled;
+            let cost = original_costs::route_cost(oracle, &route)?;
             if !cost.is_finite() {
                 return Err(invalid("inactive shared route cost overflow"));
             }
@@ -225,10 +207,7 @@ impl Pool {
 /// to reconstructing the canonical recipient schedule.
 fn compatible_schedule<const D: usize>(oracle: &Oracle<D>, route: &Route) -> bool {
     let graph = &oracle.network.graph;
-    if graph.has_coupled_resources()
-        || !route.coupled_values.is_empty()
-        || !route.coupled_controls.is_empty()
-    {
+    if graph.has_coupled_resources() || !route.coupled_values.is_empty() {
         let positions = route
             .arcs
             .iter()

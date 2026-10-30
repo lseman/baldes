@@ -3,7 +3,7 @@ use super::*;
 use crate::core::rounding::add_up;
 use crate::enumeration::{CompleteResourceRelaxation, PathDomainLimits};
 
-use crate::master::controls::affine::Interval;
+use super::interval::Interval;
 fn push(rows: &mut BTreeMap<usize, Interval>, row: usize, value: Interval) -> Option<()> {
     let previous = rows.entry(row).or_insert(Interval::point(0.));
     *previous = previous.add(value)?;
@@ -134,9 +134,6 @@ pub(super) fn minimum<const D: usize>(
     work: &mut usize,
     deadline: Instant,
 ) -> Option<Option<f64>> {
-    if super::super::control_pricing::needed(oracle) {
-        return super::super::control_pricing::minimum(oracle, offset, duals, work, deadline);
-    }
     let mut minimum: Option<f64> = None;
     visit_physical_paths(oracle, work, deadline, |positions, work| {
         let Some(bound) = column(oracle, offset, duals, positions, work, deadline) else {
@@ -168,21 +165,8 @@ pub(super) fn cutoff_minimum<const D: usize>(
         return None;
     }
     let mut minimum: Option<CutoffMinimum> = None;
-    let mut iterations = 100_000;
     visit_physical_paths(oracle, work, deadline, |path, work| {
-        let bound = if super::super::control_pricing::needed(oracle) {
-            super::super::control_pricing::column_bound_using(
-                oracle,
-                offset,
-                duals,
-                path,
-                work,
-                &mut iterations,
-                deadline,
-            )
-        } else {
-            column(oracle, offset, duals, path, work, deadline)
-        };
+        let bound = column(oracle, offset, duals, path, work, deadline);
         let Some(bound) = bound else {
             return Err(crate::enumeration::PathDomainFailure::Arithmetic);
         };
@@ -228,14 +212,7 @@ pub(super) fn cutoff_minimum<const D: usize>(
 /// `None` is a proven coupled-infeasible path; outer None is Unknown.
 pub(in crate::master::model) struct ColumnTerms {
     pub cost: Interval,
-    pub coupled: Interval,
-    pub physical: Interval,
     pub rows: BTreeMap<usize, Interval>,
-}
-pub(in crate::master::model) struct SourceColumn<'a> {
-    pub kernel: &'a crate::graph::coupled::CoupledKernel,
-    pub controls: &'a [crate::graph::coupled::PairedControl],
-    pub variable_resources: &'a [usize],
 }
 pub(in crate::master::model) fn column<const D: usize>(
     oracle: &Oracle<D>,
@@ -245,17 +222,7 @@ pub(in crate::master::model) fn column<const D: usize>(
     work: &mut usize,
     deadline: Instant,
 ) -> Option<Option<f64>> {
-    if super::super::control_pricing::needed(oracle) {
-        return super::super::control_pricing::column_bound(
-            oracle, offset, duals, arcs, work, deadline,
-        );
-    }
-    let source = SourceColumn {
-        kernel: oracle.network.graph.coupled_kernel()?,
-        controls: &[],
-        variable_resources: &[],
-    };
-    let terms = components(oracle, offset, duals, arcs, work, deadline, source)?;
+    let terms = components(oracle, offset, duals, arcs, work, deadline)?;
     let Some(mut terms) = terms else {
         return Some(None);
     };
@@ -272,7 +239,6 @@ pub(in crate::master::model) fn components<const D: usize>(
     arcs: &[usize],
     work: &mut usize,
     deadline: Instant,
-    source: SourceColumn<'_>,
 ) -> Option<Option<ColumnTerms>> {
     if Instant::now() >= deadline {
         return None;
@@ -288,9 +254,8 @@ pub(in crate::master::model) fn components<const D: usize>(
         .checked_mul(8)?;
     *work = work.checked_sub(rows_work.checked_add(width.checked_mul(width)?)?)?;
     let graph = &oracle.network.graph;
-    let kernel = source.kernel;
-    let (feasible, coupled) =
-        kernel.certify_with_controls(arcs, source.controls, work, Some(deadline))?;
+    let kernel = graph.coupled_kernel()?;
+    let (feasible, coupled) = kernel.certify_with_budget(arcs, work, Some(deadline))?;
     if !feasible {
         return Some(None);
     }
@@ -302,7 +267,6 @@ pub(in crate::master::model) fn components<const D: usize>(
     for &p in &sorted {
         cost = cost.add(Interval::point(graph.arcs[p].cost))?;
     }
-    let physical = cost;
     cost = cost.add(Interval {
         lo: coupled[0],
         hi: coupled[1],
@@ -367,11 +331,7 @@ pub(in crate::master::model) fn components<const D: usize>(
         push(&mut rows, offset + row, Interval { lo: 0., hi: 1. })?;
     }
     let mut activities = BTreeMap::new();
-    for c in oracle
-        .activity_rows
-        .iter()
-        .filter(|c| c.coefficient != 0. && !source.variable_resources.contains(&c.resource))
-    {
+    for c in oracle.activity_rows.iter().filter(|c| c.coefficient != 0.) {
         let (valid, activity) =
             kernel.certify_accumulated_activity(c.resource, arcs, work, Some(deadline))?;
         if !valid {
@@ -390,15 +350,7 @@ pub(in crate::master::model) fn components<const D: usize>(
     for (r, value) in activities {
         push(&mut rows, offset + r, value)?;
     }
-    (Instant::now() < deadline).then_some(Some(ColumnTerms {
-        cost,
-        coupled: Interval {
-            lo: coupled[0],
-            hi: coupled[1],
-        },
-        physical,
-        rows,
-    }))
+    (Instant::now() < deadline).then_some(Some(ColumnTerms { cost, rows }))
 }
 
 /// Exact incumbent/fixed-reduction contributions require a singleton source

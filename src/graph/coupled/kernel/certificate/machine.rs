@@ -159,42 +159,6 @@ fn ieee_multiply(a: f64, b: f64) -> Option<f64> {
     )
 }
 
-fn ieee_divide(a: f64, b: f64) -> Option<f64> {
-    let a = decode(a)?;
-    let b = decode(b)?;
-    if b.significand == 0 {
-        return None;
-    }
-    let negative = a.negative ^ b.negative;
-    if a.significand == 0 {
-        return Some(f64::from_bits(if negative { SIGN } else { 0 }));
-    }
-    let numerator = u128::from(a.significand);
-    let denominator = u128::from(b.significand);
-    let mut logarithm =
-        (64 - a.significand.leading_zeros()) as i32 - (64 - b.significand.leading_zeros()) as i32;
-    let below = if logarithm >= 0 {
-        numerator < denominator << logarithm as u32
-    } else {
-        (numerator << (-logarithm) as u32) < denominator
-    };
-    if below {
-        logarithm -= 1;
-    }
-    //55 normalized quotient bits:53 retained bits and two rounding guards.
-    // At most108 numerator bits are needed, including subnormal operands.
-    let shift = (54 - logarithm) as u32;
-    let scaled = numerator.checked_shl(shift)?;
-    let quotient = scaled / denominator;
-    let remainder = scaled % denominator;
-    pack(
-        negative,
-        quotient,
-        a.exponent - b.exponent - shift as i32,
-        remainder != 0,
-    )
-}
-
 pub(super) struct Machine<'a> {
     work: &'a mut usize,
     deadline: Option<Instant>,
@@ -217,10 +181,6 @@ impl<'a> Machine<'a> {
     pub(super) fn mul(&mut self, a: f64, b: f64) -> Option<f64> {
         self.take(1)?;
         ieee_multiply(a, b)
-    }
-    pub(super) fn div(&mut self, a: f64, b: f64) -> Option<f64> {
-        self.take(1)?;
-        ieee_divide(a, b)
     }
     pub(super) fn near(&mut self, a: f64, b: f64, policy: FrontOperationPolicy) -> Option<bool> {
         self.take(1)?;

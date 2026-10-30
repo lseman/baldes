@@ -143,7 +143,9 @@ fn imported_expansion_keeps_original_column_and_multiplicity_restrictions_in_lp_
         .solve_with_columns(7, vec![column(1, -1., 4.)], opts.clone())
         .unwrap();
     optimal(&expanded.output, -0.25);
-    assert_eq!(expanded.values.original, vec![(0, 1.)]);
+    assert_eq!(expanded.values.original.len(), 1);
+    assert_eq!(expanded.values.original[0].0, 0);
+    assert!((expanded.values.original[0].1 - 1.).abs() < 1e-12);
     #[cfg(feature = "highs")]
     {
         let child = expanded.snapshot().unwrap();
@@ -267,7 +269,9 @@ fn imported_expansion_reprices_routing_and_recovers_from_an_empty_import_domain(
             .solve_with_columns(7, vec![column(0, 1., 1.)], options())
             .unwrap();
         optimal(&expanded.output, 1.);
-        assert_eq!(expanded.values.original, vec![(0, 1.)]);
+        assert_eq!(expanded.values.original.len(), 1);
+        assert_eq!(expanded.values.original[0].0, 0);
+        assert!((expanded.values.original[0].1 - 1.).abs() < 1e-12);
         if routing {
             assert!(!expanded.output.oracle_calls.is_empty());
         } else {
@@ -459,14 +463,18 @@ fn imported_shared_rows_restrict_future_vectors_and_reject_internal_ids() {
                 .solve_with_columns(7, vec![column(1, -4., 4.)], opts.clone())
                 .unwrap();
             optimal(&expanded.output, -1.);
-            assert_eq!(expanded.values.original, vec![(0, 1.)]);
+            assert_eq!(expanded.values.original.len(), 1);
+            assert_eq!(expanded.values.original[0].0, 0);
+            assert!((expanded.values.original[0].1 - 1.).abs() < 1e-12);
             let again = expanded
                 .snapshot()
                 .unwrap()
                 .solve_with_columns(42, vec![column(1, -8., 4.)], opts.clone())
                 .unwrap();
             optimal(&again.output, -2.);
-            assert_eq!(again.values.original, vec![(0, 1.)]);
+            assert_eq!(again.values.original.len(), 1);
+            assert_eq!(again.values.original[0].0, 0);
+            assert!((again.values.original[0].1 - 1.).abs() < 1e-12);
             optimal(&node.solve(opts.clone()).unwrap().output, 5.);
         }
         optimal(&parent.solve(opts).unwrap().output, 5.);

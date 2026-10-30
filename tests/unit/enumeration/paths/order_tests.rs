@@ -16,7 +16,11 @@ fn tolerance_order_uses_first_greater_candidate_even_when_costs_are_not_partitio
                 reduced_cost: 0.,
             }));
         }
-        let order: Vec<_> = storage.ordered_paths().iter().map(|path| path.arcs[0]).collect();
+        let order: Vec<_> = storage
+            .ordered_paths()
+            .iter()
+            .map(|path| path.arcs[0])
+            .collect();
         assert_eq!(order, [0, 4, 1, 2, 3]);
     }
 }
@@ -28,16 +32,27 @@ fn replacement_keeps_the_native_partition_order_without_replaying_survivors() {
         let mut visited = [0; 16];
         visited[0] = 1 << mask;
         let inserted = storage.insert(Path {
-            arcs: vec![id], element_hash: 0, visited,
-            original_cost: multiple * EPSILON, reduced_cost: 0.,
+            arcs: vec![id],
+            element_hash: 0,
+            visited,
+            original_cost: multiple * EPSILON,
+            reduced_cost: 0.,
         });
         assert_eq!(inserted, id != 4);
     }
-    let order: Vec<_> = storage.ordered_paths().iter().map(|path| path.arcs[0]).collect();
+    let order: Vec<_> = storage
+        .ordered_paths()
+        .iter()
+        .map(|path| path.arcs[0])
+        .collect();
     assert_eq!(order, [2, 3, 1]);
     let mut child = storage.clone();
     child.retain(|path| path.arcs[0] != 2);
-    let retained: Vec<_> = child.ordered_paths().iter().map(|path| path.arcs[0]).collect();
+    let retained: Vec<_> = child
+        .ordered_paths()
+        .iter()
+        .map(|path| path.arcs[0])
+        .collect();
     assert_eq!(retained, [3, 1]);
     assert_eq!(storage.ordered_paths().len(), 3);
 }
@@ -50,12 +65,19 @@ fn duplicate_scan_uses_export_partition_when_storage_buckets_are_coalesced() {
             let mut visited = [0; 16];
             visited[0] = 1 << mask;
             let inserted = storage.insert(Path {
-                arcs: vec![id], element_hash: mask, visited,
-                original_cost: multiple * EPSILON, reduced_cost: 0.,
+                arcs: vec![id],
+                element_hash: mask,
+                visited,
+                original_cost: multiple * EPSILON,
+                reduced_cost: 0.,
             });
             assert_eq!(inserted, id == 0 || id == 3);
         }
-        let order: Vec<_> = storage.ordered_paths().iter().map(|path| path.arcs[0]).collect();
+        let order: Vec<_> = storage
+            .ordered_paths()
+            .iter()
+            .map(|path| path.arcs[0])
+            .collect();
         assert_eq!(order, [0, 3]);
     }
 }

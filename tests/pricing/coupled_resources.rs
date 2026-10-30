@@ -37,149 +37,79 @@ fn whole_interval_front_dominance_declines_unproved_continuation_compensation() 
 }
 
 #[test]
-fn paired_prefix_waiting_envelope_matches_original_function_on_fractional_crossings() {
-    use baldes::graph::coupled::{PairedResourceArc, PairedResourceMode};
-    let constant =
-        |lo, hi, value| PiecewiseLinearFunction::new(vec![[lo, value], [hi, value]]).unwrap();
-    for seed in 0..16 {
-        let points: Vec<_> = (0..=16)
-            .map(|i| [i as f64 * 0.5, ((i * 13 + seed * 7) % 23) as f64 * 0.3 - 3.])
-            .collect();
-        let baseline = points.iter().map(|p| p[1]).reduce(f64::min).unwrap();
-        for probe in 1..16 {
-            let lo = probe as f64 * 0.47;
-            let hi = lo + 0.001;
-            // With zero increments and free waiting, the optimum is exactly
-            // the original initial function's prefix minimum through hi.
-            let pair = points
-                .windows(2)
-                .find(|p| p[0][0] <= hi && hi <= p[1][0])
-                .unwrap();
-            let endpoint = pair[0][1]
-                + (hi - pair[0][0]) / (pair[1][0] - pair[0][0]) * (pair[1][1] - pair[0][1]);
-            let expected = points
-                .iter()
-                .filter(|p| p[0] <= hi)
-                .map(|p| p[1])
-                .fold(endpoint, f64::min)
-                - baseline;
-            let mut graph = Graph::<2>::new(3, 0).unwrap();
-            graph.add_arc(0, 1, 0.).unwrap();
-            graph.add_arc(1, 2, 0.).unwrap();
-            let arc = |lo, hi| PairedResourceArc {
-                arrival: PiecewiseLinearFunction::new(vec![[lo, lo], [hi, hi]]).unwrap(),
-                increment: constant(lo, hi, 0.),
-                lower: constant(lo, hi, -100.),
-                upper: constant(lo, hi, 100.),
-                waiting: 0,
-            };
-            graph
-                .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
-                    normalization:
-                        baldes::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
-                    initial: PiecewiseLinearFunction::new(points.clone()).unwrap(),
-                    initial_base: Window::new(0., 8.).unwrap(),
-                    arcs: vec![arc(0., 8.), arc(lo, hi)],
-                    mode: PairedResourceMode::CostUnbounded,
-                }])
-                .unwrap();
-            let actual = graph
-                .coupled_kernel()
-                .unwrap()
-                .replay(&[0, 1])
-                .unwrap()
-                .unwrap();
-            assert!(
-                (actual - expected).abs() < 1e-10,
-                "seed={seed}, probe={probe}, actual={actual}, expected={expected}"
-            );
-        }
-    }
-}
-
-#[test]
-fn unresolved_arrival_rounding_plateau_is_unsupported_instead_of_infeasible() {
-    use baldes::graph::coupled::{PairedResourceArc, PairedResourceMode};
-    let pwl = |points| PiecewiseLinearFunction::new(points).unwrap();
-    let arrival = pwl(vec![[0., 1e16], [1., 1e16 + 2.]]);
-    let upper = pwl(vec![[1e16, -0.2], [1e16 + 2., -2.]]);
-    // Independent literal witness: interpolation rounds the interior arrival
-    // onto the left endpoint, where dependent -0.25 meets the upper bound.
-    assert_eq!(arrival.value(0.25).unwrap(), Some(1e16));
-    assert!(-0.25 <= upper.value(1e16).unwrap().unwrap());
-    let mut graph = Graph::<2>::new(2, 0).unwrap();
-    graph.add_arc(0, 1, 0.).unwrap();
-    let installed = graph.set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
-        normalization: baldes::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
-        initial: pwl(vec![[0., 0.], [1., -1.]]),
-        initial_base: Window::new(0., 1.).unwrap(),
-        mode: PairedResourceMode::Feasibility,
-        arcs: vec![PairedResourceArc {
-            arrival,
-            increment: pwl(vec![[0., 0.], [1., 0.]]),
-            lower: pwl(vec![[1e16, -10.], [1e16 + 2., -10.]]),
-            upper,
-            waiting: 0,
-        }],
-    }]);
-    let error = match installed {
-        Ok(()) => graph.coupled_kernel().unwrap().replay(&[0]).unwrap_err(),
-        Err(error) => error,
+fn paired_waiting_cost_matches_native_join_at_every_split() {
+    use baldes::graph::coupled::descriptor::{
+        FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
     };
-    assert!(error.to_string().contains("rounding plateau"), "{error}");
-}
-
-#[test]
-fn paired_waiting_cost_matches_independent_control_oracle_at_every_join_split() {
-    use baldes::graph::coupled::{PairedResourceArc, PairedResourceMode};
-    let constant =
-        |lo, hi, value| PiecewiseLinearFunction::new(vec![[lo, value], [hi, value]]).unwrap();
+    use baldes::graph::coupled::{MachineArcFunctionInput, PairedResourceMode};
+    let constant = |lo: f64, hi: f64, value: f64| match lo == hi {
+        true => PreparedSlopeFunction::constant_point(value, lo).unwrap(),
+        false => PreparedSlopeFunction::from_prepared_pairs(vec![(value, lo), (0., hi)]).unwrap(),
+    };
+    let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
     // All data are integer affine functions. On this two-step model every
-    // continuous optimum occurs at an integer control or domain boundary.
-    // Enumerating physical departure/waiting controls is independent of the
-    // implementation's function composition and envelope construction.
+    // continuous optimum occurs at an integer control or domain boundary, so
+    // enumerating departure/waiting controls gives an independent oracle for
+    // replay and for joins with a nonempty backward suffix. The full-forward
+    // join (split 2) is not that optimum: the pinned binary returns
+    // `3 + 3 * first_wait`, which exceeds it when the second rate is lower.
+    // Native values: internal/reference/metasolver_paired_waiting_probe.py.
+    // Function domains are the tail windows, as in the native program.
+    let windows = [
+        Window::new(0., 1.).unwrap(),
+        Window::new(3., 8.).unwrap(),
+        Window::new(6., 10.).unwrap(),
+    ];
     for first_wait in 0..4 {
         for second_wait in 0..4 {
             let mut graph = Graph::<2>::new(3, 0).unwrap();
             graph.add_arc(0, 1, -20.).unwrap();
             graph.add_arc(1, 2, -20.).unwrap();
             graph
-                .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
-                    normalization:
-                        baldes::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
-                    initial: constant(0., 1., 0.),
-                    initial_base: Window::new(0., 0.).unwrap(),
-                    arcs: vec![
-                        PairedResourceArc {
-                            arrival: PiecewiseLinearFunction::new(vec![[0., 1.], [8., 9.]])
-                                .unwrap(),
-                            increment: constant(0., 8., 2.),
-                            lower: constant(3., 8., 0.),
-                            upper: constant(3., 8., 100.),
-                            waiting: first_wait,
-                        },
-                        PairedResourceArc {
-                            arrival: PiecewiseLinearFunction::new(vec![[0., 1.], [8., 9.]])
-                                .unwrap(),
-                            increment: constant(0., 8., 1.),
-                            lower: constant(6., 10., 0.),
-                            upper: constant(6., 10., 100.),
-                            waiting: second_wait,
-                        },
-                    ],
+                .set_coupled_resources(&[CoupledResource::PairedFront {
                     mode: PairedResourceMode::CostBounded,
                 }])
                 .unwrap();
+            let base: Vec<_> = (0..2)
+                .map(|arc| constant(windows[arc].lower, windows[arc].upper, 1.))
+                .collect();
+            let increments = [2., 1.];
+            let waiting = [first_wait, second_wait];
+            let inputs: Vec<_> = (0..2)
+                .map(|arc| MachineArcFunctionInput {
+                    physical_arc: arc,
+                    tail_bounds: windows[arc],
+                    waiting_bounds: windows[arc + 1],
+                    waiting_rate: waiting[arc],
+                    base: &base[arc],
+                    dependent: affine(increments[arc]),
+                    dependent_lower: affine(0.),
+                    dependent_upper: affine(100.),
+                })
+                .collect();
+            let prepared = graph.prepare_paired_front_program(
+                0,
+                &inputs,
+                affine(0.),
+                windows[0],
+                windows[2],
+                FrontierBudget::default(),
+            );
+            assert!(
+                matches!(prepared, FrontierOutcome::Complete(())),
+                "{prepared:?}"
+            );
             let expected = (3..=8)
                 .flat_map(|x| {
                     ((x + 1).max(6)..=10).map(move |y| {
-                        3. + f64::from(first_wait * (x - 1) + second_wait * (y - x - 1))
+                        3. + f64::from(first_wait * (x - 2) + second_wait * (y - x - 1))
                     })
                 })
                 .reduce(f64::min)
                 .unwrap();
             let kernel = graph.coupled_kernel().unwrap();
             assert_eq!(kernel.replay(&[0, 1]).unwrap(), Some(expected));
+            let native = [expected, expected, 3. + 3. * f64::from(first_wait)];
             for split in 0..=2 {
                 let (mut f, mut b) = (kernel.root(true), kernel.root(false));
                 let mut cost = 0.;
@@ -195,15 +125,17 @@ fn paired_waiting_cost_matches_independent_control_oracle_at_every_join_split() 
                 }
                 assert_eq!(
                     cost + kernel.join(&f, &b).unwrap().unwrap(),
-                    expected,
+                    native[split],
                     "waiting=({first_wait},{second_wait}), split={split}"
                 );
             }
             let mut solver = baldes::pricing::Solver::<2>::new(3, 0).unwrap();
             solver.graph = graph;
             let result = solver.price_phase(0, 100, false).unwrap();
-            assert_eq!(result.minimum_reduced_cost, expected - 40.);
-            assert_eq!(result.columns[0].original_cost, expected - 40.);
+            // Default forward pricing completes at the sink, so it reports the
+            // full-forward join value.
+            assert_eq!(result.minimum_reduced_cost, native[2] - 40.);
+            assert_eq!(result.columns[0].original_cost, native[2] - 40.);
         }
     }
 }
@@ -1615,9 +1547,6 @@ fn directional_cost_bounds_match_retained_metasolver_dominance_controls() {
 }
 
 #[cfg(feature = "clp")]
-#[path = "coupled/backward_pairing.rs"]
-mod backward_pairing;
-
 #[test]
 fn signed_dag_numeric_prefix_pays_for_both_future_weight_signs() {
     let mut graph = Graph::<2>::new(3, 0).unwrap();
@@ -1675,496 +1604,4 @@ fn integral_backward_signed_suffix_has_zero_compensation_without_rounding_slack(
                 <= kernel.join(&prefix, &b).unwrap().unwrap()
         );
     }
-}
-
-#[cfg(feature = "clp")]
-#[test]
-fn paired_enumeration_five_customer_native_capture() {
-    use baldes::graph::coupled::descriptor::{
-        FrontOperationPolicy, PairedCostNormalization, PreparedSlopeFunction, SlopeRelationArc,
-    };
-    use baldes::graph::coupled::PairedResourceMode;
-    let captured: serde_json::Value = serde_json::from_str(include_str!(
-        "../fixtures/coupled/metasolver-paired-enumeration.json"
-    ))
-    .unwrap();
-    let costs = captured["physical_arc_costs"].as_array().unwrap();
-    let mut solver = baldes::pricing::Solver::<2>::new(7, 1).unwrap();
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[6].elements.clear();
-    for vertex in 0..7 {
-        solver.graph.set_bounds(vertex, 0, 0., 2.5).unwrap();
-    }
-    let f =
-        |y, slope| PreparedSlopeFunction::from_prepared_pairs(vec![(y, 0.), (slope, 2.5)]).unwrap();
-    let mut definitions = Vec::new();
-    for customer in 1..=5 {
-        let mut edges = vec![(0, customer), (customer, 6)];
-        edges.extend(
-            (1..=5)
-                .filter(|&other| other != customer)
-                .map(|other| (customer, other)),
-        );
-        for (tail, head) in edges {
-            let original_cost = if tail == 0 {
-                1.
-            } else if (tail, head) == (1, 2) || (tail, head) == (2, 1) {
-                0.8
-            } else {
-                0.
-            };
-            let id = solver.graph.add_arc(tail, head, original_cost).unwrap();
-            solver.graph.arc_mut(id).unwrap().reduced_cost = costs[id as usize].as_f64().unwrap();
-            let increment = if head == 6 { 0. } else { 1. };
-            solver.graph.arc_mut(id).unwrap().consumption[0] = increment;
-            definitions.push(SlopeRelationArc {
-                arrival: f(increment, 1.),
-                increment: f(0., 0.),
-                lower: f(0., 0.),
-                upper: f(8., 0.),
-                waiting: 0,
-            });
-        }
-    }
-    solver
-        .graph
-        .set_coupled_resources(&[CoupledResource::SlopePaired {
-            initial: f(0., 0.),
-            initial_base: Window::new(0., 2.5).unwrap(),
-            arcs: definitions,
-            mode: PairedResourceMode::CostUnbounded,
-            normalization: PairedCostNormalization::AbsoluteFinalValue,
-            policy: FrontOperationPolicy::StrictDomain,
-        }])
-        .unwrap();
-    solver.bucket_steps[0] = 1.;
-    let routes = solver
-        .enumerate(captured["completion_cutoffs"][0].as_f64().unwrap())
-        .unwrap();
-    let mut ordered: Vec<Vec<usize>> = routes
-        .iter()
-        .map(|r| r.arcs.iter().map(|&a| a as usize).collect())
-        .collect();
-    ordered.sort();
-    let mut expected_ordered: Vec<Vec<usize>> = captured["oracle_ordered_arcs"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|route| {
-            route
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|arc| arc.as_u64().unwrap() as usize)
-                .collect()
-        })
-        .collect();
-    expected_ordered.sort();
-    assert_eq!(ordered, expected_ordered);
-    let mut sets: Vec<Vec<usize>> = routes
-        .iter()
-        .map(|r| {
-            let mut s: Vec<_> = r
-                .arcs
-                .iter()
-                .map(|&i| solver.graph.arcs[i as usize].head)
-                .filter(|&v| v != 6)
-                .collect();
-            s.sort_unstable();
-            s
-        })
-        .collect();
-    sets.sort();
-    sets.dedup();
-    let expected: Vec<Vec<usize>> = captured["native_customer_sets"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|row| {
-            row.as_array()
-                .unwrap()
-                .iter()
-                .map(|v| v.as_u64().unwrap() as usize)
-                .collect()
-        })
-        .collect();
-    assert_eq!(sets, expected);
-}
-
-#[cfg(feature = "clp")]
-#[test]
-fn paired_enumeration_nonzero_capture_keeps_source_cutoff() {
-    use baldes::graph::coupled::descriptor::{
-        FrontOperationPolicy, PairedCostNormalization, PreparedSlopeFunction, SlopeRelationArc,
-    };
-    use baldes::graph::coupled::PairedResourceMode;
-    let captured: serde_json::Value = serde_json::from_str(include_str!(
-        "../fixtures/coupled/metasolver-paired-enumeration-increment.json"
-    ))
-    .unwrap();
-    let costs = captured["physical_arc_costs"].as_array().unwrap();
-    let mut solver = baldes::pricing::Solver::<2>::new(7, 1).unwrap();
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[6].elements.clear();
-    for vertex in 0..7 {
-        solver.graph.set_bounds(vertex, 0, 0., 2.5).unwrap();
-    }
-    let f =
-        |y, slope| PreparedSlopeFunction::from_prepared_pairs(vec![(y, 0.), (slope, 2.5)]).unwrap();
-    let mut definitions = Vec::new();
-    for customer in 1..=5 {
-        let mut edges = vec![(0, customer), (customer, 6)];
-        edges.extend(
-            (1..=5)
-                .filter(|&other| other != customer)
-                .map(|other| (customer, other)),
-        );
-        for (tail, head) in edges {
-            let original_cost = if tail == 0 {
-                1.
-            } else if (tail, head) == (1, 2) || (tail, head) == (2, 1) {
-                0.8
-            } else {
-                0.
-            };
-            let id = solver.graph.add_arc(tail, head, original_cost).unwrap();
-            solver.graph.arc_mut(id).unwrap().reduced_cost = costs[id as usize].as_f64().unwrap();
-            let increment = if head == 6 { 0. } else { 1. };
-            solver.graph.arc_mut(id).unwrap().consumption[0] = increment;
-            definitions.push(SlopeRelationArc {
-                arrival: f(increment, 1.),
-                increment: f(0.25, 0.),
-                lower: f(0., 0.),
-                upper: f(8., 0.),
-                waiting: 0,
-            });
-        }
-    }
-    solver
-        .graph
-        .set_coupled_resources(&[CoupledResource::SlopePaired {
-            initial: f(0., 0.),
-            initial_base: Window::new(0., 2.5).unwrap(),
-            arcs: definitions,
-            mode: PairedResourceMode::CostUnbounded,
-            normalization: PairedCostNormalization::AbsoluteFinalValue,
-            policy: FrontOperationPolicy::StrictDomain,
-        }])
-        .unwrap();
-    solver.bucket_steps[0] = 1.;
-    // The directional API must honor its caller's completion callback for
-    // paired fronts.
-    solver.complete_labels(true).unwrap();
-    let callbacks = std::cell::Cell::new(0);
-    let checked = baldes::enumeration::Enumeration::run_directional(
-        &solver.graph,
-        &solver.engine.as_ref().unwrap().grid,
-        &baldes::enumeration::Controls {
-            cutoff: captured["completion_cutoff"].as_f64().unwrap(),
-            ..Default::default()
-        },
-        |_, _| {
-            callbacks.set(callbacks.get() + 1);
-            false
-        },
-    )
-    .unwrap();
-    assert!(callbacks.get() > 0);
-    assert!(checked.pruning.completion_rejections > 0);
-    let cutoff = captured["completion_cutoff"].as_f64().unwrap();
-    let engine = solver.engine.as_ref().unwrap();
-    let checked = baldes::enumeration::Enumeration::run_directional(
-        &solver.graph,
-        &engine.grid,
-        &baldes::enumeration::Controls {
-            cutoff,
-            ..Default::default()
-        },
-        |forward, label| engine.enumeration_completion(&solver.graph, forward, label, cutoff, true),
-    )
-    .unwrap();
-    assert!(checked.pruning.completion_rejections > 0);
-    let fixing = solver.fix(cutoff).unwrap();
-    assert!(fixing.checked > 0);
-    let routes = solver
-        .enumerate(captured["completion_cutoff"].as_f64().unwrap())
-        .unwrap();
-    for native in captured["native_paths"].as_array().unwrap() {
-        let native_arcs: Vec<i32> = native["arcs"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|arc| arc.as_i64().unwrap() as i32)
-            .collect();
-        let native_cost = native_arcs
-            .iter()
-            .map(|&arc| costs[arc as usize].as_f64().unwrap())
-            .sum::<f64>()
-            + native["paired_scalar"].as_f64().unwrap();
-        let route = routes
-            .iter()
-            .find(|route| route.arcs == native_arcs)
-            .expect("native ordering must be present");
-        assert!(
-            (route.cost - native_cost).abs() < 1e-12,
-            "arcs {native_arcs:?}, source {}, native {native_cost}",
-            route.cost
-        );
-    }
-    let mut sets: Vec<Vec<usize>> = routes
-        .iter()
-        .map(|r| {
-            let mut s: Vec<_> = r
-                .arcs
-                .iter()
-                .map(|&i| solver.graph.arcs[i as usize].head)
-                .filter(|&v| v != 6)
-                .collect();
-            s.sort_unstable();
-            s
-        })
-        .collect();
-    sets.sort();
-    sets.dedup();
-    let expected: Vec<Vec<usize>> = captured["native_customer_sets"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|row| {
-            row.as_array()
-                .unwrap()
-                .iter()
-                .map(|v| v.as_u64().unwrap() as usize)
-                .collect()
-        })
-        .collect();
-    // Compare customer sets because the native storage retains one
-    // representative per set, while source enumeration preserves arc paths.
-    assert_eq!(sets, expected);
-    // A controlled native replay lowers the enumeration cutoff to zero;
-    // all ten completion calls reject and no path survives. The source
-    // model must likewise retain no route at this strict boundary.
-    assert!(solver.enumerate(0.).unwrap().is_empty());
-    // The registered native model also reports incomplete enumeration when
-    // its concatenation ratio is zero. Reuse the captured graph and cutoff,
-    // then verify a later ordinary enumeration can start from clean state.
-    solver.restore_arcs();
-    solver.options.set("BALDESapplyReducedCostFixing", 1.).unwrap();
-    solver.options.set("BALDESstopRatioForConcatenationInEnum", 0.).unwrap();
-    let interrupted = solver.run_fixing_enumeration(0, 0., cutoff).unwrap();
-    assert_eq!((interrupted.state, interrupted.routes), (1, 0));
-    assert!(solver.enumeration.is_none());
-    assert!(solver.engine.is_none());
-    let retried = solver.enumerate(cutoff).unwrap();
-    for native in captured["native_paths"].as_array().unwrap() {
-        let arcs: Vec<i32> = native["arcs"].as_array().unwrap().iter()
-            .map(|arc| arc.as_i64().unwrap() as i32).collect();
-        assert!(retried.iter().any(|route| route.arcs == arcs));
-    }
-}
-#[test]
-fn paired_concatenation_timeout_discards_partial_universe_and_allows_repricing() {
-    use baldes::graph::coupled::descriptor::{
-        FrontOperationPolicy, PairedCostNormalization, PreparedSlopeFunction, SlopeRelationArc,
-    };
-    use baldes::graph::coupled::PairedResourceMode;
-    let mut solver = baldes::pricing::Solver::<2>::new(3, 1).unwrap();
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[2].elements.clear();
-    for vertex in 0..3 {
-        solver.graph.set_bounds(vertex, 0, 0., 4.).unwrap();
-    }
-    for (tail, head) in [(0, 1), (1, 2)] {
-        let arc = solver.graph.add_arc(tail, head, -1.).unwrap();
-        solver.graph.arc_mut(arc).unwrap().consumption[0] = 1.;
-    }
-    let line = |value, slope| {
-        PreparedSlopeFunction::from_prepared_pairs(vec![(value, 0.), (slope, 4.)]).unwrap()
-    };
-    let arc = SlopeRelationArc {
-        arrival: line(1., 1.), increment: line(0.25, 0.),
-        lower: line(0., 0.), upper: line(8., 0.), waiting: 0,
-    };
-    solver.graph.set_coupled_resources(&[CoupledResource::SlopePaired {
-        initial: line(0., 0.), initial_base: Window::new(0., 4.).unwrap(),
-        arcs: vec![arc; 2], mode: PairedResourceMode::CostUnbounded,
-        normalization: PairedCostNormalization::AbsoluteFinalValue,
-        policy: FrontOperationPolicy::StrictDomain,
-    }]).unwrap();
-    solver.options.set("BALDESmaxNumOfLabelsInHeurEnumeration", 10_000.).unwrap();
-    solver.options.set("BALDESapplyReducedCostFixing", 1.).unwrap();
-    solver.options.set("BALDESstopRatioForConcatenationInEnum", 0.).unwrap();
-    let report = solver.run_fixing_enumeration(1, 0., 0.).unwrap();
-    assert_eq!((report.state, report.routes), (1, 0));
-    assert!(solver.engine.is_none());
-    assert!(solver.enumeration.is_none());
-    assert_eq!(solver.price_phase(0, 10, false).unwrap().minimum_reduced_cost, -1.5);
-}
-
-#[test]
-fn paired_completion_pruning_preserves_paths_with_signed_slopes_and_waiting() {
-    use baldes::enumeration::{Controls, Enumeration};
-    use baldes::graph::coupled::descriptor::{
-        FrontOperationPolicy, PairedCostNormalization, PreparedSlopeFunction, SlopeRelationArc,
-    };
-    use baldes::graph::coupled::PairedResourceMode;
-    let mut rejected = 0;
-    let mut fixed_arcs = 0;
-    for seed in 0..32 {
-        let mut solver = baldes::pricing::Solver::<2>::new(5, 1).unwrap();
-        solver.graph.vertices[0].elements.clear();
-        solver.graph.vertices[4].elements.clear();
-        for v in 0..5 {
-            solver.graph.set_bounds(v, 0, 0., 8.).unwrap();
-        }
-        let f = |y, slope| {
-            PreparedSlopeFunction::from_prepared_pairs(vec![(y, 0.), (slope, 8.)]).unwrap()
-        };
-        let mut arcs = Vec::new();
-        for tail in 0..4 {
-            for head in (tail + 1)..5 {
-                let id = solver
-                    .graph
-                    .add_arc(
-                        tail,
-                        head,
-                        ((seed * 13 + tail * 7 + head * 3) % 13) as f64 / 4. - 1.5,
-                    )
-                    .unwrap();
-                solver.graph.arc_mut(id).unwrap().consumption[0] = 1.;
-                arcs.push(SlopeRelationArc {
-                    arrival: f(1., 1.),
-                    increment: f(
-                        ((seed + tail * 3 + head) % 5) as f64 / 4. - 0.5,
-                        ((seed + tail + head) % 3) as f64 / 8. - 0.125,
-                    ),
-                    lower: f(0., 0.),
-                    upper: f(10., 0.),
-                    waiting: (seed % 2) as i32,
-                });
-            }
-        }
-        solver
-            .graph
-            .set_coupled_resources(&[CoupledResource::SlopePaired {
-                initial: f(0., 0.),
-                initial_base: Window::new(0., 8.).unwrap(),
-                arcs,
-                mode: PairedResourceMode::CostUnbounded,
-                normalization: PairedCostNormalization::AbsoluteFinalValue,
-                policy: FrontOperationPolicy::StrictDomain,
-            }])
-            .unwrap();
-        solver.complete_labels(true).unwrap();
-        let engine = solver.engine.as_ref().unwrap();
-        for cutoff in [-1., 0., 1., 2.] {
-            let controls = Controls {
-                cutoff,
-                preserve_arc_paths: true,
-                ..Default::default()
-            };
-            let reference = Enumeration::run(&solver.graph, &engine.grid, &controls, None).unwrap();
-            let mut fixed_solver = solver.fork_for_node();
-            let fix = fixed_solver.fix(cutoff).unwrap();
-            fixed_arcs += fix.eliminated_forward + fix.eliminated_backward;
-            let fixed = Enumeration::run(&fixed_solver.graph, &fixed_solver.engine.as_ref().unwrap().grid, &controls, None).unwrap();
-            let fixed_paths = |universe: &Enumeration<2>| {
-                let mut paths: Vec<_> = universe.paths.partitions.iter().flatten().map(|p| p.arcs.clone()).collect();
-                paths.sort(); paths
-            };
-            assert_eq!(fixed_paths(&reference), fixed_paths(&fixed), "fix seed={seed} cutoff={cutoff} report={fix:?}");
-            let candidate =
-                Enumeration::run_directional(&solver.graph, &engine.grid, &controls, |d, l| {
-                    engine.enumeration_completion(&solver.graph, d, l, cutoff, true)
-                })
-                .unwrap();
-            rejected += candidate.pruning.completion_rejections;
-            let collect = |universe: &Enumeration<2>| {
-                let mut x: Vec<_> = universe
-                    .paths
-                    .partitions
-                    .iter()
-                    .flatten()
-                    .map(|p| p.arcs.clone())
-                    .collect();
-                x.sort();
-                x
-            };
-            assert_eq!(
-                collect(&reference),
-                collect(&candidate),
-                "seed={seed}, cutoff={cutoff}, pruning={:?}",
-                candidate.pruning
-            );
-        }
-    }
-    eprintln!("total completion rejections: {rejected}");
-    assert!(rejected > 0);
-    assert!(fixed_arcs > 0);
-}
-
-#[test]
-fn paired_fixing_preserves_enumeration_with_presence_and_branching() {
-    use baldes::cuts::soft_conflicts::{Mode, PresenceRow, PricingInput};
-    use baldes::graph::coupled::descriptor::{
-        FrontOperationPolicy, PairedCostNormalization, PreparedSlopeFunction, SlopeRelationArc,
-    };
-    use baldes::graph::coupled::PairedResourceMode;
-    use baldes::pricing::restrictions::RyanFosterConstraint;
-
-    let f = |y, slope| PreparedSlopeFunction::from_prepared_pairs(vec![(y, 0.), (slope, 8.)]).unwrap();
-    let mut eliminated = 0;
-    for together in [false, true] {
-        for presence in [false, true] {
-            for cutoff in [-1., 0., 1., 2.] {
-                let mut solver = baldes::pricing::Solver::<2>::new(5, 1).unwrap();
-                solver.graph.vertices[0].elements.clear();
-                solver.graph.vertices[4].elements.clear();
-                for v in 0..5 {
-                    solver.graph.set_bounds(v, 0, 0., 8.).unwrap();
-                }
-                let mut arcs = Vec::new();
-                let mut events = Vec::new();
-                for tail in 0..4 {
-                    for head in tail + 1..5 {
-                        let id = solver.graph.add_arc(tail, head, ((tail * 7 + head * 3) % 9) as f64 / 4. - 1.).unwrap();
-                        solver.graph.arc_mut(id).unwrap().consumption[0] = 1.;
-                        arcs.push(SlopeRelationArc {
-                            arrival: f(1., 1.), increment: f(0.25, 0.),
-                            lower: f(0., 0.), upper: f(10., 0.), waiting: 0,
-                        });
-                        events.push(if head == 1 { vec![0] } else if head == 3 { vec![1] } else { vec![] });
-                    }
-                }
-                solver.graph.set_coupled_resources(&[CoupledResource::SlopePaired {
-                    initial: f(0., 0.), initial_base: Window::new(0., 8.).unwrap(), arcs,
-                    mode: PairedResourceMode::CostUnbounded,
-                    normalization: PairedCostNormalization::AbsoluteFinalValue,
-                    policy: FrontOperationPolicy::StrictDomain,
-                }]).unwrap();
-                solver.set_ryan_foster(vec![RyanFosterConstraint { first: 1, second: 3, together }]).unwrap();
-                if presence {
-                    solver.set_presence_rows(vec![PricingInput {
-                        row: PresenceRow::new(2, vec![(0, 1)], Mode::AnyPair).unwrap(),
-                        arc_events: events,
-                        dual: 0.5,
-                    }]).unwrap();
-                }
-                solver.complete_labels(true).unwrap();
-                let mut baseline = solver.fork_for_node();
-                let mut fixed = solver.fork_for_node();
-                let expected = baseline.enumerate(cutoff).unwrap();
-                let report = fixed.fix(cutoff).unwrap();
-                eliminated += report.eliminated_forward + report.eliminated_backward;
-                let actual = fixed.enumerate(cutoff).unwrap();
-                let paths = |routes: Vec<baldes::Route>| {
-                    let mut paths: Vec<_> = routes.into_iter().map(|route| route.arcs).collect();
-                    paths.sort();
-                    paths
-                };
-                assert_eq!(paths(actual), paths(expected), "together={together}, presence={presence}, cutoff={cutoff}, report={report:?}");
-            }
-        }
-    }
-    assert!(eliminated > 0);
 }

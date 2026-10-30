@@ -47,14 +47,6 @@ impl Route {
         self.route.original_cost
     }
     #[getter]
-    fn coupled_controls(&self) -> Vec<(usize, Vec<f64>)> {
-        self.route
-            .coupled_controls
-            .iter()
-            .map(|control| (control.resource, control.base.clone()))
-            .collect()
-    }
-    #[getter]
     fn coupled_values(&self) -> Vec<(usize, f64)> {
         self.route.coupled_values.clone()
     }

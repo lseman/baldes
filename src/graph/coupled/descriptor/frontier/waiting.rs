@@ -220,7 +220,8 @@ impl MachineWaitingEnvelope {
     }
 
     /// Ordered connected-region upper filter. A later re-entry is the
-    /// machine helper's status 2 and remains unknown. The reference caller
+    /// machine helper's status 2 and remains unknown. A front entirely
+    /// above the bound is empty. The reference caller
     /// retains its waiting bits and predecessor after this in-place filter.
     pub fn apply_upper_bound(
         &self,
@@ -228,7 +229,7 @@ impl MachineWaitingEnvelope {
         budget: FrontierBudget,
     ) -> FrontierOutcome<Self> {
         let started = Instant::now();
-        let compute = || -> FrontResult<Self> {
+        let compute = || -> FrontResult<Option<Self>> {
             let deadline = || -> FrontResult<()> {
                 if budget
                     .max_elapsed
@@ -365,10 +366,10 @@ impl MachineWaitingEnvelope {
                     j += 1;
                 }
             }
+            // A front entirely above the bound leaves the native state with
+            // count -1: the extension succeeds with an empty, infeasible state.
             if output.is_empty() {
-                return Err(FrontierUnknown::Unsupported(
-                    "machine upper filter invalid empty count",
-                ));
+                return Ok(None);
             }
             if output.len() == 1 {
                 let coordinate = output[0].1;
@@ -377,14 +378,15 @@ impl MachineWaitingEnvelope {
             let function = PreparedSlopeFunction::from_machine_pairs(output)
                 .map_err(FrontierUnknown::Arithmetic)?;
             deadline()?;
-            Ok(Self {
+            Ok(Some(Self {
                 function,
                 waiting_bits: self.waiting_bits,
                 predecessor: self.predecessor,
-            })
+            }))
         };
         match compute() {
-            Ok(value) => FrontierOutcome::Complete(value),
+            Ok(Some(value)) => FrontierOutcome::Complete(value),
+            Ok(None) => FrontierOutcome::Empty,
             Err(reason) => FrontierOutcome::Unknown(reason),
         }
     }

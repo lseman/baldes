@@ -259,20 +259,24 @@ fn enumerated_snapshot_survives_siblings_grandchildren_and_failed_setup() {
 
 #[cfg(feature = "clp")]
 #[test]
-fn tree_honors_enumeration_control_during_node_processing() {
+fn tree_controls_enumeration_and_standalone_fixing_independently() {
     use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
         routing::{RootOptions, RoutingContext},
         tree::{self, TreeOptions, TreeStatus},
     };
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
-    for enumerate in [false, true] {
+    for (enumerate, fixing) in [(false, true), (false, false), (true, true)] {
         let problem =
             RoutingContext::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.)
                 .unwrap();
         let mut root = RootOptions::default();
         root.enumerate = enumerate;
         root.cg.stabilize = false;
+        root.pricing_options.push((
+            "BALDESapplyReducedCostFixing".into(),
+            if fixing { 1. } else { 0. },
+        ));
         let result = tree::solve(
             problem,
             TreeOptions {
@@ -291,8 +295,14 @@ fn tree_honors_enumeration_control_during_node_processing() {
                 "{result:?}"
             );
         } else {
-            assert_eq!(result.fixing_calls, 0);
+            // Disabling route-universe enumeration keeps the independently
+            // controlled reduced-cost fixing pass available.
             assert_eq!(result.enumerated_routes, 0);
+            if fixing {
+                assert!(result.fixing_calls > 0, "{result:?}");
+            } else {
+                assert_eq!(result.fixing_calls, 0, "{result:?}");
+            }
         }
     }
 }

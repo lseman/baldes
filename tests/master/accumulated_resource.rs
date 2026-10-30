@@ -63,7 +63,6 @@ fn stored_threshold_membership_matches_adjacent_floats() {
             let p = RoutingContext::set_partitioning(s.graph, 1.).unwrap();
             let profile = vec![0., 0., 0., 0., q];
             let mut route = baldes::Route {
-                coupled_controls: Vec::new(),
                 coupled_values: Vec::new(),
                 nodes: vec![0, 1, 0, 1, 2],
                 arcs: vec![target, back, target, end],

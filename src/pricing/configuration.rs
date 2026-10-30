@@ -27,8 +27,12 @@ impl<const D: usize> Solver<D> {
             "BALDESheurLabelingStrategy" => {
                 next_phases = Some(phases::initialize(value as i32, &[])?)
             }
-            "BALDESlabelDominanceStrategy" if value != 0. && value != 1. => {
-                return Err(invalid("unsupported label dominance strategy"));
+            // Strategy 1 selects partial dominance, which is not implemented.
+            // Every other value keeps ordinary dominance.
+            "BALDESlabelDominanceStrategy" if value == 1. => {
+                return Err(invalid(
+                    "label dominance strategy 1 (partial dominance) is not implemented",
+                ));
             }
             "BALDESuseBidirectionalSearch" if !(0. ..=2.).contains(&value) => {
                 return Err(invalid("unsupported bidirectional mode"));
@@ -68,9 +72,6 @@ impl<const D: usize> Solver<D> {
         self.controls = controls;
         if let Some(phases) = next_phases {
             self.phases = phases;
-        }
-        if name == "BALDESlabelDominanceStrategy" {
-            self.dominance_mode = value as i32;
         }
         // Runtime budgets and column limits do not change the bucket graph.
         // Keep inherited fixing when a node installs its own work budget.

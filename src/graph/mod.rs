@@ -479,6 +479,14 @@ impl<const D: usize> Graph<D> {
     }
     /// Check the physical graph and any prepared coupled resources before use.
     pub fn validate(&self) -> Result<()> {
+        self.validate_structure()?;
+        if let Some(kernel) = &self.coupled {
+            kernel.validate_for(self)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn validate_structure(&self) -> Result<()> {
         if let RouteDomain::BoundedWalks { max_arcs } = self.route_domain {
             if max_arcs == 0
                 || (self.elementary && !self.grouped)
@@ -535,9 +543,6 @@ impl<const D: usize> Graph<D> {
             ));
         }
         self.validate_time_windows()?;
-        if let Some(kernel) = &self.coupled {
-            kernel.validate_for(self)?;
-        }
         let main_disposable = self
             .main_resource
             .filter(|&resource| self.resources.get(resource) == Some(&ResourceKind::Disposable))

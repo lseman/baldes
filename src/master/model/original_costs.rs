@@ -81,3 +81,98 @@ impl OriginalVariableCosts {
         Some(costs)
     }
 }
+
+/// Apply the owner-associated paired variable coefficients after raw resource
+/// selection. The raw front program always retains its registered unit charge.
+pub(super) fn route_cost<const D: usize>(oracle: &Oracle<D>, route: &Route) -> Result<f64> {
+    let mut ids = route.arcs.clone();
+    ids.sort_unstable();
+    let positions = route
+        .arcs
+        .iter()
+        .map(|id| oracle.index[id])
+        .collect::<Vec<_>>();
+    let physical = ids
+        .iter()
+        .map(|id| oracle.network.graph.arcs[oracle.index[id]].cost)
+        .sum::<f64>();
+    let associated = oracle
+        .network
+        .graph
+        .coupled_kernel()
+        .map(|kernel| kernel.paired_associated_costs())
+        .unwrap_or_default();
+    let resource = if associated.is_empty() {
+        route.coupled_cost(&oracle.network.graph, &positions)?
+    } else {
+        let [(resource, coefficient)] = associated else {
+            return Err(crate::incomplete(
+                "multiple paired owner associations require multiple paired programs",
+            ));
+        };
+        let selected = activity_rows::column_value(oracle, route, &positions, *resource)?;
+        oracle
+            .network
+            .graph
+            .coupled_kernel()
+            .unwrap()
+            .joined_machine_path_matching_with_paired_coefficient(
+                &positions,
+                Some(selected),
+                *coefficient,
+            )?
+            .map(|(cost, _)| cost)
+    }
+    .ok_or_else(|| invalid("network path violates coupled resources"))?;
+    let cost = physical + resource;
+    if !cost.is_finite() {
+        return Err(invalid("owner-associated route cost overflow"));
+    }
+    Ok(cost)
+}
+
+impl<const D: usize> State<D> {
+    /// The paired resource operator ignores its associated variable's reduced
+    /// coefficient. Such raw pricing cannot certify the owner objective/rows.
+    pub(super) fn has_unpriced_paired_terms(&self, duals: &[f64]) -> bool {
+        self.universe.is_none()
+            && self.oracles.iter().any(|oracle| {
+                if oracle.multiplicity_upper() == 0. {
+                    return false;
+                }
+                let Some(kernel) = oracle.network.graph.coupled_kernel() else {
+                    return false;
+                };
+                kernel
+                    .definitions()
+                    .iter()
+                    .enumerate()
+                    .any(|(resource, _)| {
+                        if !activity_rows::paired(&oracle.network.graph, resource) {
+                            return false;
+                        }
+                        let mut omitted = crate::master::numerics::ExactSum::default();
+                        if omitted
+                            .add(kernel.objective_coefficient(resource).unwrap_or(1.))
+                            .is_none()
+                            || omitted.add(-1.).is_none()
+                        {
+                            return true;
+                        }
+                        for entry in oracle
+                            .activity_rows
+                            .iter()
+                            .filter(|entry| entry.resource == resource)
+                        {
+                            let Some(&dual) = duals.get(self.shared_offset + entry.row) else {
+                                return true;
+                            };
+                            if omitted.product(-dual, entry.coefficient).is_none() {
+                                return true;
+                            }
+                        }
+                        omitted.sign() != 0.
+                    })
+            })
+    }
+}

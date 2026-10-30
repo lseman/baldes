@@ -1,13 +1,13 @@
 use super::*;
 
 #[test]
-fn paired_original_variables_use_selected_columns_and_absolute_nonnegative_objectives() {
+fn paired_owner_costs_use_selected_columns_in_an_explicit_complete_universe() {
     let corpus: serde_json::Value = serde_json::from_str(include_str!(
         "../../../fixtures/coupled/metasolver-paired-preparation.json"
     ))
     .unwrap();
     for case_index in [0, 18] {
-        for coefficient in [0_f64, 0.5, 1., 2., 5., 8., 1e-308] {
+        for coefficient in [-1_f64, 0., 0.5, 1., 2., 5., 8., 1e-308] {
             for mode in [BoundMode::Numerical, BoundMode::Certified] {
                 for direction in [0., 1., 2.] {
                     let mut source = corpus["cases"][case_index]["model"].clone();
@@ -24,6 +24,7 @@ fn paired_original_variables_use_selected_columns_and_absolute_nonnegative_objec
                         options.cg.bound_mode = mode;
                         options.pricing_options =
                             vec![("BALDESuseBidirectionalSearch".into(), direction)];
+                        options.enumeration = Some(Default::default());
                         registry.configure_pricing(&mut options);
                         options
                     };
@@ -62,7 +63,7 @@ fn paired_original_variables_use_selected_columns_and_absolute_nonnegative_objec
                                 [model::OriginalColumn {
                                     network: 42,
                                     arcs: &route.route.arcs,
-                                    coupled_controls: None,
+
                                     coupled_values: Some(&wrong),
                                     quantity: 1.
                                 }]
@@ -76,33 +77,122 @@ fn paired_original_variables_use_selected_columns_and_absolute_nonnegative_objec
 }
 
 #[test]
-fn paired_original_variables_reject_unimplemented_control_changes() {
+fn paired_owner_registration_accepts_signed_costs_rows_and_integer_metadata() {
     let corpus: serde_json::Value = serde_json::from_str(include_str!(
         "../../../fixtures/coupled/metasolver-paired-preparation.json"
     ))
     .unwrap();
-    for variable in [
-        serde_json::json!({"network":42,"id":901,"cost":-1.,"accumulated_resource":0}),
-        serde_json::json!({"network":42,"id":901,"cost":1.,"accumulated_resource":0,"integer":true}),
-    ] {
-        let mut source = corpus["cases"][0]["model"].clone();
-        source["pricing_variables"] = serde_json::json!([variable]);
-        assert!(model::format::Model::from_json(&source.to_string())
-            .unwrap()
-            .compile::<2>()
-            .is_err());
-    }
     let mut source = corpus["cases"][0]["model"].clone();
     source["rows"] = serde_json::json!([{"sense":"le","rhs":10.}]);
     source["pricing_variables"] = serde_json::json!([{
-        "network":42,"id":901,"cost":1.,"accumulated_resource":0,"entries":[[0,1.]]
+        "network":42,"id":901,"cost":-1.,"accumulated_resource":0,"entries":[[0,1.]]
     }]);
+    let (problem, _) = model::format::Model::from_json(&source.to_string())
+        .unwrap()
+        .compile::<2>()
+        .unwrap();
+    assert_eq!(
+        problem.networks[0]
+            .graph
+            .coupled_kernel()
+            .unwrap()
+            .objective_coefficient(0),
+        Some(-1.)
+    );
+    assert_eq!(problem.networks[0].activity_entries.len(), 1);
+    source["pricing_variables"][0]["integer"] = true.into();
+    let (_, registry) = model::format::Model::from_json(&source.to_string())
+        .unwrap()
+        .compile::<2>()
+        .unwrap();
+    assert!(registry.variables()[0].integer);
+    assert!(registry.branch_variables().is_empty());
+    source["networks"][0]["coupled_resources"][0]["mode"] = "feasibility".into();
+    source["pricing_variables"][0]["cost"] = 0.into();
     let error = model::format::Model::from_json(&source.to_string())
         .unwrap()
         .compile::<2>()
         .unwrap_err()
         .to_string();
-    assert!(error.contains("source model"));
+    assert!(error.contains("feasibility-only paired"), "{error}");
+}
+
+#[test]
+fn paired_integer_registration_retains_fractional_selected_activity() {
+    // Captured I registration: integer-all-fractional/paired-result.json.
+    // The owner finishes at -19.5 although the associated activity is .5.
+    let corpus: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../fixtures/coupled/metasolver-paired-preparation.json"
+    ))
+    .unwrap();
+    let mut source = corpus["cases"][0]["model"].clone();
+    for arc in source["networks"][0]["paired_front_programs"][0]["arcs"]
+        .as_array_mut()
+        .unwrap()
+    {
+        arc["dependent"]["function"]["pairs"] = serde_json::json!([[0.25, 0.], [0., 8.]]);
+    }
+    source["pricing_variables"] = serde_json::json!([{
+        "network":42,"id":901,"cost":1.,"accumulated_resource":0,"integer":true
+    }]);
+    source["networks"][0]["paired_owner_registration_bounds"] =
+        serde_json::json!([[0, [0., 100.]]]);
+    let (problem, registry) = model::format::Model::from_json(&source.to_string())
+        .unwrap()
+        .compile::<2>()
+        .unwrap();
+    assert!(registry.variables()[0].integer);
+    assert!(registry.branch_variables().is_empty());
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    let output = model::solve(problem, options).unwrap();
+    assert!(
+        (output.master.lp + 19.5).abs() < 1e-8,
+        "{:?}",
+        output.master
+    );
+    let activity = registry.activity(42, 901, &output).unwrap();
+    assert!(activity.lower <= 0.5 && activity.upper >= 0.5);
+}
+
+#[test]
+fn direct_routing_signed_owner_objective_never_uses_unit_raw_pricing_as_a_bound() {
+    use baldes::master::routing::{self, RootOptions, RoutingContext};
+    let corpus: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../fixtures/coupled/metasolver-paired-preparation.json"
+    ))
+    .unwrap();
+    let mut source = corpus["cases"][0]["model"].clone();
+    for arc in source["networks"][0]["paired_front_programs"][0]["arcs"]
+        .as_array_mut()
+        .unwrap()
+    {
+        arc["dependent"]["function"]["pairs"] = serde_json::json!([[1., 0.], [0., 8.]]);
+    }
+    let (problem, _) = model::format::Model::from_json(&source.to_string())
+        .unwrap()
+        .compile::<2>()
+        .unwrap();
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let mut graph = problem.networks[0].graph.clone();
+        graph
+            .set_coupled_objective_coefficients(&[(0, -1.)])
+            .unwrap();
+        let mut context = RoutingContext::set_partitioning(graph, 1.).unwrap();
+        // Optional path selection, including the unused interior vertex.
+        for row in &mut context.model.rows {
+            row.sense = RowSense::LessEqual;
+        }
+        let mut options = RootOptions::default();
+        options.enumerate = false;
+        options.cg.stabilize = false;
+        options.bound_mode = mode;
+        let output = routing::solve(context, options).unwrap();
+        assert!((output.master.lp + 22.).abs() < 1e-8, "{:?}", output.master);
+        assert_eq!(output.master.status, Status::Stalled);
+        assert_eq!(output.master.numerical_bound, f64::NEG_INFINITY);
+        assert_eq!(output.master.certified_bound, f64::NEG_INFINITY);
+    }
 }
 
 #[test]
@@ -115,7 +205,7 @@ fn paired_original_identities_remain_network_scoped_under_every_schedule() {
     let mut source = corpus["cases"][0]["model"].clone();
     let mut second = source["networks"][0].clone();
     second["id"] = serde_json::json!(7);
-    second["coupled_resources"][0]["initial"]["pairs"][0][0] = serde_json::json!(2.);
+    second["paired_front_programs"][0]["root"]["function"]["pairs"][0][0] = serde_json::json!(2.);
     source["networks"].as_array_mut().unwrap().push(second);
     source["pricing_variables"] = serde_json::json!([
         {"network":42,"id":901,"cost":0.5,"accumulated_resource":0},
@@ -137,6 +227,7 @@ fn paired_original_identities_remain_network_scoped_under_every_schedule() {
             options.cg.stabilize = false;
             options.cg.bound_mode = mode;
             options.network_pricing_schedule = schedule;
+            options.enumeration = Some(Default::default());
             registry.configure_pricing(&mut options);
             let output = model::solve(problem, options).unwrap();
             assert_eq!(output.master.status, Status::Optimal);
@@ -162,8 +253,8 @@ fn paired_original_weight_changes_the_selected_route_and_reported_value() {
                 let mut source = corpus["cases"][0]["model"].clone();
                 source["networks"][0]["arcs"][3]["cost"] = serde_json::json!(-21.);
                 for index in [3, 4] {
-                    let pairs = source["networks"][0]["coupled_resources"][0]["arcs"][index]
-                        ["increment"]["pairs"]
+                    let pairs = source["networks"][0]["paired_front_programs"][0]["arcs"][index]
+                        ["dependent"]["function"]["pairs"]
                         .as_array_mut()
                         .unwrap();
                     pairs[0][0] = serde_json::json!(2.);
@@ -182,6 +273,7 @@ fn paired_original_weight_changes_the_selected_route_and_reported_value() {
                 options.cg.stabilize = false;
                 options.cg.bound_mode = mode;
                 options.pricing_options = vec![("BALDESuseBidirectionalSearch".into(), direction)];
+                options.enumeration = Some(Default::default());
                 registry.configure_pricing(&mut options);
                 let output = model::solve(problem, options).unwrap();
                 assert_eq!(output.master.status, Status::Optimal);
@@ -194,423 +286,7 @@ fn paired_original_weight_changes_the_selected_route_and_reported_value() {
 }
 
 #[test]
-fn control_point_absolute_original_bindings_keep_nonzero_initial_values() {
-    let corpus: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../fixtures/coupled/metasolver-paired-preparation.json"
-    ))
-    .unwrap();
-    // Exact integral encodings: convert independent slope segments to knots.
-    fn knots(function: &serde_json::Value) -> serde_json::Value {
-        let pairs = function["pairs"].as_array().unwrap();
-        let (mut y, mut x) = (pairs[0][0].as_f64().unwrap(), pairs[0][1].as_f64().unwrap());
-        let mut points = vec![serde_json::json!([x, y])];
-        for pair in &pairs[1..] {
-            let end = pair[1].as_f64().unwrap();
-            y += pair[0].as_f64().unwrap() * (end - x);
-            x = end;
-            points.push(serde_json::json!([x, y]));
-        }
-        serde_json::json!({"points":points})
-    }
-    for case_index in [36, 39] {
-        for coefficient in [0_f64, 0.5, 1., 2., 8., 1e-308] {
-            for mode in [BoundMode::Numerical, BoundMode::Certified] {
-                for direction in [0., 1., 2.] {
-                    let mut source = corpus["cases"][case_index]["model"].clone();
-                    source["networks"][0]["front_program_domain"] = serde_json::json!(false);
-                    let resource = &mut source["networks"][0]["coupled_resources"][0];
-                    resource["initial"] = knots(&resource["initial"]);
-                    for arc in resource["arcs"].as_array_mut().unwrap() {
-                        for key in ["arrival", "increment", "lower", "upper"] {
-                            arc[key] = knots(&arc[key]);
-                        }
-                    }
-                    resource["kind"] = serde_json::json!("paired_piecewise_linear");
-                    resource.as_object_mut().unwrap().remove("policy");
-                    source["pricing_variables"] = serde_json::json!([{
-                        "network":42,"id":901,"cost":coefficient,"accumulated_resource":0
-                    }]);
-                    let (problem, registry) = model::format::Model::from_json(&source.to_string())
-                        .unwrap()
-                        .compile::<2>()
-                        .unwrap();
-                    let mut options = Options::default();
-                    options.cg.stabilize = false;
-                    options.cg.bound_mode = mode;
-                    options.pricing_options =
-                        vec![("BALDESuseBidirectionalSearch".into(), direction)];
-                    registry.configure_pricing(&mut options);
-                    let output = model::solve(problem, options.clone()).unwrap();
-                    let expected = (-20. + 5. * coefficient).min(0.);
-                    assert_eq!(output.master.status, Status::Optimal);
-                    assert_eq!(output.master.lp, expected);
-                    assert!(
-                        output.master.bound <= expected && expected - output.master.bound < 1e-7
-                    );
-                    let gamma = if expected < 0. { 5. } else { 0. };
-                    let activity = registry.activity(42, 901, &output).unwrap();
-                    assert_eq!((activity.lower, activity.upper), (gamma, gamma));
-                    assert_eq!(
-                        registry
-                            .activity(42, 901, &output.snapshot.solve(options).unwrap())
-                            .unwrap(),
-                        activity
-                    );
-                    let formatted = model::format::SolveResult::root(&output, 0.)
-                        .with_original_variables(&registry)
-                        .unwrap();
-                    assert_eq!(formatted.original_variables[0].lower, gamma);
-                }
-            }
-        }
-    }
-}
-
-#[test]
-fn controlled_routes_keep_identity_costs_and_original_values_through_pool_resume_and_fixing() {
-    use baldes::graph::coupled::PairedControl;
-    let corpus: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../fixtures/coupled/metasolver-paired-preparation.json"
-    ))
-    .unwrap();
-    for control_points in [false, true] {
-        for mode in [BoundMode::Numerical, BoundMode::Certified] {
-            for direction in [0., 1., 2.] {
-                let mut source = corpus["cases"][0]["model"].clone();
-                source["networks"][0]["front_program_domain"] = false.into();
-                source["networks"][0]["coupled_resources"][0]["policy"] = "strict_domain".into();
-                let mut second = corpus["cases"][18]["model"]["networks"][0].clone();
-                second["id"] = 7.into();
-                second["front_program_domain"] = false.into();
-                second["coupled_resources"][0]["policy"] = "strict_domain".into();
-                if control_points {
-                    source["networks"][0] =
-                        control_point_source_model(source["networks"][0].clone());
-                    second = control_point_source_model(second);
-                }
-                source["networks"].as_array_mut().unwrap().push(second);
-                source["pricing_variables"] = serde_json::json!([
-                    {"network":42,"id":901,"cost":1.,"accumulated_resource":0},
-                    {"network":7,"id":901,"cost":2.,"accumulated_resource":0}
-                ]);
-                let (problem, registry) = model::format::Model::from_json(&source.to_string())
-                    .unwrap()
-                    .compile::<2>()
-                    .unwrap();
-                let mut options = Options::default();
-                options.cg.stabilize = false;
-                options.cg.bound_mode = mode;
-                options.pricing_options = vec![("BALDESuseBidirectionalSearch".into(), direction)];
-                registry.configure_pricing(&mut options);
-                let root = model::solve(problem, options.clone()).unwrap();
-                optimal(&root, -31.);
-                let original = root
-                    .routes
-                    .iter()
-                    .position(|route| route.network == 42 && route.route.arcs.len() == 2)
-                    .unwrap();
-                let generated = root
-                    .snapshot
-                    .optimize_route_control(
-                        original,
-                        0,
-                        false,
-                        Some(Window::new(4., 4.).unwrap()),
-                        Default::default(),
-                    )
-                    .unwrap();
-                assert!(generated.complete);
-                assert_eq!(generated.dependent, Some(4.));
-                assert!(generated.lower_bound.unwrap() <= 4.);
-                let control = generated.control.unwrap();
-                let node = root
-                    .snapshot
-                    .with_route_controls(original, vec![control.clone()])
-                    .unwrap();
-                let result = node.solve(options.clone()).unwrap();
-                optimal(&result, -31.);
-                let controlled = result
-                    .routes
-                    .iter()
-                    .position(|route| {
-                        route.network == 42 && route.route.coupled_controls == [control.clone()]
-                    })
-                    .unwrap();
-                assert_eq!(
-                    result.routes[controlled].route.coupled_values,
-                    vec![(0, 4.)]
-                );
-                assert_eq!(result.routes[controlled].route.original_cost, -16.);
-                assert_ne!(controlled, original);
-                if direction == 1. && mode == BoundMode::Certified {
-                    let complete = result
-                        .snapshot
-                        .enumerate(&model::EnumerationOptions::default())
-                        .unwrap();
-                    assert!(complete.enumeration_report().complete);
-                    assert!(complete
-                        .with_route_controls(original, vec![control.clone()])
-                        .is_err());
-                    assert!(complete.fix_route(controlled, 1.).is_err());
-                }
-                let fixed = result
-                    .snapshot
-                    .fix_route(controlled, 1.)
-                    .unwrap()
-                    .solve(options.clone())
-                    .unwrap();
-                optimal(&fixed, -30.);
-                let activity = registry.activity(42, 901, &fixed).unwrap();
-                assert_eq!((activity.lower, activity.upper), (4., 4.));
-                let other = registry.activity(7, 901, &fixed).unwrap();
-                assert_eq!((other.lower, other.upper), (3., 3.));
-                let formatted = model::format::SolveResult::root(&fixed, 0.)
-                    .with_original_variables(&registry)
-                    .unwrap();
-                assert_eq!(
-                    formatted.fixed_routes[0].coupled_controls,
-                    [control.clone()]
-                );
-                assert_eq!(formatted.fixed_routes[0].cost, -16.);
-                if direction == 1. {
-                    let mut tree_options = baldes::master::tree::ModelTreeOptions::default();
-                    tree_options.node = options.clone();
-                    let tree = fixed.snapshot.solve_tree(tree_options).unwrap();
-                    assert_eq!(tree.status, baldes::master::tree::TreeStatus::Optimal);
-                    assert_eq!(tree.incumbent, -30.);
-                }
-                let resumed = fixed.snapshot.solve(options.clone()).unwrap();
-                optimal(&resumed, -30.);
-                assert_eq!(registry.activity(42, 901, &resumed).unwrap(), activity);
-                // Equivalent source witnesses reuse the same model column.
-                let alternative = PairedControl {
-                    resource: 0,
-                    base: if control.base == [0.5, 1.5, 2.5] {
-                        vec![0., 2., 3.]
-                    } else {
-                        vec![0.5, 1.5, 2.5]
-                    },
-                };
-                let more = result
-                    .snapshot
-                    .with_route_controls(original, vec![alternative.clone()])
-                    .unwrap()
-                    .solve(options.clone())
-                    .unwrap();
-                let variants = more
-                    .routes
-                    .iter()
-                    .filter(|route| route.network == 42 && !route.route.coupled_controls.is_empty())
-                    .count();
-                assert_eq!(variants, 1);
-                let duplicate = more
-                    .snapshot
-                    .with_route_controls(
-                        original,
-                        vec![PairedControl {
-                            resource: 0,
-                            base: vec![-0., 2., 3.],
-                        }],
-                    )
-                    .unwrap()
-                    .solve(options.clone())
-                    .unwrap();
-                assert_eq!(duplicate.routes.len(), more.routes.len());
-                assert!(root
-                    .snapshot
-                    .with_route_controls(
-                        original,
-                        vec![PairedControl {
-                            resource: 0,
-                            base: vec![0.5, 1., 2.]
-                        }]
-                    )
-                    .is_err());
-            }
-        }
-    }
-}
-
-#[test]
-fn paired_shared_rows_price_interior_and_reversed_terminal_controls() {
-    let corpus: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../fixtures/coupled/metasolver-paired-preparation.json"
-    ))
-    .unwrap();
-    for case in [0, 18] {
-        for mode in [BoundMode::Numerical, BoundMode::Certified] {
-            for (sense, rhs, cost, expected) in [
-                ("ge", 4., 1., -16.),
-                ("ge", 7., 1., -13.),
-                ("le", 8., 1., -17.),
-                ("ge", 4., 0., -20.),
-            ] {
-                let mut source = corpus["cases"][case]["model"].clone();
-                source["networks"][0]["front_program_domain"] = false.into();
-                source["networks"][0]["coupled_resources"][0]["policy"] = "strict_domain".into();
-                source["rows"] = serde_json::json!([{"sense":sense,"rhs":rhs}]);
-                source["pricing_variables"] = serde_json::json!([{
-                    "network":42,"id":901,"cost":cost,"accumulated_resource":0,"entries":[[0,1.]]
-                }]);
-                let (problem, registry) = model::format::Model::from_json(&source.to_string())
-                    .unwrap()
-                    .compile::<2>()
-                    .unwrap();
-                let mut options = Options::default();
-                options.cg.stabilize = false;
-                options.cg.bound_mode = mode;
-                registry.configure_pricing(&mut options);
-                let output = model::solve(problem, options.clone()).unwrap();
-                assert_eq!(
-                    output.master.status,
-                    Status::Optimal,
-                    "case={case} {sense}{rhs} {:#?}",
-                    output.master
-                );
-                assert!(
-                    (output.master.lp - expected).abs() < 1e-7,
-                    "{:#?}",
-                    output.master
-                );
-                assert!(
-                    output.master.bound <= expected + 1e-10
-                        && expected - output.master.bound < 1e-7,
-                    "{:#?}",
-                    output.master
-                );
-                let gamma = registry.activity(42, 901, &output).unwrap();
-                if sense == "ge" {
-                    assert!(gamma.lower >= rhs - 1e-7, "{gamma:?}");
-                }
-                let resumed = output.snapshot.solve(options).unwrap();
-                assert!((resumed.master.lp - expected).abs() < 1e-7);
-            }
-        }
-    }
-}
-
-#[test]
-fn negative_paired_objectives_share_scheduling_and_rows_with_positive_networks() {
-    let corpus: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../fixtures/coupled/metasolver-paired-preparation.json"
-    ))
-    .unwrap();
-    for schedule in [
-        model::NetworkPricingSchedule::FullSweep,
-        model::NetworkPricingSchedule::Cyclic,
-        model::NetworkPricingSchedule::Sorted,
-        model::NetworkPricingSchedule::PromisingFirst,
-        model::NetworkPricingSchedule::UnvisitedFirst,
-    ] {
-        for mode in [BoundMode::Numerical, BoundMode::Certified] {
-            for row in [false, true] {
-                let mut source = corpus["cases"][0]["model"].clone();
-                source["networks"][0]["front_program_domain"] = false.into();
-                source["networks"][0]["coupled_resources"][0]["policy"] = "strict_domain".into();
-                let mut second = control_point_source_model(source["networks"][0].clone());
-                second["id"] = 7.into();
-                source["networks"].as_array_mut().unwrap().push(second);
-                let entries = if row {
-                    source["rows"] = serde_json::json!([{"sense":"le","rhs":9.}]);
-                    serde_json::json!([[0, 1.]])
-                } else {
-                    serde_json::json!([])
-                };
-                source["pricing_variables"] = serde_json::json!([
-                    {"network":42,"id":901,"cost":-2.,"accumulated_resource":0,"entries":entries},
-                    {"network":7,"id":901,"cost":0.5,"accumulated_resource":0,"entries":entries}
-                ]);
-                let (problem, registry) = model::format::Model::from_json(&source.to_string())
-                    .unwrap()
-                    .compile::<2>()
-                    .unwrap();
-                let mut options = Options::default();
-                options.cg.stabilize = false;
-                options.cg.bound_mode = mode;
-                options.network_pricing_schedule = schedule;
-                registry.configure_pricing(&mut options);
-                let result = model::solve(problem, options).unwrap();
-                let expected = if row { -50.5 } else { -54.5 };
-                assert_eq!(
-                    result.master.status,
-                    Status::Optimal,
-                    "{:#?}",
-                    result.master
-                );
-                assert!(
-                    (result.master.lp - expected).abs() < 1e-7,
-                    "{:#?}",
-                    result.master
-                );
-                assert!(
-                    result.master.bound <= expected + 1e-10
-                        && expected - result.master.bound < 1e-7
-                );
-                let first = registry.activity(42, 901, &result).unwrap();
-                let second = registry.activity(7, 901, &result).unwrap();
-                assert!(
-                    (first.lower - if row { 6. } else { 8. }).abs() < 1e-7
-                        && (second.lower - 3.).abs() < 1e-7,
-                    "{first:?} {second:?}"
-                );
-            }
-        }
-    }
-}
-
-#[test]
-fn negative_paired_costs_keep_deterministic_activity_certificates_and_fixed_row_contributions() {
-    let corpus: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../fixtures/coupled/metasolver-paired-preparation.json"
-    ))
-    .unwrap();
-    let mut source = corpus["cases"][0]["model"].clone();
-    source["networks"][0]["front_program_domain"] = false.into();
-    source["networks"][0]["coupled_resources"][0]["policy"] = "strict_domain".into();
-    source["networks"][0]["coupled_resources"]
-        .as_array_mut()
-        .unwrap()
-        .push(serde_json::json!({
-            "kind":"custom_resource","increments":[1.,1.,1.,1.,1.],"weights":[1.,1.,1.,1.,1.]
-        }));
-    source["rows"] = serde_json::json!([{"sense":"ge","rhs":3.}]);
-    source["pricing_variables"] = serde_json::json!([
-        {"network":42,"id":901,"cost":-1.,"accumulated_resource":0},
-        {"network":42,"id":902,"cost":0.,"accumulated_resource":1,"entries":[[0,1.]]}
-    ]);
-    let (problem, registry) = model::format::Model::from_json(&source.to_string())
-        .unwrap()
-        .compile::<2>()
-        .unwrap();
-    let mut options = Options::default();
-    options.cg.stabilize = false;
-    options.cg.bound_mode = BoundMode::Certified;
-    registry.configure_pricing(&mut options);
-    let result = model::solve(problem, options.clone()).unwrap();
-    assert_eq!(
-        result.master.status,
-        Status::Optimal,
-        "{:#?}",
-        result.master
-    );
-    assert!((result.master.lp + 28.).abs() < 1e-7);
-    let index = result
-        .routes
-        .iter()
-        .position(|r| r.route.arcs.len() == 2 && r.route.coupled_values == vec![(0, 8.)])
-        .unwrap();
-    let fixed = result
-        .snapshot
-        .fix_route(index, 1.)
-        .unwrap()
-        .solve(options)
-        .unwrap();
-    assert_eq!(fixed.master.status, Status::Optimal, "{:#?}", fixed.master);
-    assert!((fixed.master.lp + 28.).abs() < 1e-7 && (fixed.master.bound + 28.).abs() < 1e-7);
-}
-
-#[test]
-fn paired_objective_mapping_corrects_all_eight_retained_modern_registrations() {
+fn paired_owner_cost_mapping_matches_registered_selected_columns_after_explicit_enumeration() {
     let corpus: serde_json::Value = serde_json::from_str(include_str!(
         "../../../fixtures/coupled/metasolver-paired-objective-mapping.json"
     ))
@@ -622,497 +298,287 @@ fn paired_objective_mapping_corrects_all_eight_retained_modern_registrations() {
     for case in corpus["cases"].as_array().unwrap() {
         let expected = case["independent_objective"].as_f64().unwrap();
         let coefficient = case["coefficient"].as_f64().unwrap();
-        if coefficient == -1. {
+        let compiled = model::format::Model::from_json(&case["model"].to_string())
+            .unwrap()
+            .compile::<2>();
+        if coefficient < 0. {
             assert_eq!(case["reference_root"], -18.);
             assert_eq!(expected, -22.);
         }
+        if let Some(incumbent) = case["reference_incumbent"].as_f64() {
+            assert_eq!(incumbent, expected);
+        }
+        let (problem, registry) = compiled.unwrap();
         for mode in [BoundMode::Numerical, BoundMode::Certified] {
-            for points in [false, true] {
-                let mut source = case["model"].clone();
-                if points {
-                    source["networks"][0] =
-                        control_point_source_model(source["networks"][0].clone());
-                }
-                let (problem, registry) = model::format::Model::from_json(&source.to_string())
-                    .unwrap()
-                    .compile::<2>()
-                    .unwrap();
-                let mut options = Options::default();
-                options.cg.stabilize = false;
-                options.cg.bound_mode = mode;
-                registry.configure_pricing(&mut options);
-                let result = model::solve(problem, options).unwrap();
-                assert_eq!(
-                    result.master.status,
-                    Status::Optimal,
-                    "{:#?}",
-                    result.master
-                );
-                assert!(
-                    (result.master.lp - expected).abs() < 1e-7,
-                    "{:#?}",
-                    result.master
-                );
-                assert!(
-                    result.master.bound <= expected + 1e-10
-                        && expected - result.master.bound < 1e-7,
-                    "{:#?}",
-                    result.master
-                );
-                let gamma = registry.activity(42, 901, &result).unwrap();
-                assert_eq!((gamma.lower, gamma.upper), (2., 2.));
-            }
-        }
-    }
-}
-
-#[test]
-fn nonconstant_source_pricing_matches_unit_reference_and_signed_control_oracles() {
-    let base: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../fixtures/coupled/metasolver-nonconstant-source-model.json"
-    ))
-    .unwrap();
-    // A least-waiting two-arc path has base x,x+1,x+2 and Gamma=3+2*x,
-    // bounded above by 8. Witnesses x=0,2.5,.5 attain the three optima;
-    // free waiting also permits other schedules with the same final Gamma.
-    for (coefficient, upper, expected, gamma) in [
-        (1., None, -17., 3.),
-        (-1., None, -28., 8.),
-        (-1., Some(4.), -24., 4.),
-    ] {
-        for mode in [BoundMode::Numerical, BoundMode::Certified] {
-            for knots in [false, true] {
-                let mut source = base.clone();
-                source["pricing_variables"][0]["cost"] = coefficient.into();
-                if let Some(upper) = upper {
-                    source["rows"] = serde_json::json!([{"sense":"le","rhs":upper}]);
-                    source["networks"][0]["activity_entries"] = serde_json::json!([[0, 0, 1.]]);
-                }
-                if knots {
-                    source["networks"][0] =
-                        control_point_source_model(source["networks"][0].clone());
-                }
-                let (problem, registry) = model::format::Model::from_json(&source.to_string())
-                    .unwrap()
-                    .compile::<2>()
-                    .unwrap();
-                let mut options = Options::default();
-                options.cg.stabilize = false;
-                options.cg.bound_mode = mode;
-                registry.configure_pricing(&mut options);
-                let root = model::solve(problem, options).unwrap();
-                assert_eq!(root.master.status, Status::Optimal);
-                assert!((root.master.lp - expected).abs() < 1e-7, "{root:?}");
-                assert!(
-                    root.master.bound <= expected + 1e-10 && expected - root.master.bound < 1e-7
-                );
-                let activity = registry.activity(42, 901, &root).unwrap();
-                assert_eq!((activity.lower, activity.upper), (gamma, gamma));
-                if coefficient == -1. && upper.is_none() {
-                    for (route, value) in root
-                        .routes
-                        .iter()
-                        .zip(&root.values)
-                        .filter(|(_, value)| **value > 0.)
-                    {
-                        assert!(*value > 0.);
-                        let base = &route.route.coupled_controls[0].base;
-                        assert!(base[1] >= base[0] + 1. && base[2] >= base[1] + 1.);
-                        assert_eq!(2. + base[0] + base[1], 8.);
-                        assert_eq!(route.route.coupled_values, vec![(0, 8.)]);
-                    }
-                }
-            }
-        }
-    }
-}
-
-#[test]
-fn paired_variable_boxes_cover_all_controls_including_negative_objectives() {
-    let corpus: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../fixtures/coupled/metasolver-paired-preparation.json"
-    ))
-    .unwrap();
-    for points in [false, true] {
-        for cost in [-1., 0., 1., 2.] {
-            let mut source = corpus["cases"][0]["model"].clone();
-            source["networks"][0]["front_program_domain"] = false.into();
-            source["networks"][0]["coupled_resources"][0]["policy"] = "strict_domain".into();
-            if points {
-                source["networks"][0] = control_point_source_model(source["networks"][0].clone());
-            }
-            source["pricing_variables"] =
-                serde_json::json!([{"network":42,"id":901,"cost":cost,"accumulated_resource":0}]);
-            let (problem, registry) = model::format::Model::from_json(&source.to_string())
-                .unwrap()
-                .compile::<2>()
-                .unwrap();
-            let configure = |upper| {
-                let mut options = Options::default();
-                options.cg.stabilize = false;
-                options.cg.bound_mode = BoundMode::Certified;
-                registry
-                    .configure_boxes(
-                        &mut options,
-                        &[model::OriginalVariableBound {
-                            network: 42,
-                            id: 901,
-                            lower: 0.,
-                            upper: Some(upper),
-                        }],
-                    )
-                    .unwrap();
-                options
-            };
-            let output = model::solve(problem.clone(), configure(8.)).unwrap();
-            assert_eq!(
-                output.master.status,
-                Status::Optimal,
-                "{:#?}",
-                output.master
-            );
-            let expected = -20. + cost * if cost < 0. { 8. } else { 3. };
-            assert!((output.master.lp - expected).abs() < 1e-7);
-            assert!(
-                output.master.bound <= expected + 1e-10 && expected - output.master.bound < 1e-7
-            );
-            // Minimum-only columns would incorrectly validate the upper3 box.
-            assert!(model::solve(problem.clone(), configure(3.)).is_err());
-            let resumed = output.snapshot.solve(configure(8.)).unwrap();
-            assert!((resumed.master.lp - expected).abs() < 1e-7);
-        }
-    }
-}
-
-#[test]
-fn paired_integer_bindings_use_shared_mapped_branch_rows_and_tree_replay() {
-    use baldes::master::{
-        preprocessing::Bounds,
-        tree::{ModelTreeOptions, TreeStatus},
-    };
-    let corpus: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../fixtures/coupled/metasolver-paired-objective-mapping.json"
-    ))
-    .unwrap();
-    for case in [0, 4] {
-        for points in [false, true] {
-            let mut source = corpus["cases"][case]["model"].clone();
-            if points {
-                source["networks"][0] = control_point_source_model(source["networks"][0].clone());
-            }
-            for (p, arc) in source["networks"][0]["arcs"]
-                .as_array_mut()
-                .unwrap()
-                .iter_mut()
-                .enumerate()
-            {
-                arc["cost"] = if p == 0 {
-                    100.
-                } else if p == 1 || p == 3 {
-                    20.
-                } else {
-                    0.
-                }
-                .into();
-                if p == 1 || p == 3 {
-                    arc["entries"] = serde_json::json!([[0, 1.]]);
-                }
-            }
-            source["rows"] = serde_json::json!([{"sense":"ge","rhs":0.25}]);
-            source["pricing_variables"] = serde_json::json!([{"network":42,"id":901,"cost":0.,"accumulated_resource":0,"integer":true}]);
-            let (problem, registry) = model::format::Model::from_json(&source.to_string())
-                .unwrap()
-                .compile::<2>()
-                .unwrap();
-            let branch = &registry.branch_variables()[0];
-            assert_eq!(branch.name, "X_42_901");
-            assert_eq!(branch.networks[0].activities, [(0, 1.)]);
-            let mut options = Options::default();
-            options.cg.stabilize = false;
-            options.cg.bound_mode = BoundMode::Certified;
-            registry.configure_pricing(&mut options);
-            let parent = model::solve(problem.clone(), options.clone()).unwrap();
-            assert_eq!(
-                parent.master.status,
-                Status::Optimal,
-                "{:#?}",
-                parent.master
-            );
-            assert!((parent.master.lp - 5.).abs() < 1e-7);
-            let activity = registry.activity(42, 901, &parent).unwrap();
-            assert!((activity.lower - 0.5).abs() < 1e-7);
-            let down = branch
-                .apply(
-                    &parent.snapshot,
-                    Bounds {
-                        lower: f64::NEG_INFINITY,
-                        upper: 0.,
-                    },
-                )
-                .unwrap()
-                .solve(options.clone())
-                .unwrap();
-            assert_eq!(down.master.status, Status::Infeasible, "{:#?}", down.master);
-            let up = branch
-                .apply(
-                    &parent.snapshot,
-                    Bounds {
-                        lower: 1.,
-                        upper: f64::INFINITY,
-                    },
-                )
-                .unwrap()
-                .solve(options.clone())
-                .unwrap();
-            assert_eq!(up.master.status, Status::Optimal, "{:#?}", up.master);
-            assert!((up.master.lp - 10.).abs() < 1e-7);
-            let mut tree = ModelTreeOptions::default();
-            tree.branching = baldes::master::tree::NetworkBranchingPolicy::ResourceFirst;
-            tree.node = options.clone();
-            registry.configure_tree(&mut tree).unwrap();
-            let solved = parent.snapshot.solve_tree(tree).unwrap();
-            assert_eq!(solved.status, TreeStatus::Optimal, "{solved:?}");
-            assert!((solved.incumbent - 20.).abs() < 1e-7);
-            assert!(
-                solved
-                    .mapped_branch_evaluations
-                    .iter()
-                    .any(|evaluation| evaluation.name == "X_42_901"),
-                "{solved:?}"
-            );
-            let resumed = parent.snapshot.solve(options).unwrap();
-            assert!((resumed.master.lp - 5.).abs() < 1e-7);
-        }
-    }
-}
-
-#[test]
-fn paired_integer_registration_rejects_continuous_and_fractional_terminal_activities() {
-    for fractional in [false, true] {
-        let file = if fractional {
-            include_str!("../../../fixtures/coupled/metasolver-paired-objective-mapping.json")
-        } else {
-            include_str!("../../../fixtures/coupled/metasolver-paired-preparation.json")
-        };
-        let corpus: serde_json::Value = serde_json::from_str(file).unwrap();
-        for points in [false, true] {
-            let mut source = corpus["cases"][0]["model"].clone();
-            source["networks"][0]["front_program_domain"] = false.into();
-            source["networks"][0]["coupled_resources"][0]["policy"] = "strict_domain".into();
-            if fractional {
-                for arc in source["networks"][0]["coupled_resources"][0]["arcs"]
-                    .as_array_mut()
-                    .unwrap()
-                {
-                    arc["increment"]["pairs"][0][0] = 0.5.into();
-                }
-            }
-            if points {
-                source["networks"][0] = control_point_source_model(source["networks"][0].clone());
-            }
-            source["pricing_variables"] = serde_json::json!([{"network":42,"id":901,"cost":0.,"accumulated_resource":0,"integer":true}]);
-            let error = model::format::Model::from_json(&source.to_string())
-                .unwrap()
-                .compile::<2>()
-                .unwrap_err()
-                .to_string();
-            assert!(error.contains("exactly integer"), "{error}");
-        }
-    }
-}
-
-#[test]
-fn invariant_paired_rows_and_signed_costs_have_complete_controlled_universes() {
-    let corpus: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../fixtures/coupled/metasolver-paired-objective-mapping.json"
-    ))
-    .unwrap();
-    for case in [0, 4] {
-        for points in [false, true] {
-            for mode in [BoundMode::Numerical, BoundMode::Certified] {
-                for cost in [-1., 1.] {
-                    let mut source = corpus["cases"][case]["model"].clone();
-                    if points {
-                        source["networks"][0] =
-                            control_point_source_model(source["networks"][0].clone());
-                    }
-                    source["rows"] = serde_json::json!([{"sense":"ge","rhs":1.}]);
-                    source["pricing_variables"] = serde_json::json!([{"network":42,"id":901,"cost":cost,"accumulated_resource":0,"entries":[[0,1.]]}]);
-                    let (problem, registry) = model::format::Model::from_json(&source.to_string())
-                        .unwrap()
-                        .compile::<2>()
-                        .unwrap();
-                    let mut options = Options::default();
-                    options.cg.stabilize = false;
-                    options.cg.bound_mode = mode;
-                    registry.configure_pricing(&mut options);
-                    let parent = model::solve(problem, options.clone()).unwrap();
-                    let expected = -20. + 2. * cost;
-                    let complete = parent
-                        .snapshot
-                        .enumerate(&model::EnumerationOptions::default())
-                        .unwrap();
-                    assert!(
-                        complete.enumeration_report().complete,
-                        "{:?}",
-                        complete.enumeration_report()
-                    );
-                    assert_eq!(complete.enumeration_report().routes, 3);
-                    let result = complete.solve(options.clone()).unwrap();
-                    assert_eq!(
-                        result.master.status,
-                        Status::Optimal,
-                        "{:#?}",
-                        result.master
-                    );
-                    assert!((result.master.lp - expected).abs() < 1e-7);
-                    assert!(
-                        result.master.bound <= expected + 1e-10
-                            && expected - result.master.bound < 1e-7
-                    );
-                    assert_eq!(registry.activity(42, 901, &result).unwrap().lower, 2.);
-                    assert!(result
-                        .routes
-                        .iter()
-                        .filter(|r| r.route.arcs.len() == 2)
-                        .all(|r| !r.route.coupled_controls.is_empty()));
-                    let index = result
-                        .routes
-                        .iter()
-                        .position(|r| r.route.arcs.len() == 2)
-                        .unwrap();
-                    let fixed = result
-                        .snapshot
-                        .fix_route(index, 1.)
-                        .unwrap()
-                        .solve(options.clone())
-                        .unwrap();
-                    assert_eq!(fixed.master.status, Status::Optimal, "{:#?}", fixed.master);
-                    assert!((fixed.master.lp - expected).abs() < 1e-7);
-                    #[cfg(feature = "highs")]
-                    {
-                        use baldes::master::solvers::mip::{MipOptions, MipStatus};
-                        let mip = result
-                            .snapshot
-                            .solve_enumerated_mip(&MipOptions::default())
-                            .unwrap()
-                            .unwrap();
-                        assert_eq!(mip.mip.status, MipStatus::Optimal, "{:?}", mip.mip);
-                        assert!((mip.mip.solution.unwrap().objective - expected).abs() < 1e-7);
-                        assert!(mip.route_values.iter().all(|fixed| !fixed
-                            .route
-                            .route
-                            .coupled_controls
-                            .is_empty()));
-                    }
-                    let repeated = result
-                        .snapshot
-                        .enumerate(&model::EnumerationOptions::default())
-                        .unwrap();
-                    assert_eq!(repeated.enumeration_report().attempts, 1);
-                    assert!(!parent.snapshot.enumeration_report().complete);
-                }
-            }
-        }
-    }
-}
-
-#[test]
-fn relative_and_absolute_negative_networks_share_rows_and_every_pricing_schedule() {
-    use baldes::graph::coupled::{CoupledResource, PairedCostNormalization};
-    let corpus: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../fixtures/coupled/metasolver-paired-preparation.json"
-    ))
-    .unwrap();
-    let mut source = corpus["cases"][0]["model"].clone();
-    source["networks"][0]["front_program_domain"] = false.into();
-    let definition = &mut source["networks"][0]["coupled_resources"][0];
-    definition["policy"] = "strict_domain".into();
-    definition["normalization"] = "final_minus_initial_minimum".into();
-    definition["initial"]["pairs"][0][0] = 2.into();
-    definition["initial"]["pairs"][1][0] = 1.into();
-    let mut problem = model::format::Model::from_json(&source.to_string())
-        .unwrap()
-        .problem::<2>()
-        .unwrap();
-    problem.networks[0]
-        .graph
-        .set_coupled_objective_coefficients(&[(0, -1.)])
-        .unwrap();
-    let mut other = problem.networks[0].clone();
-    other.id = 7;
-    let mut definitions = other.graph.coupled_kernel().unwrap().definitions().to_vec();
-    match &mut definitions[0] {
-        CoupledResource::SlopePaired { normalization, .. } => {
-            *normalization = PairedCostNormalization::AbsoluteFinalValue
-        }
-        _ => unreachable!(),
-    }
-    other.graph.set_coupled_resources(&definitions).unwrap();
-    other
-        .graph
-        .set_coupled_objective_coefficients(&[(0, -2.)])
-        .unwrap();
-    problem.networks.push(other);
-    problem.rows = vec![Row {
-        sense: RowSense::LessEqual,
-        rhs: 1.5,
-    }];
-    for network in &mut problem.networks {
-        network.route_entries = vec![(0, 1.)];
-    }
-    for mode in [BoundMode::Numerical, BoundMode::Certified] {
-        for schedule in [
-            model::NetworkPricingSchedule::FullSweep,
-            model::NetworkPricingSchedule::Cyclic,
-            model::NetworkPricingSchedule::Sorted,
-            model::NetworkPricingSchedule::PromisingFirst,
-            model::NetworkPricingSchedule::UnvisitedFirst,
-        ] {
             let mut options = Options::default();
             options.cg.stabilize = false;
             options.cg.bound_mode = mode;
-            options.network_pricing_schedule = schedule;
-            let output = model::solve(problem.clone(), options.clone()).unwrap();
+            options.enumeration = Some(Default::default());
+            registry.configure_pricing(&mut options);
+            let result = model::solve(problem.clone(), options).unwrap();
             assert_eq!(
-                output.master.status,
+                result.master.status,
                 Status::Optimal,
-                "{schedule:?} {:#?}",
-                output.master
+                "{:#?}",
+                result.master
             );
-            assert!((output.master.lp + 49.).abs() < 1e-7);
-            assert!(output.master.bound <= -49. + 1e-10 && -49. - output.master.bound < 1e-7);
-            let mut tree_options = baldes::master::tree::ModelTreeOptions::default();
-            tree_options.node = options;
-            let tree = output.snapshot.solve_tree(tree_options).unwrap();
-            assert_eq!(
-                tree.status,
-                baldes::master::tree::TreeStatus::Optimal,
-                "{tree:?}"
+            assert!(
+                (result.master.lp - expected).abs() < 1e-7,
+                "{:#?}",
+                result.master
             );
-            assert!((tree.incumbent + 36.).abs() < 1e-7);
+            assert!(
+                result.master.bound <= expected + 1e-10 && expected - result.master.bound < 1e-7,
+                "{:#?}",
+                result.master
+            );
+            let gamma = registry.activity(42, 901, &result).unwrap();
+            assert_eq!((gamma.lower, gamma.upper), (2., 2.));
         }
     }
 }
 
 #[test]
-fn explicit_graph_costs_survive_variable_compilation_and_reject_duplicate_ownership() {
+fn signed_owner_cost_preserves_raw_paired_pricing_and_restricted_master_cost_separately() {
+    let corpus: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../fixtures/coupled/metasolver-paired-objective-mapping.json"
+    ))
+    .unwrap();
+    let case = corpus["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["coefficient"] == -1.)
+        .unwrap();
+    let (problem, registry) = model::format::Model::from_json(&case["model"].to_string())
+        .unwrap()
+        .compile::<2>()
+        .unwrap();
+    let graph = &problem.networks[0].graph;
+    let mut raw =
+        baldes::pricing::Solver::<2>::new(graph.vertices.len(), graph.resources.len()).unwrap();
+    raw.graph = graph.clone();
+    assert_eq!(
+        raw.price_phase(0, 20, false).unwrap().minimum_reduced_cost,
+        -18.
+    );
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    options.cg.max_iterations = 12;
+    // Owner metadata lives in the compiled model, so correctness does not
+    // depend on installing the optional cached-pricing decomposition.
+    let output = model::solve(problem, options).unwrap();
+    assert_eq!(output.master.lp, -22.);
+    assert_eq!(output.master.status, Status::Stalled);
+    assert_eq!(output.master.certified_bound, f64::NEG_INFINITY);
+    assert_eq!(output.master.numerical_bound, f64::NEG_INFINITY);
+    let gamma = registry.activity(42, 901, &output).unwrap();
+    assert_eq!((gamma.lower, gamma.upper), (2., 2.));
+    let route = output
+        .routes
+        .iter()
+        .zip(&output.values)
+        .find(|(_, value)| **value > 0.5)
+        .unwrap()
+        .0;
+    assert_eq!(route.route.coupled_values, [(0, 2.)]);
+    assert_eq!(route.route.original_cost, -22.);
+}
+
+#[test]
+fn paired_owner_rows_replay_recorded_selected_columns_without_a_source_control_projection() {
+    let corpus: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../fixtures/coupled/metasolver-paired-owner-rows.json"
+    ))
+    .unwrap();
+    for case in corpus["cases"].as_array().unwrap() {
+        if case["case"] == "singleton-lower" {
+            assert_eq!(
+                case["native_outcome"],
+                "adapter_rejects_propagated_lower_bound"
+            );
+            let (problem, _) = model::format::Model::from_json(&case["model"].to_string())
+                .unwrap()
+                .compile::<2>()
+                .unwrap();
+            let error = model::solve(problem, Options::default())
+                .err()
+                .expect("owner callback must reject the propagated bound")
+                .to_string();
+            assert!(
+                error.contains("non-zero lower bounds on variables associated to arcs"),
+                "{error}"
+            );
+            continue;
+        }
+        let (problem, registry) = model::format::Model::from_json(&case["model"].to_string())
+            .unwrap()
+            .compile::<2>()
+            .unwrap();
+        let mut options = Options::default();
+        options.cg.stabilize = false;
+        options.cg.max_iterations = 12;
+        registry.configure_pricing(&mut options);
+        let output = model::solve(problem, options).unwrap();
+        assert_eq!(
+            output.master.lp,
+            case["native_restricted_master_lp"].as_f64().unwrap(),
+            "{case}"
+        );
+        let expected = if case["case"] == "baseline" || case["case"] == "nonbinding-upper" {
+            Status::Optimal
+        } else {
+            Status::Stalled
+        };
+        assert_eq!(output.master.status, expected);
+        if expected == Status::Stalled {
+            assert_eq!(output.master.certified_bound, f64::NEG_INFINITY);
+            assert_eq!(output.master.numerical_bound, f64::NEG_INFINITY);
+        }
+        for (route, quantity) in output
+            .routes
+            .iter()
+            .zip(&output.values)
+            .filter(|(_, q)| **q > 1e-8)
+        {
+            assert!(*quantity > 0.);
+            assert!(
+                case["native_selected_columns"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|column| {
+                        column["arcs"] == serde_json::json!(route.route.arcs)
+                            && column["associations"][0]["value"] == route.route.coupled_values[0].1
+                    }),
+                "{route:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn paired_owner_bound_propagation_keeps_mixed_signed_rows_and_callback_tolerance() {
+    let corpus: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../fixtures/coupled/metasolver-paired-preparation.json"
+    ))
+    .unwrap();
+    // Fresh owner-bound-propagation captures use explicit gamma[0,100].
+    // Bounds are registration state, never substituted for a shared row.
+    for (sense, rhs, gamma, arc, rejected, expected_upper) in [
+        ("ge", 4., 1., 0., true, 100.),
+        ("ge", 4., 1., 10., false, 100.),
+        ("ge", 4., 1., -10., true, 100.),
+        ("le", -4., -1., 0., true, 100.),
+        ("ge", -4., -1., 0., false, 4.),
+        ("eq", 4., 1., 10., false, 4.),
+        ("ge", 1e-6, 1., 0., false, 100.),
+        ("ge", 3e-6, 1., 0., true, 100.),
+    ] {
+        let mut source = corpus["cases"][0]["model"].clone();
+        source["rows"] = serde_json::json!([{"sense":sense,"rhs":rhs}]);
+        source["networks"][0]["paired_owner_registration_bounds"] =
+            serde_json::json!([[0, [0., 100.]]]);
+        source["networks"][0]["arcs"][1]["entries"] = serde_json::json!([[0, arc]]);
+        source["pricing_variables"] = serde_json::json!([{
+            "network":42,"id":901,"cost":1.,"accumulated_resource":0,"entries":[[0,gamma]]
+        }]);
+        let (problem, _) = model::format::Model::from_json(&source.to_string())
+            .unwrap()
+            .compile::<2>()
+            .unwrap();
+        let mut options = Options::default();
+        options.cg.stabilize = false;
+        options.cg.max_iterations = 12;
+        let result = model::solve(problem, options);
+        if rejected {
+            let error = result
+                .err()
+                .expect("owner callback must reject the propagated bound")
+                .to_string();
+            assert!(
+                error.contains("non-zero lower bounds on variables associated to arcs"),
+                "{sense} {rhs} {gamma} {arc}: {error}"
+            );
+        } else {
+            let output = result.unwrap();
+            let bounds = output
+                .snapshot
+                .preprocessing_report()
+                .paired_owner_bounds
+                .iter()
+                .find(|&&(network, resource, _)| network == 42 && resource == 0)
+                .unwrap()
+                .2;
+            assert!(
+                (bounds.upper - expected_upper).abs() < 1e-8,
+                "{sense} {rhs} {gamma} {arc}: {bounds:?}"
+            );
+            assert!(bounds.lower <= 2e-6, "{bounds:?}");
+        }
+    }
+}
+
+#[test]
+fn direct_routing_paired_row_uses_selected_activity_and_rejects_fractional_route_witness() {
+    use baldes::master::routing::{self, RootOptions, RoutingContext};
+    let corpus: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../fixtures/coupled/metasolver-paired-preparation.json"
+    ))
+    .unwrap();
+    let (problem, _) = model::format::Model::from_json(&corpus["cases"][0]["model"].to_string())
+        .unwrap()
+        .compile::<2>()
+        .unwrap();
+    let mut graph = problem.networks[0].graph.clone();
+    graph
+        .set_paired_owner_registration_bounds(&[(0, [0., 100.])])
+        .unwrap();
+    let mut context = RoutingContext::set_partitioning(graph, 1.).unwrap();
+    for row in &mut context.model.rows {
+        row.sense = RowSense::LessEqual;
+    }
+    // Vertex1 is unused, so its pre-existing row has no physical arc terms.
+    // Replace it with gamma<=2, the captured owner-bound-upper-row2 case.
+    context.model.rows[1].rhs = 2.;
+    context.model.networks[0]
+        .activity_entries
+        .push(model::AccumulatedActivityEntry {
+            row: 1,
+            resource: 0,
+            coefficient: 1.,
+        });
+    let mut options = RootOptions::default();
+    options.enumerate = false;
+    options.cg.stabilize = false;
+    options.cg.max_iterations = 12;
+    let output = routing::solve(context, options).unwrap();
+    // Captured native RMP=-11.333333; native owner terminates with a fatal
+    // duality gap. Source output keeps that RMP without claiming its optimum.
+    assert!(
+        (output.master.lp + 34. / 3.).abs() < 1e-7,
+        "{:?}",
+        output.master
+    );
+    assert_eq!(output.master.status, Status::Stalled);
+    assert!(
+        output.incumbent >= -1e-8,
+        "a fractional selected route is not an integer witness"
+    );
+    assert_eq!(output.master.numerical_bound, f64::NEG_INFINITY);
+}
+
+#[test]
+fn paired_owner_registration_upper_is_not_a_shared_row_or_a_path_window() {
     let corpus: serde_json::Value = serde_json::from_str(include_str!(
         "../../../fixtures/coupled/metasolver-paired-preparation.json"
     ))
     .unwrap();
     let mut source = corpus["cases"][0]["model"].clone();
-    source["networks"][0]["front_program_domain"] = false.into();
-    source["networks"][0]["coupled_resources"][0]["policy"] = "strict_domain".into();
-    let paired = source["networks"][0]["coupled_resources"][0].clone();
-    source["networks"][0]["coupled_resources"]
-        .as_array_mut()
-        .unwrap()
-        .push(paired);
-    source["networks"][0]["coupled_objective_coefficients"] = serde_json::json!([[1, -1.]]);
-    source["pricing_variables"] = serde_json::json!([
-        {"network":42,"id":901,"cost":1.,"accumulated_resource":0}
-    ]);
+    source["networks"][0]["paired_owner_registration_bounds"] = serde_json::json!([[0, [0., 2.]]]);
+    source["pricing_variables"] = serde_json::json!([{
+        "network":42,"id":901,"cost":1.,"accumulated_resource":0
+    }]);
     let (problem, registry) = model::format::Model::from_json(&source.to_string())
         .unwrap()
         .compile::<2>()
@@ -1122,64 +588,63 @@ fn explicit_graph_costs_survive_variable_compilation_and_reject_duplicate_owners
             .graph
             .coupled_kernel()
             .unwrap()
-            .objective_coefficient(1),
-        Some(-1.)
+            .paired_owner_registration_bounds(),
+        &[(0, [0., 2.])]
     );
     let mut options = Options::default();
     options.cg.stabilize = false;
-    registry.configure_pricing(&mut options);
-    let root = model::solve(problem, options).unwrap();
-    assert_eq!(root.master.status, Status::Optimal, "{:#?}", root.master);
-    assert!((root.master.lp + 25.).abs() < 1e-7);
-    assert!(root.master.bound <= -25. + 1e-10 && -25. - root.master.bound < 1e-7);
-    for cost in [1., -1.] {
-        source["networks"][0]["coupled_objective_coefficients"] = serde_json::json!([[0, cost]]);
-        let error = model::format::Model::from_json(&source.to_string())
-            .unwrap()
-            .compile::<2>()
-            .err()
-            .unwrap();
-        assert!(error.to_string().contains("not both"), "{error}");
-    }
+    let output = model::solve(problem, options).unwrap();
+    // Native actual Mlp/PB and public printed incumbent are -17/gamma3,
+    // despite current owner UB2 at fillRCSPInput. A row gamma<=2 differs.
+    assert!((output.master.lp + 17.).abs() < 1e-8, "{:?}", output.master);
+    let activity = registry.activity(42, 901, &output).unwrap();
+    assert_eq!((activity.lower, activity.upper), (3., 3.));
+    assert_eq!(
+        output.snapshot.preprocessing_report().paired_owner_bounds[0]
+            .2
+            .upper,
+        2.
+    );
 }
 
 #[test]
-fn source_control_cycle_ignores_dead_negative_branch_and_retains_bounded_optimum() {
+fn paired_owner_local_and_aggregate_bounds_survive_multiplicity_and_fixed_routes() {
     let corpus: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../fixtures/coupled/metasolver-paired-objective-mapping.json"
+        "../../../fixtures/coupled/metasolver-paired-preparation.json"
     ))
     .unwrap();
-    let mut source = corpus["cases"][0]["model"].clone();
-    source["pricing_variables"] = serde_json::json!([]);
-    let network = &mut source["networks"][0];
-    network["vertices"] = 4.into();
-    network["sink"] = 3.into();
-    network["elementary"] = false.into();
-    network["route_domain"] = serde_json::json!({"kind":"bounded_walks","max_arcs":4});
-    network["arcs"] = serde_json::json!([
-        {"tail":0,"head":1,"cost":-20.},
-        {"tail":1,"head":1,"cost":0.},
-        {"tail":1,"head":3,"cost":0.},
-        {"tail":1,"head":2,"cost":-100.},
-        {"tail":2,"head":2,"cost":-100.}
-    ]);
-    let arc = network["coupled_resources"][0]["arcs"][0].clone();
-    network["coupled_resources"][0]["arcs"] =
-        serde_json::json!([arc.clone(), arc.clone(), arc.clone(), arc.clone(), arc]);
-    network["coupled_objective_coefficients"] = serde_json::json!([[0, -1.]]);
-    let problem = model::format::Model::from_json(&source.to_string())
-        .unwrap()
-        .problem::<2>()
-        .unwrap();
-    let mut options = Options::default();
-    options.cg.stabilize = false;
-    options.cg.bound_mode = BoundMode::Certified;
-    let root = model::solve(problem, options).unwrap();
-    assert_eq!(root.master.status, Status::Optimal, "{:#?}", root.master);
-    assert!((root.master.lp + 24.).abs() < 1e-7);
-    assert!(root.master.bound <= -24. + 1e-10 && -24. - root.master.bound < 1e-7);
-    assert!(root
-        .routes
-        .iter()
-        .any(|route| route.route.arcs.len() == 4 && route.route.coupled_values == [(0, 4.)]));
+    for (multiplicity, local_lower) in [(1., 0.), (2., -4.)] {
+        let mut source = corpus["cases"][0]["model"].clone();
+        source["networks"][0]["multiplicity"] = serde_json::json!([0., multiplicity]);
+        source["networks"][0]["paired_owner_registration_bounds"] =
+            serde_json::json!([[0, [-4., 100.]]]);
+        source["pricing_variables"] = serde_json::json!([{
+            "network":42,"id":901,"cost":1.,"accumulated_resource":0
+        }]);
+        let (problem, _) = model::format::Model::from_json(&source.to_string())
+            .unwrap()
+            .compile::<2>()
+            .unwrap();
+        let mut options = Options::default();
+        options.cg.stabilize = false;
+        let output = model::solve(problem, options.clone()).unwrap();
+        let report = output.snapshot.preprocessing_report();
+        assert_eq!(report.paired_owner_bounds[0].2.lower, local_lower);
+        assert_eq!(report.paired_owner_aggregate_bounds[0].2.lower, 0.);
+        if multiplicity == 2. {
+            let tag = output.values.iter().position(|&value| value > 0.).unwrap();
+            let fixed = output
+                .snapshot
+                .fix_route(tag, 1.)
+                .unwrap()
+                .solve(options)
+                .unwrap();
+            let report = fixed.snapshot.preprocessing_report();
+            assert_eq!(report.paired_owner_aggregate_bounds[0].2.upper, 97.);
+            // Remaining single-copy domain converts residual global UB97 with
+            // signed local lower: effective minimum1 leaves the same local UB.
+            assert_eq!(report.paired_owner_bounds[0].2.upper, 97.);
+            assert_eq!(report.paired_owner_bounds[0].2.lower, 0.);
+        }
+    }
 }

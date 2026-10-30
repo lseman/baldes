@@ -29,9 +29,17 @@ impl<const D: usize> Storage<D> {
             protected_resources: Vec::new(),
         })
     }
-    fn dominates(g: &Graph<D>, a: &Label<D>, b: &Label<D>, forward: bool, protected: &[usize]) -> bool {
+    fn dominates(
+        g: &Graph<D>,
+        a: &Label<D>,
+        b: &Label<D>,
+        forward: bool,
+        protected: &[usize],
+    ) -> bool {
         if !protected.iter().all(|&resource| {
-            a.resources.get(resource).zip(b.resources.get(resource))
+            a.resources
+                .get(resource)
+                .zip(b.resources.get(resource))
                 .is_some_and(|(a, b)| a.to_bits() == b.to_bits())
         }) {
             return false;
@@ -113,7 +121,13 @@ impl<const D: usize> Storage<D> {
         let records = &mut self.partitions[partition];
         records.retain(|&id| {
             self.checks += 1;
-            if Self::dominates(g, &label, &self.arena[id], forward, &self.protected_resources) {
+            if Self::dominates(
+                g,
+                &label,
+                &self.arena[id],
+                forward,
+                &self.protected_resources,
+            ) {
                 self.live[id] = false;
                 if id >= self.cursor {
                     self.pending -= 1;
@@ -125,7 +139,8 @@ impl<const D: usize> Storage<D> {
         });
         // Tolerant insertion can leave costs out of strict numeric order, so
         // the predicate is not necessarily monotone for a binary search.
-        let at = records.iter()
+        let at = records
+            .iter()
             .position(|&id| label.original_cost + EPSILON < self.arena[id].original_cost)
             .unwrap_or(records.len());
         let id = self.arena.len();

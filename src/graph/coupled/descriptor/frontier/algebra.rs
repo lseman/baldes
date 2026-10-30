@@ -278,7 +278,10 @@ impl SlopeFront {
             for &(slope, end) in &pairs[2..] {
                 work.charge(0)?;
                 let last = reduced.len() - 1;
-                if near(reduced[last].0, slope, FrontOperationPolicy::FrontAlgebra)? {
+                if reduced[last].0.is_finite()
+                    && slope.is_finite()
+                    && near(reduced[last].0, slope, FrontOperationPolicy::FrontAlgebra)?
+                {
                     reduced[last].1 = end;
                     merged = true;
                 } else {
@@ -289,18 +292,21 @@ impl SlopeFront {
             // The anchor is a value, so comparisons start at segment two.
             for index in 2..reduced.len() {
                 work.charge(0)?;
-                if near(
-                    reduced[index - 1].0,
-                    reduced[index].0,
-                    FrontOperationPolicy::FrontAlgebra,
-                )? {
+                if reduced[index - 1].0.is_finite()
+                    && reduced[index].0.is_finite()
+                    && near(
+                        reduced[index - 1].0,
+                        reduced[index].0,
+                        FrontOperationPolicy::FrontAlgebra,
+                    )?
+                {
                     return Err(FrontierUnknown::Unsupported(
                         "machine reduction consecutive slopes",
                     ));
                 }
             }
             let components = if merged {
-                vec![PreparedSlopeFunction::from_machine_pairs(reduced)
+                vec![PreparedSlopeFunction::from_machine_output_pairs(reduced)
                     .map_err(FrontierUnknown::Arithmetic)?]
                 .into()
             } else {
@@ -529,40 +535,6 @@ impl SlopeFront {
         self.provenance = Arc::new(provenance);
         self.tolerant_alignment |= tolerant_alignment;
         self
-    }
-    pub(in crate::graph::coupled::descriptor) fn paired_result(
-        mut self,
-        input: &Self,
-        arc: Arc<crate::graph::coupled::descriptor::SlopeRelationArc>,
-        policy: FrontOperationPolicy,
-        intermediate_tolerant_alignment: bool,
-    ) -> Self {
-        self.provenance = Arc::new(FrontierProvenance::Paired {
-            input: input.provenance.clone(),
-            arc,
-            policy,
-            intermediate_tolerant_alignment,
-        });
-        self.tolerant_alignment |= input.tolerant_alignment || intermediate_tolerant_alignment;
-        self
-    }
-    pub(in crate::graph::coupled::descriptor) fn paired_adjoint_result(
-        self,
-        input: &Self,
-        arc: Arc<crate::graph::coupled::descriptor::SlopeRelationArc>,
-        policy: FrontOperationPolicy,
-        intermediate_tolerant_alignment: bool,
-    ) -> Self {
-        self.with_provenance(
-            FrontierProvenance::PairedAdjoint {
-                input: input.components.clone(),
-                arc,
-                policy,
-            },
-            input.tolerant_alignment
-                || intermediate_tolerant_alignment
-                || policy == FrontOperationPolicy::FrontAlgebra,
-        )
     }
     pub fn zero(lower: f64, upper: f64) -> Result<Self, RawFunctionError> {
         let function = super::RawAffine::new(0., 0.)?.prepare(lower, upper)?;
@@ -857,18 +829,6 @@ impl SlopeFront {
             tolerant_alignment: tolerant,
         })
     }
-    /// This front is defined wherever `other` is and is no higher there.
-    /// A front's value is the minimum over its components. Each of
-    /// `other`'s components is checked at its knots merged with this
-    /// front's knots inside its domain; one component of this front must
-    /// cover each sub-interval by itself (components are continuous, so its
-    /// endpoint values bound it). Under the native policy, domains snap and
-    /// values compare as the reference does (1e-4, or relative 2.22e-10);
-    /// under the strict policy both are exact. Arithmetic failure rejects.
-    pub(crate) fn covers_below(&self, other: &Self, policy: FrontOperationPolicy) -> bool {
-        self.excess(other, policy) == Some(0.)
-    }
-
     /// The largest amount by which this front exceeds `other` on `other`'s
     /// domain, or None when it does not cover that domain. Checked knot-wise
     /// exactly as `covers_below`; a value no higher than (or, under the
@@ -970,13 +930,10 @@ impl SlopeFront {
             if let Err(reason) = work.charge(1) {
                 return FrontierOutcome::Unknown(reason);
             }
-            value = match checked(end - coordinate, "machine backward key span")
-                .and_then(|span| checked(span * slope, "machine backward key multiplication"))
-                .and_then(|product| checked(value + product, "machine backward key accumulation"))
-            {
-                Ok(value) => value,
-                Err(error) => return FrontierOutcome::Unknown(FrontierUnknown::Arithmetic(error)),
-            };
+            // The native key scan propagates IEEE arithmetic through a
+            // retained empty NaN segment. Its ordered maximum comparison
+            // keeps the preceding finite maximum when the next value is NaN.
+            value += (end - coordinate) * slope;
             // MAXSD takes the preceding maximum on an equal comparison.
             if value > maximum {
                 maximum = value;

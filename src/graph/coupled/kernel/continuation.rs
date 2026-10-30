@@ -3,20 +3,6 @@
 //! piecewise regions when several dependencies are composed.
 use std::sync::Arc;
 
-/// Canonical classes for complete encoded operators. Hashing indexes the
-/// candidates only: full key equality resolves every collision. The temporary
-/// keys are dropped after preparation; hot suffix comparisons retain one ID
-/// per physical arc and preserve their original operation order.
-pub(super) fn operator_classes(keys: impl IntoIterator<Item = Vec<u64>>) -> Arc<[usize]> {
-    let mut classes = std::collections::HashMap::new();
-    let mut result = Vec::new();
-    for (arc, key) in keys.into_iter().enumerate() {
-        let class = *classes.entry(key).or_insert(arc);
-        result.push(class);
-    }
-    result.into()
-}
-
 struct Step {
     arc: usize,
     next: Option<Arc<Step>>,

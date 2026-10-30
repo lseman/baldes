@@ -2,14 +2,9 @@
 use super::*;
 mod encoded;
 mod fronts;
-mod lattice;
 mod machine;
 mod operators;
 mod paired;
-#[cfg(feature = "clp")]
-pub(super) use paired::PairedArcBounds;
-pub use paired::PairedControlCertificate;
-mod paired_machine;
 use crate::core::rounding::{add_down, add_up, multiply_down};
 use std::time::Instant;
 
@@ -140,56 +135,18 @@ impl CoupledKernel {
         work: &mut usize,
         deadline: Option<Instant>,
     ) -> Option<(bool, [f64; 2])> {
-        self.certify_with_controls(arcs, &[], work, deadline)
-    }
-
-    /// Certify actual source choices on controlled descriptors and retain the
-    /// ordinary independent proof for every other resource family.
-    pub fn certify_with_controls(
-        &self,
-        arcs: &[usize],
-        controls: &[PairedControl],
-        work: &mut usize,
-        deadline: Option<Instant>,
-    ) -> Option<(bool, [f64; 2])> {
-        if !controls.is_empty() {
-            if self.front_program_domain {
-                return None;
-            }
-            debit(work, controls.len(), deadline)?;
-            if controls
-                .windows(2)
-                .any(|pair| pair[0].resource >= pair[1].resource)
-                || controls.iter().any(|control| {
-                    !matches!(
-                        self.definitions.get(control.resource),
-                        Some(
-                            CoupledResource::SlopePaired { .. }
-                                | CoupledResource::PairedPiecewiseLinear { .. }
-                        )
-                    )
-                })
-            {
-                return None;
-            }
-        }
         self.debit_replay(arcs, work, deadline)?;
         if self.cost_scale != 0.
             && self.definitions.iter().enumerate().any(|(r, definition)| {
                 self.objective_coefficients[r] < 0.
-                    && matches!(
-                        definition,
-                        CoupledResource::SlopePaired { .. }
-                            | CoupledResource::PairedPiecewiseLinear { .. }
-                    )
-                    && !controls.iter().any(|control| control.resource == r)
+                    && matches!(definition, CoupledResource::PairedFront { .. })
             })
         {
             // An unspecified minimum-Gamma choice is not a lower objective
             // bound when the model coefficient is negative.
             return None;
         }
-        let result = self.certify_inner(arcs, work, deadline, controls);
+        let result = self.certify_inner(arcs, work, deadline);
         if deadline.is_some_and(|limit| Instant::now() >= limit) {
             None
         } else {
@@ -295,7 +252,6 @@ impl CoupledKernel {
         arcs: &[usize],
         work: &mut usize,
         deadline: Option<Instant>,
-        controls: &[PairedControl],
     ) -> Option<(bool, [f64; 2])> {
         // A feasibility-only plugin proof must never erase an objective.
         if self.plugins.iter().any(|p| p.0.has_costs()) {
@@ -336,7 +292,7 @@ impl CoupledKernel {
             lo: slope_cost[0],
             hi: slope_cost[1],
         })?;
-        let (valid, paired_cost) = self.certify_relations(arcs, work, deadline, controls)?;
+        let (valid, paired_cost) = self.certify_relations(arcs, work, deadline)?;
         if !valid {
             return Some((false, [0.; 2]));
         }

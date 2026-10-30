@@ -235,16 +235,17 @@ policy: Optional[str]  # read-only property
 ## ResourceModel signatures
 
 ```python
-add_paired_piecewise_linear(self, initial_lower: float, initial_upper: float, initial: list[tuple[float, float]], arrivals: list[list[tuple[float, float]]], increments: list[list[tuple[float, float]]], lowers: list[list[tuple[float, float]]], uppers: list[list[tuple[float, float]]], waiting: list[int], mode: str='feasibility') -> int
 add_interval_cost(self, initial_lower: float, initial_upper: float, lower: float, upper: float, increments: list[float], functions: list[list[tuple[float, float]]]) -> int
 add_slope_interval_cost(self, initial_lower: float, initial_upper: float, lower: float, upper: float, increments: list[float], functions: list[EncodedFunction], policy: str='strict_domain') -> int
-add_slope_paired(self, initial_lower: float, initial_upper: float, initial: EncodedFunction, arrivals: list[EncodedFunction], increments: list[EncodedFunction], lowers: list[EncodedFunction], uppers: list[EncodedFunction], waiting: list[int], mode: str='feasibility', policy: str='strict_domain', normalization: str='absolute_final_value') -> int
 __init__(self) -> None
+add_paired_front(self, mode: str="feasibility") -> int
+set_paired_front_program(self, resource: int, program: dict[str, Any] | None) -> None
 install(self, solver: Solver, *, front_program_domain: bool=False) -> None
 set_paired_waiting_base_resource(self, resource: int, base_resource: int | None) -> None
 set_paired_machine_inputs(self, resource: int, arcs: list[dict[str, Any]] | None) -> None
 set_paired_machine_root(self, resource: int, root: dict[str, Any] | None) -> None
 set_paired_machine_terminal_bounds(self, resource: int, bounds: tuple[float, float] | None) -> None
+set_paired_machine_waiting_rates(self, resource: int, rates: list[float] | None) -> None
 add_selection(self, initial: int, allowed: list[int], vertices: list[int] | None=None, relaxed: bool=False) -> int
 add_simultaneous_pickup_delivery(self, capacity: float, deliveries: list[float], pickups: list[float], tolerance: float=1e-06) -> int
 add_cumulative_cost(self, initial: float, increments: list[float], weights: list[float], sink_upper: float | None=None, source_upper: float | None=None) -> int
@@ -258,24 +259,19 @@ add_encoded_piecewise_linear_dependent(self, parent: int, initial: float, lower:
 add_dependent(self, parent: int, initial: float, lower: float, upper: float, offsets: list[float], factors: list[float]) -> int
 ```
 
-`set_paired_machine_inputs` stores explicit prepared inputs for a
-`front_algebra` slope-paired resource in physical-arc insertion order. Each
-arc dictionary contains `tail_limit`, `head_limit`, `waiting_lower`,
-`waiting_upper`, `waiting_rate`, and the five function fields
-`forward_mapping`, `inverse`, `sum_vector`, `dependent_lower`, and
-`dependent_upper`. Each function is a dictionary `{"pairs": [...]}` of
-prepared `(value, coordinate)` and `(slope, endpoint)` pairs. Pass `None` to
-remove a mapping. Prepared-pair validation occurs at the setter; the physical
-arc count and remaining graph constraints are checked atomically at `install`.
-An optional `backward` dictionary supplies `tail_lower`, `tail_upper`,
-`forward_at_tail_lower`, `mapped_upper`, and a prepared `dependent` function.
-With `front_program_domain=True`, the partial machine path also requires a
-separately prepared dependent root supplied by `set_paired_machine_root` in the
-same `{"pairs": [...]}` format. Both setters accept the recovered two-pair
-zero-width and three-pair leading-zero-width shapes. Unsupported machine
-operations return an incomplete result; these inputs do not certify a route.
-Use `set_paired_machine_terminal_bounds` with the explicit terminal base window
-to install a backward machine root from the prepared sink-arc operands.
+`add_paired_front` declares a paired resource. Call `set_paired_front_program`
+with source/terminal windows, a root function and one arc mapping per physical
+arc before installing. Pass `None` to remove the stored program. The complete
+schema and encoding rules are in [paired front programs](../extensions/coupled-resources.md#paired-front-programs-and-waiting).
+Installation prepares both directions atomically and selects the front-program
+domain. Modes are `feasibility`, `cost_unbounded` and `cost_bounded`.
+
+`set_paired_machine_inputs`, `set_paired_machine_root` and
+`set_paired_machine_terminal_bounds` instead accept separately prepared operands.
+They cannot be combined with a complete front program for the same resource.
+Functions in prepared operands use `{"pairs": [...]}` with an initial
+`(value, coordinate)` anchor and subsequent `(slope, endpoint)` pairs.
+Unsupported operations return explicit incomplete outcomes.
 
 ## Network constructors and results
 
