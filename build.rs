@@ -119,6 +119,16 @@ mod clp {
         files.sort();
         for file in &mut files {
             let name = file.file_name().unwrap().to_str().unwrap();
+            if name == "ClpModel.cpp" {
+                // Reserve mode 6 for the bundled Ruiz scaling implementation.
+                let text = fs::read_to_string(&*file).unwrap();
+                let old = "if (mode > 0 && mode < 6)";
+                assert_eq!(text.matches(old).count(), 1);
+                let copy = patched.join(name);
+                fs::write(&copy, text.replace(old, "if (mode > 0 && mode <= 6)")).unwrap();
+                *file = copy;
+                continue;
+            }
             if name == "Clp_C_Interface.cpp" {
                 // Keep the opaque C wrapper in its own translation unit;
                 // upstream Clp implements the deep model/basis copy.
@@ -232,6 +242,23 @@ extern "C" void baldes_clp_solve_limits(Clp_Simplex *model, double *values) {
                 // clears duplicate marks. Keep all coefficient validation and
                 // duplicate compression in their original order.
                 let mut text = fs::read_to_string(&*file).unwrap();
+                // Add Ruiz without changing Clp's existing scaling modes or
+                // its post-scaling bound and tolerance safeguards.
+                let begin_scale = text
+                    .find("int ClpPackedMatrix::scale(ClpModel *model, ClpSimplex *simplex) const")
+                    .unwrap();
+                let mut scale = text[begin_scale..].to_string();
+                for (old, new) in [
+                    ("assert(model->scalingFlag() <= 5);", "assert(model->scalingFlag() <= 6);"),
+                    ("      } else {\n#ifdef USE_OBJECTIVE\n        // This will be used to help get scale factors", concat!(include_str!("src/master/solvers/clp/native/ruiz_scaling.inc"), "      } else {\n#ifdef USE_OBJECTIVE\n        // This will be used to help get scale factors")),
+                    ("if (scalingMethod == 1 || scalingMethod == 2) {", "if (scalingMethod == 1 || scalingMethod == 2 || scalingMethod == 6) {"),
+                    ("          columnScale[iColumn] = overallLargest / largest;", "          if (scalingMethod != 6)\n            columnScale[iColumn] = overallLargest / largest;"),
+                ] {
+                    assert_eq!(scale.matches(old).count(), 1, "unsupported Ruiz scaling site");
+                    scale = scale.replacen(old, new, 1);
+                }
+                text.replace_range(begin_scale.., &scale);
+                text.insert_str(0, "#include <vector>\n#include <algorithm>\n");
                 for (old, new) in [
                     ("if (mark[iRow] == -1)", "if (mark[iRow] != iColumn)"),
                     ("mark[iRow] = j;", "mark[iRow] = iColumn;"),
@@ -349,6 +376,11 @@ extern "C" void baldes_clp_solve_limits(Clp_Simplex *model, double *values) {
         println!(
             "cargo:rerun-if-changed={}",
             root.join("src/master/solvers/clp/native/baldes_clp_matrix_kernels.hpp")
+                .display()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
+            root.join("src/master/solvers/clp/native/ruiz_scaling.inc")
                 .display()
         );
         let patched = PathBuf::from(env::var("OUT_DIR").unwrap()).join("patched");

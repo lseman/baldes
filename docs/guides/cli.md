@@ -43,7 +43,7 @@ baldes solve examples/networks/triangle.json --tree --nodes 100 --json -
 | `--rounding MODE` | distances `none` (unrounded), `nearest`, `tenth` or `ceil` (default: `tenth`) |
 | `--cuts` | enable rank-one, capacity, k-path, knapsack (rounding/1K), and Fenchel cuts; also 2-path for models with time windows. Requires the integer-demand Fenchel configuration to be valid. |
 | `--rank1` | separate limited-memory rank-one cuts |
-| `--clp-scaling MODE` | equilibrium (default), auto, geometric, or off |
+| `--clp-scaling MODE` | off (default), equilibrium, auto, geometric, or ruiz |
 | `--capacity` / `--capacity-cuts` | separate rounded capacity cuts in the routing master |
 | `--two-path-cuts` | enable capacity cuts with Kohl's time resource attached (VRPTW only) |
 | `--tree` | run integer branch-and-price for the input registration |

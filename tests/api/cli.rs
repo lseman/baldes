@@ -1220,7 +1220,7 @@ fn clp_runtime_policy_modes_are_validated() {
     }
     let path = std::env::temp_dir().join(format!("baldes-clp-policy-{}.txt", std::process::id()));
     std::fs::write(&path, "tiny\nVEHICLE\nNUMBER CAPACITY\n2 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n").unwrap();
-    for scaling in ["auto", "geometric", "equilibrium", "off"] {
+    for scaling in ["auto", "geometric", "equilibrium", "ruiz", "off"] {
         for areas in ["retain", "discard"] {
             let output = command()
                 .arg("solve")

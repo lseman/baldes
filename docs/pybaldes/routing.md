@@ -97,7 +97,7 @@ depends on build features. Inspect supported controls with
 | `master_solver` | `"clp"` | `"clp"`, `"ipm"`, `"highs"`, or `"gurobi"`; last two need features |
 | `master_threads` | `0` | HiGHS/Gurobi worker budget; 0 uses available CPUs; Clp/IPM ignore it |
 | `bound_mode` | `"numerical"` | Numerical bounds or independent `"certified"` validation |
-| `clp_scaling` | `"equilibrium"` | `"equilibrium"`, `"auto"`, `"geometric"`, or `"off"` |
+| `clp_scaling` | `"off"` | `"off"`, `"equilibrium"`, `"auto"`, `"geometric"`, or `"ruiz"` |
 | `clp_keep_work_areas` | `True` | Retain native work buffers across LP solves |
 
 HiGHS uses a process-shared native scheduler: keep its worker budget consistent

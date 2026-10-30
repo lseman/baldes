@@ -255,7 +255,7 @@ def test_resource_capacity_is_fixed_at_build_time():
         pybaldes.Solver(3, pybaldes.resource_dimensions + 1)
 
 
-@pytest.mark.parametrize("scaling", ["auto", "geometric", "equilibrium", "off"])
+@pytest.mark.parametrize("scaling", ["auto", "geometric", "equilibrium", "ruiz", "off"])
 @pytest.mark.parametrize("keep", [False, True])
 @pytest.mark.parametrize("rank_one", [False, True])
 def test_clp_runtime_policy_preserves_routing_solution(scaling, keep, rank_one):
@@ -287,11 +287,12 @@ def test_master_worker_budget_defaults_and_validation():
     assert result.status == "Optimal"
 
 
-def test_root_scaling_defaults_to_equilibrium():
+def test_root_scaling_defaults_to_off():
     import inspect
 
+    assert inspect.signature(solve).parameters["clp_scaling"].default == "off"
     default = solve(triangle(), reduced_cost_fixing=False)
-    explicit = solve(triangle(), reduced_cost_fixing=False, clp_scaling="equilibrium")
+    explicit = solve(triangle(), reduced_cost_fixing=False, clp_scaling="off")
     assert default.status == explicit.status == "Optimal"
     assert default.lp == pytest.approx(explicit.lp, abs=1e-8)
 

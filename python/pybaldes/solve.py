@@ -55,7 +55,7 @@ def _routing(
     master_solver: str = "clp",
     master_threads: int = 0,
     bound_mode: str = "numerical",
-    clp_scaling: str = "equilibrium",
+    clp_scaling: str = "off",
     clp_keep_work_areas: bool = True,
     verbose: bool = False,
     log_interval: int = 10,
@@ -76,7 +76,7 @@ def _routing(
     (unrounded for Solomon, TSPLIB nint for CVRPLIB EUC_2D); rounding accepts
     'none', 'nearest', 'tenth' and 'ceil'.
     verbose=True prints a CG progress table to stderr every log_interval iterations.
-    clp_scaling selects equilibrium (default), auto, geometric, or off for Clp.
+    clp_scaling selects off (default), equilibrium, auto, geometric, or ruiz for Clp.
     clp_keep_work_areas retains native work buffers between LP solves by default.
     master_solver='highs' selects HiGHS (requires a build with its feature);
     master_solver='gurobi' selects Gurobi (requires its feature and a license);
