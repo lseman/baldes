@@ -46,6 +46,9 @@ pub struct EngineControls<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS 
     /// a conservative minimum capped at that threshold when pruning occurs.
     pub load_completion_resource: Option<usize>,
     pub load_completion_threshold: f64,
+    /// Selected NG elements tracked by completion tables (0 disables subset
+    /// conditioning; at most 6, reduced further to respect the memory budget).
+    pub load_completion_subset_size: usize,
 }
 impl<const D: usize> Default for EngineControls<D> {
     fn default() -> Self {
@@ -62,6 +65,7 @@ impl<const D: usize> Default for EngineControls<D> {
             use_symmetric_execution: true,
             load_completion_resource: None,
             load_completion_threshold: 0.,
+            load_completion_subset_size: 0,
         }
     }
 }

@@ -6,9 +6,9 @@ fn public_metadata_lists_only_supported_canonical_names_and_consistent_indices()
     let mut options = Options::default();
     let mut solver = Solver::<2>::new(2, 0).unwrap();
     let expected = if cfg!(all(feature = "clp", feature = "highs")) {
-        43
+        46
     } else {
-        41
+        44
     };
     assert_eq!(OPTION_TABLE.len(), expected);
     let mut names = std::collections::HashSet::new();

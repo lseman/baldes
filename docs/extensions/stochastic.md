@@ -28,141 +28,117 @@ states and two vectors, taking O(route length * (Q+1) * support size) time.
 Probability sums within 1e-12 of one are normalized during `Demand::new`.
 Computation uses `f64`; no Monte Carlo sampling is involved.
 
-## BALDES pricing and branch-and-price
+## Conventional routing with Theta cuts
 
-`Problem::pricing_graph` compiles to the ordinary BALDES physical graph, using
-`CoupledPlugin` objective costs for expected recourse. `Problem::price` runs
-`pricing::Solver::price_phase_partial`, including bucket labeling and optional
-bidirectional joins. This prices the stochastic objective directly. The compiled graph also works
-with `RoutingContext::set_partitioning` and the shared routing root master in
-numerical bound mode; regression tests cover its phase-I cost suppression and
-restoration.
+`Problem::solve` uses the ordinary BALDES routing branch-cut-and-price tree.
+Pricing uses mean demands and travel costs plus per-customer recourse lower
+bounds. Exact P1/P3 route evaluation supplies the excess charged by Theta
+optimality cuts. Integral routes are separated before accepting an integral
+master solution. The separate stochastic Bellman-pricing master/tree has been
+removed.
 
-The default search traverses the physical graph in reverse and carries a
-`Q + 1` Bellman continuation vector. Each extension prepends one Bellman
-operator in O((Q+1) * support size), avoiding repeated prefix evaluation.
-For visited-customer subsets, componentwise continuation-vector dominance
-is safe because Bellman expectation and minimum operators are monotone.
-Expected capacity is summed in customer-ID order, independently of route order.
-
-`PricingOptions::bidirectional = true` retains the original bidirectional
-adapter: forward states retain their complete customer sequence and joins
-replay suffixes. `Problem::pricing_graph` also retains that original physical
-orientation for shared-master integration. Generic completion bounds and
-reversal reuse remain disabled for cost plugins. Other cost plugins retain
-equality dominance unless they explicitly supply a cost-preserving dominance
-contract. Large instances can still exhaust their label or time budget.
-
-The adapter supplies full elementarity through NG memory and supports at most
-`NG_MEMORY_CAPACITY` customers: 15 by default, or 31/63 with `ng-memory-31` /
-`ng-memory-63`. The route domain has at most n+1 arcs, including departure and
-return. A loose scalar mean-load window is only a necessary filter; canonical
-forward resource replay enforces the expected-demand capacity condition.
-Cost magnitudes are checked against BALDES's route-pool sentinel; unusually
-large units must be rescaled.
-
-Column generation starts with scalar NG-route prepricing when the customer
-count exceeds `ColumnGenerationOptions::ng_size` (default 8; zero disables it).
-For configured sizes above four, it first tries a four-customer neighborhood.
-If that stage neither finds a new improving route nor proves convergence, it
-tries the configured size, then falls back to stochastic Bellman pricing.
-Completed lower bounds are retained across stages; interrupted stages cannot
-certify convergence by themselves.
-`Problem::price_ng` builds nearest-customer memories in the ordinary BALDES
-engine. Its first sweep retains 16 labels per bucket to find columns quickly;
-these heuristic sweeps supply **no lower bound**. A complete scalar sweep can
-supply a bound. The master allocates at most 100,000 labels and two seconds per
-NG neighborhood, subject to the remaining pricing and solve time budgets.
-During the expected-cost phase, every eighth master iteration also starts each
-NG neighborhood with a complete scalar sweep, bypassing the bounded heuristic
-sweeps. This gives bound-producing pricing a chance even when earlier
-iterations keep finding improving columns. The same label and time limits
-apply; an interrupted sweep cannot certify convergence.
-
-The scalar objective charges travel plus each visited customer's minimum
-nonpositive preventive detour. Bellman recourse is bounded below by the sum of
-these customer charges, including on nonmetric matrices. Hence the minimum of
-a completely priced NG relaxation is a global lower bound on true elementary
-stochastic reduced costs. It proves convergence only if it excludes improving
-columns within tolerance. It does not generally equal true stochastic pricing.
-
-Cyclic walks never enter the master or an incumbent. Candidate elementary routes
-are evaluated with the full P1/P3 Bellman program, including all branch duals.
-When cycles obscure useful candidates, decremental state-space refinement adds
-the repeated customer to memories along its cycle and reprices; every elementary
-route remains in the relaxation. Label/time exhaustion retains earlier valid
-bounds but cannot turn an observed minimum into a bound. Primal pool/complement
-search runs during column generation, and feasible integer restricted-master
-snapshots can become incumbents even before pricing converges.
-
-Use `stochastic_instance ... --ng-size 8` for this pipeline and `--ng-size 0`
-for the Bellman-only adapter. `Problem::price` itself retains its original exact
-stochastic pricing contract. The benchmark runner also accepts `--ng-size`.
-
-`Master<M: LpMaster>` builds exact customer-cover rows and an upper fleet row.
-Phase I uses artificial variables and zero physical/recourse costs; phase II
-restores total expected costs. Every seed/generated route is independently
-re-evaluated. Complete pricing is required before reporting LP convergence or
-phase-I infeasibility. Restricted-pool objectives are never reported as global
-bounds.
-
-`Problem::solve_with` accepts a factory for fresh LP backends. Its arc
-branch-and-price driver branches on fractional directed arc flows: zero removes
-the arc from subsequent pricing; one adds a required-arc equality row whose
-dual enters pricing. Each child performs two-phase column generation. Solving
-only an integer restricted route pool is not used to establish optimality.
-`Problem::solve` is the Clp convenience wrapper, available with `features=clp`:
+The routing pipeline includes heuristic pricing phases, exact bidirectional
+pricing, dynamic NG refinement, bucket pruning and reduced-cost fixing.
+Rank-one cuts (eight per round), rounded capacity cuts on mean demands, and
+load-indexed completion bounds are enabled by default. Dynamic NG mode `-1`
+pauses memory strengthening while rank-one rows are active; existing NG memories
+remain in use. Set `BALDESdynamicNGmode = 1` to continue strengthening, or `0`
+to disable it. Explicit pricing options override the default NG limits of 15
+customers per vertex and on average. `BALDESloadCompletionResource = -1`
+disables load completion bounds. Route enumeration is disabled for recourse.
 
 ```rust,ignore
-use baldes::extensions::stochastic::{Policy, SolveOptions};
-let answer = problem.solve(Policy::OptimalRestocking, 3, SolveOptions::default())?;
+use baldes::extensions::stochastic::{HgsWarmStart, Policy, SolveOptions};
+use std::time::Duration;
+let mut options = SolveOptions::default();
+options.tree.time_limit = Duration::from_secs(30);
+options.hgs_warm_start = Some(HgsWarmStart {
+    time_limit: Duration::from_secs(3), seed: 0,
+});
+let answer = problem.solve(Policy::OptimalRestocking, 3, options)?;
+println!("{:?}: {}", answer.tree.status, answer.tree.incumbent);
 ```
 
-An optional HGS warm start searches a deterministic CVRP with the same cost
-matrix and mean customer demands. HGS uses integer loads, so means are scaled
-and rounded down for the heuristic. Every candidate route is independently
-checked for elementarity and the original expected-capacity constraint, then
-evaluated with the selected stochastic recourse policy before entering the
-column pool. A complete HGS plan becomes an incumbent only if it covers each
-customer once, respects the fleet limit, and all its routes pass validation.
-HGS candidates do not establish bounds or optimality. Its time budget is part
-of the overall solve time; initialization can overrun the requested limit.
+`SolveOptions` contains `tree: TreeOptions`, `ng_size` (default 8), and
+`hgs_warm_start`. `SolveResult::tree` is the conventional routing `TreeOutput`;
+`hgs_warm_start` reports the optional heuristic's validation counts, elapsed time,
+and the accepted plan's stochastic `initial_objective`. For callers configuring
+all seeds themselves, `solve_theta_cuts(policy, vehicles, ng, tree)` runs the same
+routing implementation directly.
 
-Set `SolveOptions::hgs_warm_start` to `Some(HgsWarmStart { time_limit, seed })`.
-The result's `hgs_warm_start` summary reports accepted and rejected candidate
-counts and whether the HGS plan passed validation. For generated instances:
+HGS searches a deterministic CVRP with the same cost matrix and mean demands.
+Its integer loads are scaled and rounded down, then every candidate route is
+independently checked for elementarity and original expected-capacity feasibility.
+A complete plan must cover each customer exactly once within the fleet limit.
+Its incumbent cost is recomputed with the selected stochastic policy, including
+expected recourse; HGS's travel score is never used as the stochastic objective.
+Both directions of every route in a valid HGS plan are evaluated; an improving
+reverse order replaces the original in the seed, and both remain candidate
+columns. This also matters with symmetric travel costs because recourse depends
+on visit order. The summary reports `proposal_objective` before this check and
+`reversed_routes`, alongside the actual seeded `initial_objective`.
+Accepted routes seed the root column pool. A validated complete plan also enters
+`TreeOptions::initial_solution`, so it is immediately available without a pool
+MIP search and survives exhausted time or node budgets.
+
+HGS is optional and runs only when requested. HGS, validation and seed construction
+consume the overall `tree.time_limit`; the routing tree receives the remaining
+budget. A zero overall budget skips HGS. Heuristic initialization and cleanup can
+slightly overrun wall-clock limits. HGS candidates never certify a lower bound.
+No previous run's solution is automatically loaded.
 
 ```sh
-cargo run --release --features clp,ng-memory-63 --example stochastic_instance -- \
-  instances/stochastic/generated_salavati_style/synthetic-n20-m2-r01-fr0.90.json \
+cargo run --release --features clp --example stochastic_instance -- \
+  instances/stochastic/generated_salavati_style/synthetic-n40-m3-r01-fr0.94.json \
   --solve --seconds 30 --hgs-seconds 3 --hgs-seed 0 --json
 ```
 
-Run the complete example:
+`--solve` always uses Theta recourse cuts; `--recourse-cuts` remains a compatibility
+alias. `--dynamic-ng-mode -1|0|1`, `--rank-one-cut-limit`, `--log-cg`, and
+`--no-load-completion-bound` configure the routing path. Flags for the removed
+stochastic pricing implementation are rejected.
 
-```sh
-cargo run -p baldes --features clp --example stochastic
-```
+The result retains the best incumbent and numerical bound on interruption.
+`TreeStatus::Optimal` describes termination at the configured floating-point
+tolerances, not an outward-rounded arithmetic certificate. The routing tree
+requires nonnegative adjusted arc costs; some rounded nonmetric inputs can fail
+that check and require a different cost representation.
 
-`SolveStatus::Optimal` means the branch-and-price tree is exhausted under the
-configured floating-point tolerances. It is not an outward-rounded arithmetic
-certificate. Node, iteration, pricing-work, and time limits retain an incomplete
-status. Completed routes and labeling statistics survive pricing interruptions;
-partial routes can improve the restricted master but never establish convergence.
-Best-fit starts with several nearest-neighbor/shuffled orders, travel 2-opt,
-and a bounded exact-cover/complement search over known columns provide feasible incumbents without waiting for complete pricing.
-Heuristic packing failure does not prove infeasibility.
+## Subset-conditioned RCSP completion bounds
 
-Stopped solves return the best incumbent found and a numerical lower bound.
-The initial degree relaxation accounts for negative recourse on nonmetric
-matrices. A hop-bounded shortest-walk relaxation supplies a global reduced-cost
-lower bound even after incomplete pricing; shifting the fleet dual by its
-negative part gives a valid full-master bound. Open nodes retain the best such
-bound or their inherited bound. `PricingResult::minimum_reduced_cost` is absent
-after incomplete pricing; `lower_bound` is the separate relaxation bound.
-Generic directed
-plugin certification returns unknown for cost-bearing plugins, preventing a
-feasibility-only proof from silently assigning zero recourse cost.
+Exact conventional pricing conditions load-indexed completion tables on a small
+selected NG-memory subset. The stochastic default requests four elements;
+`BALDESloadCompletionSubsetSize` (or `--completion-subset-size`) selects 0–6.
+Zero retains the unconditional bound. `--no-load-completion-bound` disables both.
+Elements are ranked by negative incoming reduced cost per unit of load.
+
+The table state is `(vertex, remaining load, selected memory subset)`, in each
+labeling direction. Each arc follows the corresponding projection of the actual
+NG transition, including vertex elements, arc elements, arc memory and forgetting.
+A selected customer is unavailable while remembered and can be revisited after
+it is forgotten. This adapts the selected-set idea of Florio et al. §4.5.2 to NG
+pricing; it does not impose permanent elementarity on an NG label.
+
+Every feasible NG continuation projects into this state graph. Other resources
+and branch memories are relaxed, loads are rounded down, available capacity is
+rounded up, and future nonnegative packing-cut increments are omitted. Thus the
+table is a lower bound on the current pricing objective, including arc-based
+Theta, capacity and branch prices. The pruning test also retains packing
+penalties already paid by the label. Unsupported cost-bearing resources/cuts
+continue to disable these bounds.
+
+Tables are rebuilt at the current reduced costs and NG neighborhoods for each
+exact pricing call. The optional subset construction has a 100 ms setup budget,
+at most 32 MiB of table cells across both directions, and at most one million
+projected transitions. The selected set shrinks to fit the memory limit; an
+incomplete construction falls back to the unconditional bound. An NG-conditioned
+table can also be finite when a zero-load negative cycle makes the unconditional
+walk relaxation unbounded. If neither bound completes, ordinary pricing proceeds.
+`BALDES_DEBUG_COMPLETION=1` reports the actual selected subset size per call.
+
+These are pricing accelerators, not additional master inequalities. They do not
+by themselves strengthen a fully priced LP relaxation. Benchmark comparisons
+must include setup time as well as labeling work and the retained global bound.
 
 ## Exact tiny-instance baseline
 
@@ -179,19 +155,14 @@ respect to the supplied distributions and ordinary floating-point comparisons.
 
 ## Remaining boundaries
 
-The paper's arc-based MIP, rule-based and penalty recourse policies, Python
-bindings, stronger stochastic dominance, specialized fast joins, and stochastic
-cut separation are not implemented. The branch-and-price driver currently adds
-arc branch rows and uses no additional cutting planes.
-
-Verification:
+Rule-based and penalty recourse policies, stochastic Python bindings, and
+reproduction of the paper's reported run times are outside this implementation.
 
 ```sh
 cargo test -p baldes --features clp --test stochastic --test stochastic_pricing
 ```
 
-Tests cover hand-calculated costs, comparison against a separate scenario tree,
-BALDES pricing against exhaustive route orders in both directions, phase-I cost
-suppression, forbidden/required arc handling, full-route LP comparisons, integer
-optima against the tiny oracle, a fractional root requiring branching, and
-incomplete-work statuses.
+Tests cover hand-calculated and scenario-tree route costs, exact tiny-instance
+solutions, the routing tree against the tiny oracle with both policies and cut
+families, bucket fixing, HGS route validation, seeded incumbents without pool
+search, stochastic objective reconstruction, and shared time budgets.

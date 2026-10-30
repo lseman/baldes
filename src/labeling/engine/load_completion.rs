@@ -2,6 +2,9 @@
 use super::*;
 use crate::core::rounding::{add_down, add_up, multiply_down};
 
+mod subset;
+use subset::SubsetCompletion;
+
 const LOAD_LEVELS: usize = 256;
 
 #[derive(Clone, Debug)]
@@ -12,6 +15,7 @@ pub(super) struct LoadCompletion {
     width: usize,
     prefix: Vec<f64>,
     suffix: Vec<f64>,
+    subset: Option<SubsetCompletion>,
 }
 
 impl LoadCompletion {
@@ -63,11 +67,17 @@ impl LoadCompletion {
             })
             .collect::<Option<_>>()?;
         let width = g.vertices.len();
-        let suffix = Self::table(width, g.sink, &edges, false, started, limit)?;
+        let suffix = Self::table(width, &[g.sink], &edges, false, started, limit);
         let prefix = if bidirectional {
-            Self::table(width, g.source, &edges, true, started, limit)?
+            Self::table(width, &[g.source], &edges, true, started, limit)
         } else {
-            vec![]
+            Some(vec![])
+        };
+        // A zero-load cycle may make the unconditional walk bound unbounded
+        // while the selected NG automaton still has finite completion costs.
+        let (suffix, prefix) = match (suffix, prefix) {
+            (Some(suffix), Some(prefix)) => (suffix, prefix),
+            _ => (vec![], vec![]),
         };
         Some(Self {
             resource,
@@ -76,18 +86,20 @@ impl LoadCompletion {
             width,
             prefix,
             suffix,
+            subset: None,
         })
     }
 
     fn table(
         width: usize,
-        terminal: usize,
+        terminals: &[usize],
         edges: &[(usize, usize, usize, f64)],
         reverse: bool,
         started: Instant,
         limit: std::time::Duration,
     ) -> Option<Vec<f64>> {
         // One extra capacity cell encloses upward-rounded query budgets.
+        let zero_edges: Vec<_> = edges.iter().filter(|edge| edge.2 == 0).collect();
         let mut values = vec![f64::INFINITY; (LOAD_LEVELS + 2) * width];
         for k in 0..LOAD_LEVELS + 2 {
             if started.elapsed() >= limit {
@@ -98,7 +110,9 @@ impl LoadCompletion {
             if k > 0 {
                 layer.copy_from_slice(&previous[(k - 1) * width..]);
             }
-            layer[terminal] = layer[terminal].min(0.);
+            for &terminal in terminals {
+                layer[terminal] = layer[terminal].min(0.);
+            }
             for &(a, b, units, cost) in edges {
                 if units == 0 || units > k {
                     continue;
@@ -113,11 +127,11 @@ impl LoadCompletion {
             // A reachable negative cycle makes this walk relaxation unbounded;
             // declining the table leaves ordinary pricing intact.
             for pass in 0..width {
+                if pass % 8 == 0 && started.elapsed() >= limit {
+                    return None;
+                }
                 let mut changed = false;
-                for &(a, b, units, cost) in edges {
-                    if units != 0 {
-                        continue;
-                    }
+                for &&(a, b, _, cost) in &zero_edges {
                     let (from, to) = if reverse { (b, a) } else { (a, b) };
                     if layer[to].is_finite() {
                         let candidate = add_down(cost, layer[to])?;
@@ -138,6 +152,10 @@ impl LoadCompletion {
         Some(values)
     }
 
+    pub(super) fn subset_size(&self) -> usize {
+        self.subset.as_ref().map_or(0, SubsetCompletion::size)
+    }
+
     pub(super) fn rejects<const D: usize>(
         &self,
         label: &StoredLabel<D>,
@@ -145,8 +163,8 @@ impl LoadCompletion {
         threshold: f64,
     ) -> bool {
         let q = label.resources[self.resource];
-        // Relax every intermediate window and all NG/branch memories. Never
-        // exclude a previously visited customer from this walk relaxation.
+        // Relax intermediate windows and branch memories. A selected NG
+        // projection may restrict continuations, but must preserve forgetting.
         let room = if forward {
             add_up(self.capacity, -q)
         } else {
@@ -166,7 +184,13 @@ impl LoadCompletion {
             return false;
         }
         let table = if forward { &self.suffix } else { &self.prefix };
-        let rest = table[level * self.width + label.vertex];
+        let mut rest = table
+            .get(level * self.width + label.vertex)
+            .copied()
+            .unwrap_or(f64::NEG_INFINITY);
+        if let Some(subset) = &self.subset {
+            rest = rest.max(subset.bound(label, forward, level));
+        }
         if rest == f64::INFINITY {
             return true;
         }
@@ -214,6 +238,29 @@ impl<const D: usize> LabelingEngine<D> {
         }
         // Packing rank-one increments are nonnegative. Keep the penalties
         // already paid by the label and relax all future increments to zero.
-        LoadCompletion::prepare(g, resource, self.runtime_bidirectional(), started, limit)
+        let bidirectional = self.runtime_bidirectional();
+        let mut bound = LoadCompletion::prepare(g, resource, bidirectional, started, limit)?;
+        // Optional conditioning must not consume the whole pricing budget.
+        // Keep the unconditional tables if memory, arithmetic or time prevents
+        // completing either directional subset table.
+        let subset_limit = limit.min(
+            started
+                .elapsed()
+                .saturating_add(std::time::Duration::from_millis(100)),
+        );
+        bound.subset = SubsetCompletion::prepare(
+            g,
+            &self.ng,
+            resource,
+            bidirectional,
+            self.controls.load_completion_subset_size,
+            started,
+            subset_limit,
+        );
+        if bound.suffix.is_empty() && bound.subset.is_none() {
+            None
+        } else {
+            Some(bound)
+        }
     }
 }
