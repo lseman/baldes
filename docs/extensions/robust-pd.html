@@ -132,8 +132,13 @@ tail exchanges at most 128 cut pairs, and ejection scans at most eight shuffled
 requests against each other. These are bounded neighbourhood scans rather than
 claims of exhaustive local optimality. Ejection requires a feasible source
 removal; pair exchange directly checks final routes without this restriction.</p>
+<p>Two further ruin strategies remove related requests, ranked by pickup and
+delivery travel proximity and time-window differences, or expensive requests,
+ranked by their marginal route travel saving. Both mix with uniform ruin;
+when several directed removal strategies are enabled, one is chosen uniformly
+for each directed ruin. Removal and repair still verify robust feasibility.</p>
 <p>The example accepts <code>--heuristic extended</code> or one of <code>regret</code>, <code>critical</code>,
-<code>exchange</code>, <code>tails</code>, and <code>ejection</code> to enable one extension at a time. The
+<code>related</code>, <code>expensive</code>, <code>exchange</code>, <code>tails</code>, and <code>ejection</code> to enable one extension at a time. The
 existing <code>--heuristic ils</code> remains the baseline. For example:</p>
 <div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp,multi-time-windows<span class="w"> </span>--example<span class="w"> </span>robust_pdptw<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>instances/RobustPDPTW/AA40.txt<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="m">0</span>.3<span class="w"> </span><span class="m">0</span>.3<span class="w"> </span><span class="m">10</span><span class="w"> </span>hundredth<span class="w"> </span>--heuristic<span class="w"> </span>extended<span class="w"> </span>--seed<span class="w"> </span><span class="m">1</span>
