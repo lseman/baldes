@@ -93,7 +93,7 @@ baldes<span class="w"> </span>solve<span class="w"> </span>examples/networks/tri
 </tr>
 <tr>
 <td><code>--clp-scaling MODE</code></td>
-<td>equilibrium (default), auto, geometric, or off</td>
+<td>off (default), equilibrium, auto, geometric, or ruiz</td>
 </tr>
 <tr>
 <td><code>--capacity</code> / <code>--capacity-cuts</code></td>
@@ -249,7 +249,7 @@ disabled families have no column.</p>
 <a href="../benchmarks/root.html">Root benchmarks</a>.</p>
 <p>For named pricing controls, see the <a href="../reference/options.html">BALDES option reference</a>.
 Public option names start with <code>BALDES</code>, for example
-<code>--option BALDESlabelDominanceStrategy=1</code>. Rust exposes supported metadata in
+<code>--option BALDESnumberOfBucketsPerVertex=20</code>. Rust exposes supported metadata in
 <code>OPTION_TABLE</code>; Python exposes <code>Solver.option_names()</code> and
 <code>Solver.option_support(name)</code>. The public list contains 41 supported controls,
 plus two enumerated-MIP controls when both <code>clp</code> and <code>highs</code> are enabled.

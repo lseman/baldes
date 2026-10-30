@@ -72,7 +72,7 @@ see the <a href="../solver/models.html#original-pricing-variable-compilation-rus
 </code></pre></div>
 <p><code>NetworkRoute.coupled_values</code> is an immutable tuple of paired descriptor/value
 pairs retained with the scalar <code>resource_profile</code>. Values describe the current
-selected physical dependent state, independently of objective normalization;
+selected physical dependent state, independently of the objective coefficient;
 they are not full control trajectories or standalone feasibility certificates.</p>
 <p>The only covering route costs 3, contributes one unit to shared row 0, consumes
 one load unit, and uses one copy of network 19's allowed route multiplicity.
@@ -101,7 +101,7 @@ Both require Clp.</p>
 </tr>
 <tr>
 <td><code>PricingNetwork</code></td>
-<td><code>id</code>, <code>vertices</code>, <code>multiplicity</code>, <code>arcs</code>, <code>resources=()</code>, <code>source=0</code>, <code>sink=None</code>, <code>route_entries=()</code>, <code>activity_entries=()</code>, <code>ng=None</code>, <code>coupled_resources=()</code>, <code>coupled_objective_coefficients=()</code>, <code>paired_waiting_base_resources=()</code>, <code>paired_machine_inputs=()</code>, <code>paired_machine_roots=()</code>, <code>paired_machine_terminal_bounds=()</code>, <code>elementary=False</code>, <code>route_domain=None</code>, <code>front_program_domain=False</code></td>
+<td><code>id</code>, <code>vertices</code>, <code>multiplicity</code>, <code>arcs</code>, <code>resources=()</code>, <code>source=0</code>, <code>sink=None</code>, <code>route_entries=()</code>, <code>activity_entries=()</code>, <code>ng=None</code>, <code>coupled_resources=()</code>, <code>coupled_objective_coefficients=()</code>, <code>paired_waiting_base_resources=()</code>, <code>paired_machine_inputs=()</code>, <code>paired_machine_roots=()</code>, <code>paired_machine_terminal_bounds=()</code>, <code>paired_machine_waiting_rates=()</code>, <code>paired_front_programs=()</code>, <code>paired_owner_registration_bounds=()</code>, <code>elementary=False</code>, <code>route_domain=None</code>, <code>front_program_domain=False</code></td>
 </tr>
 <tr>
 <td><code>NetworkProblem</code></td>
@@ -121,47 +121,27 @@ bounds the sum of route variables in that network. Shared coverage rows and
 fleet multiplicity are different constraints. <code>sink=None</code> selects the last
 vertex. <code>ng</code> supplies per-vertex neighborhoods; <code>elementary=True</code> selects an
 elementary network domain. <code>coupled_resources</code> accepts tagged descriptors.</p>
-<p><code>paired_waiting_base_resources=((coupled_index, scalar_index), ...)</code> opts a
-<code>slope_paired</code> resource into waiting windows derived from the corresponding
-scalar resource. Each physical arc's window intersects its head vertex bounds
-with the arc bounds; absent arc bounds use -1e12 and 1e12. Indices refer to
-<code>coupled_resources</code> and <code>resources</code>, respectively. Duplicate coupled indices,
-invalid indices, empty intersections, and scalar resources with multi-time
-windows are rejected. The equivalent CLI JSON field uses arrays of pairs,
-for example <code>&quot;paired_waiting_base_resources&quot;: [[0, 1]]</code>. An omitted or empty
-field leaves the paired resource's existing waiting behavior unchanged.</p>
-<p><code>paired_machine_inputs=((coupled_index, arc_inputs), ...)</code> attaches exact
-prepared machine operands to a <code>slope_paired</code> resource using <code>front_algebra</code>.
-<code>arc_inputs</code> contains one mapping per physical arc in insertion order. Each
-mapping supplies finite <code>tail_limit</code>, <code>head_limit</code>, <code>waiting_lower</code>,
-<code>waiting_upper</code>, integer <code>waiting_rate</code>, and <code>forward_mapping</code>, <code>inverse</code>,
-<code>sum_vector</code>, <code>dependent_lower</code>, and <code>dependent_upper</code> functions. Encode each
-function as <code>{&quot;pairs&quot;: [[value, coordinate], [slope, end], ...]}</code>. The
-machine decoder also accepts a zero-width two-pair vector and a three-pair
-vector with a zero-width first segment. The waiting limits must be ordered. Resource
-indices must be unique and each arc vector must match the graph's arc count.
-An arc may also include a <code>backward</code> mapping with <code>tail_lower</code>, <code>tail_upper</code>,
-<code>forward_at_tail_lower</code>, <code>mapped_upper</code>, and <code>dependent</code> (a prepared function
-in the same <code>pairs</code> format). These are the separate operands needed by the
-backward recurrence, which remains incomplete.
-These inputs invalidate prepared pricing state when changed. When
-<code>front_program_domain</code> is enabled, the incomplete machine path uses them and
-also requires <code>paired_machine_roots=((coupled_index, {&quot;pairs&quot;: [...]}), ...)</code>
-with the separately prepared dependent root vector. The equivalent JSON field is
-an array of <code>[coupled_index, arc_inputs]</code> pairs. An omitted field defaults to
-empty. To initialize backward machine labels, supply
-<code>paired_machine_terminal_bounds=((coupled_index, (lower, upper)), ...)</code> with
-the prepared terminal base window. The associated arc operands must already
-be supplied in <code>paired_machine_inputs</code>.</p>
+<p><code>paired_front_programs</code> supplies a sequence of complete program dictionaries,
+with one <code>resource</code> index per entry. Declare the corresponding coupled resource
+as <code>{&quot;kind&quot;: &quot;paired_front&quot;, &quot;mode&quot;: &quot;cost_unbounded&quot;}</code> (or <code>feasibility</code> /
+<code>cost_bounded</code>). Each program supplies source/terminal windows, a root and one
+arc mapping per physical arc. See <a href="../extensions/coupled-resources.html#paired-front-programs-and-waiting">paired front programs</a>
+for the complete schema. Preparation selects the front-program domain.</p>
+<p><code>paired_waiting_base_resources=((coupled_index, scalar_index), ...)</code> derives
+head waiting windows from the intersection of scalar vertex and arc bounds.
+Invalid indices, duplicate coupled indices, empty intersections and disconnected
+scalar time windows are rejected.</p>
+<p>The lower-level <code>paired_machine_inputs</code>, <code>paired_machine_roots</code> and
+<code>paired_machine_terminal_bounds</code> fields accept separately prepared operands.
+Do not combine those fields with a complete program for the same resource.
+Changing preparation invalidates existing pricing state.</p>
 <p><code>coupled_objective_coefficients=((resource_index, coefficient), ...)</code> sets
-graph-level costs using each descriptor's declared normalization. With Clp,
-negative source paired costs support both absolute and final-minus-initial
-normalization. A relative objective subtracts the global initial-front minimum,
-independently of the witness's initial coordinate. Each resource has one cost
-owner: omit its graph coefficient when an original <code>pricing_variables</code> entry
-binds that resource. Duplicate indices, unsupported descriptors and nonfinite
-coefficients are rejected by the common graph setter. Omitted resources keep
-coefficient one. The field works for one network and arrays of networks.</p>
+finite paired owner objective coefficients of either sign; omitted resources
+use one. Raw front pricing keeps its unit charge and minimum-front selection.
+Original route costs apply the owner coefficient to the recorded selected
+dependent value without initial-minimum subtraction. Each resource has one
+objective owner: omit a graph coefficient when an original <code>pricing_variables</code>
+entry binds that resource.</p>
 <p>The Rust interface additionally supports independent master variables and
 imported-column domains. Those registrations are not fields in the CLI/Python
 network JSON schema. <code>pricing_variables</code> registers original pricing-variable
@@ -179,19 +159,24 @@ over the complete bounded graph relaxation. Direct network
 <code>activity_entries</code> use objects with <code>resource</code>, <code>row</code> and <code>coefficient</code> fields.
 See <a href="../solver/models.html#original-pricing-variable-compilation-rust">original variable compilation</a>
 for the shared contract.</p>
-<p><code>accumulated_resource</code> also accepts cost-bearing paired descriptors (raw slopes or control points) with
-<code>absolute_final_value</code> normalization and a finite <code>cost</code>. Negative costs require
-a source-domain model and use maximum-control pricing. The reported
-value comes from the selected column, independently of the cost coefficient.
-For this paired binding, <code>entries</code> supports signed shared-row coefficients in
-source-domain models. <code>integer=True</code> is accepted when a program or complete
-control-domain proof establishes integral terminal activity for every control.
-Continuous ranges with integral endpoints are rejected. Verified
-<code>original_variable_boxes</code> enclose all controls, including nonminimum choices;
-they are envelopes, not new model restrictions. Automatic pricing covers finite
-physical paths and independently bounds alternative source controls. Incomplete
-coverage remains explicit. Machine-front integer activities/negative objectives
-and rows remain unsupported.</p>
+<p><code>accumulated_resource</code> also accepts cost-bearing paired fronts with any finite
+<code>cost</code>. The reported value comes from the selected column, independently of the
+objective coefficient. Paired <code>entries</code> and network <code>activity_entries</code> use that
+selected value. Their dual terms do not change raw front pricing. When owner
+terms differ from raw pricing, completion alone cannot certify the owner
+objective; a solve may report <code>Stalled</code> with an unknown bound.</p>
+<p>Paired integer registration is retained as metadata. It does not constrain each
+path's selected activity to an integer or supply a projected integer branching
+rule. Feasibility-only paired fronts cannot bind an original variable.</p>
+<p><code>paired_owner_registration_bounds=((resource_index, (lower, upper)), ...)</code>
+supplies owner preprocessing bounds, with <code>None</code> for an unbounded endpoint.
+These inputs are separate from per-path resource windows and shared activity
+rows. A positive propagated lower bound can fail the pricing callback with an
+explicit unsupported-bound error. They do not truncate individual path values.</p>
+<p>Only one paired program can be installed, alone or with standard graph
+resources. Combinations with other coupled descriptors, including custom and
+cumulative resources, and a second paired program return explicit unsupported
+composition errors. These combinations are solver limitations.</p>
 <h2 id="model-json">Model JSON</h2>
 <div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">NetworkProblem</span>
@@ -406,11 +391,11 @@ and preserve their parent. Handles are bound to their creating Python thread.</p
 </code></pre></div>
 <p><code>NetworkRowCoefficients(network, arcs, per_route=0.0, activities=())</code> supplies
 one coefficient per physical arc and optional <code>(coupled_descriptor, coefficient)</code>
-activity terms. The constant is charged once per route. Deterministic activities
-and selected source paired values use the same <code>with_row</code> lifecycle, including
-<code>dynamic=True</code>. These terms apply to existing and future columns. An existing
-complete universe accepts a paired term only after an all-control invariance
-proof confirms that its retained coefficients remain valid.</p>
+activity terms. The constant is charged once per route. Supported deterministic
+custom/cumulative activities use the same <code>with_row</code> lifecycle, including
+<code>dynamic=True</code>, for existing and future columns. Paired front activities are
+rejected because their selected split-dependent values do not define this
+shared-row contract.</p>
 <p><code>parent.fractional_assignments(tolerance=1e-6)</code> returns <code>NetworkAssignment</code>
 objects with <code>shared_row</code>, <code>network</code>, and <code>value</code>. A candidate can be branched:</p>
 <div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="k">for</span> <span class="n">candidate</span> <span class="ow">in</span> <span class="n">parent</span><span class="o">.</span><span class="n">fractional_assignments</span><span class="p">():</span>
@@ -568,43 +553,9 @@ follow from the pricing graph; an unproved envelope raises an error. These
 bounds guide pricing admission without adding a route restriction. Original
 variable costs remain separate during this calculation even if they cancel on
 shared physical arcs. See the <a href="../solver/models.html#original-pricing-variable-compilation-rust">compilation contract</a>.</p>
-<p>Explicit source choices can be retained for an existing route with
-<code>node.with_route_controls(route_index, (PairedControl(resource, base), ...))</code>.
-<code>base</code> contains the initial coordinate and one head coordinate per arc. The
-result is a new node; duplicate identities are reused. Controls need independent
-singleton source certificates, and complete/cutoff universes and machine-front
-model domains reject this operation. <code>route.coupled_controls</code> is an immutable
-tuple of <code>PairedControl</code> objects. Values and costs survive resume, fixing and
-tree solving; original-variable reporting reads the supplied selected value.
-Models without paired rows retain ordinary minimum-front pricing. Paired rows
-use the same master coordinator with bounded source-control generation, including
-reversed reduced weights and row-boundary proposals. Complete enumeration retains invariant terminal values or a certified attained
-endpoint that weakly improves both the objective and every row. Negative costs
-favor maxima, positive costs minima, and zero costs either direction, subject
-to all row signs and inequality senses. Equality rows, opposing requirements,
-identity-specific column caps, and uncertain/unattained bounds remain guarded.
-A new Gamma row may reuse invariant matching values or the same certified
-endpoints when they still favor the objective and every old/new row. Repeated
-terms are checked together; restrictive retained-column caps and fixed-copy
-certificates remain part of the proof. Opposing/equality rows requiring other
-controls cannot widen the projected universe. Negative model costs use the same bounded source-control optimizer;
-machine-front negative models remain unsupported.</p>
-<p><code>node.optimize_route_control(route_index, resource, maximize=False, terminal=None, max_cells=4096, max_work=1_000_000, max_lp_iterations=10000, time_limit=1.0)</code> generates a source control on one
-registered path. <code>terminal=(lower, upper)</code> restricts its physical dependent
-value. It returns an immutable <code>ControlOptimization</code> with <code>control</code>, <code>dependent</code>,
-<code>work_used</code>, <code>lp_iterations</code>,
-<code>lower_bound</code>, <code>complete</code>, <code>maximize</code> and <code>cells</code>.</p>
-<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="n">choice</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">optimize_route_control</span><span class="p">(</span><span class="n">route_index</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">terminal</span><span class="o">=</span><span class="p">(</span><span class="mf">4.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">))</span>
-<span class="k">if</span> <span class="n">choice</span><span class="o">.</span><span class="n">control</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="n">node</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">with_route_controls</span><span class="p">(</span><span class="n">route_index</span><span class="p">,</span> <span class="p">(</span><span class="n">choice</span><span class="o">.</span><span class="n">control</span><span class="p">,))</span>
-</code></pre></div>
-<p>Every returned control has an independent source certificate. <code>complete=True</code>
-means all regions were bounded/rejected and a feasible control was found, or
-all regions were proved empty. It does not assert a zero primal/dual gap.
-<code>lower_bound</code> applies to Gamma, or -Gamma when maximizing. An incomplete result
-can retain a useful feasible control; it cannot assert infeasibility. This is a
-fixed-path descriptor search, not a whole-model pricing certificate. Its limits
-are shared across LP regions. Machine-front models reject the source search.</p>
+<p>Paired front routes retain their selected <code>coupled_values</code>. The selected value
+must match a successful split join of the retained program. Explicit source
+controls and route-control optimization are unsupported.</p>
 </article>
 <nav class="page-turn" aria-label="Adjacent guides"><a href="../solver/models.html"><small>Previous guide</small>Network models and shared masters <span aria-hidden="true">↗</span></a><a href="../solver/column-imports.html"><small>Next guide</small>Finite column imports <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
