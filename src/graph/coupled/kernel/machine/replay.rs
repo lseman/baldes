@@ -40,7 +40,8 @@ impl<const D: usize> Graph<D> {
     }
 
     /// Replay and bind a diagnostic history to the exact installed machine
-    /// inputs. This does not validate the supplied root or certify a route.
+    /// inputs. A rejected machine transition returns `Empty`. This does not
+    /// validate the supplied root or certify a route.
     pub fn replay_bound_paired_machine_path(
         &self,
         resource: usize,
@@ -108,11 +109,7 @@ impl<const D: usize> Graph<D> {
             },
         ) {
             FrontierOutcome::Complete(value) => value,
-            FrontierOutcome::Empty => {
-                return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                    "machine replay rejected",
-                ))
-            }
+            FrontierOutcome::Empty => return FrontierOutcome::Empty,
             FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
         };
         if budget
@@ -133,7 +130,7 @@ impl<const D: usize> Graph<D> {
             resource,
             path,
             inputs,
-            identity: kernel.identity.clone(),
+            identity: kernel.machine_identity.clone(),
         })
     }
 
@@ -156,14 +153,14 @@ impl<const D: usize> Graph<D> {
         let Some(kernel) = self.coupled.as_ref() else {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("no coupled resources"));
         };
-        if !std::sync::Arc::ptr_eq(&kernel.identity, &history.identity)
+        if !std::sync::Arc::ptr_eq(&kernel.machine_identity, &history.identity)
             || !matches!(
                 kernel.definitions.get(history.resource),
                 Some(CoupledResource::SlopePaired { .. })
             )
         {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                "paired machine kernel identity changed",
+                "paired machine program identity changed",
             ));
         }
         let Some(remaining_work) = budget.max_operations.checked_sub(history.resource) else {
@@ -337,12 +334,16 @@ impl<const D: usize> Graph<D> {
         if remaining_time.is_some_and(|limit| limit.is_zero()) {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
-        PreparedSlopeRelationArc::machine_reconstruct_backward_path(
+        let waiting_rates = prepared.machine_waiting_rates().map(|rates| {
+            path.iter().map(|&arc| rates[arc]).collect::<Vec<_>>()
+        });
+        PreparedSlopeRelationArc::machine_reconstruct_backward_path_with_rates(
             history,
             &steps,
             initial_base,
             initial_dependent,
             prepared.machine_mode(),
+            waiting_rates.as_deref(),
             FrontierBudget {
                 max_operations: remaining_work,
                 max_elapsed: remaining_time,

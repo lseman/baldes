@@ -35,6 +35,9 @@ impl<'a, const D: usize> Context<'a, D> {
         &self,
         label: &mut StoredLabel<D>,
     ) {
+        if let Some(state) = &mut label.coupled_state {
+            state.custom_machine_enter_vertex();
+        }
         label.ng |= self.ng.vertex_bits[label.vertex];
         if BRANCHING {
             let valid = self.branching.visit(&mut label.branch_state, label.vertex);
@@ -200,15 +203,25 @@ impl<'a, const D: usize> Context<'a, D> {
         } else {
             cost
         };
+        if !cost.is_finite() {
+            self.resource_error.store(true, Ordering::Relaxed);
+            return (false, f64::INFINITY);
+        }
         if self.cuts.presence.active() {
             let Ok(correction) = self
                 .cuts
                 .presence
                 .join_cost(f.presence_state(), b.presence_state())
             else {
+                self.resource_error.store(true, Ordering::Relaxed);
                 return (false, f64::INFINITY);
             };
-            return (true, cost + correction);
+            let joined = cost + correction;
+            if !joined.is_finite() {
+                self.resource_error.store(true, Ordering::Relaxed);
+                return (false, f64::INFINITY);
+            }
+            return (true, joined);
         }
         (true, cost)
     }
@@ -395,6 +408,10 @@ impl<'a, const D: usize> Context<'a, D> {
         {
             return None;
         }
+        let vertex = if forward { physical.head } else { physical.tail };
+        if BRANCHING && !self.branching.can_visit(from.branch_state(), vertex) {
+            return None;
+        }
         let mut q = crate::graph::ResourceValues::<D>::from_slice(from.resources());
         if self.phase.jump_arcs {
             if let Some(jump) = arc.jump {
@@ -434,14 +451,6 @@ impl<'a, const D: usize> Context<'a, D> {
         } else {
             (None, 0.)
         };
-        let vertex = if forward {
-            physical.head
-        } else {
-            physical.tail
-        };
-        if BRANCHING && !self.branching.can_visit(from.branch_state(), vertex) {
-            return None;
-        }
         let transition = if forward {
             &self.ng.forward[arc.physical]
         } else {

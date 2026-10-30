@@ -17,7 +17,13 @@ impl<const D: usize> Solver<D> {
         if !enforce_time_limit {
             controls.time_limit = Duration::MAX;
         }
-        engine.prepare_full_labels(&self.graph, &controls)
+        let result = engine.prepare_full_labels(&self.graph, &controls);
+        if result.is_err() {
+            // A failed completion can leave partially populated labels,
+            // buckets and an error flag in the working engine.
+            self.restore_arcs();
+        }
+        result
     }
     pub fn restore_arcs(&mut self) {
         self.raw_pricing = None;

@@ -159,6 +159,9 @@ impl PreparedSlopeRelationArc {
         };
         match compute() {
             Ok(value) => FrontierOutcome::Complete(value),
+            Err(FrontierUnknown::Unsupported("machine minimum stream domain")) => {
+                FrontierOutcome::Empty
+            }
             Err(reason) => FrontierOutcome::Unknown(reason),
         }
     }
@@ -181,8 +184,8 @@ impl PreparedSlopeRelationArc {
             || a.len() > 12
             || fixed.has_internal_zero_length()
             || vector.has_internal_zero_length()
-            || fixed.is_machine_zero_length()
-            || vector.is_machine_zero_length()
+            || fixed.has_machine_only_geometry()
+            || vector.has_machine_only_geometry()
             || !a.iter().zip(b).all(|(x, y)| x.1.to_bits() == y.1.to_bits())
         {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
@@ -309,6 +312,12 @@ impl PreparedSlopeRelationArc {
         ) {
             FrontierOutcome::Complete(front) => FrontierOutcome::Complete((front, upper)),
             FrontierOutcome::Empty => FrontierOutcome::Empty,
+            // The lower-filter helper returns status 2 when the feasible
+            // front re-enters after leaving. The backward caller rejects the
+            // extension on that status; status 1 remains diagnostic.
+            FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "machine lower stream reentry status",
+            )) => FrontierOutcome::Empty,
             FrontierOutcome::Unknown(reason) => FrontierOutcome::Unknown(reason),
         }
     }
@@ -339,9 +348,9 @@ impl PreparedSlopeRelationArc {
             || f.len() > 12
             || v.len() < 2
             || fixed.has_internal_zero_length()
-            || fixed.is_machine_zero_length()
+            || fixed.has_machine_only_geometry()
             || vector.has_internal_zero_length()
-            || vector.is_machine_zero_length()
+            || vector.has_machine_only_geometry()
             || (!constant && !aligned)
             || f[0].1 < v[0].1
             || f.last().unwrap().1 > v.last().unwrap().1
@@ -752,8 +761,8 @@ impl PreparedSlopeRelationArc {
         }
         let f = forward.pairs();
         let b = backward.pairs();
-        if forward.is_machine_zero_length()
-            || backward.is_machine_zero_length()
+        if forward.has_machine_only_geometry()
+            || backward.has_machine_only_geometry()
             || f.len() != 2
             || b.len() != 2
             || f[1].1.to_bits() != b[1].1.to_bits()
@@ -838,8 +847,8 @@ impl PreparedSlopeRelationArc {
         if budget.max_operations < 12 {
             return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
         }
-        if fixed.is_machine_zero_length()
-            || vector.is_machine_zero_length()
+        if fixed.has_machine_only_geometry()
+            || vector.has_machine_only_geometry()
             || fixed.pairs().len() != 2
             || vector.pairs().len() != 2
         {
@@ -996,6 +1005,19 @@ impl PreparedSlopeRelationArc {
         mode: i32,
         budget: FrontierBudget,
     ) -> FrontierOutcome<f64> {
+        Self::machine_backward_waiting_with_debug(next, input, initial, target, mode, 0, budget)
+    }
+
+    /// Run the waiting scan with the resource's diagnostic level.
+    pub fn machine_backward_waiting_with_debug(
+        next: &PreparedSlopeFunction,
+        input: &MachineBackwardInputs<'_>,
+        initial: f64,
+        target: f64,
+        _mode: i32,
+        debug_level: i32,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<f64> {
         let started = Instant::now();
         let count = next.pairs().len();
         if budget.max_components == 0 {
@@ -1030,7 +1052,7 @@ impl PreparedSlopeRelationArc {
             };
             deadline()?;
             let pairs = next.pairs();
-            if mode > 1
+            if debug_level > 1
                 && initial > pairs.last().unwrap().1
                 && !near(initial, pairs.last().unwrap().1)?
             {

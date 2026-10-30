@@ -9,18 +9,35 @@ impl<const D: usize> LabelingEngine<D> {
         g: &Graph<D>,
         threshold: f64,
     ) -> Result<crate::pricing::fixing::FixingReport> {
+        let has_full_cuts = self.cuts.full.as_ref().is_some_and(|full| !full.fields.is_empty());
+        self.fix_bucket_arcs_with_full_cut_state(g, threshold, has_full_cuts)
+    }
+
+    pub(crate) fn fix_bucket_arcs_with_full_cut_state(
+        &mut self,
+        g: &Graph<D>,
+        threshold: f64,
+        has_full_cuts: bool,
+    ) -> Result<crate::pricing::fixing::FixingReport> {
         use crate::pricing::fixing::{contains, update, FixingReport, PairingCache};
         if !self.full_ready {
             return Err(invalid("fixing requires complete exact labeling"));
         }
+        if !self.labels_match_graph(g) {
+            return Err(invalid("fixing requires labels at current reduced costs and resource configuration"));
+        }
         if !threshold.is_finite() {
             return Err(invalid("finite fixing threshold required"));
         }
-        if g.coupled_kernel()
-            .is_some_and(|kernel| kernel.has_slope_fronts())
-        {
-            return Ok(FixingReport::default());
-        }
+        // Packed pricing cuts can forget information retained by full-memory
+        // enumeration. Do not use those labels to discard paired-resource
+        // arcs without a certificate relating their objectives.
+        let paired = g.coupled_kernel().is_some_and(|kernel| kernel.has_slope_fronts());
+        let scalar_only = paired && (self.has_cuts() || has_full_cuts);
+        // A paired front and a knapsack term have independent lower-bound
+        // representations. Scan actual joins instead of combining those
+        // bounds as if their minimizing resource controls were identical.
+        let scan_all_knapsack = paired && self.cuts.knapsack.active;
         // Both roles must be disproved before fixing a dual-orientation arc.
         if self.consumption_joins
             && g.coupled_kernel()
@@ -57,7 +74,7 @@ impl<const D: usize> LabelingEngine<D> {
                         } else {
                             physical.tail
                         }];
-                        if self.consumption_joins && physical.head == g.sink {
+                        if !scalar_only && self.consumption_joins && physical.head == g.sink {
                             // The physical terminal has no suffix. Dominated
                             // prefixes still inherit useful terminal arcs from
                             // predecessor buckets, even without active labels.
@@ -103,6 +120,9 @@ impl<const D: usize> LabelingEngine<D> {
                             removed.insert(arc.id);
                             continue;
                         };
+                        if scalar_only {
+                            continue;
+                        }
                         let mut extended = vec![];
                         let mut minimum = NO_ROUTE_COST;
                         for &id in
@@ -113,13 +133,17 @@ impl<const D: usize> LabelingEngine<D> {
                             {
                                 let key = l.key()
                                     + self.cuts.knapsack.partial_cost(g, &l.resources, forward);
-                                minimum = minimum.min(self.ctx().resource_completion_key(
-                                    g,
-                                    forward,
-                                    l.coupled_state.as_deref(),
-                                    &l.presence_state,
-                                    key,
-                                ));
+                                minimum = if scan_all_knapsack {
+                                    f64::NEG_INFINITY
+                                } else {
+                                    minimum.min(self.ctx().resource_completion_key(
+                                        g,
+                                        forward,
+                                        l.coupled_state.as_deref(),
+                                        &l.presence_state,
+                                        key,
+                                    ))
+                                };
                                 extended.push(l);
                             }
                         }
@@ -157,19 +181,30 @@ impl<const D: usize> LabelingEngine<D> {
                                                 &l.resources,
                                                 forward,
                                             );
-                                        let Some(key) = self.ctx().bucket_completion(
-                                            g,
-                                            forward,
-                                            l.into(),
-                                            key,
-                                            BucketId {
-                                                vertex: storage_vertex,
-                                                bucket,
-                                            },
-                                            opposite.hot.key.first().copied(),
-                                            threshold,
-                                        ) else {
-                                            continue 'pairs;
+                                        let key = if scan_all_knapsack {
+                                            if !self.ctx().bucket_completion_feasible(
+                                                g, forward, l.coupled_state.as_deref(),
+                                                storage_vertex, bucket,
+                                            ) {
+                                                continue 'pairs;
+                                            }
+                                            f64::NEG_INFINITY
+                                        } else {
+                                            let Some(key) = self.ctx().bucket_completion(
+                                                g,
+                                                forward,
+                                                l.into(),
+                                                key,
+                                                BucketId {
+                                                    vertex: storage_vertex,
+                                                    bucket,
+                                                },
+                                                opposite.hot.key.first().copied(),
+                                                threshold,
+                                            ) else {
+                                                continue 'pairs;
+                                            };
+                                            key
                                         };
                                         for &id in &opposite.active {
                                             let other = storage.labels.view(id);

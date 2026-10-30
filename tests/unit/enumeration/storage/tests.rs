@@ -18,6 +18,7 @@ fn resource_dominance_preserves_binary_boundaries_during_enumeration() {
         cut_words: [0; FULL_WORDS],
         cut_cost: 0.,
         presence_state: None,
+        branch_state: None,
         coupled_state: None,
     };
     for forward in [true, false] {
@@ -69,6 +70,7 @@ fn dominance_removal_preserves_survivor_order_and_pending_after_pop() {
         cut_words: [0; FULL_WORDS],
         cut_cost: 0.,
         presence_state: None,
+        branch_state: None,
         coupled_state: None,
     };
     let mut storage = Storage::new(1).unwrap();

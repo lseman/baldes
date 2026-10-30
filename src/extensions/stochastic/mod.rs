@@ -8,10 +8,13 @@
 
 use crate::{invalid, Result};
 
+#[cfg(feature = "clp")]
 mod solve;
+#[cfg(feature = "clp")]
 mod theta;
 mod tiny;
 mod warm_start;
+#[cfg(feature = "clp")]
 pub use solve::{SolveOptions, SolveResult};
 pub use tiny::{ExactSolution, TinyOptions};
 pub use warm_start::{HgsWarmStart, HgsWarmStartSummary};

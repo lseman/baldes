@@ -95,6 +95,12 @@ pub struct PricingNetwork {
     /// Explicit terminal base bounds for backward machine roots.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub paired_machine_terminal_bounds: Vec<(usize, [f64; 2])>,
+    /// Original per-arc waiting coefficients for prepared machine inputs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub paired_machine_waiting_rates: Vec<(usize, Vec<f64>)>,
+    /// Unprepared front-program functions in physical arc order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub paired_front_programs: Vec<PairedFrontProgram>,
     /// Graph-level costs, using each descriptor's declared normalization.
     /// A resource bound to an original variable gets its cost from that variable.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -115,6 +121,56 @@ pub struct PricingNetwork {
     pub activity_entries: Vec<AccumulatedActivityEntry>,
     #[serde(default)]
     pub ng: Option<Vec<Vec<usize>>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "encoding", rename_all = "snake_case", deny_unknown_fields)]
+pub enum FrontProgramFunction {
+    Affine {
+        intercept: f64,
+        slope: f64,
+    },
+    Vector {
+        #[serde(
+            deserialize_with = "crate::graph::coupled::descriptor::deserialize_machine_function"
+        )]
+        function: crate::graph::coupled::PreparedSlopeFunction,
+    },
+}
+
+impl FrontProgramFunction {
+    fn input(&self) -> Result<crate::graph::coupled::descriptor::MachineRootInput<'_>> {
+        use crate::graph::coupled::descriptor::{MachineRootInput, RawAffine};
+        Ok(match self {
+            Self::Affine { intercept, slope } => MachineRootInput::Affine(
+                RawAffine::new(*intercept, *slope).map_err(|error| invalid(error.to_string()))?,
+            ),
+            Self::Vector { function } => MachineRootInput::Vector(function),
+        })
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct FrontProgramArc {
+    pub tail_bounds: [f64; 2],
+    pub waiting_bounds: [f64; 2],
+    pub waiting_rate: f64,
+    #[serde(deserialize_with = "crate::graph::coupled::descriptor::deserialize_machine_function")]
+    pub base: crate::graph::coupled::PreparedSlopeFunction,
+    pub dependent: FrontProgramFunction,
+    pub dependent_lower: FrontProgramFunction,
+    pub dependent_upper: FrontProgramFunction,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PairedFrontProgram {
+    pub resource: usize,
+    pub source_bounds: [f64; 2],
+    pub terminal_bounds: [f64; 2],
+    pub root: FrontProgramFunction,
+    pub arcs: Vec<FrontProgramArc>,
 }
 
 fn deserialize_machine_roots<'de, D: serde::Deserializer<'de>>(
@@ -326,6 +382,78 @@ impl Model {
                         )));
                     }
                 }
+            }
+            for (index, program) in input.paired_front_programs.iter().enumerate() {
+                use crate::graph::coupled::descriptor::{FrontierBudget, FrontierOutcome};
+                use crate::graph::coupled::MachineArcFunctionInput;
+                if input.paired_front_programs[..index]
+                    .iter()
+                    .any(|p| p.resource == program.resource)
+                    || input
+                        .paired_machine_inputs
+                        .iter()
+                        .any(|(r, _)| *r == program.resource)
+                    || input
+                        .paired_machine_roots
+                        .iter()
+                        .any(|(r, _)| *r == program.resource)
+                    || input
+                        .paired_machine_terminal_bounds
+                        .iter()
+                        .any(|(r, _)| *r == program.resource)
+                {
+                    return Err(invalid("duplicate paired front-program inputs"));
+                }
+                let windows = |bounds: [f64; 2]| crate::graph::Window::new(bounds[0], bounds[1]);
+                let arcs = program
+                    .arcs
+                    .iter()
+                    .enumerate()
+                    .map(|(physical_arc, arc)| {
+                        let truncated = arc.waiting_rate.trunc();
+                        if !arc.waiting_rate.is_finite()
+                            || truncated < f64::from(i32::MIN)
+                            || truncated > f64::from(i32::MAX)
+                        {
+                            return Err(invalid("paired waiting rate is outside the supported machine range"));
+                        }
+                        Ok(MachineArcFunctionInput {
+                            physical_arc,
+                            tail_bounds: windows(arc.tail_bounds)?,
+                            waiting_bounds: windows(arc.waiting_bounds)?,
+                            waiting_rate: truncated as i32,
+                            base: &arc.base,
+                            dependent: arc.dependent.input()?,
+                            dependent_lower: arc.dependent_lower.input()?,
+                            dependent_upper: arc.dependent_upper.input()?,
+                        })
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let waiting_rates: Vec<_> = program.arcs.iter().map(|arc| arc.waiting_rate).collect();
+                match graph.prepare_paired_front_program_with_rates(
+                    program.resource,
+                    &arcs,
+                    program.root.input()?,
+                    windows(program.source_bounds)?,
+                    windows(program.terminal_bounds)?,
+                    &waiting_rates,
+                    FrontierBudget::default(),
+                ) {
+                    FrontierOutcome::Complete(()) => {}
+                    other => {
+                        return Err(invalid(format!(
+                            "paired front program unavailable: {other:?}"
+                        )))
+                    }
+                }
+            }
+            for (index, (resource, rates)) in input.paired_machine_waiting_rates.iter().enumerate() {
+                if input.paired_machine_waiting_rates[..index].iter().any(|(previous, _)| previous == resource)
+                    || input.paired_front_programs.iter().any(|program| program.resource == *resource)
+                {
+                    return Err(invalid("duplicate paired machine waiting rates"));
+                }
+                graph.set_paired_machine_waiting_rates(*resource, rates)?;
             }
             if input.front_program_domain {
                 graph.set_front_program_domain(true)?;

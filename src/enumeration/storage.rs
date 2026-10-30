@@ -64,6 +64,7 @@ impl<const D: usize> Storage<D> {
             crate::core::rounding::add_up(a.original_cost, penalty).unwrap_or(f64::INFINITY)
         };
         a.presence_state == b.presence_state
+            && a.branch_state == b.branch_state
             && a.vertex == b.vertex
             && a.visited == b.visited
             && cost - b.original_cost < EPSILON
@@ -114,8 +115,11 @@ impl<const D: usize> Storage<D> {
                 true
             }
         });
-        let at = records
-            .partition_point(|&id| !(label.original_cost + EPSILON < self.arena[id].original_cost));
+        // Tolerant insertion can leave costs out of strict numeric order, so
+        // the predicate is not necessarily monotone for a binary search.
+        let at = records.iter()
+            .position(|&id| label.original_cost + EPSILON < self.arena[id].original_cost)
+            .unwrap_or(records.len());
         let id = self.arena.len();
         label.id = id;
         self.arena.push(label);

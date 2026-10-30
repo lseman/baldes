@@ -227,6 +227,7 @@ impl Drop for MachinePathNode {
 #[derive(Clone, Debug)]
 pub struct MachinePathHistory {
     head: Arc<MachinePathNode>,
+    root: Arc<MachinePathNode>,
     len: usize,
     max_states: usize,
 }
@@ -256,7 +257,7 @@ impl SourceReplayWitness {
         let mut value = 0.;
         let mut charges = Vec::with_capacity(functions.len());
         for function in functions {
-            if function.is_machine_zero_length() {
+            if function.has_machine_only_geometry() {
                 return Err(RawFunctionError::Unsupported(
                     "machine zero-length segment is not a source descriptor",
                 ));
@@ -407,10 +408,10 @@ fn add_component(
         return Err(FrontierUnknown::PairLimit);
     }
     work.charge(input_pairs)?;
-    if a.is_machine_zero_length() {
+    if a.has_machine_only_geometry() {
         return add_machine_zero_length(a, b, policy, work);
     }
-    if b.is_machine_zero_length() {
+    if b.has_machine_only_geometry() {
         return Err(FrontierUnknown::Unsupported(
             "machine zero-length segment as vector addition input",
         ));
@@ -508,6 +509,11 @@ fn add_machine_zero_length(
             "machine zero-length segment outside front algebra",
         ));
     }
+    if fixed.pairs().len() != 2 || fixed.pairs()[0].1 != fixed.pairs()[1].1 {
+        return Err(FrontierUnknown::Unsupported(
+            "machine zero-length addition requires a single point segment",
+        ));
+    }
     let x = fixed.pairs()[0].1;
     let (start, end) = vector.domain();
     if (x < start && !near(x, start, policy)?) || (x > end && !near(x, end, policy)?) {
@@ -517,7 +523,7 @@ fn add_machine_zero_length(
     let (value, segment) = if same_start {
         (vector.pairs()[0].0, 1)
     } else {
-        if vector.is_machine_zero_length() {
+        if vector.has_machine_only_geometry() {
             return Err(FrontierUnknown::Unsupported(
                 "unresolved machine zero-length vector alignment",
             ));

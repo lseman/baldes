@@ -87,6 +87,7 @@ _deps/
 /.config.old
 AGENTS.md
 /.codex/
+/.codegraph/
 /.aws/
 /.env
 /.env.*

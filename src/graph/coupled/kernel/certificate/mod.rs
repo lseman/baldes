@@ -6,6 +6,7 @@ mod lattice;
 mod machine;
 mod operators;
 mod paired;
+#[cfg(feature = "clp")]
 pub(super) use paired::PairedArcBounds;
 pub use paired::PairedControlCertificate;
 mod paired_machine;

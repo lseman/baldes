@@ -497,17 +497,21 @@ impl<'a, const D: usize> Sweep<'a, D> {
                                 self.pending.push((label, hot));
                                 continue;
                             }
-                            let same = self.ctx.grid.direction(forward).buckets
-                                [label.bucket.vertex][label.bucket.bucket]
-                                .component
-                                == self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket]
-                                    .component;
+                            let destination = label.bucket;
                             let inserted = if BRANCHING || R::OWNS_AUXILIARY {
                                 self.insert::<BRANCHING, R, _>(g, forward, label, hot, controls)
                             } else {
                                 self.insert::<BRANCHING, R, _>(g, forward, &label, hot, controls)
                             };
-                            if inserted && same {
+                            // Only accepted labels can require another component pass.
+                            if inserted
+                                && self.ctx.grid.direction(forward).buckets[destination.vertex]
+                                    [destination.bucket]
+                                    .component
+                                    == self.ctx.grid.direction(forward).buckets[id.vertex]
+                                        [id.bucket]
+                                        .component
+                            {
                                 repeat = true;
                             }
                         }

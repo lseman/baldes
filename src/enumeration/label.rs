@@ -16,6 +16,9 @@ pub struct Label<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub cut_words: [u32; FULL_WORDS],
     pub cut_cost: f64,
     pub presence_state: crate::cuts::soft_conflicts::LabelState,
+    /// Branch state before entering `vertex` for a completion query. `None`
+    /// means the enumeration was started without branch-state tracking.
+    pub branch_state: Option<crate::pricing::restrictions::BranchState>,
     pub coupled_state: Option<Box<crate::graph::coupled::CoupledLabelState>>,
 }
 /// Full-memory cut tables of an enumeration with cuts.
@@ -45,10 +48,8 @@ impl<'a> CutTables<'a> {
         };
         for record in &table[arc].full_memory {
             let mut transition = *record;
-            // Preparation retains the observed binary descriptor layout. Its
-            // k-path exit descriptor uses the word index as the destination
-            // bit shift, which can overwrite a neighboring rank-one field.
-            // Enumeration must preserve the visitation bit in its own field.
+            // Preserve the source field even if the table was prepared with
+            // the machine descriptor layout for a direct comparison.
             if transition.covering
                 && transition.denominator == -2
                 && transition.increment == 1
@@ -118,6 +119,7 @@ impl<const D: usize> Label<D> {
             cut_words,
             cut_cost,
             presence_state,
+            branch_state,
             coupled_state: _,
         } = self;
         Self {
@@ -134,6 +136,7 @@ impl<const D: usize> Label<D> {
             cut_words: *cut_words,
             cut_cost: *cut_cost,
             presence_state: presence_state.clone(),
+            branch_state: branch_state.clone(),
             coupled_state: None,
         }
     }

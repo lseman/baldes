@@ -99,21 +99,12 @@ impl RawAffine {
     }
 
     /// Prepare a singleton affine input with the machine's two-pair output.
-    /// Equal bounds retain the zero-length segment; reversed bounds and
-    /// non-finite arithmetic remain unsupported machine cases.
+    /// Equal or reversed bounds retain the literal machine-only geometry.
     pub fn prepare_machine(&self, lower: f64, upper: f64) -> Result<PreparedSlopeFunction> {
         finite(lower, "domain lower")?;
         finite(upper, "domain upper")?;
-        if lower > upper {
-            return Err(RawFunctionError::Unsupported(
-                "machine affine reversed bounds",
-            ));
-        }
         let initial = self.evaluate(lower)?;
-        if lower == upper {
-            return PreparedSlopeFunction::machine_zero_length(initial, self.slope, lower, upper);
-        }
-        PreparedSlopeFunction::from_prepared_pairs(vec![(initial, lower), (self.slope, upper)])
+        PreparedSlopeFunction::from_machine_pairs(vec![(initial, lower), (self.slope, upper)])
     }
 }
 
@@ -127,8 +118,8 @@ pub struct PreparedSlopeFunction {
     // fixed array's zero-length segment; source constructors never admit it.
     #[cfg_attr(feature = "clp", serde(skip))]
     machine_zero_length: bool,
-    // The machine output can also contain a zero-width first segment followed
-    // by a nonempty segment. Its consumers are not those of a point front.
+    // Other machine arrays can have duplicate endpoints or a reversed first
+    // segment. Their consumers are not those of a point front.
     #[cfg_attr(feature = "clp", serde(skip))]
     machine_internal_zero_length: bool,
 }
@@ -150,7 +141,7 @@ impl PreparedSlopeFunction {
     fn machine_truncate_ordered(&self, lower: f64, upper: f64, fixed_array: bool) -> Result<Self> {
         finite(lower, "machine truncation lower")?;
         finite(upper, "machine truncation upper")?;
-        if lower > upper {
+        if lower > upper && !near(lower, upper)? {
             return Err(RawFunctionError::Unsupported("machine truncation geometry"));
         }
         let (start, end) = self.domain();
@@ -254,19 +245,48 @@ impl PreparedSlopeFunction {
         })
     }
 
-    /// Decode a prepared machine array, including the two recovered
-    /// zero-width shapes. This does not make it a source descriptor.
+    /// Decode a finite machine array. Duplicate coordinates and a reversed
+    /// first segment remain machine-only, not source descriptors.
     pub fn from_machine_pairs(pairs: Vec<(f64, f64)>) -> Result<Self> {
         let mut function = match pairs.as_slice() {
             [(value, lower), (slope, upper)] if lower == upper => {
                 Self::machine_zero_length(*value, *slope, *lower, *upper)?
             }
             [(value, coordinate), (slope, duplicate), (waiting, end)]
-                if coordinate == duplicate =>
+                if coordinate == duplicate && end > duplicate =>
             {
                 Self::machine_internal_zero_length(*value, *slope, *coordinate, *waiting, *end)?
             }
-            _ => return Self::from_prepared_pairs(pairs),
+            _ => {
+                if !pairs.windows(2).any(|window| window[0].1 >= window[1].1) {
+                    return Self::from_prepared_pairs(pairs);
+                }
+                let &(mut value, mut previous) = pairs
+                    .first()
+                    .ok_or(RawFunctionError::EmptyPreparedFunction)?;
+                finite(value, "initial value")?;
+                finite(previous, "initial coordinate")?;
+                for (index, &(slope, end)) in pairs.iter().enumerate().skip(1) {
+                    finite(slope, "slope")?;
+                    finite(end, "segment end")?;
+                    // The fixed-array check begins coordinate comparisons
+                    // with the second segment, so retain the first literally.
+                    if index > 1 && end < previous {
+                        return Err(RawFunctionError::InvalidOrdering { pair: index });
+                    }
+                    let span = arithmetic(end - previous, "segment span")?;
+                    value = arithmetic(
+                        value + arithmetic(slope * span, "segment multiplication")?,
+                        "segment accumulation",
+                    )?;
+                    previous = end;
+                }
+                return Ok(Self {
+                    pairs,
+                    machine_zero_length: true,
+                    machine_internal_zero_length: true,
+                });
+            }
         };
         // Preserve signed-zero coordinate bits exactly as supplied.
         function.pairs = pairs;
@@ -327,8 +347,15 @@ impl PreparedSlopeFunction {
         })
     }
 
-    /// Whether this output retains a machine-only zero-length segment.
+    /// Whether this output retains at least one zero-length segment.
     pub fn is_machine_zero_length(&self) -> bool {
+        self.pairs
+            .windows(2)
+            .any(|window| window[0].1 == window[1].1)
+    }
+
+    /// Whether the stored geometry requires the machine-only contract.
+    pub fn has_machine_only_geometry(&self) -> bool {
         self.machine_zero_length
     }
 
@@ -344,15 +371,32 @@ impl PreparedSlopeFunction {
         &self.pairs
     }
 
+    /// Validate the fixed-array output contract used by the paired program.
+    /// This checks machine geometry, not source-function feasibility.
+    pub(crate) fn check_machine_array(&self) -> Result<bool> {
+        if !(2..=12).contains(&self.pairs.len()) || self.pairs[0].0 == 1e12 {
+            return Ok(false);
+        }
+        for index in 2..self.pairs.len() {
+            let previous = self.pairs[index - 1].1;
+            let current = self.pairs[index].1;
+            if current <= previous || near(current, previous)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
     /// Machine lookup with the selected segment id. A near upper knot can
     /// advance the id while retaining evaluation at the unsnapped argument.
     pub(super) fn machine_value_and_segment(&self, argument: f64) -> Result<Option<(f64, usize)>> {
         self.machine_lookup_segment(argument, false)
     }
 
-    /// Vector lookup advances past a near final segment, whereas the fixed
-    /// array lookup retains its final segment id. Both evaluate at the
-    /// original argument rather than snapping its value to the near knot.
+    /// Lookup that advances past a near final segment. The vector lookup and
+    /// the fixed-array helper used by concatenation both have this behavior;
+    /// some inlined fixed-array lookups retain the final segment instead.
+    /// Both evaluate at the original argument without snapping it to the knot.
     pub(super) fn machine_vector_value_and_segment(
         &self,
         argument: f64,
@@ -360,17 +404,30 @@ impl PreparedSlopeFunction {
         self.machine_lookup_segment(argument, true)
     }
 
+    /// Domain check used by the paired initializer for a vector input.
+    pub(crate) fn check_machine_domain(&self, lower: f64, upper: f64) -> Result<bool> {
+        for pair in self.pairs.windows(2) {
+            let previous = pair[0].1;
+            let next = pair[1].1;
+            if next <= previous || near(next, previous)? {
+                return Ok(false);
+            }
+        }
+        Ok(near(self.pairs[0].1, lower)?
+            && near(self.pairs[self.pairs.len() - 1].1, upper)?)
+    }
+
     fn machine_lookup_segment(&self, argument: f64, vector: bool) -> Result<Option<(f64, usize)>> {
         Self::machine_lookup_pairs(&self.pairs, argument, vector)
     }
 
-    /// Fixed-array lookup for finite machine intermediates. Their coordinates
-    /// need not satisfy the validated source/prepared representation contract.
+    /// Fixed-array helper lookup for finite machine intermediates. Their
+    /// coordinates need not satisfy the source/prepared representation.
     pub(super) fn machine_array_value_and_segment(
         pairs: &[(f64, f64)],
         argument: f64,
     ) -> Result<Option<(f64, usize)>> {
-        Self::machine_lookup_pairs(pairs, argument, false)
+        Self::machine_lookup_pairs(pairs, argument, true)
     }
 
     fn machine_lookup_pairs(

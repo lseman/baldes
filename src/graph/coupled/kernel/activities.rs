@@ -76,13 +76,6 @@ impl CoupledKernel {
                 paired_values: values,
             }));
         }
-        #[cfg(not(feature = "clp"))]
-        {
-            return Err(invalid(
-                "explicit paired controls require source certification with clp",
-            ));
-        }
-        #[cfg(feature = "clp")]
         {
             if self.front_program_domain {
                 return Err(invalid(

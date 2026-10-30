@@ -1254,6 +1254,9 @@ fn joined_machine_reconstruction_preserves_consumptions_and_rejects_replaced_roo
             .unwrap()
             .unwrap()
             .0;
+        if mode == PairedResourceMode::Feasibility {
+            assert_eq!(kernel.join(&forward, &backward).unwrap(), Some(0.));
+        }
         let FrontierOutcome::Complete(joined) =
             graph.reconstruct_paired_machine_join(0, &forward, &backward, budget)
         else {

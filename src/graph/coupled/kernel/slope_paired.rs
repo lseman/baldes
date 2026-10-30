@@ -151,6 +151,7 @@ pub(super) struct PreparedSlopePaired {
     operator_classes: Arc<[usize]>,
     waiting_windows: Option<std::sync::Arc<[Window]>>,
     machine_inputs: Option<Arc<[PreparedMachineArc]>>,
+    machine_waiting_rates: Option<Arc<[f64]>>,
     machine_root_input: Option<PreparedSlopeFunction>,
     machine_root_history: Option<Arc<MachinePathHistory>>,
     machine_backward_root: Option<Arc<MachinePathHistory>>,
@@ -160,6 +161,8 @@ pub(super) struct PreparedSlopePaired {
     exact_cost: bool,
     integral_costs: bool,
     monotone_constant_transfers: bool,
+    constant_mapping_transfers: bool,
+    constant_backward_mapping: bool,
     cost_lattice: Option<Arc<PreparedCostLattice>>,
     ceiling: f64,
     mode: PairedResourceMode,
@@ -181,6 +184,11 @@ impl PartialEq for PreparedSlopePaired {
                 b.waiting_windows.as_deref(),
             )
             && machine_inputs_equal(self.machine_inputs.as_deref(), b.machine_inputs.as_deref())
+            && match (&self.machine_waiting_rates, &b.machine_waiting_rates) {
+                (None, None) => true,
+                (Some(a), Some(b)) => a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| x.to_bits() == y.to_bits()),
+                _ => false,
+            }
             && match (&self.machine_backward_root, &b.machine_backward_root) {
                 (None, None) => true,
                 (Some(a), Some(b)) => Arc::ptr_eq(a, b),
@@ -188,7 +196,7 @@ impl PartialEq for PreparedSlopePaired {
             }
             && match (&self.machine_root_input, &b.machine_root_input) {
                 (Some(a), Some(b)) => {
-                    a.is_machine_zero_length() == b.is_machine_zero_length()
+                    a.has_machine_only_geometry() == b.has_machine_only_geometry()
                         && a.pairs().len() == b.pairs().len()
                         && a.pairs().iter().zip(b.pairs()).all(|(a, b)| {
                             a.0.to_bits() == b.0.to_bits() && a.1.to_bits() == b.1.to_bits()
@@ -201,6 +209,8 @@ impl PartialEq for PreparedSlopePaired {
             && self.mode == b.mode
             && self.integral_costs == b.integral_costs
             && self.monotone_constant_transfers == b.monotone_constant_transfers
+            && self.constant_mapping_transfers == b.constant_mapping_transfers
+            && self.constant_backward_mapping == b.constant_backward_mapping
             && self.cost_lattice == b.cost_lattice
             && self.normalization == b.normalization
             && self.policy == b.policy
@@ -310,6 +320,22 @@ impl PreparedSlopePaired {
     }
     pub(super) fn machine_input_handle(&self) -> Option<Arc<[PreparedMachineArc]>> {
         self.machine_inputs.clone()
+    }
+    pub(super) fn machine_waiting_rates(&self) -> Option<&[f64]> {
+        self.machine_waiting_rates.as_deref()
+    }
+    pub(super) fn set_machine_waiting_rates(&mut self, rates: &[f64]) -> Result<bool> {
+        let inputs = self.machine_inputs.as_deref().ok_or_else(|| invalid("paired machine inputs unavailable"))?;
+        if rates.len() != inputs.len() || rates.iter().zip(inputs).any(|(rate, input)| {
+            !rate.is_finite() || rate.trunc() != f64::from(input.waiting_rate)
+        }) {
+            return Err(invalid("paired machine waiting rates do not match transition operands"));
+        }
+        if self.machine_waiting_rates.as_ref().is_some_and(|old| old.iter().zip(rates).all(|(a, b)| a.to_bits() == b.to_bits())) {
+            return Ok(false);
+        }
+        self.machine_waiting_rates = Some(Arc::from(rates));
+        Ok(true)
     }
     pub(super) fn machine_topology(&self) -> Option<&MachineTopology> {
         self.machine_topology.as_ref()
@@ -502,8 +528,24 @@ impl PreparedSlopePaired {
         {
             return Ok(false);
         }
+        // Existing path histories were extended with the old arc operands.
+        // Give the unchanged forward root a fresh identity before publishing
+        // replacement operands so those histories cannot be joined later.
+        let root_history = if let Some(root) = &self.machine_root_input {
+            let budget = FrontierBudget::default();
+            let state = outcome(MachineRootState::from_prepared(root, budget))?
+                .ok_or_else(|| invalid("paired machine root is empty"))?;
+            Some(Arc::new(
+                outcome(MachinePathHistory::from_root(&state, usize::MAX, budget))?
+                    .ok_or_else(|| invalid("paired machine root history is empty"))?,
+            ))
+        } else {
+            None
+        };
         self.machine_inputs = inputs.map(|inputs| Arc::from(inputs.to_vec()));
+        self.machine_waiting_rates = None;
         self.machine_topology = topology;
+        self.machine_root_history = root_history;
         self.machine_backward_root = None;
         Ok(true)
     }
@@ -529,7 +571,7 @@ impl PreparedSlopePaired {
         }
         let same = match (&self.machine_root_input, root) {
             (Some(a), Some(b)) => {
-                a.is_machine_zero_length() == b.is_machine_zero_length()
+                a.has_machine_only_geometry() == b.has_machine_only_geometry()
                     && a.pairs().len() == b.pairs().len()
                     && a.pairs().iter().zip(b.pairs()).all(|(a, b)| {
                         a.0.to_bits() == b.0.to_bits() && a.1.to_bits() == b.1.to_bits()
@@ -768,7 +810,7 @@ impl PreparedSlopePaired {
         let operator_classes = continuation::operator_classes(arcs.iter().map(|arc| {
             let mut key = vec![arc.waiting as i64 as u64];
             for function in [&arc.arrival, &arc.increment, &arc.lower, &arc.upper] {
-                key.push(u64::from(function.is_machine_zero_length()));
+                key.push(u64::from(function.has_machine_only_geometry()));
                 key.push(function.pairs().len() as u64);
                 for &(slope, coordinate) in function.pairs() {
                     key.push(slope.to_bits());
@@ -824,6 +866,26 @@ impl PreparedSlopePaired {
         // same domains and identity arrivals. T(y)=max(y+c, lower), c>=0,
         // is monotone and T(y)>=y under binary64 arithmetic; any upper bound
         // satisfied by the longer suffix also holds for the shorter one.
+        let constant_mapping_transfers = mode != PairedResourceMode::Feasibility
+            && constant(initial).is_some()
+            && {
+                let domain = initial.domain();
+                domain.0 == 0.
+                    && domain.1 > 0.
+                    && !arcs.is_empty()
+                    && arcs.iter().all(|arc| {
+                        arc.waiting == 0
+                            && arc.arrival.pairs() == [(0., 0.), (1., domain.1)]
+                            && [&arc.increment, &arc.lower, &arc.upper].iter().all(|f| {
+                                f.domain() == domain && f.pairs().len() == 2 && constant(f).is_some()
+                            })
+                            && constant(&arc.increment).is_some_and(|value| value >= 0.)
+                    })
+            };
+        let constant_backward_mapping = constant_mapping_transfers
+            && arcs.iter().all(|arc| {
+                constant(&arc.upper).is_some_and(|upper| upper.to_bits() == ceiling.to_bits())
+            });
         let monotone_constant_transfers = mode != PairedResourceMode::Feasibility
             && constant(initial).is_some()
             && arcs.first().is_some_and(|first| {
@@ -861,6 +923,7 @@ impl PreparedSlopePaired {
             operator_classes,
             waiting_windows: None,
             machine_inputs: None,
+            machine_waiting_rates: None,
             machine_root_input: None,
             machine_root_history: None,
             machine_backward_root: None,
@@ -870,6 +933,8 @@ impl PreparedSlopePaired {
             exact_cost,
             integral_costs,
             monotone_constant_transfers,
+            constant_mapping_transfers,
+            constant_backward_mapping,
             cost_lattice,
             ceiling,
             mode,
@@ -1016,7 +1081,7 @@ impl PreparedSlopePaired {
         for component in front.components() {
             let pairs = component.pairs();
             let value = pairs.first()?.0;
-            if component.is_machine_zero_length()
+            if component.has_machine_only_geometry()
                 || !value.is_finite()
                 || pairs.iter().skip(1).any(|pair| pair.0 != 0.)
                 || (value == 0.
@@ -1075,7 +1140,7 @@ impl PreparedSlopePaired {
         (value.is_finite()
             && stable_zero
             && value != 1e12
-            && !function.is_machine_zero_length()
+            && !function.has_machine_only_geometry()
             && pairs.iter().skip(1).all(|pair| pair.0 == 0.))
         .then_some(value)
     }
@@ -1138,15 +1203,6 @@ impl PreparedSlopePaired {
         }
     }
 
-    fn machine_root(&self, budget: FrontierBudget) -> FrontierOutcome<MachineRootState> {
-        let Some(root) = self.machine_root_input.as_ref() else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                "explicit paired machine root is unavailable",
-            ));
-        };
-        MachineRootState::from_prepared(root, budget)
-    }
-
     pub(super) fn machine_mode(&self) -> i32 {
         match self.mode {
             PairedResourceMode::Feasibility => 4,
@@ -1178,13 +1234,18 @@ impl PreparedSlopePaired {
                 .machine_history
                 .as_ref()
                 .ok_or_else(|| crate::incomplete("paired machine backward root is unavailable"))?;
+            if !self.matches_backward_root(history) {
+                return Err(crate::incomplete(
+                    "paired machine backward history is stale",
+                ));
+            }
             let ceiling = history.backward_ceiling().ok_or_else(|| {
                 crate::incomplete("paired machine backward history is unavailable")
             })?;
             let backward = input.backward_inputs().ok_or_else(|| {
                 crate::incomplete("paired machine backward arc inputs are unavailable")
             })?;
-            let (front, bits, key) =
+            let Some((front, bits, key)) =
                 outcome(PreparedSlopeRelationArc::machine_backward_transition(
                     history.last().front(),
                     &backward,
@@ -1192,7 +1253,9 @@ impl PreparedSlopePaired {
                     self.machine_mode(),
                     budget,
                 ))?
-                .ok_or_else(|| crate::incomplete("paired machine backward transition rejected"))?;
+            else {
+                return Ok(None);
+            };
             let mut source = None;
             if self.mode != PairedResourceMode::Feasibility && scale != 0. {
                 let unavailable = || {
@@ -1201,7 +1264,7 @@ impl PreparedSlopePaired {
                     )
                 };
                 if scale < 0.
-                    || !self.monotone_constant_transfers
+                    || !self.constant_backward_mapping
                     || self.waiting_windows.is_some()
                     || ceiling.to_bits() != self.ceiling.to_bits()
                     || history.len().saturating_mul(128) > budget.max_operations
@@ -1249,23 +1312,22 @@ impl PreparedSlopePaired {
                 machine_history: Some(Arc::new(next_history)),
             }));
         }
-        let history = if let Some(history) = &old.machine_history {
-            history.clone()
-        } else {
-            let root = outcome(self.machine_root(budget))?
-                .ok_or_else(|| crate::incomplete("paired machine root is empty"))?;
-            Arc::new(
-                outcome(MachinePathHistory::from_root(&root, usize::MAX, budget))?
-                    .ok_or_else(|| crate::incomplete("paired machine root history is empty"))?,
-            )
-        };
-        let (reduced, next) = outcome(prepared.machine_transition(
+        let history = old
+            .machine_history
+            .as_ref()
+            .ok_or_else(|| crate::incomplete("paired machine forward history is unavailable"))?;
+        if !self.matches_forward_root(history) {
+            return Err(crate::incomplete("paired machine forward history is stale"));
+        }
+        let Some((reduced, next)) = outcome(prepared.machine_transition(
             history.last().front(),
             &input.continuation_inputs(),
             self.machine_mode(),
             budget,
         ))?
-        .ok_or_else(|| crate::incomplete("paired machine transition rejected"))?;
+        else {
+            return Ok(None);
+        };
         let front = next.front().clone();
         let next_history = outcome(history.append(arc, &reduced, &next, budget))?
             .ok_or_else(|| crate::incomplete("paired machine history rejected"))?;
@@ -1286,19 +1348,20 @@ impl PreparedSlopePaired {
     }
 
     fn same_machine_constant_front(source: &SlopeFront, machine: &SlopeFront) -> bool {
-        Self::machine_constant_value(source).is_some()
-            && Self::machine_constant_value(machine).is_some()
-            && source.components().len() == machine.components().len()
-            && source
-                .components()
-                .iter()
-                .zip(machine.components())
-                .all(|(a, b)| {
-                    a.pairs().len() == b.pairs().len()
-                        && a.pairs().iter().zip(b.pairs()).all(|(a, b)| {
-                            a.0.to_bits() == b.0.to_bits() && a.1.to_bits() == b.1.to_bits()
-                        })
-                })
+        let (Some(source_value), Some(machine_value)) = (
+            Self::machine_constant_value(source),
+            Self::machine_constant_value(machine),
+        ) else {
+            return false;
+        };
+        let [source] = source.components() else { return false; };
+        let [machine] = machine.components() else { return false; };
+        let (source_lower, source_upper) = source.domain();
+        let (machine_lower, machine_upper) = machine.domain();
+        source_value.to_bits() == machine_value.to_bits()
+            && source_lower.to_bits() == machine_lower.to_bits()
+            && source_upper.to_bits() == machine_upper.to_bits()
+            && (source_upper - source_lower).is_finite()
     }
 
     /// Establish compatibility rather than interpreting a raw key as an
@@ -1314,7 +1377,7 @@ impl PreparedSlopePaired {
         let unavailable =
             || crate::incomplete("paired machine objective normalization is unavailable");
         if weighted_scale < 0.
-            || !self.monotone_constant_transfers
+            || !self.constant_mapping_transfers
             || self.waiting_windows.is_some()
         {
             return Err(unavailable());

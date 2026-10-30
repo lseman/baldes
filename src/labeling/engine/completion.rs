@@ -25,7 +25,7 @@ impl<const D: usize> LabelData for EnumerationProjection<'_, D> {
         self.ng
     }
     fn branch_state(&self) -> &crate::pricing::restrictions::BranchState {
-        &None
+        self.label.branch_state.as_ref().unwrap_or(&None)
     }
     fn presence_state(&self) -> &crate::cuts::soft_conflicts::LabelState {
         &self.label.presence_state
@@ -48,6 +48,10 @@ impl<const D: usize> LabelData for EnumerationProjection<'_, D> {
 }
 
 impl<const D: usize> LabelingEngine<D> {
+    pub(crate) fn completion_resource_failed(&self) -> bool {
+        self.resource_error.load(Ordering::Relaxed)
+    }
+
     pub(super) fn refresh_coupled_completion(&mut self, g: &Graph<D>) {
         self.coupled_completion = std::array::from_fn(|_| Default::default());
         let Some(kernel) = g.coupled_kernel().filter(|_| self.coupled_present) else {
@@ -155,7 +159,9 @@ impl<const D: usize> LabelingEngine<D> {
     }
     /// Completion query shared by pricing, enumeration and fixing. The lower
     /// cost already includes dominance predecessors; scanning follows their
-    /// native staircase and minimum-index bounds.
+    /// native staircase and minimum-index bounds. The label must be at the
+    /// stage before entering the meeting vertex, whose elements and cut
+    /// supports are already represented by the opposite stored label.
     pub fn completion_exists(
         &self,
         g: &Graph<D>,
@@ -164,7 +170,19 @@ impl<const D: usize> LabelingEngine<D> {
         threshold: f64,
         scan: bool,
     ) -> bool {
-        self.completion_exists_data(g, forward, label, label.bucket, threshold, scan)
+        if !self.labels_match_graph(g) {
+            return true;
+        }
+        self.completion_exists_data(
+            g,
+            forward,
+            label,
+            label.bucket,
+            threshold,
+            scan,
+            self.full_ready,
+            None,
+        )
     }
 
     fn completion_exists_data<L: LabelData>(
@@ -175,10 +193,13 @@ impl<const D: usize> LabelingEngine<D> {
         own: BucketId,
         threshold: f64,
         scan: bool,
+        complete_labels: bool,
+        timer: Option<(Instant, std::time::Duration)>,
     ) -> bool {
-        if g.coupled_kernel()
-            .is_some_and(|kernel| kernel.has_slope_fronts())
-        {
+        // A partial opposite-label store cannot certify that a coupled
+        // resource prefix has no completion. This applies to numeric and
+        // piecewise states as well as paired fronts.
+        if !complete_labels && self.coupled_present {
             return true;
         }
         // The retained prefix may only be feasible when used in reverse.
@@ -192,7 +213,13 @@ impl<const D: usize> LabelingEngine<D> {
         if self.resource_error.load(Ordering::Relaxed) {
             return true;
         }
-        // Unknown incidence cannot justify deleting a caller-supplied label.
+        if let Some(kernel) = g.coupled_kernel() {
+            if label.coupled_state().is_none_or(|state| !kernel.completion_state_matches(state)) {
+                return true;
+            }
+        }
+        // Invalid incidence cannot justify deleting a caller-supplied label;
+        // signal the owner so it does not publish the partial enumeration.
         if self.cuts.presence.active()
             && self
                 .cuts
@@ -200,6 +227,7 @@ impl<const D: usize> LabelingEngine<D> {
                 .join_correction_lower_bound(label.presence_state())
                 .is_err()
         {
+            self.resource_error.store(true, Ordering::Relaxed);
             return true;
         }
         let vertex = self.grid.internal[label.vertex()];
@@ -220,18 +248,29 @@ impl<const D: usize> LabelingEngine<D> {
                 .knapsack
                 .partial_cost(g, label.resources(), forward);
         let base_key = key;
-        let key = self.ctx().resource_completion_key(
-            g,
-            forward,
-            label.coupled_state(),
-            label.presence_state(),
-            key,
-        );
+        let scan_all_knapsack = self.cuts.knapsack.active
+            && g.coupled_kernel().is_some_and(|kernel| kernel.has_slope_fronts());
+        let key = if scan_all_knapsack {
+            f64::NEG_INFINITY
+        } else {
+            self.ctx().resource_completion_key(
+                g,
+                forward,
+                label.coupled_state(),
+                label.presence_state(),
+                key,
+            )
+        };
         // The initial bucket needs no heap storage. Bounds-only queries and
         // leaf buckets finish here without allocating a predecessor stack.
         let mut initial = Some((bucket, 0usize));
         let mut work = Vec::new();
+        let mut examined = 0usize;
         while let Some((k, min)) = work.pop().or_else(|| initial.take()) {
+            examined = examined.wrapping_add(1);
+            if examined & 255 == 0 && timer.is_some_and(|(start, limit)| start.elapsed() > limit) {
+                return true;
+            }
             let row = &storage.buckets[vertex][k];
             if self
                 .ctx()
@@ -243,17 +282,28 @@ impl<const D: usize> LabelingEngine<D> {
             if !scan {
                 return true;
             }
-            if let Some(scan_key) = self.ctx().bucket_completion_data(
-                g,
-                forward,
-                label,
-                own,
-                base_key,
-                BucketId { vertex, bucket: k },
-                row.hot.key.first().copied(),
-                threshold,
-            ) {
+            let scan_key = if scan_all_knapsack {
+                self.ctx().bucket_completion_feasible(
+                    g, forward, label.coupled_state(), vertex, k,
+                ).then_some(f64::NEG_INFINITY)
+            } else {
+                self.ctx().bucket_completion_data(
+                    g,
+                    forward,
+                    label,
+                    own,
+                    base_key,
+                    BucketId { vertex, bucket: k },
+                    row.hot.key.first().copied(),
+                    threshold,
+                )
+            };
+            if let Some(scan_key) = scan_key {
                 for &id in &row.active {
+                    examined = examined.wrapping_add(1);
+                    if examined & 255 == 0 && timer.is_some_and(|(start, limit)| start.elapsed() > limit) {
+                        return true;
+                    }
                     let other = storage.labels.view(id);
                     if self.ctx().completion_sum(scan_key, other.key()) >= threshold {
                         break;
@@ -270,14 +320,21 @@ impl<const D: usize> LabelingEngine<D> {
                     }
                 }
             }
-            for p in self.grid.direction(opposite).buckets[vertex][k]
-                .predecessors
-                .iter()
-                .rev()
-            {
-                if p.bucket.bucket >= min {
-                    work.push((p.bucket.bucket, min.max(p.minimum)));
+            let predecessors = &self.grid.direction(opposite).buckets[vertex][k].predecessors;
+            let mut end = 0;
+            while end < predecessors.len() && predecessors[end].bucket.bucket >= min {
+                examined = examined.wrapping_add(1);
+                if examined & 255 == 0 && timer.is_some_and(|(start, limit)| start.elapsed() > limit) {
+                    return true;
                 }
+                end += 1;
+            }
+            for p in predecessors[..end].iter().rev() {
+                examined = examined.wrapping_add(1);
+                if examined & 255 == 0 && timer.is_some_and(|(start, limit)| start.elapsed() > limit) {
+                    return true;
+                }
+                work.push((p.bucket.bucket, min.max(p.minimum)));
             }
         }
         self.resource_error.load(Ordering::Relaxed)
@@ -291,7 +348,25 @@ impl<const D: usize> LabelingEngine<D> {
         threshold: f64,
         scan: bool,
     ) -> bool {
-        if self.branching.resources != 0 {
+        if !self.labels_match_graph(g) {
+            return true;
+        }
+        self.enumeration_completion_with_timer(g, forward, label, threshold, scan, None)
+    }
+
+    pub(crate) fn enumeration_completion_with_timer(
+        &self,
+        g: &Graph<D>,
+        forward: bool,
+        label: &crate::enumeration::Label<D>,
+        threshold: f64,
+        scan: bool,
+        timer: Option<(Instant, std::time::Duration)>,
+    ) -> bool {
+        if timer.is_some_and(|(start, limit)| start.elapsed() > limit) {
+            return true;
+        }
+        if self.branching.resources != 0 && label.branch_state.is_none() {
             return true;
         }
         // Pricing completion bounds use limited-memory states. Negative
@@ -313,7 +388,12 @@ impl<const D: usize> LabelingEngine<D> {
         }
         let cut_words = match (&self.cuts.full, self.has_cuts()) {
             (Some(full), true) => {
-                state::project_words(&self.cuts.limited, full, label.vertex, &label.cut_words)
+                let Some(words) = state::project_words_mapped(
+                    &self.cuts.limited, full, label.vertex, &label.cut_words,
+                ) else {
+                    return true;
+                };
+                words
             }
             _ => [0; LIMITED_WORDS],
         };
@@ -328,7 +408,16 @@ impl<const D: usize> LabelingEngine<D> {
                 .get(label.vertex)
                 .map_or(0.0, |&p| 0.5 * p),
         };
-        self.completion_exists_data(g, forward, &projected, BucketId::default(), threshold, scan)
+        self.completion_exists_data(
+            g,
+            forward,
+            &projected,
+            BucketId::default(),
+            threshold,
+            scan,
+            self.full_ready,
+            timer,
+        )
     }
 }
 

@@ -50,7 +50,7 @@ impl PreparedSlopeAdjointArc {
             &source.upper,
         ]
         .iter()
-        .any(|function| function.is_machine_zero_length())
+        .any(|function| function.has_machine_only_geometry())
         {
             return Err(RawFunctionError::Unsupported(
                 "machine zero-length segment as paired source",

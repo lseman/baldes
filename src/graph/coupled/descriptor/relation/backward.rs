@@ -48,7 +48,7 @@ impl PreparedSlopeRelationArc {
             }
             let a = outer;
             let b = inner.pairs();
-            if a.len() > 12 || !lower.is_finite() || !upper.is_finite() || lower > upper {
+            if a.len() > 12 || !lower.is_finite() || !upper.is_finite() {
                 return Err(FrontierUnknown::Unsupported(
                     "machine waiting composition inputs",
                 ));
@@ -91,15 +91,18 @@ impl PreparedSlopeRelationArc {
                 deadline()?;
                 return Ok((result, ((waiting_bits >> segment) & 1) << 1));
             }
+            if lower > upper {
+                return Err(FrontierUnknown::Unsupported(
+                    "machine waiting composition reversed interval",
+                ));
+            }
             let (mut current_y, mut inner_index) = if near(lower, b[0].1)? {
                 (b[0].0, 1usize)
             } else {
                 inner
                     .machine_vector_value_and_segment(lower)
                     .map_err(FrontierUnknown::Arithmetic)?
-                    .ok_or(FrontierUnknown::Unsupported(
-                        "machine waiting composition start lookup",
-                    ))?
+                    .unwrap_or((1e12, 0))
             };
             // On the long path a literal inner value of 1e12 is passed to
             // the outer lookup; only the outer result is treated as sentinel.
@@ -223,6 +226,14 @@ impl PreparedSlopeRelationArc {
         };
         match compute() {
             Ok(value) => FrontierOutcome::Complete(value),
+            Err(FrontierUnknown::Unsupported(
+                "machine waiting composition inner domain"
+                | "machine waiting composition reversed interval"
+                | "machine short waiting composition inner sentinel"
+                | "machine short waiting composition outer sentinel"
+                | "machine waiting composition outer sentinel"
+                | "machine waiting composition exhausted outer domain",
+            )) => FrontierOutcome::Empty,
             Err(reason) => FrontierOutcome::Unknown(reason),
         }
     }
@@ -718,7 +729,11 @@ impl PreparedSlopeRelationArc {
         );
         let (composed, bits) = match composition {
             FrontierOutcome::Complete(value) => value,
-            FrontierOutcome::Empty => return FrontierOutcome::Empty,
+            FrontierOutcome::Empty => {
+                return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                    "machine backward composition diagnostic",
+                ))
+            }
             FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
         };
         let Some(second_budget) = stage_budget(stage_work) else {
@@ -727,7 +742,11 @@ impl PreparedSlopeRelationArc {
         let (difference, bits) =
             match Self::machine_backward_difference(&composed, bits, increment, second_budget) {
                 FrontierOutcome::Complete(value) => value,
-                FrontierOutcome::Empty => return FrontierOutcome::Empty,
+                FrontierOutcome::Empty => {
+                    return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                        "machine backward difference diagnostic",
+                    ))
+                }
                 FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
             };
         let Some(key_budget) = stage_budget(budget.max_operations - 2 * stage_work) else {
@@ -812,18 +831,14 @@ impl PreparedSlopeRelationArc {
                 let (value, segment) = second
                     .machine_vector_value_and_segment(a[0].1)
                     .map_err(FrontierUnknown::Arithmetic)?
-                    .ok_or(FrontierUnknown::Unsupported(
-                        "machine difference vector start lookup",
-                    ))?;
+                    .unwrap_or((1e12, 0));
                 j = segment;
                 (a[0].1, finite(a[0].0 - value)?)
             } else {
                 let (value, segment) = first
-                    .machine_value_and_segment(b[0].1)
+                    .machine_vector_value_and_segment(b[0].1)
                     .map_err(FrontierUnknown::Arithmetic)?
-                    .ok_or(FrontierUnknown::Unsupported(
-                        "machine difference fixed start lookup",
-                    ))?;
+                    .unwrap_or((1e12, 0));
                 i = segment;
                 (b[0].1, finite(value - b[0].0)?)
             };
@@ -875,6 +890,9 @@ impl PreparedSlopeRelationArc {
         };
         match compute() {
             Ok(value) => FrontierOutcome::Complete(value),
+            Err(FrontierUnknown::Unsupported("machine difference disjoint domains")) => {
+                FrontierOutcome::Empty
+            }
             Err(reason) => FrontierOutcome::Unknown(reason),
         }
     }
@@ -924,7 +942,9 @@ impl PreparedSlopeRelationArc {
             Self::machine_minimum_streams(&filtered.components()[0], upper, minimum_budget);
         match minimum {
             FrontierOutcome::Complete(vector) => FrontierOutcome::Complete((vector, limit)),
-            FrontierOutcome::Empty => FrontierOutcome::Empty,
+            FrontierOutcome::Empty => FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "machine backward minimum diagnostic",
+            )),
             FrontierOutcome::Unknown(reason) => FrontierOutcome::Unknown(reason),
         }
     }

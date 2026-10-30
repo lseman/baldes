@@ -9,7 +9,7 @@ pub use adjoint::PreparedSlopeAdjointArc;
 mod composition;
 mod concatenation;
 pub use concatenation::{
-    MachineConcatenation, MachineJoinedPathReconstruction, MachineLabelConcatenation,
+    MachineConcatenation, MachineConcatenationScan, MachineJoinedPathReconstruction, MachineLabelConcatenation,
 };
 mod normalization;
 pub use bounds::{clamp_filter, PreparedClampFilter};

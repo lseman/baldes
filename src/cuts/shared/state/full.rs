@@ -15,6 +15,9 @@ pub struct FullField {
 pub struct FullPreparation {
     pub fields: Vec<FullField>,
     pub row_to_field: Vec<i32>,
+    /// Full-field index for each limited-memory pricing row, when prepared
+    /// from a shared cut registry.
+    pub limited_to_field: Option<Vec<usize>>,
 }
 /// Full-memory enumeration tables. Rows with the same ordered support,
 /// denominator and rounding direction share one field and sum their duals.
@@ -25,6 +28,32 @@ pub fn prepare_full_memory<const D: usize>(
     cuts: &[FullInput],
     kpath: &[FullKPathInput],
     backward: bool,
+) -> bool {
+    prepare_full_memory_with_layout(info, prep, g, cuts, kpath, backward, false)
+}
+
+/// Prepare the recovered machine descriptor layout for raw comparisons.
+/// Its strong k-path exit shift can alias another field; it is not a source
+/// enumeration correctness certificate.
+pub fn prepare_full_memory_machine<const D: usize>(
+    info: &mut CutResourceInfo,
+    prep: &mut FullPreparation,
+    g: &Graph<D>,
+    cuts: &[FullInput],
+    kpath: &[FullKPathInput],
+    backward: bool,
+) -> bool {
+    prepare_full_memory_with_layout(info, prep, g, cuts, kpath, backward, true)
+}
+
+fn prepare_full_memory_with_layout<const D: usize>(
+    info: &mut CutResourceInfo,
+    prep: &mut FullPreparation,
+    g: &Graph<D>,
+    cuts: &[FullInput],
+    kpath: &[FullKPathInput],
+    backward: bool,
+    machine_layout: bool,
 ) -> bool {
     let vertices = g.vertices.len();
     let mut groups: BTreeMap<_, Vec<usize>> = BTreeMap::new();
@@ -44,6 +73,7 @@ pub fn prepare_full_memory<const D: usize>(
     let mut next = FullPreparation {
         fields: vec![],
         row_to_field: vec![-1; cuts.len() + kpath.len()],
+        limited_to_field: None,
     };
     let mut vertex_tables: Vec<Vec<VertexSupport>> = vec![vec![]; vertices];
     let mut forward_tables: Vec<Vec<ArcTransition>> = vec![vec![]; g.arcs.len()];
@@ -144,9 +174,8 @@ pub fn prepare_full_memory<const D: usize>(
                 if !from && to {
                     tables[i].push(transition(&f, -1, -1, -1));
                 } else if from && !to {
-                    // Keep the visited bit in this cut's field. The word
-                    // index is not its bit offset within that word.
-                    tables[i].push(transition(&f, 1, f.word, f.shift));
+                    let target_shift = if machine_layout { f.word } else { f.shift };
+                    tables[i].push(transition(&f, 1, f.word, target_shift));
                 }
             };
             add(true, &mut forward_tables);
@@ -212,7 +241,7 @@ pub fn full_memory_concatenation_cost(
                 cost = cost - f.cost;
             }
         } else if f.denominator <= sum {
-            cost = f.cost + cost;
+            cost = cost + f.cost;
         }
     }
     cost
@@ -237,6 +266,33 @@ pub fn project_words(
     }
     result
 }
+
+/// Project only when the pricing rows have been associated with the same
+/// original cuts as the full-memory rows.
+pub(crate) fn project_words_mapped(
+    limited: &LimitedPreparation,
+    full: &FullPreparation,
+    vertex: usize,
+    words: &[u32; FULL_WORDS],
+) -> Option<[u32; LIMITED_WORDS]> {
+    let mapping = full.limited_to_field.as_ref()?;
+    if mapping.len() != limited.positions.len() {
+        return None;
+    }
+    let mut result = [0u32; LIMITED_WORDS];
+    for (positions, &index) in limited.positions.iter().zip(mapping) {
+        let target = *positions.get(vertex)?;
+        if target < 0 {
+            continue;
+        }
+        let field = full.fields.get(index)?;
+        let source = *words.get(usize::try_from(field.word).ok()?)?;
+        let destination = result.get_mut(usize::try_from(target / 32).ok()?)?;
+        let value = arithmetic_shift_word(source, field.shift) & field.mask;
+        *destination |= value << ((target as u32) % 32);
+    }
+    Some(result)
+}
 /// Rank-one and strong k-path costs of an
 /// enumerated path from physical incidence (no memory), the byte-wide
 /// accumulator included.
@@ -251,11 +307,11 @@ pub fn enumerated_path_cut_cost(
         let mut sum: u8 = 0;
         let mut add = |value: i32| {
             let v = if cut.covering && !cut.type2 {
-                -value
+                value.wrapping_neg()
             } else {
                 value
             };
-            sum = (sum as i32 + v) as u8;
+            sum = sum.wrapping_add(v as u8);
         };
         for &v in vertices {
             add(cut.vertex_coefficient[v]);
@@ -274,7 +330,10 @@ pub fn enumerated_path_cut_cost(
         } else {
             sum as i32 / cut.denominator
         };
-        if coefficient != 0 {
+        // Type-2 rows execute the addition for every nonzero byte, even
+        // when integer division yields zero. The addition is observable for
+        // signed zero and must follow the retained-path update order.
+        if coefficient != 0 || (cut.type2 && sum != 0) {
             cost = cost + coefficient as f64 * cut.dual;
         }
     }

@@ -7,6 +7,7 @@ use crate::{invalid, Result};
 
 pub mod descriptor;
 mod encoded;
+mod custom_machine;
 mod kernel;
 pub mod plugin;
 mod pwl;
@@ -15,13 +16,13 @@ pub use descriptor::{
     SlopeRelationArc,
 };
 pub use encoded::EncodedFunction;
+pub use custom_machine::{CustomMachineState, CustomMachineTrace};
 pub use kernel::{
     BoundMachinePathHistory, CoupledKernel, CoupledLabelState, CoupledPathCosts, CoupledPathValues,
-    CoupledWorkspace, MachineArcPreparationInput, PairedControl, PreparedMachineArc,
-    PreparedMachineBackwardInputs,
+    CoupledWorkspace, MachineArcFunctionInput, MachineArcPreparationInput, PairedControl,
+    PreparedMachineArc, PreparedMachineBackwardInputs,
 };
 pub(crate) use kernel::{CoupledPairSummary, CoupledStateBounds};
-#[cfg(feature = "clp")]
 pub use kernel::{FrontProgramCertificate, PairedControlCertificate};
 pub use plugin::{CoupledPlugin, PluginResource, PluginState};
 pub use pwl::PiecewiseLinearFunction;

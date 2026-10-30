@@ -112,6 +112,41 @@ fn full_memory_kpath_fields_do_not_overwrite_other_cuts() {
 }
 
 #[test]
+fn machine_kpath_exit_layout_preserves_recovered_destination_shift() {
+    let mut graph = Graph::<2>::new(4, 0).unwrap();
+    graph.add_arc(2, 3, 0.).unwrap();
+    let inputs: Vec<_> = [1, 2]
+        .into_iter()
+        .map(|vertex| {
+            let mut support = vec![false; 4];
+            support[vertex] = true;
+            FullKPathInput {
+                ordered_support: vec![vertex],
+                dual: -1.,
+                vertex_support: support,
+            }
+        })
+        .collect();
+    let mut source = CutResourceInfo::default();
+    let mut machine = CutResourceInfo::default();
+    assert!(prepare_full_memory(&mut source, &mut FullPreparation::default(), &graph, &[], &inputs, true));
+    assert!(prepare_full_memory_machine(&mut machine, &mut FullPreparation::default(), &graph, &[], &inputs, true));
+    let source_exit = &source.forward[0].full_memory[0];
+    let machine_exit = &machine.forward[0].full_memory[0];
+    assert_eq!((source_exit.source_shift, source_exit.target_shift), (1, 1));
+    assert_eq!((machine_exit.source_shift, machine_exit.target_shift), (1, 0));
+    // The pinned helper produces these packed words in both directions for
+    // the corresponding descriptor; its additional cost remains zero.
+    for (initial, expected) in [(0, 1), (1, 1), (2, 2), (3, 2)] {
+        let mut words = [0; FULL_WORDS];
+        let mut additional = 0.;
+        words[0] = initial;
+        change_full_memory_along_arc(&mut words, &mut additional, &[*machine_exit]);
+        assert_eq!((words[0], additional), (expected, 0.));
+    }
+}
+
+#[test]
 fn omitted_words_match_zero_extended_states_in_all_readers() {
     let prefix = [1, 0];
     let mut padded = [0; LIMITED_WORDS];

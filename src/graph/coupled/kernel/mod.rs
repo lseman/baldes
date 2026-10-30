@@ -5,9 +5,7 @@ mod activities;
 pub(super) mod bounds;
 mod bucketing;
 mod budgeted;
-#[cfg(feature = "clp")]
 mod certificate;
-#[cfg(feature = "clp")]
 pub use certificate::PairedControlCertificate;
 mod continuation;
 mod dependency_order;
@@ -24,8 +22,8 @@ mod selection;
 mod slope_interval;
 pub(super) mod slope_paired;
 pub use slope_paired::{PreparedMachineArc, PreparedMachineBackwardInputs};
-/// Diagnostic machine history bound to the exact installed sidecar and
-/// kernel identity that produced it. This is not a route certificate.
+/// Diagnostic machine history bound to the installed machine program that
+/// produced it. This is not a route certificate.
 #[derive(Clone, Debug)]
 pub struct BoundMachinePathHistory {
     history: descriptor::MachinePathHistory,
@@ -56,6 +54,21 @@ pub struct MachineArcPreparationInput<'a> {
     pub dependent: &'a PreparedSlopeFunction,
     pub dependent_lower: &'a PreparedSlopeFunction,
     pub dependent_upper: &'a PreparedSlopeFunction,
+}
+
+/// Per-arc function inputs before the front program's window preparation.
+#[derive(Clone, Copy, Debug)]
+pub struct MachineArcFunctionInput<'a> {
+    pub physical_arc: usize,
+    pub tail_bounds: Window,
+    pub waiting_bounds: Window,
+    pub waiting_rate: i32,
+    /// Base consumption vector, before truncation to the tail window and
+    /// conversion to the arrival mapping.
+    pub base: &'a PreparedSlopeFunction,
+    pub dependent: descriptor::MachineRootInput<'a>,
+    pub dependent_lower: descriptor::MachineRootInput<'a>,
+    pub dependent_upper: descriptor::MachineRootInput<'a>,
 }
 mod storage;
 pub use activities::{CoupledPathCosts, CoupledPathValues, PairedControl};
@@ -100,6 +113,8 @@ pub struct CoupledLabelState {
     /// a reversed suffix, so dominance must preserve that role too.
     reversed_use: bool,
     numeric: StateValues<f64, 4>,
+    custom_machine: Vec<crate::graph::coupled::CustomMachineTrace>,
+    custom_machine_identity: Option<std::sync::Arc<()>>,
     suffix: Option<Box<Suffix>>,
     fronts: Vec<front::CostFront>,
     slope_fronts: Vec<slope_interval::SlopeLabel>,
@@ -116,7 +131,10 @@ pub struct CoupledLabelState {
 pub struct CoupledKernel {
     // Shared by semantic clones; cost suppression receives a fresh token.
     identity: std::sync::Arc<()>,
+    // Machine operands and roots outlive changes to pricing-only state.
+    machine_identity: std::sync::Arc<()>,
     definitions: std::sync::Arc<[CoupledResource]>,
+    custom_indices: Vec<usize>,
     slots: Vec<Option<usize>>,
     initial: Vec<f64>,
     cost_scale: f64,
@@ -162,7 +180,6 @@ pub struct CoupledKernel {
 /// Certificate for the explicitly named alternate native machine-front model.
 /// It is not a source-control feasibility witness for a default graph. The
 /// objective interval also includes outward aggregation with other resources.
-#[cfg(feature = "clp")]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FrontProgramCertificate {
     pub feasible: bool,
@@ -207,6 +224,9 @@ impl CoupledKernel {
                 .iter()
                 .any(|label| label.front.is_some() != state.suffix.is_none())
             || state.numeric.len() != self.initial.len()
+            || state.custom_machine.len() != self.custom_indices.len()
+            || (!state.custom_machine.is_empty()
+                && !state.custom_machine_identity.as_ref().is_some_and(|identity| std::sync::Arc::ptr_eq(identity, &self.machine_identity)))
             || state.selection.len() != self.selection_initial.len()
             || state.loads.len() != self.load_capacities.len()
             || state.budgets.len() != budgeted::PreparedBudgeted::width(&self.budgeted)
@@ -229,6 +249,23 @@ impl CoupledKernel {
 }
 
 impl CoupledLabelState {
+    /// Apply the recovered custom vertex callback to this label's raw machine
+    /// traces. Labeling and enumeration call this at their vertex step;
+    /// callers extending standalone labels may call it at the same point.
+    pub fn custom_machine_enter_vertex(&mut self) {
+        for trace in &mut self.custom_machine {
+            if trace.accepted {
+                trace.wrapper_cost = 0. + trace.wrapper_cost;
+            }
+        }
+    }
+
+    /// Raw custom callback traces in descriptor order. A rejected machine
+    /// trace does not reject the independently evaluated source label.
+    pub fn custom_machine_traces(&self) -> &[crate::graph::coupled::CustomMachineTrace] {
+        &self.custom_machine
+    }
+
     /// Cost knots for each interval resource in declaration order. Forward
     /// functions price prefixes at the current arrival value; backward
     /// functions price suffixes at their entry value. Singleton domains are

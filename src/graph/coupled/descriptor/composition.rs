@@ -85,7 +85,7 @@ pub fn inverse_increasing(
     budget: FrontierBudget,
 ) -> FrontierOutcome<PreparedSlopeFunction> {
     finish((|| {
-        if function.is_machine_zero_length() {
+        if function.has_machine_only_geometry() {
             return Err(unsupported("machine zero-length segment inversion"));
         }
         let mut work = Work::new(budget);
@@ -176,7 +176,7 @@ pub struct MachineArcPreparation {
 /// Prepare machine vectors from explicitly supplied, already prepared inputs
 /// and compute the reference initializer's bounded limit branch. This does not
 /// infer truncation, dependent map entries, resource identity, or graph bounds.
-/// Both stages share one elapsed deadline and conservatively split work.
+/// Both stages share one elapsed deadline and a bounded work allowance.
 pub fn prepare_machine_arc(
     truncated: &PreparedSlopeFunction,
     dependent: &PreparedSlopeFunction,
@@ -186,11 +186,18 @@ pub fn prepare_machine_arc(
     budget: FrontierBudget,
 ) -> FrontierOutcome<MachineArcPreparation> {
     let started = Instant::now();
-    let per_stage = budget.max_operations / 2;
-    if per_stage == 0 {
+    // Forward and inverse vectors preserve the truncated array's pair count.
+    // The initial-limit scan charges two pair checks, two forward lookups,
+    // one inverse lookup and four branch operations.
+    let Some(limit_work) = truncated.pairs().len().checked_mul(3)
+        .and_then(|work| work.checked_add(6)) else {
         return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
-    }
-    let stage_budget = || -> Result<FrontierBudget> {
+    };
+    let limit_work = limit_work.min(budget.max_operations / 2);
+    let Some(input_work) = budget.max_operations.checked_sub(limit_work) else {
+        return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
+    };
+    let stage_budget = |max_operations| -> Result<FrontierBudget> {
         let remaining = budget
             .max_elapsed
             .map(|limit| limit.saturating_sub(started.elapsed()));
@@ -198,12 +205,12 @@ pub fn prepare_machine_arc(
             return Err(FrontierUnknown::Deadline);
         }
         Ok(FrontierBudget {
-            max_operations: per_stage,
+            max_operations,
             max_elapsed: remaining,
             ..budget
         })
     };
-    let first_budget = match stage_budget() {
+    let first_budget = match stage_budget(input_work) {
         Ok(value) => value,
         Err(reason) => return FrontierOutcome::Unknown(reason),
     };
@@ -214,7 +221,7 @@ pub fn prepare_machine_arc(
         }
         FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
     };
-    let second_budget = match stage_budget() {
+    let second_budget = match stage_budget(limit_work) {
         Ok(value) => value,
         Err(reason) => return FrontierOutcome::Unknown(reason),
     };
@@ -272,7 +279,7 @@ pub fn machine_initial_limits(
         work.charge(operations)?;
         let lookup = |function: &PreparedSlopeFunction, coordinate: f64| -> Result<Option<f64>> {
             function
-                .machine_value_and_segment(coordinate)
+                .machine_vector_value_and_segment(coordinate)
                 .map(|value| value.map(|(value, _)| value).filter(|&value| value != 1e12))
                 .map_err(FrontierUnknown::Arithmetic)
         };
@@ -318,21 +325,31 @@ pub fn prepare_machine_inputs(
     budget: FrontierBudget,
 ) -> FrontierOutcome<MachinePreparedInputs> {
     let started = Instant::now();
-    let per_stage = budget.max_operations / 4;
     let forward_work = match truncated.pairs().len().checked_mul(2) {
         Some(value) => value,
         None => return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit),
     };
-    if per_stage < forward_work {
+    let inverse_work = match truncated.pairs().len().checked_mul(6)
+        .and_then(|work| work.checked_add(1)) {
+        Some(value) => value,
+        None => return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit),
+    };
+    // A machine array accepted by the following check has at most twelve
+    // pairs. For smaller budgets retain the earlier quarter-budget limit,
+    // so a short output is not rejected merely by reserving for twelve.
+    let check_work = 72usize.min(budget.max_operations / 4);
+    let Some(composition_work) = budget.max_operations.checked_sub(forward_work)
+        .and_then(|work| work.checked_sub(inverse_work))
+        .and_then(|work| work.checked_sub(check_work)) else {
         return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
-    }
+    };
     if budget.max_components == 0 {
         return FrontierOutcome::Unknown(FrontierUnknown::ComponentLimit);
     }
     if truncated.pairs().len() > budget.max_pairs || dependent.pairs().len() > budget.max_pairs {
         return FrontierOutcome::Unknown(FrontierUnknown::PairLimit);
     }
-    let remaining = || -> std::result::Result<FrontierBudget, FrontierUnknown> {
+    let remaining = |max_operations| -> std::result::Result<FrontierBudget, FrontierUnknown> {
         let remaining = budget
             .max_elapsed
             .map(|limit| limit.saturating_sub(started.elapsed()));
@@ -340,19 +357,19 @@ pub fn prepare_machine_inputs(
             return Err(FrontierUnknown::Deadline);
         }
         Ok(FrontierBudget {
-            max_operations: per_stage,
+            max_operations,
             max_elapsed: remaining,
             ..budget
         })
     };
-    if let Err(reason) = remaining() {
+    if let Err(reason) = remaining(forward_work) {
         return FrontierOutcome::Unknown(reason);
     }
     let forward = match truncated.machine_forward_from_truncated() {
         Ok(value) => value,
         Err(error) => return FrontierOutcome::Unknown(FrontierUnknown::Arithmetic(error)),
     };
-    let inverse_budget = match remaining() {
+    let inverse_budget = match remaining(inverse_work) {
         Ok(value) => value,
         Err(reason) => return FrontierOutcome::Unknown(reason),
     };
@@ -364,7 +381,7 @@ pub fn prepare_machine_inputs(
         FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
     };
     let (lower, upper) = inverse.domain();
-    let composition_budget = match remaining() {
+    let composition_budget = match remaining(composition_work) {
         Ok(value) => value,
         Err(reason) => return FrontierOutcome::Unknown(reason),
     };
@@ -385,10 +402,10 @@ pub fn prepare_machine_inputs(
     // The initializer checks the composed fixed array before consuming it.
     // Its first segment is exempt from coordinate-separation checks; later
     // coordinates must strictly increase outside the machine tolerance band.
-    if !(2..=12).contains(&sum.pairs().len()) || sum.pairs()[0].0 == 1e12 {
+    if sum.pairs().len() > 12 {
         return FrontierOutcome::Unknown(unsupported("machine prepared sum output check"));
     }
-    let check_budget = match remaining() {
+    let check_budget = match remaining(check_work) {
         Ok(value) => value,
         Err(reason) => return FrontierOutcome::Unknown(reason),
     };
@@ -396,23 +413,17 @@ pub fn prepare_machine_inputs(
     if let Err(reason) = work.charge(sum.pairs().len().saturating_mul(6)) {
         return FrontierOutcome::Unknown(reason);
     }
-    for index in 2..sum.pairs().len() {
-        let current = sum.pairs()[index].1;
-        let previous = sum.pairs()[index - 1].1;
-        match near(current, previous) {
-            Ok(false) if current > previous => {}
-            Ok(_) => {
-                return FrontierOutcome::Unknown(unsupported(
-                    "machine prepared sum consecutive coordinates",
-                ))
-            }
-            Err(reason) => return FrontierOutcome::Unknown(reason),
+    match sum.check_machine_array() {
+        Ok(true) => {}
+        Ok(false) => {
+            return FrontierOutcome::Unknown(unsupported("machine prepared sum output check"));
         }
-        if let Err(reason) = work.charge(0) {
-            return FrontierOutcome::Unknown(reason);
-        }
+        Err(error) => return FrontierOutcome::Unknown(FrontierUnknown::Arithmetic(error)),
     }
-    if let Err(reason) = remaining() {
+    if let Err(reason) = work.charge(0) {
+        return FrontierOutcome::Unknown(reason);
+    }
+    if let Err(reason) = remaining(0) {
         return FrontierOutcome::Unknown(reason);
     }
     FrontierOutcome::Complete(MachinePreparedInputs {
@@ -428,7 +439,7 @@ struct Cached<'a> {
 }
 impl<'a> Cached<'a> {
     fn new(function: &'a PreparedSlopeFunction, increasing: bool, work: &mut Work) -> Result<Self> {
-        if function.is_machine_zero_length() {
+        if function.has_machine_only_geometry() {
             return Err(unsupported("machine zero-length segment composition"));
         }
         work.pairs(function.pairs().len())?;

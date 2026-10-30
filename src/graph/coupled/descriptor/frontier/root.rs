@@ -19,7 +19,9 @@ impl MachineRootState {
         if budget.max_pairs < 2 {
             return FrontierOutcome::Unknown(FrontierUnknown::PairLimit);
         }
-        if !lower.is_finite() || !upper.is_finite() || lower > upper {
+        // The initializer writes the terminal endpoints literally; source
+        // window validation remains the caller's separate responsibility.
+        if !lower.is_finite() || !upper.is_finite() {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
                 "machine backward root bounds",
             ));

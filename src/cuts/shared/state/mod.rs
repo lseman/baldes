@@ -141,7 +141,7 @@ pub(crate) fn changed_along_arc(
             remainder = rest;
             if coefficient != 0 {
                 let charge = coefficient as f64 * t.overflow_cost;
-                *additional = *additional + charge;
+                *additional = charge + *additional;
             }
         }
         if remainder > 0 && t.target_word >= 0 {
@@ -249,7 +249,7 @@ pub fn concatenation_cost(
                 cost = cost - f.cost;
             }
         } else if f.denominator <= sum {
-            cost = f.cost + cost;
+            cost = cost + f.cost;
         }
     }
     cost

@@ -128,6 +128,7 @@ fn machine_history_backtracks_through_a_multisegment_inverse() {
             previous: Some(history.head.clone()),
             snapshot: MachinePathSnapshot::Forward { arc: 7, state },
         }),
+        root: history.root.clone(),
         len: 2,
         max_states: 2,
     };

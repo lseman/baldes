@@ -13,7 +13,7 @@ impl PreparedSlopeRelationArc {
             &source.upper,
         ]
         .iter()
-        .any(|function| function.is_machine_zero_length())
+        .any(|function| function.has_machine_only_geometry())
         {
             return Err(RawFunctionError::Unsupported(
                 "machine zero-length segment as paired source",
@@ -189,7 +189,11 @@ impl PreparedSlopeRelationArc {
         let started = Instant::now();
         let reduced = match front.machine_reduce_for_continuation(budget) {
             FrontierOutcome::Complete(front) => front,
-            FrontierOutcome::Empty => return FrontierOutcome::Empty,
+            FrontierOutcome::Empty => {
+                return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                    "machine continuation reduction empty",
+                ))
+            }
             FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
         };
         // Reserve the complete reducer scan plus both possible vector lookups
@@ -298,11 +302,9 @@ impl PreparedSlopeRelationArc {
             budget,
         ) {
             FrontierOutcome::Complete(output) => FrontierOutcome::Complete((reduced, output)),
-            // A missing intersection is not yet a proved machine rejection
-            // for every tolerance branch, nor a source infeasibility proof.
-            FrontierOutcome::Empty => FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                "unrecovered machine continuation composition failure",
-            )),
+            // The raw composition helper reports false when its requested
+            // interval is disjoint from the inverse vector's domain.
+            FrontierOutcome::Empty => FrontierOutcome::Empty,
             FrontierOutcome::Unknown(reason) => FrontierOutcome::Unknown(reason),
         }
     }
@@ -354,18 +356,14 @@ impl PreparedSlopeRelationArc {
                 let (value, segment) = vector
                     .machine_vector_value_and_segment(a[0].1)
                     .map_err(FrontierUnknown::Arithmetic)?
-                    .ok_or(FrontierUnknown::Unsupported(
-                        "machine sum vector start lookup",
-                    ))?;
+                    .unwrap_or((1e12, 0));
                 j = segment;
                 (a[0].1, finite(a[0].0 + value)?)
             } else {
                 let (value, segment) = fixed
-                    .machine_value_and_segment(b[0].1)
+                    .machine_vector_value_and_segment(b[0].1)
                     .map_err(FrontierUnknown::Arithmetic)?
-                    .ok_or(FrontierUnknown::Unsupported(
-                        "machine sum fixed start lookup",
-                    ))?;
+                    .unwrap_or((1e12, 0));
                 i = segment;
                 (b[0].1, finite(value + b[0].0)?)
             };
@@ -411,6 +409,9 @@ impl PreparedSlopeRelationArc {
         };
         match compute() {
             Ok(value) => FrontierOutcome::Complete(value),
+            Err(FrontierUnknown::Unsupported("machine sum disjoint domains")) => {
+                FrontierOutcome::Empty
+            }
             Err(reason) => FrontierOutcome::Unknown(reason),
         }
     }
@@ -455,24 +456,14 @@ impl PreparedSlopeRelationArc {
             }
             FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
         };
-        let pairs = output.pairs();
-        if !(2..=12).contains(&pairs.len()) || pairs[0].0 == 1e12 {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                "machine continuation sum failed output check",
-            ));
-        }
-        // The first segment may be a retained duplicate. Later coordinates
-        // must increase strictly and must be outside the near-equality band.
-        for index in 2..pairs.len() {
-            match near(pairs[index].1, pairs[index - 1].1) {
-                Ok(false) if pairs[index].1 > pairs[index - 1].1 => {}
-                Ok(_) => {
-                    return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                        "machine continuation sum consecutive coordinates",
-                    ))
-                }
-                Err(reason) => return FrontierOutcome::Unknown(reason),
+        match output.check_machine_array() {
+            Ok(true) => {}
+            Ok(false) => {
+                return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                    "machine continuation sum failed output check",
+                ))
             }
+            Err(error) => return FrontierOutcome::Unknown(FrontierUnknown::Arithmetic(error)),
         }
         if budget
             .max_elapsed
@@ -486,8 +477,9 @@ impl PreparedSlopeRelationArc {
     /// Execute the bounded recovered machine continuation with distinct
     /// caller-supplied operands. The returned reduced input retains machine
     /// provenance; the envelope retains waiting provenance. Neither is a
-    /// source-control certificate or a reconstructed route. Unsupported and
-    /// machine-only rejection cases return unknown.
+    /// source-control certificate or a reconstructed route. The recovered
+    /// preflight and disjoint-composition rejections are empty; unsupported
+    /// later stages are unknown.
     ///
     /// Six stages share the operation allowance conservatively and use the
     /// remaining elapsed time from one start instant. A stage may exhaust its
@@ -537,15 +529,23 @@ impl PreparedSlopeRelationArc {
                 }
             };
         }
-        let preflight = stage!(self.machine_continuation_preflight(
+        let preflight = match self.machine_continuation_preflight(
             front,
             inputs.tail_limit,
             inputs.head_limit,
             inputs.forward_mapping,
-            next_budget!()
-        ));
+            next_budget!(),
+        ) {
+            FrontierOutcome::Complete(value) => value,
+            FrontierOutcome::Empty => return FrontierOutcome::Empty,
+            FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
+        };
         let composed =
-            stage!(self.machine_continuation_compose(preflight, inputs.inverse, next_budget!()));
+            match self.machine_continuation_compose(preflight, inputs.inverse, next_budget!()) {
+                FrontierOutcome::Complete(value) => value,
+                FrontierOutcome::Empty => return FrontierOutcome::Empty,
+                FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
+            };
         let (reduced, sum) =
             stage!(self.machine_continuation_sum(composed, inputs.sum_vector, next_budget!()));
         let sum_front = SlopeFront::from_prepared(sum);
@@ -597,11 +597,7 @@ impl PreparedSlopeRelationArc {
         };
         let (reduced, envelope) = match self.machine_continue(front, inputs, continuation_budget) {
             FrontierOutcome::Complete(value) => value,
-            FrontierOutcome::Empty => {
-                return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                    "machine continuation rejected",
-                ));
-            }
+            FrontierOutcome::Empty => return FrontierOutcome::Empty,
             FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
         };
         let remaining = budget
@@ -656,8 +652,8 @@ impl PreparedSlopeRelationArc {
         if budget.max_operations < 16 {
             return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
         }
-        if fixed.is_machine_zero_length()
-            || vector.is_machine_zero_length()
+        if fixed.has_machine_only_geometry()
+            || vector.has_machine_only_geometry()
             || fixed.pairs().len() != 2
             || vector.pairs().len() != 2
         {

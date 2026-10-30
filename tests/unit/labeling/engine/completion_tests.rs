@@ -16,6 +16,67 @@ fn model() -> Graph<2> {
         .unwrap();
     graph
 }
+
+#[test]
+fn stored_paired_completion_scans_only_after_labels_are_complete() {
+    use crate::graph::coupled::descriptor::{
+        FrontOperationPolicy, PairedCostNormalization, PreparedSlopeFunction, SlopeRelationArc,
+    };
+    use crate::graph::coupled::PairedResourceMode;
+    use crate::graph::Window;
+
+    let mut graph = Graph::<2>::new(3, 1).unwrap();
+    graph.vertices[0].elements.clear();
+    graph.vertices[2].elements.clear();
+    for vertex in 0..3 {
+        graph.set_bounds(vertex, 0, 0., 4.).unwrap();
+    }
+    for (tail, head) in [(0, 1), (1, 2)] {
+        let id = graph.add_arc(tail, head, -1.).unwrap();
+        graph.arc_mut(id).unwrap().consumption[0] = 1.;
+    }
+    let line = |value, slope| {
+        PreparedSlopeFunction::from_prepared_pairs(vec![(value, 0.), (slope, 4.)]).unwrap()
+    };
+    let arc = SlopeRelationArc {
+        arrival: line(1., 1.),
+        increment: line(0.25, 0.),
+        lower: line(0., 0.),
+        upper: line(8., 0.),
+        waiting: 0,
+    };
+    graph
+        .set_coupled_resources(&[CoupledResource::SlopePaired {
+            initial: line(0., 0.),
+            initial_base: Window::new(0., 4.).unwrap(),
+            arcs: vec![arc; 2],
+            mode: PairedResourceMode::CostUnbounded,
+            normalization: PairedCostNormalization::AbsoluteFinalValue,
+            policy: FrontOperationPolicy::StrictDomain,
+        }])
+        .unwrap();
+    let mut engine = engine(&graph);
+    engine
+        .prepare_full_labels(&graph, &Controls::default())
+        .unwrap();
+    let vertex = engine.grid.internal[1];
+    let id = engine.forward.buckets[vertex]
+        .iter()
+        .flat_map(|bucket| &bucket.active)
+        .copied()
+        .next()
+        .unwrap();
+    let mut label = engine.forward.labels.view(id).to_owned();
+    // A stored label has already visited the meeting vertex. The completion
+    // query used during extension runs before that vertex step, since the
+    // opposite stored label already contains its elements.
+    assert!(!engine.completion_exists(&graph, true, &label, 100., true));
+    label.ng &= !engine.ng.vertex_bits[label.vertex];
+    assert!(!engine.completion_exists(&graph, true, &label, -100., true));
+    assert!(engine.completion_exists(&graph, true, &label, 100., true));
+    engine.full_ready = false;
+    assert!(engine.completion_exists(&graph, true, &label, -100., true));
+}
 fn engine(g: &Graph<2>) -> LabelingEngine<2> {
     LabelingEngine::prepare(
         g,
@@ -259,6 +320,7 @@ fn enumeration_projection_borrows_payloads_and_matches_owned_completion() {
         cut_words: [0; crate::cuts::state::FULL_WORDS],
         cut_cost: original.additional_cost,
         presence_state: original.presence_state.clone(),
+        branch_state: None,
         coupled_state: original.coupled_state.clone(),
     };
     let projected = EnumerationProjection {

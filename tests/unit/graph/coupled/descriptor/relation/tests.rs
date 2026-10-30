@@ -25,7 +25,7 @@ fn general_machine_minimum_matches_binary_scan() {
         );
         if !row["accepted"].as_bool().unwrap() {
             assert!(
-                matches!(result, FrontierOutcome::Unknown(_)),
+                matches!(result, FrontierOutcome::Empty),
                 "case {index}: {result:?}"
             );
         } else if row["finite"].as_bool().unwrap() {

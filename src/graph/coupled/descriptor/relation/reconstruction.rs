@@ -13,10 +13,48 @@ impl PreparedSlopeRelationArc {
         mode: i32,
         budget: FrontierBudget,
     ) -> FrontierOutcome<MachinePathReconstruction> {
+        Self::machine_reconstruct_backward_path_with_rates(
+            history, steps, initial_base, initial_dependent, mode, None, budget,
+        )
+    }
+
+    /// Reconstruct with the original per-arc waiting coefficients. Label
+    /// extension uses each input's integer rate; recording uses these raw
+    /// coefficients when supplied, as in the paired solution recorder.
+    pub fn machine_reconstruct_backward_path_with_rates(
+        history: &MachinePathHistory,
+        steps: &[(usize, MachineBackwardInputs<'_>)],
+        initial_base: f64,
+        initial_dependent: f64,
+        mode: i32,
+        waiting_rates: Option<&[f64]>,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<MachinePathReconstruction> {
+        Self::machine_reconstruct_backward_path_with_rates_and_debug(
+            history, steps, initial_base, initial_dependent, mode, waiting_rates, 0, budget,
+        )
+    }
+
+    /// Reconstruct with original waiting rates and the resource diagnostic level.
+    pub fn machine_reconstruct_backward_path_with_rates_and_debug(
+        history: &MachinePathHistory,
+        steps: &[(usize, MachineBackwardInputs<'_>)],
+        initial_base: f64,
+        initial_dependent: f64,
+        mode: i32,
+        waiting_rates: Option<&[f64]>,
+        debug_level: i32,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<MachinePathReconstruction> {
         let started = Instant::now();
         if !initial_base.is_finite()
             || !initial_dependent.is_finite()
             || history.len().checked_sub(1) != Some(steps.len())
+            || waiting_rates.is_some_and(|rates| {
+                rates.len() != steps.len() || rates.iter().zip(steps).any(|(rate, (_, input))| {
+                    !rate.is_finite() || rate.trunc() != f64::from(input.waiting_rate)
+                })
+            })
         {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
                 "machine suffix reconstruction shape",
@@ -58,11 +96,10 @@ impl PreparedSlopeRelationArc {
             }
             work = work.saturating_add(16);
         }
-        let Some(remaining_work) = budget.max_operations.checked_sub(work) else {
+        let Some(mut remaining_work) = budget.max_operations.checked_sub(work) else {
             return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
         };
-        let per_wait = remaining_work / steps.len().max(1);
-        let compute = || -> Result<MachinePathReconstruction, FrontierUnknown> {
+        let mut compute = || -> Result<MachinePathReconstruction, FrontierUnknown> {
             let deadline = || -> Result<Option<std::time::Duration>, FrontierUnknown> {
                 let remaining = budget
                     .max_elapsed
@@ -75,8 +112,9 @@ impl PreparedSlopeRelationArc {
             let lookup =
                 |function: &PreparedSlopeFunction, coordinate| -> Result<f64, FrontierUnknown> {
                     function
-                        .evaluate(coordinate, EvaluationPolicy::EndpointTolerance)
+                        .machine_vector_value_and_segment(coordinate)
                         .map_err(FrontierUnknown::Arithmetic)?
+                        .map(|(value, _)| value)
                         .filter(|value| *value != 1e12)
                         .ok_or(FrontierUnknown::Unsupported(
                             "machine suffix lookup sentinel",
@@ -125,14 +163,22 @@ impl PreparedSlopeRelationArc {
                         .front()
                         .components()[0];
                     let target = finite(increment + value)?;
-                    match Self::machine_backward_waiting(
+                    // Reserve only for waiting scans actually reached. A
+                    // clipped point may be expanded to two machine pairs.
+                    let count = next.pairs().len();
+                    let wait_work = count.saturating_mul(16).saturating_add(160)
+                        .saturating_add(count.max(2).saturating_add(input.dependent_upper.pairs().len()).saturating_mul(64));
+                    remaining_work = remaining_work.checked_sub(wait_work)
+                        .ok_or(FrontierUnknown::WorkLimit)?;
+                    match Self::machine_backward_waiting_with_debug(
                         next,
                         input,
                         arrival,
                         target,
                         mode,
+                        debug_level,
                         FrontierBudget {
-                            max_operations: per_wait,
+                            max_operations: wait_work,
                             max_elapsed: deadline()?,
                             ..budget
                         },
@@ -149,23 +195,15 @@ impl PreparedSlopeRelationArc {
                     0.
                 };
                 base = finite(arrival + waiting)?;
+                let waiting_rate = waiting_rates.map_or(f64::from(input.waiting_rate), |rates| rates[position]);
                 dependent = finite(
                     finite(dependent + increment)?
-                        + finite(waiting * f64::from(input.waiting_rate))?,
+                        + finite(waiting * waiting_rate)?,
                 )?;
                 result.waiting.push(waiting);
                 result.base.push(base);
                 result.dependent.push(dependent);
             }
-            // Check that the reconstructed coordinate can be read at the
-            // retained terminal entry. This is still a machine-domain check.
-            snapshots[0].front().components()[0]
-                .machine_value_and_segment(base)
-                .map_err(FrontierUnknown::Arithmetic)?
-                .filter(|(value, _)| *value != 1e12)
-                .ok_or(FrontierUnknown::Unsupported(
-                    "machine suffix terminal lookup sentinel",
-                ))?;
             deadline()?;
             Ok(result)
         };
@@ -201,8 +239,8 @@ impl PreparedSlopeRelationArc {
     /// Recompute an explicit machine path, preserving each state before the
     /// following arc's reduction. Arc identities and prepared inputs are
     /// supplied by the caller and are not validated against a graph here.
-    /// This models the bounded recomputation path; it does not certify a
-    /// pricing-label history, a source-control route, or feasibility.
+    /// A recovered machine preflight rejection returns `Empty`. This does not
+    /// certify a pricing-label history, a source-control route, or feasibility.
     pub fn machine_replay_path(
         root: &MachineRootState,
         steps: &[(
@@ -263,12 +301,16 @@ impl PreparedSlopeRelationArc {
             next_budget!()
         ));
         for (arc, transition, inputs) in steps {
-            let (reduced, next) = run_stage!(transition.machine_transition(
+            let (reduced, next) = match transition.machine_transition(
                 history.last().front(),
                 inputs,
                 mode,
                 next_budget!(),
-            ));
+            ) {
+                FrontierOutcome::Complete(value) => value,
+                FrontierOutcome::Empty => return FrontierOutcome::Empty,
+                FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
+            };
             history = run_stage!(history.append(*arc, &reduced, &next, next_budget!()));
         }
         if budget

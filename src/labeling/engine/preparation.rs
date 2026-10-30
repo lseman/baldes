@@ -9,6 +9,7 @@ impl<const D: usize> LabelingEngine<D> {
         self.half_ready = false;
         self.full_ready = false;
         self.last_costs.clear();
+        self.last_original_costs.clear();
         self.pending_middle = None;
         self.coupled_completion = std::array::from_fn(|_| Default::default());
         self.forward_scratch = Default::default();
@@ -31,6 +32,7 @@ impl<const D: usize> LabelingEngine<D> {
             half_ready: false,
             full_ready: false,
             last_costs: vec![],
+            last_original_costs: vec![],
             pending_middle: self.pending_middle,
             consumption_joins: self.consumption_joins,
             symmetric_costs: self.symmetric_costs.clone(),
@@ -94,6 +96,7 @@ impl<const D: usize> LabelingEngine<D> {
             half_ready: false,
             full_ready: false,
             last_costs: vec![],
+            last_original_costs: vec![],
             pending_middle: None,
             consumption_joins,
             symmetric_costs: if consumption_joins {
@@ -216,8 +219,20 @@ impl<const D: usize> LabelingEngine<D> {
     pub fn costs_unchanged(&self, g: &Graph<D>) -> bool {
         self.last_costs
             .iter()
-            .copied()
-            .eq(g.arcs.iter().map(|a| a.reduced_cost))
+            .map(|cost| cost.to_bits())
+            .eq(g.arcs.iter().map(|a| a.reduced_cost.to_bits()))
+    }
+    pub(super) fn labels_match_graph(&self, g: &Graph<D>) -> bool {
+        self.costs_unchanged(g)
+            && self.last_original_costs.iter().map(|cost| cost.to_bits())
+                .eq(g.arcs.iter().map(|arc| arc.cost.to_bits()))
+            && match (&self.coupled_identity, g.coupled_kernel()) {
+                (None, None) => true,
+                (Some(identity), Some(kernel)) => {
+                    std::sync::Arc::ptr_eq(identity, kernel.cache_identity())
+                }
+                _ => false,
+            }
     }
     pub(super) fn runtime_bidirectional(&self) -> bool {
         self.controls.bidirectional

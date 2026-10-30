@@ -330,6 +330,8 @@ impl MachineWaitingEnvelope {
                     }
                 } else if tie {
                     if !output.is_empty() {
+                        // The machine upper filter reports its re-entry status
+                        // to a fatal caller path; it is not a rejected label.
                         return Err(FrontierUnknown::Unsupported(
                             "machine upper filter reentry status",
                         ));

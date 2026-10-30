@@ -36,7 +36,7 @@ impl PreparedClampFilter {
         lower: &PreparedSlopeFunction,
         upper: &PreparedSlopeFunction,
     ) -> Result<Self, RawFunctionError> {
-        if lower.is_machine_zero_length() || upper.is_machine_zero_length() {
+        if lower.has_machine_only_geometry() || upper.has_machine_only_geometry() {
             return Err(RawFunctionError::Unsupported(
                 "machine zero-length segment as bound",
             ));
@@ -244,8 +244,7 @@ impl PreparedClampFilter {
         front: &SlopeFront,
         work: &mut Work,
     ) -> Answer<Option<PreparedSlopeFunction>> {
-        if self.constant_bounds
-            || front.components().len() != 1
+        if front.components().len() != 1
             || front.components()[0].pairs().len() != 2
             || self.upper.pairs().len() != 2
             || front.components()[0].domain() != self.lower.domain()

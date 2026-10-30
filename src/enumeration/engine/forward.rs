@@ -9,11 +9,22 @@ impl<const D: usize> Enumeration<D> {
         controls: &Controls,
         cuts: Option<CutTables>,
     ) -> Result<Self> {
+        Self::run_forward_with_completion(g, grid, controls, cuts, None, |_, _| true)
+    }
+
+    pub(super) fn run_forward_with_completion<F: Fn(bool, &Label<D>) -> bool>(
+        g: &Graph<D>,
+        grid: &BucketGraph,
+        controls: &Controls,
+        cuts: Option<CutTables>,
+        branching: Option<&crate::pricing::restrictions::RyanFosterResources>,
+        completion: F,
+    ) -> Result<Self> {
         g.validate()?;
         let effective = controls.for_graph(g)?;
         let controls = &effective;
         if let Some(walk) = g.walk_memory_relaxation() {
-            return Self::run(&walk, grid, controls, cuts);
+            return Self::run_forward_with_completion(&walk, grid, controls, cuts, branching, completion);
         }
         if controls.label_limit == 0 || controls.path_limit == 0 || !controls.cutoff.is_finite() {
             return Err(invalid("invalid enumeration controls"));
@@ -44,6 +55,7 @@ impl<const D: usize> Enumeration<D> {
             cut_words: [0; FULL_WORDS],
             cut_cost: 0.,
             presence_state: cuts.and_then(|c| c.presence).and_then(|p| p.empty_state()),
+            branch_state: branching.filter(|b| b.resources != 0).map(|_| None),
             coupled_state: g.coupled_kernel().map(|k| k.root(true)),
         };
         for r in 0..g.resources.len() {
@@ -61,6 +73,7 @@ impl<const D: usize> Enumeration<D> {
         let step = controls.label_limit / 50;
         let mut checkpoint = 0;
         let mut coupled_workspace = crate::graph::coupled::CoupledWorkspace::default();
+        let mut extensions = 0usize;
         while let Some(from_id) = labels.pop_id() {
             if started.elapsed() > controls.time_limit {
                 return Err(incomplete("enumeration time limit exceeded"));
@@ -88,6 +101,10 @@ impl<const D: usize> Enumeration<D> {
                 continue;
             };
             for arc in &grid.forward.buckets[v][bucket].arcs {
+                extensions = extensions.wrapping_add(1);
+                if extensions & 255 == 0 && started.elapsed() > controls.time_limit {
+                    return Err(incomplete("enumeration time limit exceeded"));
+                }
                 let from = &labels.arena[from_id];
                 let physical = &g.arcs[arc.physical];
                 if g.max_route_arcs().is_some()
@@ -100,6 +117,11 @@ impl<const D: usize> Enumeration<D> {
                 next.arc = Some(arc.physical);
                 next.vertex = physical.head;
                 next.hops += 1;
+                if let (Some(branching), Some(state)) = (branching, &next.branch_state) {
+                    if !branching.can_visit(state, next.vertex) {
+                        continue;
+                    }
+                }
                 if let Some(kernel) = g.coupled_kernel() {
                     let state = from
                         .coupled_state
@@ -146,13 +168,69 @@ impl<const D: usize> Enumeration<D> {
                 if let Some(c) = &cuts {
                     c.along_arc(&mut next, true, arc.physical)?;
                 }
+                if next.vertex != g.sink {
+                    // As in directional enumeration, do not ask completion
+                    // about a prefix that already repeats the head element.
+                    // The projection must still exclude the head until the
+                    // opposite-label compatibility check has run.
+                    if !next.can_add_elements(&g.vertices[next.vertex].elements) {
+                        continue;
+                    }
+                    if !completion(true, &next) {
+                        pruning.completion_rejections += 1;
+                        continue;
+                    }
+                }
                 if !next.add_elements(&g.vertices[next.vertex].elements) {
                     continue;
+                }
+                if let (Some(branching), Some(state)) = (branching, &mut next.branch_state) {
+                    if !branching.visit(state, next.vertex) {
+                        continue;
+                    }
+                }
+                if next.vertex != g.sink {
+                    if let Some(state) = &mut next.coupled_state {
+                        state.custom_machine_enter_vertex();
+                    }
                 }
                 if let Some(c) = &cuts {
                     c.to_vertex(&mut next);
                 }
                 if next.vertex == g.sink {
+                    if let (Some(branching), Some(state)) = (branching, &next.branch_state) {
+                        if !branching.accepts(state) {
+                            continue;
+                        }
+                    }
+                    let mut machine_contribution = None;
+                    if let Some(kernel) = g.coupled_kernel() {
+                        let state = next
+                            .coupled_state
+                            .as_deref()
+                            .ok_or_else(|| invalid("missing coupled terminal state"))?;
+                        let root = kernel.root(false);
+                        let contribution = kernel.machine_join_contribution(state, &root);
+                        let paired_resource = kernel.retained_paired_machine_resource();
+                        if paired_resource.is_some() || kernel.has_custom_machine_resource() {
+                            machine_contribution = Some((kernel.machine_identity().clone(), contribution, paired_resource, Box::new(state.clone()), root.clone()));
+                        }
+                        if kernel.has_costs() {
+                            let Some((reduced, original)) =
+                                super::directional::coupled_canonical_join(g, state, &root)?
+                            else {
+                                continue;
+                            };
+                            next.reduced_cost = reduced;
+                            next.original_cost = original;
+                        } else {
+                            let Some(correction) = kernel.join(state, &root)? else {
+                                continue;
+                            };
+                            next.reduced_cost += correction;
+                            next.original_cost += correction;
+                        }
+                    }
                     if let Some(c) = &cuts {
                         let mut empty = next.clone_without_coupled();
                         empty.cut_words = [0; FULL_WORDS];
@@ -178,13 +256,16 @@ impl<const D: usize> Enumeration<D> {
                         parent = label.parent;
                     }
                     arcs.reverse();
-                    paths.insert(Path {
-                        reduced_cost: next.reduced_cost,
-                        original_cost: next.original_cost,
-                        visited: next.visited,
-                        element_hash: next.element_hash,
-                        arcs,
-                    });
+                    paths.insert_with_machine_contribution(
+                        Path {
+                            reduced_cost: next.reduced_cost,
+                            original_cost: next.original_cost,
+                            visited: next.visited,
+                            element_hash: next.element_hash,
+                            arcs,
+                        },
+                        machine_contribution,
+                    );
                     if paths.len > controls.path_limit {
                         return Err(incomplete("enumeration path budget exceeded"));
                     }
@@ -192,6 +273,9 @@ impl<const D: usize> Enumeration<D> {
                     labels.insert(g, next, true);
                 }
             }
+        }
+        if started.elapsed() > controls.time_limit {
+            return Err(incomplete("enumeration time limit exceeded"));
         }
         let generated = labels.arena.len();
         Ok(Self {

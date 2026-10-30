@@ -98,7 +98,8 @@ fn machine_pairs_preserve_zero_width_coordinate_bits_without_relaxing_source_inp
     assert!(machine.has_internal_zero_length());
     assert_eq!(machine.pairs()[0].1.to_bits(), (-0.0f64).to_bits());
     assert_eq!(machine.pairs()[1].1.to_bits(), 0.0f64.to_bits());
-    assert!(PreparedSlopeFunction::from_machine_pairs(vec![(1., 0.), (2., 0.), (3., 0.)]).is_err());
+    let repeated = PreparedSlopeFunction::from_machine_pairs(vec![(1., 0.), (2., 0.), (3., 0.)]).unwrap();
+    assert!(repeated.has_internal_zero_length());
 }
 
 #[cfg(feature = "clp")]

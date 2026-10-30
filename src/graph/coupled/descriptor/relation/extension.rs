@@ -389,11 +389,9 @@ impl PreparedSlopeRelationArc {
         // waiting envelope. A one-segment duplicate is accepted, but an
         // anchor equal to its 1e12 sentinel is rejected. Other numerical
         // validity checks are enforced by the prepared representation.
-        if charged
-            .components()
-            .iter()
-            .any(|component| component.is_machine_zero_length() && component.pairs()[0].0 == 1e12)
-        {
+        if charged.components().iter().any(|component| {
+            component.has_machine_only_geometry() && component.pairs()[0].0 == 1e12
+        }) {
             return Err(FrontierUnknown::Unsupported(
                 "machine zero-length sum sentinel",
             ));
@@ -402,7 +400,7 @@ impl PreparedSlopeRelationArc {
             let (lower, upper) = machine_waiting_bounds.ok_or(FrontierUnknown::Unsupported(
                 "machine zero-length waiting bounds are unavailable",
             ))?;
-            let waiting = match charged.machine_zero_length_waiting(
+            let waiting = match charged.machine_waiting(
                 lower,
                 upper,
                 self.source.waiting,
@@ -410,6 +408,18 @@ impl PreparedSlopeRelationArc {
             ) {
                 FrontierOutcome::Complete(value) => value,
                 FrontierOutcome::Empty => return Ok(None),
+                // The specialized scan has a smaller bounded-work cost for a
+                // single zero-length segment. Use it when the general scan's
+                // conservative reservation does not fit the caller's budget.
+                FrontierOutcome::Unknown(FrontierUnknown::WorkLimit) => {
+                    match charged.machine_zero_length_waiting(
+                        lower, upper, self.source.waiting, stage_budget(),
+                    ) {
+                        FrontierOutcome::Complete(value) => value,
+                        FrontierOutcome::Empty => return Ok(None),
+                        FrontierOutcome::Unknown(reason) => return Err(reason),
+                    }
+                }
                 FrontierOutcome::Unknown(reason) => return Err(reason),
             };
             let waiting = match waiting.pass_constant_lower(&self.source.lower, stage_budget()) {

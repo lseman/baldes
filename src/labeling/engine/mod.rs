@@ -97,6 +97,7 @@ pub struct LabelingEngine<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS 
     pub half_ready: bool,
     pub full_ready: bool,
     last_costs: Vec<f64>,
+    last_original_costs: Vec<f64>,
     pending_middle: Option<bool>,
     pub consumption_joins: bool,
     symmetric_costs: Vec<f64>,

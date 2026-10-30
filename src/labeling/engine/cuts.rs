@@ -222,7 +222,7 @@ impl<const D: usize> LabelingEngine<D> {
         }
         self.cuts.presence.validate_engine(g.arcs.len())?;
         self.ensure_reversal_costs(g)?;
-        if self.costs_unchanged(g) {
+        if self.labels_match_graph(g) {
             if self.full_ready {
                 return Ok(());
             }
@@ -249,6 +249,7 @@ impl<const D: usize> LabelingEngine<D> {
         self.half_ready = false;
         self.full_ready = false;
         self.last_costs = g.arcs.iter().map(|a| a.reduced_cost).collect();
+        self.last_original_costs = g.arcs.iter().map(|a| a.cost).collect();
         self.forward
             .reset(self.grid.forward.buckets.iter().map(Vec::len));
         self.backward
