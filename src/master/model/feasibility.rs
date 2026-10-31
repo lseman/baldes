@@ -14,7 +14,7 @@ pub(super) fn recover<const D: usize>(
     remaining: Duration,
     iterations: usize,
     tolerance: f64,
-    _bound_mode: cg::BoundMode,
+    bound_mode: cg::BoundMode,
 ) -> Result<FeasibilityRecovery> {
     let started = Instant::now();
     let deadline = started
@@ -208,6 +208,7 @@ pub(super) fn recover<const D: usize>(
                 break;
             }
         }
+        let complete_exact = answer.exact && state.scheduler.complete;
         let mut inserted = 0;
         for column in answer.columns {
             if !column.acceptable || column.reduced_cost >= -tolerance || !seen.insert(column.tag) {
@@ -231,7 +232,18 @@ pub(super) fn recover<const D: usize>(
             inserted += 1;
         }
         if inserted == 0 {
-            report.status = FeasibilityStatus::Stalled;
+            // Reference pure phase I (as in routing's phase_one_stall): an
+            // exact, complete pass without an improving column leaves positive
+            // activity, so the node is infeasible. Certified mode still needs
+            // the independent directed proof above.
+            report.status = if complete_exact
+                && bound_mode == cg::BoundMode::Numerical
+                && report.artificial_activity.is_some_and(|x| x > tolerance)
+            {
+                FeasibilityStatus::Infeasible
+            } else {
+                FeasibilityStatus::Stalled
+            };
             break;
         }
     }

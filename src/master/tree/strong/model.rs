@@ -6,11 +6,11 @@ use crate::master::{tree::strong, LpMaster};
 /// Original-domain phase-one proof, also required by ordinary tree closure.
 pub(super) fn proven_infeasible<const D: usize>(output: &Output<D>) -> bool {
     output.master.status == cg::Status::Infeasible
-        && output
-            .master
-            .feasibility
-            .iter()
-            .any(|r| r.certified_infeasible)
+        && output.master.feasibility.iter().any(|r| {
+            r.certified_infeasible
+                || (output.master.bound_mode == cg::BoundMode::Numerical
+                    && r.status == cg::FeasibilityStatus::Infeasible)
+        })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]

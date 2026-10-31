@@ -226,7 +226,6 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
             return Ok(Decision::Continue);
         }
         if output.master.status != cg::Status::Optimal {
-            eprintln!("DEBUGTREE master status {:?} depth {} lp {} bound {}", output.master.status, output.snapshot.state.node_depth, output.master.lp, bound);
             result.status = if output.master.status == cg::Status::TimeLimit {
                 TreeStatus::TimeLimit
             } else {
@@ -346,7 +345,6 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                 )?;
             }
         } else {
-            eprintln!("DEBUGTREE no children depth {} bound {bound} incumbent {}", output.snapshot.state.node_depth, result.incumbent);
             *unresolved = Some(bound);
             return Ok(Decision::Stop {
                 reason: Stop::Requested,

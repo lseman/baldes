@@ -448,7 +448,11 @@ pub(super) fn run<const D: usize>(
     };
     // A finite artificial penalty cannot prove original-model infeasibility.
     if result.status == cg::Status::Infeasible
-        && !result.feasibility.iter().any(|r| r.certified_infeasible)
+        && !result.feasibility.iter().any(|r| {
+            r.certified_infeasible
+                || (result.bound_mode == cg::BoundMode::Numerical
+                    && r.status == cg::FeasibilityStatus::Infeasible)
+        })
     {
         result.status = cg::Status::Stalled;
         result.lp = master.objective;
