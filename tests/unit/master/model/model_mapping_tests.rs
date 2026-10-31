@@ -320,3 +320,26 @@ fn half_arc_validation_rejects_invalid_topology_without_panicking() {
     graph.source = graph.vertices.len();
     assert!(!integral_path_parity(&graph, &[(0, 0.5), (1, 0.5)]));
 }
+
+#[test]
+fn near_tied_fractionality_keeps_registration_order_like_the_reference() {
+    let named = |name: &str, priority: f64| MappedBranchVariable {
+        name: name.into(),
+        priority,
+        networks: vec![],
+        masters: vec![],
+    };
+    let (z, a, b) = (named("z-first", 0.), named("a-second", 0.), named("m-third", 0.));
+    // z and a lie within the reference band (1e-10 relative, 1e-6 absolute) of
+    // each other: registration order wins, not the name or the tiny margin.
+    let ranked = rank_candidates([(&z, 0.4999995), (&a, 0.5)].into_iter());
+    assert_eq!(ranked[0].0.name, "z-first");
+    // Outside the band the more fractional value still wins.
+    let ranked = rank_candidates([(&z, 0.49), (&a, 0.5), (&b, 0.3)].into_iter());
+    let names: Vec<_> = ranked.iter().map(|(v, _)| v.name.as_str()).collect();
+    assert_eq!(names, ["a-second", "z-first", "m-third"]);
+    // Priority is compared before fractionality.
+    let high = named("high", 1.);
+    let ranked = rank_candidates([(&a, 0.5), (&high, 0.9)].into_iter());
+    assert_eq!(ranked[0].0.name, "high");
+}

@@ -23,7 +23,8 @@ pub struct MappedNetworkVariable {
 
 /// A named integer model variable assembled from several pricing networks and
 /// independent integer master variables. Larger priorities are considered first;
-/// equal-priority candidates prefer the most fractional value, then their name.
+/// equal-priority candidates prefer the most fractional value, then registration
+/// order, both compared within the reference's tolerance band.
 /// This registration does not assert that a continuous master value is integer.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -508,29 +509,46 @@ pub(super) fn validate<'a, const D: usize>(
     Ok(())
 }
 
+/// Order fractional candidates as the reference's ordered candidate set does.
+/// The comparison uses a tolerance band (relative 1e-10, absolute 1e-6):
+/// larger priority, then larger distance to the nearest integer; values inside
+/// the band tie and keep registration order. Candidates are inserted one by one
+/// in registration order because the band is not transitive and a sort could
+/// reorder near-ties differently.
+pub(super) fn rank_candidates<'a>(
+    candidates: impl Iterator<Item = (&'a MappedBranchVariable, f64)>,
+) -> Vec<(&'a MappedBranchVariable, f64)> {
+    fn exceeds(a: f64, b: f64) -> bool {
+        a > b + (a.abs().max(b.abs()) * 1e-10 + 1e-6)
+    }
+    let before = |(a, x): &(&MappedBranchVariable, f64), (b, y): &(&MappedBranchVariable, f64)| {
+        if exceeds(a.priority, b.priority) {
+            return true;
+        }
+        if exceeds(b.priority, a.priority) {
+            return false;
+        }
+        exceeds((x - x.round()).abs(), (y - y.round()).abs())
+    };
+    let mut ranked: Vec<(&MappedBranchVariable, f64)> = vec![];
+    for candidate in candidates {
+        // A later registration goes after every element it does not precede.
+        let at = ranked.partition_point(|c| !before(&candidate, c));
+        ranked.insert(at, candidate);
+    }
+    ranked
+}
+
 pub(super) fn children<const D: usize>(
     output: &Output<D>,
     variables: &[MappedBranchVariable],
     tolerance: f64,
 ) -> Result<Option<Vec<NodeSnapshot<D>>>> {
-    let mut candidates: Vec<_> = variables
-        .iter()
-        .filter_map(|v| {
-            let value = v.value(output)?;
-            (value.abs() < 9_007_199_254_740_992. && (value - value.round()).abs() > tolerance)
-                .then_some((v, value))
-        })
-        .collect();
-    candidates.sort_by(|(a, x), (b, y)| {
-        b.priority
-            .total_cmp(&a.priority)
-            .then_with(|| {
-                ((x - x.floor()) - 0.5)
-                    .abs()
-                    .total_cmp(&((y - y.floor()) - 0.5).abs())
-            })
-            .then_with(|| a.name.cmp(&b.name))
-    });
+    let candidates = rank_candidates(variables.iter().filter_map(|v| {
+        let value = v.value(output)?;
+        (value.abs() < 9_007_199_254_740_992. && (value - value.round()).abs() > tolerance)
+            .then_some((v, value))
+    }));
     let Some((variable, value)) = candidates.first() else {
         return Ok(None);
     };
