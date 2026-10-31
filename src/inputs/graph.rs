@@ -76,20 +76,20 @@ impl Instance {
             };
             graph.set_bounds(v, 0, ready, due)?;
             graph.set_bounds(v, 1, 0., self.capacity)?;
-            let mut order: Vec<_> = (0..=sink).collect();
+            // Native initializeNGmemoriesFromDistanceMatrix: each customer
+            // remembers its ng_size nearest customers (itself included, ties by
+            // index); depots carry no element and so get no memory.
+            if v == 0 || v == sink {
+                continue;
+            }
+            let mut order: Vec<_> = (1..=n).collect();
             order.sort_by(|&a, &b| {
-                let ai = if a == sink { 0 } else { a };
-                let bi = if b == sink { 0 } else { b };
-                self.distance(i, ai, rounding)
-                    .total_cmp(&self.distance(i, bi, rounding))
+                self.distance(i, a, rounding)
+                    .total_cmp(&self.distance(i, b, rounding))
                     .then(a.cmp(&b))
             });
-            order.truncate(ng_size.min(n + 2));
-            let elements: Vec<_> = order
-                .into_iter()
-                .filter(|&vertex| vertex > 0 && vertex <= n)
-                .map(|vertex| vertex - 1)
-                .collect();
+            order.truncate(ng_size);
+            let elements: Vec<_> = order.into_iter().map(|customer| customer - 1).collect();
             graph.set_ng(v, &elements)?;
         }
         graph.initial[0] = Some(if time_windows {

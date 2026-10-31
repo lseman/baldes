@@ -73,7 +73,6 @@ options below are keyword-only. The call requires a Clp-enabled build.
 | `problem_type` | `None` | Infer from finite due times; `"vrptw"` or `"cvrp"` explicitly overrides it |
 | `customers` | `None` | Keep the first N customers before solving |
 | `ng` | `8` | NG neighborhood size; constrained by compiled memory |
-| `reference_ng` | `False` | Use reference nearest-customer neighborhood construction |
 | `rounding` | `None` | Override coordinate distance convention |
 | `pricing_options` | `None` | Mapping of supported BALDES names to numeric values |
 | `capacity_cuts` | `False` | Enable rounded capacity cuts |

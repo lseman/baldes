@@ -33,7 +33,7 @@ fn _read_instance(py: Python<'_>, path: PathBuf) -> PyResult<Py<PyDict>> {
 
 #[cfg(feature = "clp")]
 #[pyfunction]
-#[pyo3(signature = (name, vehicles, capacity, customers, distances, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options, two_path_cuts=false, master_solver="clp", hgs_time=None, hgs_columns="best", hgs_seed=0, verbose=false, log_interval=10, bound_mode="numerical", clp_scaling="off", clp_keep_work_areas=true, master_threads=0, stabilization_max_tree_depth=10000))]
+#[pyo3(signature = (name, vehicles, capacity, customers, distances, problem_type, ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options, two_path_cuts=false, master_solver="clp", hgs_time=None, hgs_columns="best", hgs_seed=0, verbose=false, log_interval=10, bound_mode="numerical", clp_scaling="off", clp_keep_work_areas=true, master_threads=0, stabilization_max_tree_depth=10000))]
 #[allow(clippy::too_many_arguments)]
 pub(super) fn solve_routing(
     py: Python<'_>,
@@ -44,7 +44,6 @@ pub(super) fn solve_routing(
     distances: Option<Vec<Vec<f64>>>,
     problem_type: &str,
     ng: usize,
-    reference_ng: bool,
     rounding: &str,
     capacity_cuts: bool,
     rank_one_cuts: bool,
@@ -249,35 +248,12 @@ pub(super) fn solve_routing(
     }
     let output = py
         .detach(move || -> baldes::Result<_> {
-            let mut graph = if cvrp {
+            let graph = if cvrp {
                 instance.capacity_graph(ng, rounding)?
             } else {
                 instance.graph(ng, rounding)?
             };
             let n = instance.customers.len() - 1;
-            if reference_ng {
-                for v in 0..=n + 1 {
-                    let mut neighbors = if v == 0 || v == n + 1 {
-                        vec![v]
-                    } else {
-                        let mut ids: Vec<_> = (1..=n).collect();
-                        ids.sort_by(|&a, &b| {
-                            instance
-                                .distance(v, a, rounding)
-                                .total_cmp(&instance.distance(v, b, rounding))
-                                .then(a.cmp(&b))
-                        });
-                        ids.truncate(ng);
-                        ids
-                    };
-                    neighbors.sort_unstable();
-                    let elements: Vec<_> = neighbors
-                        .iter()
-                        .flat_map(|&vertex| graph.vertices[vertex].elements.iter().copied())
-                        .collect();
-                    graph.set_ng(v, &elements)?;
-                }
-            }
             options.cg.multiplicity = n as f64;
             let problem = RoutingContext::set_partitioning(graph, n as f64)?;
             if let Some(warm) = warm {

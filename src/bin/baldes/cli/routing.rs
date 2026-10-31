@@ -17,7 +17,6 @@ Options:
   --ng N                NG neighborhood size (default: 8)
   --steps S|TIME,CAPACITY Initial bucket widths in graph resource units; one value
                         applies to both resources (0 = automatic; default: 0)
-  --reference-ng        Use reference-compatible customer neighborhoods
   --robust GQ,GT,AQ,AT  Robust VRPTW (Munari et al., 2019): at most GQ demands and
                         GT travel times deviate by trunc(AQ*q) and 0.1*trunc(10*AT*t)
                         (solve/vrptw with time windows and tenth rounding)
@@ -68,7 +67,6 @@ Options:
 struct RoutingOptions {
     ignore_time_windows: bool,
     customers: Option<usize>,
-    reference_ng: bool,
     ng: usize,
     options: RootOptions,
     all_cuts: bool,
@@ -94,7 +92,6 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
     let mut common = CommonOptions::default();
     let mut ignore_time_windows = false;
     let mut customers = None;
-    let mut reference_ng = false;
     let mut ng = 8;
     let mut options = RootOptions::default();
     let mut all_cuts = false;
@@ -131,7 +128,6 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
                 }
                 ignore_time_windows = true;
             }
-            "--reference-ng" => reference_ng = true,
             "--robust" => {
                 let text = args.next().ok_or("missing robust uncertainty")?;
                 robust = Some(
@@ -378,7 +374,6 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
     Ok(Some(RoutingOptions {
         ignore_time_windows,
         customers,
-        reference_ng,
         ng,
         options,
         all_cuts,
@@ -404,7 +399,6 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
     let Some(RoutingOptions {
         ignore_time_windows,
         customers,
-        reference_ng,
         ng,
         mut options,
         all_cuts,
@@ -577,30 +571,6 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
             .map_err(|e| e.to_string())?;
     }
     let n = instance.customers.len() - 1;
-    if reference_ng {
-        let sink = n + 1;
-        for v in 0..=sink {
-            let mut neighbours: Vec<_> = if v == 0 || v == sink {
-                vec![v]
-            } else {
-                let mut ids: Vec<_> = (1..=n).collect();
-                ids.sort_by(|&a, &b| {
-                    instance
-                        .distance(v, a, rounding)
-                        .total_cmp(&instance.distance(v, b, rounding))
-                        .then(a.cmp(&b))
-                });
-                ids.truncate(ng);
-                ids
-            };
-            neighbours.sort_unstable();
-            let elements: Vec<_> = neighbours
-                .iter()
-                .flat_map(|&vertex| graph.vertices[vertex].elements.iter().copied())
-                .collect();
-            graph.set_ng(v, &elements).map_err(|e| e.to_string())?;
-        }
-    }
     options.cg.multiplicity = n as f64;
     let fleet = if tree {
         instance.vehicles as f64

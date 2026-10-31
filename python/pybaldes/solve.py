@@ -45,7 +45,6 @@ def _routing(
     problem_type: Optional[str] = None,
     customers: Optional[int] = None,
     ng: int = 8,
-    reference_ng: bool = False,
     rounding: Optional[str] = None,
     capacity_cuts: bool = False,
     two_path_cuts: bool = False,
@@ -105,7 +104,7 @@ def _routing(
         problem_type = "vrptw" if all(math.isfinite(c.due) for c in instance.customers) else "cvrp"
     rows = [(c.x, c.y, c.demand, c.ready, c.due, c.service) for c in instance.customers]
     distances = None if instance.distances is None else [list(row) for row in instance.distances]
-    data = _core._solve({"kind": "routing", "data": {'name': instance.name, 'vehicles': instance.vehicles, 'capacity': instance.capacity, 'customers': rows, 'distances': distances}}, {'problem_type': problem_type, 'ng': ng, 'reference_ng': reference_ng, 'rounding': rounding or instance.rounding, 'capacity_cuts': capacity_cuts, 'rank_one_cuts': rank_one_cuts, 'stabilize': stabilize, 'enumerate': reduced_cost_fixing, 'upper_bound': upper_bound, 'time_limit': time_limit, 'max_iterations': max_iterations, 'max_cut_rounds': max_cut_rounds, 'pricing_options': dict(pricing_options or {}), 'two_path_cuts': two_path_cuts, 'master_solver': master_solver, 'hgs_time': hgs_time, 'hgs_columns': str(hgs_columns), 'hgs_seed': hgs_seed, 'verbose': verbose, 'log_interval': log_interval, 'bound_mode': bound_mode, 'clp_scaling': clp_scaling, 'clp_keep_work_areas': clp_keep_work_areas, 'master_threads': master_threads, 'stabilization_max_tree_depth': stabilization_max_tree_depth})
+    data = _core._solve({"kind": "routing", "data": {'name': instance.name, 'vehicles': instance.vehicles, 'capacity': instance.capacity, 'customers': rows, 'distances': distances}}, {'problem_type': problem_type, 'ng': ng, 'rounding': rounding or instance.rounding, 'capacity_cuts': capacity_cuts, 'rank_one_cuts': rank_one_cuts, 'stabilize': stabilize, 'enumerate': reduced_cost_fixing, 'upper_bound': upper_bound, 'time_limit': time_limit, 'max_iterations': max_iterations, 'max_cut_rounds': max_cut_rounds, 'pricing_options': dict(pricing_options or {}), 'two_path_cuts': two_path_cuts, 'master_solver': master_solver, 'hgs_time': hgs_time, 'hgs_columns': str(hgs_columns), 'hgs_seed': hgs_seed, 'verbose': verbose, 'log_interval': log_interval, 'bound_mode': bound_mode, 'clp_scaling': clp_scaling, 'clp_keep_work_areas': clp_keep_work_areas, 'master_threads': master_threads, 'stabilization_max_tree_depth': stabilization_max_tree_depth})
     data["duals"] = tuple(data["duals"])
     data["routes"] = tuple(
         RootRoute(**{**r, "nodes": tuple(r["nodes"]), "arcs": tuple(r["arcs"])})

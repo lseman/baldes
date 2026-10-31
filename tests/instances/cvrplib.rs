@@ -152,7 +152,6 @@ fn cli_solves_a_cvrplib_root() {
         .args([
             "--capacity-cuts",
             "--no-enumeration",
-            "--reference-ng",
             "--rounding",
             "nearest",
         ])

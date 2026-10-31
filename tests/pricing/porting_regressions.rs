@@ -858,3 +858,93 @@ fn symmetric_consumption_join_counts_nonzero_source_state_once() {
         assert!(symmetric.engine.as_ref().unwrap().consumption_joins);
     }
 }
+
+#[test]
+fn arc_memory_ng_strengthening_mirrors_on_symmetric_execution() {
+    use baldes::graph::relaxation::{Controls, FractionalPath};
+    for symmetric in [false, true] {
+        let mut s = solver(symmetric, false);
+        s.graph.elementary = false;
+        s.price_phase(0, 100, false).unwrap();
+        assert_eq!(s.engine.as_ref().unwrap().consumption_joins, symmetric);
+        let id = |s: &Solver<2>, tail: usize, head: usize| {
+            s.graph
+                .arcs
+                .iter()
+                .find(|a| a.tail == tail && a.head == head)
+                .unwrap()
+                .id
+        };
+        let memory = |s: &Solver<2>, tail: usize, head: usize| {
+            let a = id(s, tail, head);
+            s.graph
+                .arcs
+                .iter()
+                .find(|b| b.id == a)
+                .unwrap()
+                .memory
+                .clone()
+        };
+        // 0 -> 1 -> 2 -> 3 -> 1 -> 4 revisits element 1 through 1-2-3-1.
+        let path = [(0, 1), (1, 2), (2, 3), (3, 1), (1, 4)];
+        let arcs = path.iter().map(|&(u, v)| id(&s, u, v)).collect();
+        let controls = Controls {
+            mode: 2,
+            ..Controls::default()
+        };
+        let counts = s
+            .strengthen_ng(&[FractionalPath { arcs, value: 0.5 }], &controls)
+            .unwrap();
+        assert_eq!(counts.columns_forbidden, 1);
+        for (u, v) in [(1, 2), (2, 3), (3, 1)] {
+            assert!(memory(&s, u, v).contains(&1));
+            assert_eq!(memory(&s, v, u).contains(&1), symmetric, "{v}->{u}");
+        }
+        s.price_phase(0, 100, false).unwrap();
+        assert_eq!(s.engine.as_ref().unwrap().consumption_joins, symmetric);
+    }
+}
+
+/// Native symmetric joins test `f + b <= sink.ub`, omitting the source
+/// initial value both halves start from (it drops this route when the source
+/// lower bound is positive, root LP 4 instead of 2 in the reference probe).
+/// BALDES joins at `f + b - init`, which keeps the feasible route.
+#[test]
+fn symmetric_join_subtracts_the_source_initial_value() {
+    for init in [0., 2.] {
+        let mut s = Solver::<2>::new(4, 1).unwrap();
+        s.graph.vertices[0].elements.clear();
+        s.graph.vertices[3].elements.clear();
+        s.graph.elementary = true;
+        for v in 0..4 {
+            s.graph.set_bounds(v, 0, init, init + 8.5).unwrap();
+        }
+        for (u, v, cost, used) in [
+            (0, 1, 1., 3.),
+            (1, 3, 1., 3.),
+            (0, 2, 1., 3.),
+            (2, 3, 1., 3.),
+            (1, 2, -5., 2.),
+            (2, 1, -5., 2.),
+        ] {
+            let a = s.graph.add_arc(u, v, cost).unwrap();
+            s.graph.arc_mut(a).unwrap().consumption[0] = used;
+        }
+        let result = s.price_phase(0, 100, false).unwrap();
+        assert!(s.engine.as_ref().unwrap().consumption_joins, "init={init}");
+        // Both two-customer routes arrive at init + 8 <= init + 8.5 but cross
+        // the half-way point at their second customer, so only a join finds them.
+        assert!(
+            (result.minimum_reduced_cost + 3.).abs() < 1e-9,
+            "init={init}"
+        );
+        assert!(
+            result
+                .columns
+                .iter()
+                .any(|r| r.arcs.len() == 3 && (r.cost + 3.).abs() < 1e-9),
+            "init={init}: {:?}",
+            result.columns
+        );
+    }
+}

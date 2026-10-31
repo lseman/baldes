@@ -22,6 +22,7 @@
 //!              Population → Selection & diversity
 //! ```
 
+pub mod ails_ii;
 pub mod circle_sector;
 pub mod dri;
 pub mod driver;

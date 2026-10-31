@@ -98,7 +98,7 @@ def test_solomon_file_and_time_window_semantics(tmp_path):
     cvrp = solve(path, problem_type="cvrp", reduced_cost_fixing=False)
     assert vrptw.lp == pytest.approx(4)
     assert cvrp.lp == pytest.approx(2 + math.sqrt(2))
-    assert solve(path, customers=1, reference_ng=True, reduced_cost_fixing=False).lp == pytest.approx(2)
+    assert solve(path, customers=1, reduced_cost_fixing=False).lp == pytest.approx(2)
     with pytest.raises(ValueError):
         Instance.from_file(tmp_path / "absent.txt")
 

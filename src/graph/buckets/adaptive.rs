@@ -19,6 +19,10 @@ impl BucketGraph {
         // Reject invalid geometry before replacing either directional graph or
         // its shared indexing strides. A failed round must remain reusable.
         self.validate_bucket_geometry(steps)?;
+        // Old cells are indexed with the old grid's own row width, built with
+        // +1e-6. Native recomputes it without, which skips a row when
+        // (ub - lb)/step rounds just below an integer and loses arcs.
+        let old_stride = self.stride.clone();
         self.step = steps;
         for forward in [true, false] {
             if !forward && !self.bidirectional {
@@ -31,9 +35,7 @@ impl BucketGraph {
                 for k in 0..count {
                     let point = self.direction(forward).corners[v][k];
                     let mut selected = BTreeSet::new();
-                    let old_row = (((self.upper[v][0] - self.lower[v][0]) / old_steps[0]).floor()
-                        as usize)
-                        + 1;
+                    let old_row = old_stride[v][1].max(1);
                     let origin = if forward {
                         point[0] - (self.lower[v][0] - 1e-6)
                     } else {

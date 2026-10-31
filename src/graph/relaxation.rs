@@ -111,6 +111,16 @@ pub fn strengthen<const D: usize>(
         }
     }
     let original = g.clone();
+    // Native mirrors through MsArc's reverse pointer, the split-depot reversal
+    // (source arcs pair with sink arcs) used by symmetric execution.
+    let reverse = if controls.mirror && controls.mode != 1 {
+        Some(
+            super::symmetry::reverse_arcs(g)
+                .ok_or_else(|| invalid("NG mirror requires reverse arcs"))?,
+        )
+    } else {
+        None
+    };
     let mut order: Vec<_> = (0..paths.len()).collect();
     order.sort_by(|&a, &b| {
         let x = &paths[a];
@@ -181,18 +191,10 @@ pub fn strengthen<const D: usize>(
                         if !g.arcs[id].memory.contains(&e) {
                             g.arcs[id].memory.push(e);
                         }
-                        if controls.mirror {
-                            let a = &g.arcs[id];
-                            let Some(reverse) = g
-                                .arcs
-                                .iter()
-                                .position(|b| b.tail == a.head && b.head == a.tail)
-                            else {
-                                *g = original;
-                                return Err(invalid("NG mirror requires reverse arcs"));
-                            };
-                            if !g.arcs[reverse].memory.contains(&e) {
-                                g.arcs[reverse].memory.push(e);
+                        if let Some(reverse) = &reverse {
+                            let r = reverse[id];
+                            if !g.arcs[r].memory.contains(&e) {
+                                g.arcs[r].memory.push(e);
                             }
                         }
                     }
@@ -226,8 +228,10 @@ pub fn strengthen<const D: usize>(
     }
     Ok(counts)
 }
-/// NG memories from a distance matrix: stable distance/id ties, and each
-/// physical traversal stops at the first previously populated destination.
+/// NG memories from a distance matrix (native
+/// initializeNGmemoriesFromDistanceMatrix): each element's `size` nearest
+/// elements, stable distance/id ties. Nothing is written unless every vertex
+/// and arc memory is empty.
 pub fn initialize_distances<const D: usize>(
     g: &mut Graph<D>,
     distances: &[f64],
@@ -241,7 +245,10 @@ pub fn initialize_distances<const D: usize>(
     {
         return Err(invalid("NG set distance dimensions/value"));
     }
-    if n == 0 {
+    if n == 0
+        || g.vertices.iter().any(|v| !v.memory.is_empty())
+        || g.arcs.iter().any(|a| !a.memory.is_empty())
+    {
         return Ok(false);
     }
     let mut neighbourhood = vec![];
@@ -258,9 +265,6 @@ pub fn initialize_distances<const D: usize>(
     }
     let mut changed = false;
     for vertex in &mut g.vertices {
-        if !vertex.memory.is_empty() {
-            break;
-        }
         let mut memory = BTreeSet::new();
         for &e in &vertex.elements {
             memory.extend(&neighbourhood[e]);
@@ -269,9 +273,6 @@ pub fn initialize_distances<const D: usize>(
         changed |= !vertex.memory.is_empty();
     }
     for arc in &mut g.arcs {
-        if !arc.memory.is_empty() {
-            break;
-        }
         let mut memory = BTreeSet::new();
         for &e in &arc.elements {
             memory.extend(&neighbourhood[e]);
@@ -281,3 +282,7 @@ pub fn initialize_distances<const D: usize>(
     }
     Ok(changed)
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/graph/relaxation/tests.rs"]
+mod tests;

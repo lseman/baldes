@@ -21,12 +21,12 @@ def test_from_file_reads_cvrplib():
 @pytest.mark.skipif(not pybaldes.has_clp, reason="built without Clp")
 def test_cvrplib_root_uses_the_file_convention():
     result = solve(INSTANCES / "E-n22-k4.vrp", problem_type="cvrp", capacity_cuts=True,
-                        reduced_cost_fixing=False, reference_ng=True)
+                        reduced_cost_fixing=False)
     assert result.lp == pytest.approx(375.0)
-    automatic = solve(INSTANCES / "E-n22-k4.vrp", capacity_cuts=True, reduced_cost_fixing=False, reference_ng=True)
+    automatic = solve(INSTANCES / "E-n22-k4.vrp", capacity_cuts=True, reduced_cost_fixing=False)
     assert automatic.lp == pytest.approx(result.lp)
     unrounded = solve(INSTANCES / "E-n22-k4.vrp", problem_type="cvrp", capacity_cuts=True,
-                           reduced_cost_fixing=False, reference_ng=True, rounding="none")
+                           reduced_cost_fixing=False, rounding="none")
     assert unrounded.lp == pytest.approx(375.2797868, abs=1e-6)
     with pytest.raises(ValueError, match="no time windows"):
         solve(INSTANCES / "E-n22-k4.vrp", problem_type="vrptw")

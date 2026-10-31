@@ -248,3 +248,47 @@ fn node_restore_reorders_components_only_after_a_step_change_elsewhere() {
         assert_eq!(directions(&detached), stored);
     }
 }
+
+#[test]
+fn bucket_refinement_indexes_old_cells_with_the_grid_row_width() {
+    use super::{BucketGraph, Graph};
+    use crate::graph::Window;
+    use std::collections::BTreeSet;
+    // Axis 0 spans 0.3 with step 0.1: the grid holds ⌊(0.3 + 1e-6)/0.1⌋ + 1 = 4
+    // cells per row, while ⌊0.3/0.1⌋ + 1 = 3 because 0.3/0.1 rounds below 3.
+    let mut graph = Graph::<2>::new(3, 2).unwrap();
+    for v in 0..3 {
+        graph.set_bounds(v, 0, 0., 0.3).unwrap();
+        graph.set_bounds(v, 1, 0., 2.).unwrap();
+    }
+    graph.add_arc(0, 1, 0.).unwrap();
+    for limit in [0.5, 1.5, 2.] {
+        let id = graph.add_arc(1, 2, 0.).unwrap();
+        graph.arc_mut(id).unwrap().bounds[1] = Some(Window::new(0., limit).unwrap());
+    }
+    let arcs = |grid: &BucketGraph, forward: bool| -> Vec<BTreeSet<usize>> {
+        grid.direction(forward)
+            .buckets
+            .iter()
+            .flatten()
+            .map(|b| b.arcs.iter().map(|a| a.physical).collect())
+            .collect()
+    };
+    for bidirectional in [false, true] {
+        let mut grid = BucketGraph::prepare(&graph, [0.1, 1.], 20, bidirectional).unwrap();
+        assert_eq!(grid.stride[grid.internal[1]][1], 4);
+        grid.decrease_steps(&graph).unwrap();
+        // Without fixing, refinement keeps exactly the arcs a fresh grid has.
+        let fresh = BucketGraph::prepare(&graph, grid.step, 20, bidirectional).unwrap();
+        for forward in [true, false] {
+            if !forward && !bidirectional {
+                continue;
+            }
+            assert_eq!(
+                arcs(&grid, forward),
+                arcs(&fresh, forward),
+                "forward={forward}"
+            );
+        }
+    }
+}

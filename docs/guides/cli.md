@@ -39,7 +39,6 @@ baldes solve examples/networks/triangle.json --tree --nodes 100 --json -
 | `--customers N` | keep the first N customers |
 | `--ng N` | NG neighbourhood size (default 8) |
 | `--steps S` or `--steps TIME,CAPACITY` | Initial bucket widths in graph resource units (time, capacity). A single value applies to both; 0 selects automatic sizing (default). Dynamic refinement can decrease these widths. |
-| `--reference-ng` | the N nearest customers, ties by index (the comparison setup) |
 | `--rounding MODE` | distances `none` (unrounded), `nearest`, `tenth` or `ceil` (default: `tenth`) |
 | `--cuts` | enable rank-one, capacity, k-path, knapsack (rounding/1K), and Fenchel cuts; also 2-path for models with time windows. Requires the integer-demand Fenchel configuration to be valid. |
 | `--rank1` | separate limited-memory rank-one cuts |

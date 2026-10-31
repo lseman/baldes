@@ -24,7 +24,14 @@ impl<const D: usize> Solver<D> {
                 .collect(),
             self.graph.arcs.iter().map(|a| a.memory.clone()).collect(),
         );
-        let counts = crate::graph::relaxation::strengthen(&mut self.graph, paths, controls)?;
+        // Native passes its symmetric flag: forward-only symmetric labeling
+        // reverses half-routes, so arc memories must stay mirrored.
+        let mut controls = controls.clone();
+        controls.mirror |= self
+            .engine
+            .as_ref()
+            .is_some_and(|engine| engine.consumption_joins);
+        let counts = crate::graph::relaxation::strengthen(&mut self.graph, paths, &controls)?;
         if counts.columns_forbidden > 0 {
             if self.ng_baseline.is_none() {
                 self.ng_baseline = Some(baseline);
