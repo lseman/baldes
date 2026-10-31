@@ -150,6 +150,9 @@ pub(in crate::master::model) fn zero_arcs<const D: usize>(
                 }
                 let cut = &oracle.solver.cuts.knapsack_cuts[cut];
                 let &(resource, scale) = &cut.graph_resources[&oracle.network.id];
+                let Some(resource) = super::coordinate(oracle, resource) else {
+                    continue;
+                };
                 // This zero-arc inference uses the initial amount as a lower
                 // envelope for every future path prefix. A negative
                 // increment on the axis invalidates that shortcut, while

@@ -293,3 +293,104 @@ fn formatted_registry_survives_resume_fixed_copies_and_tree_reporting() {
     assert_eq!(report.original_variables[0].lower, 1.);
     assert_eq!(report.original_variables[0].upper, 1.);
 }
+
+#[test]
+fn branching_expressions_and_aggregates_compile_to_mapped_variables() {
+    let mut problem = alternatives();
+    let mut copy = problem.networks[0].clone();
+    copy.id = 8;
+    problem.networks.push(copy);
+    let first = variable();
+    let mut other = variable();
+    other.id = 1;
+    other.arcs = vec![(0, 1.)];
+    let mut second = variable();
+    second.network = 8;
+    second.arcs = vec![(1, 1.)];
+    let (_, registry) = compile_pricing_variables(problem, &[first, other, second]).unwrap();
+    let expression = registry
+        .expression(&BranchingExpression {
+            name: "flow".into(),
+            priority: 4.,
+            terms: vec![
+                BranchingTerm {
+                    network: Some(7),
+                    id: 0,
+                    coefficient: 2.,
+                },
+                BranchingTerm {
+                    network: Some(7),
+                    id: 1,
+                    coefficient: -1.,
+                },
+                BranchingTerm {
+                    network: None,
+                    id: 5,
+                    coefficient: 3.,
+                },
+            ],
+        })
+        .unwrap();
+    assert_eq!(expression.priority, 4.);
+    assert_eq!(expression.networks.len(), 1);
+    assert_eq!(expression.networks[0].arcs, [(0, 1.), (2, 2.)]);
+    assert_eq!(expression.masters, [(5, 3.)]);
+    let aggregate = registry
+        .aggregate(&AggregateVariableBranching {
+            id: 0,
+            priority: 2.,
+            networks: vec![],
+        })
+        .unwrap();
+    assert_eq!(aggregate.name, "AGG_0");
+    let networks: Vec<_> = aggregate
+        .networks
+        .iter()
+        .map(|n| (n.network, n.arcs.clone()))
+        .collect();
+    assert_eq!(networks, [(7, vec![(0, 1.), (2, 1.)]), (8, vec![(1, 1.)])]);
+    assert!(registry
+        .aggregate(&AggregateVariableBranching {
+            id: 1,
+            priority: 2.,
+            networks: vec![8],
+        })
+        .is_err());
+    assert!(registry
+        .expression(&BranchingExpression {
+            name: "unknown".into(),
+            priority: 1.,
+            terms: vec![BranchingTerm {
+                network: Some(8),
+                id: 9,
+                coefficient: 1.,
+            }],
+        })
+        .is_err());
+    let mut tree = ModelTreeOptions::default();
+    registry.configure_tree(&mut tree).unwrap();
+    let duplicate = BranchingExpression {
+        name: "X_7_0".into(),
+        priority: 1.,
+        terms: vec![BranchingTerm {
+            network: Some(7),
+            id: 0,
+            coefficient: 1.,
+        }],
+    };
+    assert!(registry
+        .configure_expressions(&mut tree, &[duplicate], &[])
+        .is_err());
+    registry
+        .configure_expressions(
+            &mut tree,
+            &[],
+            &[AggregateVariableBranching {
+                id: 0,
+                priority: 2.,
+                networks: vec![7, 8],
+            }],
+        )
+        .unwrap();
+    assert!(tree.mapped_variables.iter().any(|v| v.name == "AGG_0"));
+}

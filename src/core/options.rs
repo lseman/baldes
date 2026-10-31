@@ -266,6 +266,12 @@ pub const OPTION_TABLE: &[OptionInfo] = &[
         support: OptionSupport::Implemented("src/cuts/registry/rank_one.rs"),
     },
     OptionInfo {
+        name: "BALDESrankOneCutsNeighbourhoodSize",
+        kind: OptionKind::Int,
+        default: 16.0,
+        support: OptionSupport::Implemented("src/cuts/registry/rank_one.rs"),
+    },
+    OptionInfo {
         name: "BALDESrankOneCutsMaxNumTriplets",
         kind: OptionKind::Int,
         default: 10000.0,

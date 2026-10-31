@@ -2,9 +2,7 @@
 use super::{Instance, Rounding};
 use crate::{
     hgs::driver::{self, HgsOptions},
-    invalid,
-    master::routing::{RootOptions, RoutingContext},
-    Result,
+    invalid, Graph, Result, Route,
 };
 use std::{collections::HashSet, time::Duration};
 
@@ -81,19 +79,32 @@ pub struct HgsSeedSummary {
     pub elapsed_secs: f64,
 }
 
+/// Validated HGS routes for seeding a one-network set-partitioning model.
+#[derive(Clone, Debug)]
+pub struct HgsSeed {
+    /// Unique resource-feasible routes, in the selected order.
+    pub routes: Vec<Route>,
+    /// Cost of the best solution when it covers every customer exactly once
+    /// with at most the instance's vehicles.
+    pub incumbent: Option<f64>,
+    /// The routes of that solution, when `incumbent` is known.
+    pub solution: Option<Vec<Route>>,
+    pub summary: HgsSeedSummary,
+}
+
 impl Instance {
-    /// Run HGS before root/tree solving and append unique, resource-feasible
-    /// initial columns. A complete validated best solution also supplies an
-    /// incumbent. `problem` must use this instance's split-depot vertex IDs.
-    /// HGS uses the selected distance metric; the target graph validates every route.
+    /// Run HGS and replay its routes in `graph`, which must use this
+    /// instance's split-depot vertex IDs (depot 0, customers 1..n, sink n+1).
+    /// HGS uses the selected distance metric; the graph validates every route.
+    /// Routes whose arcs are already in `existing` are skipped.
     pub fn seed_hgs<const D: usize>(
         &self,
-        problem: &RoutingContext<D>,
+        graph: &Graph<D>,
         rounding: Rounding,
-        options: &mut RootOptions,
         warm: &HgsWarmStart,
-    ) -> Result<HgsSeedSummary> {
-        let graph = &problem.model.networks[0].graph;
+        verbose: bool,
+        existing: &[Route],
+    ) -> Result<HgsSeed> {
         let n = self.customers.len().saturating_sub(1);
         if warm.time_limit.is_zero()
             || n == 0
@@ -123,7 +134,7 @@ impl Instance {
         let controls = HgsOptions {
             time_limit: warm.time_limit.as_secs_f64(),
             seed: warm.seed,
-            verbose: options.cg.log_interval.is_some(),
+            verbose,
             ..Default::default()
         };
         let found = if warm.columns != HgsColumns::Best {
@@ -146,9 +157,7 @@ impl Instance {
                 .windows(2)
                 .map(|w| arcs.get(&(w[0], w[1])).copied())
                 .collect::<Option<Vec<_>>>()?;
-            let route = problem.elementary_route(&ids)?;
-            crate::master::routing::exact_route_feasible(problem, &route)?;
-            Some(route)
+            graph.elementary_route(&ids).ok().flatten()
         };
         let best = found
             .routes
@@ -158,10 +167,18 @@ impl Instance {
         let incumbent = best
             .as_ref()
             .filter(|r| !r.is_empty())
-            .and_then(|r| problem.unit_route_incumbent(r));
-        if let Some(upper) = incumbent {
-            options.incumbent = options.incumbent.min(upper);
-        }
+            .and_then(|routes| -> Option<f64> {
+                let mut covered = vec![false; graph.vertices.len()];
+                for route in routes {
+                    for &v in &route.nodes[1..route.nodes.len() - 1] {
+                        if std::mem::replace(&mut covered[v as usize], true) {
+                            return None;
+                        }
+                    }
+                }
+                (routes.len() <= self.vehicles && (1..=n).all(|v| covered[v]))
+                    .then(|| routes.iter().map(|r| r.original_cost).sum::<f64>())
+            });
         let candidates = if warm.columns != HgsColumns::Best {
             &found.columns
         } else {
@@ -175,14 +192,17 @@ impl Instance {
             }
             converted
         });
-        let selected = select_new_columns(feasible, &options.initial_routes, warm.columns);
-        let inserted_columns = selected.len();
-        options.initial_routes.extend(selected);
-        Ok(HgsSeedSummary {
-            inserted_columns,
-            rejected_columns,
+        let routes = select_new_columns(feasible, existing, warm.columns);
+        Ok(HgsSeed {
+            summary: HgsSeedSummary {
+                inserted_columns: routes.len(),
+                rejected_columns,
+                incumbent,
+                elapsed_secs: found.elapsed_secs,
+            },
+            routes,
+            solution: incumbent.and(best),
             incumbent,
-            elapsed_secs: found.elapsed_secs,
         })
     }
 }

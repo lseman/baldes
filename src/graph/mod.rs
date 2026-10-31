@@ -8,6 +8,7 @@ pub mod symmetry;
 use crate::{invalid, Result};
 use std::collections::HashSet;
 pub mod ng;
+mod route_replay;
 mod time_windows;
 mod window_arcs;
 pub use window_arcs::{WindowArc, WindowArcs};

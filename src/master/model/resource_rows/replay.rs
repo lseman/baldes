@@ -2,6 +2,9 @@
 use super::*;
 
 pub(super) fn load<const D: usize>(oracle: &Oracle<D>, route: &Route, r: usize) -> Result<f64> {
+    if r >= oracle.network.graph.resources.len() {
+        return Err(invalid("resource-row coordinate"));
+    }
     // Resource-group branches add waiting for their own disjunction; they must
     // not redefine this original load-row coefficient. Synchronized-start
     // branches do change the required schedule, so replay the immutable graph
@@ -39,7 +42,11 @@ pub(super) fn load<const D: usize>(oracle: &Oracle<D>, route: &Route, r: usize) 
 pub(in crate::master::model) fn requires_forward<const D: usize>(oracle: &Oracle<D>) -> bool {
     let g = &oracle.network.graph;
     oracle.knapsack_rows.iter().any(|&(index, _)| {
-        let r = oracle.solver.cuts.knapsack_cuts[index].graph_resources[&oracle.network.id].0;
+        let original =
+            oracle.solver.cuts.knapsack_cuts[index].graph_resources[&oracle.network.id].0;
+        let Some(r) = super::coordinate(oracle, original) else {
+            return true;
+        };
         let capacity = g.vertices[g.sink].bounds[r].upper;
         g.resource_has_time_windows(r)
             || capacity.fract() != 0.

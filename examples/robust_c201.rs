@@ -7,8 +7,8 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use baldes::extensions::robust::{Problem, Uncertainty};
     use baldes::inputs::{Instance, Rounding};
-    use baldes::master::cg::{Options, Status};
-    use baldes::master::routing::{self, RootOptions, RoutingContext};
+    use baldes::master::cg::Status;
+    use baldes::master::model;
     use std::time::Instant;
 
     let args = std::env::args().collect::<Vec<_>>();
@@ -40,37 +40,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let graph = problem
                 .pricing_graph(&vec![0.; problem.nodes.len()], 0., customers)
                 .map_err(error)?;
-            let options = RootOptions {
-                enumerate: false,
-                cg: Options {
-                    multiplicity: customers as f64,
-                    artificial_cost: 1e5,
-                    ..Default::default()
-                },
-                ..Default::default()
-            };
-            let result = routing::solve(
-                RoutingContext::set_partitioning(graph, customers as f64).map_err(error)?,
+            let mut options = model::Options::default();
+            options.cg.multiplicity = customers as f64;
+            options.cg.artificial_cost = 1e5;
+            let result = model::solve(
+                model::Problem::set_partitioning(graph, customers as f64).map_err(error)?,
                 options,
             )
             .map_err(error)?;
-            let artificial: f64 = result
-                .master
-                .artificials
+            // Objective not explained by route columns is paid by artificials.
+            let routed: f64 = result
+                .routes
                 .iter()
-                .map(|&c| result.values[c].max(0.))
+                .zip(&result.values)
+                .map(|(route, &value)| value * route.route.original_cost)
                 .sum();
+            let artificial = ((result.master.lp - routed) / 1e5).max(0.);
             let lp = if result.master.status == Status::Optimal && artificial <= 1e-6 {
                 result.master.bound
             } else {
                 f64::NAN
             };
-            let columns = result
-                .master
-                .column_tags
-                .iter()
-                .filter(|&&tag| tag >= 0)
-                .count();
+            let columns = result.routes.len();
             println!(
                 "{customers},{alpha},{gq},{gt},{:?},{lp:.4},{artificial:.4},{},{columns},{:.3}",
                 result.master.status,

@@ -6,6 +6,17 @@ mod replay;
 use crate::cuts::knapsack::{ResourceKnapsackCut, RouteLoadKnapsackCut};
 pub(super) use replay::requires_forward;
 
+/// Resolve a cut's original resource ID to this solver's physical coordinate.
+pub(super) fn coordinate<const D: usize>(oracle: &Oracle<D>, resource: usize) -> Option<usize> {
+    let mapping = &oracle.solver.knapsack_resource_indices;
+    let coordinate = if mapping.is_empty() {
+        resource
+    } else {
+        *mapping.get(&resource)?
+    };
+    (coordinate < oracle.network.graph.resources.len()).then_some(coordinate)
+}
+
 /// Nonnegative monotone terminal-load coefficient on one network.
 /// Resource is a solver coordinate; scale converts it to the cut's load units.
 #[derive(Clone, Debug)]
@@ -24,6 +35,8 @@ pub(super) fn entries<const D: usize>(
     for &(index, row) in &oracle.knapsack_rows {
         let cut = &oracle.solver.cuts.knapsack_cuts[index];
         let &(resource, scale) = &cut.graph_resources[&oracle.network.id];
+        let resource = coordinate(oracle, resource)
+            .ok_or_else(|| invalid("unknown knapsack resource mapping"))?;
         let q = replay::load(oracle, route, resource)?;
         let load = (q * scale + 1e-6).floor() as i32;
         result.push((row, cut.cut.coefficient(load) as f64));
@@ -116,11 +129,36 @@ pub(super) fn install<const D: usize>(
             .find(|o| o.network.id == c.network)
             .unwrap();
         let index = oracle.solver.cuts.knapsack_cuts.len();
+        let resource = if oracle.solver.knapsack_resource_indices.is_empty() {
+            c.resource
+        } else if let Some((&id, _)) = oracle
+            .solver
+            .knapsack_resource_indices
+            .iter()
+            .find(|(_, &coordinate)| coordinate == c.resource)
+        {
+            id
+        } else {
+            let id = oracle
+                .solver
+                .knapsack_resource_indices
+                .keys()
+                .next_back()
+                .copied()
+                .unwrap_or(0)
+                .checked_add(1)
+                .ok_or_else(|| invalid("knapsack resource ID overflow"))?;
+            oracle
+                .solver
+                .knapsack_resource_indices
+                .insert(id, c.resource);
+            id
+        };
         oracle.solver.cuts.knapsack_cuts.push(ResourceKnapsackCut {
             id: i32::try_from(index).map_err(|_| invalid("resource knapsack index"))?,
             row: shared,
             cut_class: 0,
-            graph_resources: BTreeMap::from([(c.network, (c.resource, c.scale))]),
+            graph_resources: BTreeMap::from([(c.network, (resource, c.scale))]),
             cut: c.cut.clone(),
             dual: 0.,
         });

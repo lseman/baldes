@@ -150,40 +150,32 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Stochastic routing enables rank-one and mean-capacity cuts by default.
         let rank_one_cuts = true;
         rank_one_cut_limit = Some(rank_one_cut_limit.unwrap_or(8));
-        // Classic routing branch-cut-and-price; recourse enters by Theta cuts.
-        let threads = std::env::var("RAYON_NUM_THREADS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, usize::from));
-        let mut tree = baldes::master::tree::TreeOptions {
-            threads,
+        // Network-model branch-cut-and-price; recourse enters by Theta cuts.
+        let mut tree = baldes::master::tree::ModelTreeOptions {
             time_limit,
             ..Default::default()
         };
-        tree.root.cg.time_limit = time_limit;
+        tree.node.cg.time_limit = time_limit;
         let dynamic_ng_mode = dynamic_ng_mode.unwrap_or(-1);
-        tree.root
-            .pricing_options
-            .push(("BALDESdynamicNGmode".into(), dynamic_ng_mode as f64));
+        let pricing = &mut tree.node.pricing_options;
+        pricing.push(("BALDESdynamicNGmode".into(), dynamic_ng_mode as f64));
         if !load_completion_bound {
-            tree.root
-                .pricing_options
-                .push(("BALDESloadCompletionResource".into(), -1.));
+            pricing.push(("BALDESloadCompletionResource".into(), -1.));
         }
-        tree.root.pricing_options.push((
+        pricing.push((
             "BALDESloadCompletionSubsetSize".into(),
             completion_subset_size as f64,
         ));
         if rank_one_cuts {
-            tree.root = tree.root.with_rank_one_cuts();
+            tree.node.separation.rank_one.enabled = true;
             if let Some(limit) = rank_one_cut_limit {
-                tree.root
+                tree.node
                     .pricing_options
                     .push(("BALDESrankOneCutsMaxNumPerRound".into(), limit as f64));
             }
         }
         if log_cg {
-            tree.root.cg.log_interval = Some(1);
+            tree.node.cg.log_interval = Some(1);
         }
         let solve_started = Instant::now();
         let result = problem
@@ -208,7 +200,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         let routes: Vec<Vec<i32>> = answer
             .routes
             .iter()
-            .map(|r| r.nodes[1..r.nodes.len() - 1].to_vec())
+            .map(|r| {
+                let nodes = &r.route.route.nodes;
+                nodes[1..nodes.len() - 1].to_vec()
+            })
             .collect();
         println!(
             "{}",
@@ -218,10 +213,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "status": format!("{:?}", answer.status), "objective": objective,
                 "lower_bound": lower_bound, "gap": gap, "routes": routes,
                 "nodes": answer.nodes, "pricing_calls": answer.pricing_calls,
-                "fixing_calls": answer.fixing_calls, "enumerated_routes": answer.enumerated_routes,
-                "mip_nodes": answer.mip_nodes, "strong_branching_trials": answer.strong_branching_trials,
-                "diving_nodes": answer.diving_nodes,
-                "threads": threads, "ng_size": ng_size, "dynamic_ng_mode": dynamic_ng_mode,
+                "strong_branching_trials": answer.strong_branching_trials,
+                "ng_size": ng_size, "dynamic_ng_mode": dynamic_ng_mode,
                 "rank_one_cuts": rank_one_cuts,
                 "rank_one_cut_limit": rank_one_cut_limit,
                 "capacity_cuts": true,

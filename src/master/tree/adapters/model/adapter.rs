@@ -12,6 +12,7 @@ pub(super) struct NetworkSearch<'a, const D: usize> {
     pub mapped_history: &'a mut model_strong::History,
     pub selected_nodes: &'a mut usize,
     pub unresolved: &'a mut Option<f64>,
+    pub workers: Option<&'a rayon::ThreadPool>,
 }
 impl<const D: usize> Model for NetworkSearch<'_, D> {
     type Node = NodeSnapshot<D>;
@@ -20,7 +21,11 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
         Limits {
             deadline: self.deadline,
             remaining_nodes: self.options.node_limit.saturating_sub(*self.selected_nodes),
-            batch_size: 1,
+            batch_size: if self.workers.is_some() {
+                self.options.threads
+            } else {
+                1
+            },
             time_first: false,
         }
     }
@@ -30,7 +35,9 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
             self.result.processed_nodes += 1;
         }
         if entry.proven_infeasible()
-            || entry.node.warm.bound >= self.result.incumbent - self.options.tolerance
+            || self
+                .options
+                .closes(entry.node.warm.bound, self.result.incumbent)
         {
             if let Some(history) = self.subtree_history.as_mut() {
                 history.close(entry.node.state.mapped_lineage);
@@ -45,6 +52,28 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
         entries: &mut [QueuedNode<Self::Node, Self::Output>],
         _frontier: &mut crate::master::tree::TreeFrontier<Self::Node, Self::Output>,
     ) -> Result<Vec<Result<Self::Output>>> {
+        if let Some(workers) = self.workers.filter(|_| entries.len() > 1) {
+            if self.options.share_inactive_columns {
+                for entry in entries.iter_mut() {
+                    self.mapped_history
+                        .column_pool
+                        .seed(&mut entry.node, self.deadline)?;
+                }
+            }
+            let mut options = self.options.node.clone();
+            options.fixing_upper_bound = self
+                .result
+                .incumbent
+                .is_finite()
+                .then_some(self.result.incumbent);
+            options.search_inactive_columns |= self.options.share_inactive_columns;
+            options.cg.time_limit = options
+                .cg
+                .time_limit
+                .min(self.deadline.saturating_duration_since(Instant::now()));
+            let nodes: Vec<_> = entries.iter().map(|entry| &entry.node).collect();
+            return parallel::evaluate(workers, &nodes, &options);
+        }
         entries
             .iter_mut()
             .map(|entry| {
@@ -54,6 +83,11 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                         .seed(&mut entry.node, self.deadline)?;
                 }
                 let mut options = self.options.node.clone();
+                options.fixing_upper_bound = self
+                    .result
+                    .incumbent
+                    .is_finite()
+                    .then_some(self.result.incumbent);
                 options.search_inactive_columns |= self.options.share_inactive_columns;
                 options.cg.time_limit = options
                     .cg
@@ -190,7 +224,7 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                                 mip.mip.status,
                                 MipStatus::Optimal | MipStatus::ObjectiveCutoff
                             ) && result.incumbent.is_finite()
-                                && mip.mip.bound >= result.incumbent - options.tolerance
+                                && options.closes(mip.mip.bound, result.incumbent)
                             {
                                 if let Some(history) = &mut subtree_history {
                                     history.close(lineage);
@@ -218,7 +252,7 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
         // and require an existing original-model incumbent to close such a node.
         if result.incumbent.is_finite()
             && bound.is_finite()
-            && bound >= result.incumbent - options.tolerance
+            && options.closes(bound, result.incumbent)
         {
             if let Some(history) = &mut subtree_history {
                 history.close(lineage);
@@ -245,28 +279,84 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                 result.routes = routes;
                 result.master_values = master_values;
             }
-            if bound >= result.incumbent - options.tolerance {
+            if options.closes(bound, result.incumbent) {
                 if let Some(history) = &mut subtree_history {
                     history.close(lineage);
                 }
                 return Ok(Decision::Continue);
             }
         }
-        let count_children = if options.branching == NetworkBranchingPolicy::MultiplicityFirst {
-            branching::multiplicity_children(&output, options.tolerance)?
-        } else {
-            None
-        };
+        if let Some(config) = options.diving.as_ref().filter(|config| {
+            config.due(
+                output.snapshot.state.node_depth.saturating_sub(base_depth),
+                *selected_nodes,
+            )
+        }) {
+            let dive = diving::run(&output, options, config, result.incumbent, deadline)?;
+            result.diving_nodes += dive.nodes;
+            result.iterations += dive.iterations;
+            result.pricing_calls += dive.pricing_calls;
+            for (id, calls) in dive.oracle_calls {
+                if let Some((_, total)) = result
+                    .oracle_calls
+                    .iter_mut()
+                    .find(|(network, _)| *network == id)
+                {
+                    *total += calls;
+                }
+            }
+            if let Some((objective, routes, master_values)) = dive.incumbent {
+                if objective < result.incumbent {
+                    result.incumbent = objective;
+                    result.routes = routes;
+                    result.master_values = master_values;
+                }
+            }
+            // The dive's own bounds are heuristic; only this node's bound prunes.
+            if options.closes(bound, result.incumbent) {
+                if let Some(history) = &mut subtree_history {
+                    history.close(lineage);
+                }
+                return Ok(Decision::Continue);
+            }
+        }
+        if let Some(config) = options.restricted_master_mip.as_ref().filter(|config| {
+            config.due(
+                output.snapshot.state.node_depth.saturating_sub(base_depth),
+                *selected_nodes,
+            )
+        }) {
+            let mip = crate::master::solvers::mip::MipOptions {
+                time_limit: Duration::try_from_secs_f64(config.time_limit)
+                    .unwrap_or(Duration::ZERO)
+                    .min(deadline.saturating_duration_since(Instant::now())),
+                node_limit: config.node_limit,
+                objective_cutoff: result.incumbent,
+            };
+            result.restricted_mip_calls += 1;
+            // A failed heuristic leaves normal branching available.
+            if let Ok(Some((objective, routes, master_values))) =
+                output.snapshot.solve_restricted_mip(&mip)
+            {
+                if objective < result.incumbent {
+                    result.incumbent = objective;
+                    result.routes = routes;
+                    result.master_values = master_values;
+                }
+            }
+            if options.closes(bound, result.incumbent) {
+                if let Some(history) = &mut subtree_history {
+                    history.close(lineage);
+                }
+                return Ok(Decision::Continue);
+            }
+        }
+        // One priority dispatcher for every policy; the policy only presets
+        // family priorities (`proposals::collect`) and child direction.
+        let proposals = proposals::collect(&output, options, windows)?;
         if options.mapped_strong_branching.is_some()
-            && count_children.is_none()
             && *selected_nodes >= options.node_limit
-            && (options.branching == NetworkBranchingPolicy::Phased
-                || !model_strong::mapped_proposals(
-                    &output,
-                    &options.mapped_variables,
-                    options.tolerance,
-                )?
-                .is_empty())
+            && (!proposals.is_empty() || options.branching == NetworkBranchingPolicy::Phased)
         {
             result.status = TreeStatus::NodeLimit;
             *unresolved = Some(bound);
@@ -275,46 +365,31 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                 restore_ready: false,
             });
         }
+        let upper_first = options.branching != NetworkBranchingPolicy::ResourceFirst;
         let trials_before = mapped_history.processed_trials;
-        let children = if options.branching == NetworkBranchingPolicy::Phased {
-            let proposals = proposals::collect(&output, &options, windows)?;
-            if let Some(mut children) = model_strong::choose_proposals(
-                &output,
-                &options,
-                &mut mapped_history,
-                result.incumbent,
-                deadline,
-                proposals,
-            )? {
-                children.admit(NetworkBranchDirection::UpperFirst);
-                Some(children)
-            } else {
-                phased_fallback_selection(branching::phased_children(
-                    &output,
-                    options.tolerance,
-                    windows,
-                )?)
-            }
-        } else if count_children.is_some() {
-            count_children.map(model_strong::Selection::fresh)
-        } else if let Some(mut children) = model_strong::choose(
+        let children = if let Some(mut children) = model_strong::choose_proposals(
             &output,
-            &options,
-            &mut mapped_history,
+            options,
+            mapped_history,
             result.incumbent,
             deadline,
+            proposals,
         )? {
-            children.admit(
-                if options.branching == NetworkBranchingPolicy::MultiplicityFirst {
-                    NetworkBranchDirection::UpperFirst
-                } else {
-                    NetworkBranchDirection::LowerFirst
-                },
-            );
+            children.admit(if upper_first {
+                NetworkBranchDirection::UpperFirst
+            } else {
+                NetworkBranchDirection::LowerFirst
+            });
             Some(children)
         } else {
-            branching::children(&output, options.tolerance, options.branching, windows, &[])?
-                .map(model_strong::Selection::fresh)
+            // Non floor/ceiling disjunctions (synchronization, window
+            // conflicts) and generators whose children could not be built.
+            let fallback = branching::phased_children(&output, options.tolerance, windows)?;
+            if upper_first {
+                phased_fallback_selection(fallback)
+            } else {
+                fallback.map(|(nodes, _)| model_strong::Selection::fresh(nodes))
+            }
         };
         result.processed_nodes += mapped_history.processed_trials - trials_before;
         if let Some((objective, routes, master_values)) = mapped_history.incumbent.take() {

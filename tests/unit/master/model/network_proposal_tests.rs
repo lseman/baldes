@@ -61,8 +61,14 @@ fn native_priority_batches_choose_count_and_stage_three_without_history_leak() {
     .unwrap();
     assert_eq!(history.trials, 2);
     // Count priority11 is the only nonempty admitted family; its two
-    // intermediate phases skip, and its exact trials do not enter history.
-    assert!(history.evaluations.is_empty());
+    // intermediate phases skip. Its exact trials are traced but never
+    // become pseudocost history, so nothing is ranked from them.
+    assert!(!history.evaluations.is_empty());
+    assert!(history
+        .evaluations
+        .iter()
+        .all(|e| e.name.starts_with("multiplicity:")));
+    assert_eq!(history.ranked, 0);
     let lower = selected.evaluated[0].as_ref().expect("exact lower child");
     let upper = selected.evaluated[1].as_ref().expect("exact upper child");
     assert!((lower.master.lp - 2.).abs() < 1e-8);
@@ -200,4 +206,38 @@ fn explicit_packing_registration_replaces_inferred_shared_row_assignments() {
     assert!(ordinary
         .iter()
         .any(|p| matches!(p.restriction, Restriction::Multiplicity { .. })));
+}
+
+#[test]
+fn multiplicity_first_runs_exact_strong_trials_on_the_route_count_split() {
+    let mut instance = problem();
+    instance.networks.truncate(1);
+    // Three pair routes cover a different pair of rows; their LP uses each
+    // with quantity one half, so the total route count is 1.5.
+    instance.networks[0].arc_entries[4] = vec![(0, 1.), (2, 1.)];
+    for strong in [false, true] {
+        let mut configured = ModelTreeOptions::default();
+        configured.node.cg.stabilize = false;
+        configured.node.cg.artificial_cost = 100.;
+        configured.node_limit = 20;
+        configured.mapped_strong_branching = strong.then(StrongBranchingOptions::default);
+        let output = crate::master::tree::solve(instance.clone(), configured).unwrap();
+        assert_eq!(output.status, TreeStatus::Optimal, "{output:?}");
+        assert!((output.incumbent - 2.).abs() < 1e-8);
+        if strong {
+            assert!(output.strong_branching_trials >= 2, "{output:?}");
+            // Route-count trials are traced, but they are not pseudocost
+            // history generators, so nothing is ranked from them.
+            assert!(
+                output.mapped_branch_evaluations.iter().any(|e| {
+                    e.name == "multiplicity:7"
+                        && e.kind == model_strong::MappedEvaluationKind::ExactPricing
+                }),
+                "{output:?}"
+            );
+            assert_eq!(output.mapped_history_ranked, 0);
+        } else {
+            assert_eq!(output.strong_branching_trials, 0);
+        }
+    }
 }

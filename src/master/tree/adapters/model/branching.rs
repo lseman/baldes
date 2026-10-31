@@ -5,7 +5,6 @@ use crate::master::preprocessing::Bounds;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum ChildOrder {
     LowerThenUpper,
-    UpperThenLower,
     Custom,
 }
 
@@ -34,22 +33,6 @@ pub(super) fn fractional(value: f64, tolerance: f64) -> bool {
         && (value - value.round()).abs() > tolerance
 }
 
-pub(super) fn children<const D: usize>(
-    output: &Output<D>,
-    tolerance: f64,
-    policy: NetworkBranchingPolicy,
-    windows: &[super::time_windows::NetworkWindows],
-    variables: &[MappedBranchVariable],
-) -> Result<Option<Vec<NodeSnapshot<D>>>> {
-    let mut branches = children_inner(output, tolerance, policy, windows, variables)?;
-    if let Some(branches) = &mut branches {
-        for child in &mut branches.nodes {
-            child.state.node_depth = output.snapshot.state.node_depth.saturating_add(1);
-        }
-    }
-    Ok(branches.map(|branches| branches.nodes))
-}
-
 /// Generate the ordinary fallback disjunction and retain enough information
 /// to reproduce native upper-first admission for conventional floor/ceiling
 /// splits. Custom disjunction order is left to its generator.
@@ -58,13 +41,7 @@ pub(super) fn phased_children<const D: usize>(
     tolerance: f64,
     windows: &[super::time_windows::NetworkWindows],
 ) -> Result<Option<(Vec<NodeSnapshot<D>>, ChildOrder)>> {
-    let branches = children_inner(
-        output,
-        tolerance,
-        NetworkBranchingPolicy::ResourceFirst,
-        windows,
-        &[],
-    )?;
+    let branches = children_inner(output, tolerance, windows, &[])?;
     Ok(branches.map(|mut branches| {
         for child in &mut branches.nodes {
             child.state.node_depth = output.snapshot.state.node_depth.saturating_add(1);
@@ -73,83 +50,22 @@ pub(super) fn phased_children<const D: usize>(
     }))
 }
 
+/// Fallback cascade for disjunctions the priority dispatcher cannot build:
+/// registered mapped variables, then resource, assignment, master-variable,
+/// route-count, arc and window splits, synchronization and window conflicts.
 fn children_inner<const D: usize>(
     output: &Output<D>,
     tolerance: f64,
-    policy: NetworkBranchingPolicy,
     windows: &[super::time_windows::NetworkWindows],
     variables: &[MappedBranchVariable],
 ) -> Result<Option<BranchChildren<D>>> {
-    if policy == NetworkBranchingPolicy::MultiplicityFirst {
-        if let Some(children) = multiplicity_children(output, tolerance)? {
-            return Ok(Some(BranchChildren {
-                nodes: children,
-                order: ChildOrder::UpperThenLower,
-            }));
-        }
-    }
-    let mut branches = if let Some(mapped) = model_mapping::children(output, variables, tolerance)?
-    {
-        Some(BranchChildren {
+    if let Some(mapped) = model_mapping::children(output, variables, tolerance)? {
+        return Ok(Some(BranchChildren {
             nodes: mapped,
             order: ChildOrder::LowerThenUpper,
-        })
-    } else {
-        resource_or_assignment_children(output, tolerance, windows)?
-    };
-    if policy == NetworkBranchingPolicy::MultiplicityFirst {
-        if let Some(branches) = &mut branches {
-            branches.nodes.reverse();
-            branches.order = match branches.order {
-                ChildOrder::LowerThenUpper => ChildOrder::UpperThenLower,
-                ChildOrder::UpperThenLower => ChildOrder::LowerThenUpper,
-                ChildOrder::Custom => ChildOrder::Custom,
-            };
-        }
+        }));
     }
-    Ok(branches)
-}
-
-pub(super) fn multiplicity_children<const D: usize>(
-    output: &Output<D>,
-    tolerance: f64,
-) -> Result<Option<Vec<NodeSnapshot<D>>>> {
-    let node = &output.snapshot;
-    for oracle in &node.state.oracles {
-        let value = output
-            .routes
-            .iter()
-            .zip(&output.values)
-            .filter(|(route, _)| route.network == oracle.network.id)
-            .map(|(_, &quantity)| quantity)
-            .chain(
-                node.state
-                    .fixed_routes
-                    .iter()
-                    .filter(|fixed| fixed.route.network == oracle.network.id)
-                    .map(|fixed| fixed.quantity),
-            )
-            .sum::<f64>();
-        if value >= 0. && fractional(value, tolerance) {
-            return Ok(Some(vec![
-                node.with_multiplicity(
-                    oracle.network.id,
-                    Bounds {
-                        lower: value.ceil(),
-                        upper: f64::INFINITY,
-                    },
-                )?,
-                node.with_multiplicity(
-                    oracle.network.id,
-                    Bounds {
-                        lower: 0.,
-                        upper: value.floor(),
-                    },
-                )?,
-            ]));
-        }
-    }
-    Ok(None)
+    resource_or_assignment_children(output, tolerance, windows)
 }
 
 fn resource_or_assignment_children<const D: usize>(

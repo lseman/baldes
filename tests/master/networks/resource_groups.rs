@@ -985,7 +985,8 @@ fn rounded_compatible_profiles_cannot_hide_an_exact_fixed_resource_contradiction
                 .unwrap()
                 .mip
                 .status,
-            baldes::master::solvers::mip::MipStatus::Infeasible
+            baldes::master::solvers::mip::MipStatus::Infeasible,
+            "fixed={fixed}"
         );
     }
     optimal(&parent.snapshot.solve(options()).unwrap(), 1.);

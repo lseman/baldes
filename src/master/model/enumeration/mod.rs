@@ -10,8 +10,10 @@ mod collection;
 mod cutoff;
 mod mip;
 mod transfer;
-use collection::{collect_routes, collect_routes_with_plan};
+pub(super) use collection::collect_routes;
+use collection::collect_routes_with_plan;
 pub use cutoff::{CutoffCostBound, CutoffEnumeration};
+pub(super) use transfer::install_collected;
 use transfer::install_collected_with;
 pub(super) use transfer::transfer;
 #[cfg(all(test, feature = "highs"))]

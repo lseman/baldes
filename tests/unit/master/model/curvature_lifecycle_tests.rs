@@ -64,7 +64,18 @@ fn explicit_dynamic_rows_and_ordinary_children_keep_physical_classification_inde
     );
     assert!(ordinary.warm.proximal.is_none());
     let count = ordinary.master.rhs.len();
-    let controller = Coordinator(Rc::new(RefCell::new(ordinary.state)), false, false, None);
+    let controller = Coordinator(
+        Rc::new(RefCell::new(ordinary.state)),
+        false,
+        false,
+        None,
+        None,
+        None,
+        Vec::new(),
+        false,
+        false,
+        CheckpointStore::default(),
+    );
     let rows = cg::Controller::<ClpMaster>::curvature_rows(&controller, count + 1);
     assert_eq!(rows[original_rows].class, cg::CurvatureRowClass::Dynamic);
     assert_eq!(

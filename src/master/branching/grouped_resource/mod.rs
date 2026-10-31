@@ -1,9 +1,6 @@
 //! Packing-group accumulated-resource disjunctions over physical arc IDs.
-use super::{BranchConstraint, RowSense};
-use crate::{
-    invalid, master::routing::RoutingContext, pricing::restrictions::AccumulatedResourceBranch,
-    Graph, Result, Route,
-};
+use crate::master::{formulation::Row, RowSense};
+use crate::{invalid, pricing::restrictions::AccumulatedResourceBranch, Graph, Result, Route};
 mod name;
 
 /// Apply one resource split to every occurrence of a verified packing group.
@@ -83,19 +80,10 @@ impl AccumulatedResourceGroupBranch {
             upper: self.upper,
         }
     }
-    pub(crate) fn validate<const D: usize>(&self, problem: &RoutingContext<D>) -> Result<()> {
-        self.validate_proof(
-            &problem.model.networks[0].graph,
-            &problem.model.rows,
-            &problem.model.networks[0].arc_entries,
-            &problem.model.networks[0].route_entries,
-            |id| problem.arc_position(id),
-        )
-    }
     pub(crate) fn validate_support<const D: usize>(
         &self,
         graph: &Graph<D>,
-        rows: &[crate::master::routing::Row],
+        rows: &[Row],
         arc_entries: &[Vec<(usize, f64)>],
         route_entries: &[(usize, f64)],
     ) -> Result<()> {
@@ -112,7 +100,7 @@ impl AccumulatedResourceGroupBranch {
     fn validate_proof<const D: usize>(
         &self,
         graph: &Graph<D>,
-        rows: &[crate::master::routing::Row],
+        rows: &[Row],
         arc_entries: &[Vec<(usize, f64)>],
         route_entries: &[(usize, f64)],
         position: impl Fn(i32) -> Option<usize>,
@@ -193,7 +181,7 @@ impl AccumulatedResourceGroupBranch {
                     .and_then(|q| q.get(self.resource))
                     .map_or(true, |&q| !self.rule(arc).satisfied_by(q))
         }) as u8 as f64;
-        if nonlinear_only && super::enforcement::ACCUMULATED_RESOURCE_IN_PRICING {
+        if nonlinear_only && super::ACCUMULATED_RESOURCE_IN_PRICING {
             // Blocked arcs already contribute through the additive entries.
             // Correct that decomposition even for a repeated group occurrence:
             // the complete route coefficient is a Boolean violation indicator.
@@ -212,19 +200,6 @@ impl AccumulatedResourceGroupBranch {
             && self.arcs == other.arcs
             && self.resource == other.resource
             && self.boundary() == other.boundary()
-    }
-}
-
-impl BranchConstraint {
-    pub(crate) fn nonlinear_coefficient<const D: usize>(
-        &self,
-        problem: &RoutingContext<D>,
-        route: &Route,
-    ) -> f64 {
-        match self {
-            Self::AccumulatedResourceGroup(c) => c.coefficient(route, true),
-            _ => self.coefficient(problem, route),
-        }
     }
 }
 

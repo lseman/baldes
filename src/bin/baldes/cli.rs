@@ -9,7 +9,6 @@ use baldes::master::model::{
     self,
     format::{Model, ResourceGroupRestriction, SolveOptions, SolveResult},
 };
-use baldes::master::routing::RootOptions;
 use networks::{solve_networks, NETWORK_HELP};
 use routing::{solve_routing, ROUTING_HELP};
 
@@ -26,7 +25,7 @@ pub(super) fn run() -> Result<(), String> {
         }
         "pstep" => pstep_cli::run(args.collect()),
         "ce" => ce_cli::run(args.collect()),
-        "solve" | "hgs" => {
+        "solve" | "hgs" | "ails-ii" => {
             let file = args.next().ok_or(ROUTING_HELP)?;
             if file == "--help" || file == "-h" {
                 println!(
@@ -128,7 +127,7 @@ impl CommonOptions {
         }
         Ok(true)
     }
-    fn apply_routing(&self, options: &mut RootOptions) {
+    fn apply_routing(&self, options: &mut model::Options) {
         if let Some(v) = self.time {
             options.cg.time_limit = v;
         }
@@ -136,7 +135,7 @@ impl CommonOptions {
             options.cg.max_iterations = v;
         }
         if let Some(v) = self.bound_mode {
-            options.bound_mode = v;
+            options.cg.bound_mode = v;
         }
         if let Some(v) = self.stabilize {
             options.cg.stabilize = v;

@@ -352,7 +352,7 @@ impl Problem {
     /// Set partitioning with one equality per request and up to n vehicles.
     #[cfg(feature = "clp")]
     pub fn master_problem(&self) -> Result<crate::master::model::Problem> {
-        use crate::master::{model, routing::Row, RowSense};
+        use crate::master::{formulation::Row, model, RowSense};
         let n = self.instance.requests;
         let graph = self.pricing_graph(&vec![0.; n], 0.)?;
         let arc_entries = graph

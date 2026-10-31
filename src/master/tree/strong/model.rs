@@ -6,11 +6,12 @@ use crate::master::{tree::strong, LpMaster};
 /// Original-domain phase-one proof, also required by ordinary tree closure.
 pub(super) fn proven_infeasible<const D: usize>(output: &Output<D>) -> bool {
     output.master.status == cg::Status::Infeasible
-        && output.master.feasibility.iter().any(|r| {
-            r.certified_infeasible
-                || (output.master.bound_mode == cg::BoundMode::Numerical
-                    && r.status == cg::FeasibilityStatus::Infeasible)
-        })
+        && (output.snapshot.state.phase_one_infeasible
+            || output.master.feasibility.iter().any(|r| {
+                r.certified_infeasible
+                    || (output.master.bound_mode == cg::BoundMode::Numerical
+                        && r.status == cg::FeasibilityStatus::Infeasible)
+            }))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
@@ -120,10 +121,24 @@ impl History {
 pub(super) enum Restriction {
     Mapped(MappedBranchVariable),
     Resource(ResourceGroupCandidate),
-    Assignment { shared_row: usize, network: i32 },
-    Master { id: i32 },
-    Multiplicity { network: i32 },
-    Activity { network: i32, arcs: Vec<(i32, f64)> },
+    Assignment {
+        shared_row: usize,
+        network: i32,
+    },
+    Master {
+        id: i32,
+    },
+    Multiplicity {
+        network: i32,
+    },
+    Activity {
+        network: i32,
+        arcs: Vec<(i32, f64)>,
+    },
+    /// Apart (lower) and together (upper) packing-set children.
+    RyanFoster {
+        members: Vec<super::RyanFosterMember>,
+    },
 }
 
 pub(super) struct Proposal {
@@ -203,10 +218,19 @@ impl Proposal {
                     })
                     .collect()
             }
+            Restriction::RyanFoster { members } => [false, true]
+                .into_iter()
+                .map(|together| node.with_ryan_foster(members, together))
+                .collect(),
         }
     }
+    /// Generators whose children may be rejected (resource schedules, or the
+    /// pricing limit of 512 Ryan–Foster resource bits); try the next one.
     fn unsupported_resource(&self) -> bool {
-        matches!(self.restriction, Restriction::Resource(_))
+        matches!(
+            self.restriction,
+            Restriction::Resource(_) | Restriction::RyanFoster { .. }
+        )
     }
 }
 
@@ -252,6 +276,22 @@ impl<const D: usize> Selection<D> {
     }
 }
 
+/// Native `GenVar` admission: the distance to the nearest integer must
+/// exceed the 1e-8 integrality parameter by the native comparison band
+/// (`1e-6 + 1e-10 * max(|x|, |y|)`), and also the tree tolerance.
+pub(super) fn mapped_fractional(value: f64, tolerance: f64) -> bool {
+    const INTEGRALITY: f64 = 1e-8;
+    let fraction = (value - value.round()).abs();
+    fraction > tolerance && fraction - (1e-6 + 1e-10 * fraction.max(INTEGRALITY)) > INTEGRALITY
+}
+
+/// A generator family's own child order, independent of the tree policy.
+/// Packing-set Ryan–Foster generators are created with native direction `U`.
+fn family_direction(proposal: &Proposal) -> Option<NetworkBranchDirection> {
+    matches!(proposal.restriction, Restriction::RyanFoster { .. })
+        .then_some(NetworkBranchDirection::UpperFirst)
+}
+
 pub(super) fn mapped_proposals<const D: usize>(
     output: &Output<D>,
     variables: &[MappedBranchVariable],
@@ -264,7 +304,7 @@ pub(super) fn mapped_proposals<const D: usize>(
         };
         if !value.is_finite()
             || value.abs() >= 9_007_199_254_740_992.
-            || (value - value.round()).abs() <= tolerance
+            || !mapped_fractional(value, tolerance)
         {
             continue;
         }
@@ -279,6 +319,51 @@ pub(super) fn mapped_proposals<const D: usize>(
         });
     }
     Ok(proposals)
+}
+
+/// Reorder registered mapped candidates within their family slots, keeping
+/// unrelated generators in place. Input proposals are sorted by priority.
+fn rank_mapped_slots(
+    proposals: &[Proposal],
+    variables: &[MappedBranchVariable],
+    order: &mut [usize],
+) {
+    let registrations: HashMap<&str, usize> = variables
+        .iter()
+        .enumerate()
+        .map(|(index, variable)| (variable.name.as_str(), index))
+        .collect();
+    let mut groups: BTreeMap<usize, Vec<(usize, usize)>> = BTreeMap::new();
+    let mut first_at_level = 0;
+    for (index, proposal) in proposals.iter().enumerate() {
+        if index > 0 && proposals[index - 1].priority != proposal.priority {
+            first_at_level = index;
+        }
+        if matches!(proposal.restriction, Restriction::Mapped(_)) {
+            if let Some(&registration) = registrations.get(proposal.name.as_str()) {
+                groups
+                    .entry(first_at_level)
+                    .or_default()
+                    .push((index, registration));
+            }
+        }
+    }
+    for slots in groups.values() {
+        let mut registered = slots.clone();
+        registered.sort_by_key(|&(_, registration)| registration);
+        let indices: HashMap<&str, usize> = slots
+            .iter()
+            .map(|&(index, _)| (proposals[index].name.as_str(), index))
+            .collect();
+        let ranked = super::model_mapping::rank_candidates(
+            registered
+                .iter()
+                .map(|&(index, registration)| (&variables[registration], proposals[index].value)),
+        );
+        for (&(slot, _), (variable, _)) in slots.iter().zip(ranked) {
+            order[slot] = indices[variable.name.as_str()];
+        }
+    }
 }
 
 pub(super) fn validate(options: &crate::master::tree::StrongBranchingOptions) -> Result<()> {
@@ -296,15 +381,20 @@ pub(super) fn validate(options: &crate::master::tree::StrongBranchingOptions) ->
     Ok(())
 }
 
-pub(super) fn choose<const D: usize>(
+/// Explicitly registered generators: mapped original variables, then
+/// cluster boundaries and pairs of each registered network.
+pub(super) fn registered_proposals<const D: usize>(
     output: &Output<D>,
     options: &ModelTreeOptions,
-    history: &mut History,
-    incumbent: f64,
-    deadline: Instant,
-) -> Result<Option<Selection<D>>> {
-    let proposals = mapped_proposals(output, &options.mapped_variables, options.tolerance)?;
-    choose_proposals(output, options, history, incumbent, deadline, proposals)
+) -> Result<Vec<Proposal>> {
+    let mut proposals = mapped_proposals(output, &options.mapped_variables, options.tolerance)?;
+    for clusters in &options.clusters {
+        proposals.extend(clusters.proposals(output, options.tolerance)?);
+    }
+    if let Some(ryan_foster) = &options.ryan_foster {
+        proposals.extend(ryan_foster.proposals(output)?);
+    }
+    Ok(proposals)
 }
 
 pub(super) fn choose_proposals<const D: usize>(
@@ -359,6 +449,10 @@ pub(super) fn choose_proposals<const D: usize>(
     // including unequal fractional counts. Keep their priority-family slots
     // and the ordering of every other generator unchanged.
     let mut order: Vec<_> = (0..proposals.len()).collect();
+    // Explicit mapped variables use the same in-family comparator as the
+    // non-strong path. Reorder only their own slots: packing and other
+    // families retain their separately defined tie rules and priorities.
+    rank_mapped_slots(&proposals, &options.mapped_variables, &mut order);
     let mut groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     for (index, proposal) in proposals.iter().enumerate() {
         if matches!(proposal.restriction, Restriction::Multiplicity { .. }) {
@@ -395,7 +489,11 @@ pub(super) fn choose_proposals<const D: usize>(
             match proposal.children(&output.snapshot) {
                 Ok(children) => {
                     let mut selection = Selection::fresh(children);
-                    selection.direction = options.branch_directions.get(&proposal.name).copied();
+                    selection.direction = options
+                        .branch_directions
+                        .get(&proposal.name)
+                        .copied()
+                        .or_else(|| family_direction(&proposal));
                     return Ok(Some(selection));
                 }
                 Err(_) if proposal.unsupported_resource() => continue,
@@ -436,6 +534,14 @@ pub(super) fn choose_proposals<const D: usize>(
     if let Some(packing) = &options.packing {
         priorities.push(packing.priority);
     }
+    priorities.extend(options.clusters.iter().map(|c| c.priority));
+    priorities.extend(options.ryan_foster.iter().map(|r| r.priority));
+    if options.branching != NetworkBranchingPolicy::Phased {
+        // Preset policies rank inferred families relative to the registered
+        // ones (see `proposals::preset_priorities`); their levels are the
+        // proposals' own priorities.
+        priorities.extend(proposals.iter().map(|proposal| proposal.priority));
+    }
     if options.branching == NetworkBranchingPolicy::Phased {
         let p = &options.branch_priorities;
         priorities.extend([
@@ -449,7 +555,7 @@ pub(super) fn choose_proposals<const D: usize>(
     }
     priorities.sort_by(|a, b| b.total_cmp(a));
     priorities.dedup_by(|a, b| *a == *b);
-    let (fresh, priority_cutoff) = crate::master::tree::history::fresh_batches_with_budget(
+    let (fresh, priority_cutoff) = crate::master::tree::strong::fresh_batches_with_budget(
         budget.quota,
         &priorities,
         Some(&mut budget),
@@ -465,7 +571,7 @@ pub(super) fn choose_proposals<const D: usize>(
     // Native history admission uses the actual fresh-loop cutoff, including
     // empty registered priority families, and reserves at most half the quota.
     let mut ranked = vec![];
-    if output.snapshot.state.node_depth > 0 && gap > 0. {
+    if options.use_branching_history && output.snapshot.state.node_depth > 0 && gap > 0. {
         ranked = proposals
             .iter()
             .enumerate()
@@ -563,6 +669,7 @@ pub(super) fn choose_proposals<const D: usize>(
                 .branch_directions
                 .get(&candidate.proposal.name)
                 .copied()
+                .or_else(|| family_direction(&candidate.proposal))
                 .unwrap_or_else(|| {
                     if options.branching == NetworkBranchingPolicy::Phased
                         || matches!(
@@ -607,6 +714,7 @@ pub(super) fn choose_proposals<const D: usize>(
                     observation
                 } else {
                     let mut node = options.node.clone();
+                    node.fixing_upper_bound = incumbent.is_finite().then_some(incumbent);
                     node.search_inactive_columns |= options.share_inactive_columns;
                     node.enumeration = None;
                     node.cg.max_iterations = phase.max_iterations;
@@ -729,7 +837,7 @@ pub(super) fn choose_proposals<const D: usize>(
                         Err(error) => return Err(error),
                     }
                 };
-                if let Some(kind) = observation.filter(|_| candidate.proposal.history_eligible) {
+                if let Some(kind) = observation {
                     let fraction = candidate.proposal.value - candidate.proposal.value.floor();
                     if let Restriction::Resource(template) = &candidate.proposal.restriction {
                         history
@@ -737,19 +845,23 @@ pub(super) fn choose_proposals<const D: usize>(
                             .entry(candidate.proposal.history_key.clone())
                             .or_insert_with(|| template.clone());
                     }
-                    history.record_with_key(
-                        &candidate.proposal.history_key,
-                        MappedBranchEvaluation {
-                            name: candidate.proposal.name.clone(),
-                            depth: output.snapshot.state.node_depth,
-                            side,
-                            stage: candidate.stages[side],
-                            kind,
-                            parent,
-                            estimate: estimates[side],
-                            distance: if side == 0 { fraction } else { 1. - fraction },
-                        },
-                    );
+                    let evaluation = MappedBranchEvaluation {
+                        name: candidate.proposal.name.clone(),
+                        depth: output.snapshot.state.node_depth,
+                        side,
+                        stage: candidate.stages[side],
+                        kind,
+                        parent,
+                        estimate: estimates[side],
+                        distance: if side == 0 { fraction } else { 1. - fraction },
+                    };
+                    if candidate.proposal.history_eligible {
+                        history.record_with_key(&candidate.proposal.history_key, evaluation);
+                    } else {
+                        // Route-count trials are traced but, as in native,
+                        // never enter the pseudocost statistics.
+                        history.evaluations.push(evaluation);
+                    }
                 }
             }
             candidate.estimates = estimates;
@@ -832,7 +944,8 @@ pub(super) fn choose_proposals<const D: usize>(
             direction: options
                 .branch_directions
                 .get(&candidate.proposal.name)
-                .copied(),
+                .copied()
+                .or_else(|| family_direction(&candidate.proposal)),
         }));
     }
     Ok(None)

@@ -158,6 +158,14 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
     let finish = |out, loaded, cut_artificials, pool, smoothing| {
         checkpoint.finish(out, loaded, cut_artificials, pool, smoothing)
     };
+    if controller.proven_infeasible() {
+        out.status = Status::Infeasible;
+        out.lp = f64::INFINITY;
+        out.bound = f64::INFINITY;
+        out.numerical_bound = f64::INFINITY;
+        out.certified_bound = f64::INFINITY;
+        return finish(out, loaded, cut_artificials, pool, smoothing);
+    }
     if let Some(parameters) = configured_proximal {
         out.warm_start.proximal = ProximalWarmStart::capture(
             &proximal_state,

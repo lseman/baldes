@@ -34,6 +34,30 @@ pub(in crate::master::model) fn transfer<const D: usize>(
     )
 }
 
+pub(in crate::master::model) fn install_collected<const D: usize>(
+    master: &mut ClpMaster,
+    state: &mut State<D>,
+    cg: &mut cg::Options,
+    routes: Vec<NetworkRoute>,
+    counts: Vec<(i32, usize)>,
+    deadline: Instant,
+) -> Result<()> {
+    install_collected_with(
+        master,
+        state,
+        cg,
+        routes,
+        counts,
+        deadline,
+        |destination, column| {
+            destination
+                .add_column(column.cost, &column.entries)
+                .map(|_| ())
+        },
+        Instant::now,
+    )
+}
+
 pub(super) fn transfer_with<const D: usize>(
     master: &mut ClpMaster,
     state: &mut State<D>,

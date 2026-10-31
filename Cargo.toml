@@ -188,6 +188,10 @@ path = "tests/master/preprocessing.rs"
 # HGS integration tests.
 
 [[test]]
+name = "ails_ii"
+path = "tests/ails_ii.rs"
+
+[[test]]
 name = "hgs_driver"
 path = "tests/hgs/hgs_driver.rs"
 

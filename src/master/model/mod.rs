@@ -5,6 +5,7 @@
 //! Complete all-network enumeration can feed an optional HiGHS integer copy.
 mod adapter;
 mod feasibility;
+mod fixing;
 pub use crate::master::pricing::NetworkPricingSchedule;
 use crate::master::pricing::Scheduler;
 #[cfg(test)]
@@ -25,11 +26,14 @@ mod bounds;
 mod column_pool;
 mod enumeration;
 pub mod format;
+mod gap_enumeration;
 pub mod imported;
 mod lifecycle;
 mod nonlinear;
 mod presence_rows;
 mod resource_groups;
+mod ryan_foster;
+pub use ryan_foster::{RyanFosterBranching, RyanFosterMember};
 mod synchronization;
 pub use synchronization::{SynchronizedService, SynchronizedServiceMember};
 mod activity_rows;
@@ -44,20 +48,26 @@ mod flow_adapter;
 #[path = "../preprocessing/model.rs"]
 mod preprocessing_adapter;
 mod route_bounds;
+pub mod separation;
+mod set_partitioning;
 pub use preprocessing_adapter::{NetworkActivityBounds, PreprocessingOptions, PreprocessingReport};
+pub use separation::SeparationOptions;
 mod master_variables;
 mod model_mapping;
 mod original_costs;
 mod original_variables;
 pub use original_costs::OriginalVariableCosts;
 pub use original_variables::{
-    compile_pricing_variables, OriginalColumn, OriginalPricingVariable, PricingVariableRegistry,
+    compile_pricing_variables, AggregateVariableBranching, BranchingExpression, BranchingTerm,
+    OriginalColumn, OriginalPricingVariable, PricingVariableRegistry,
 };
 mod grouped_boxes;
 mod variable_boxes;
 pub use grouped_boxes::{GroupedVariableBound, OriginalVariableBound};
 pub use variable_boxes::{ArcVariableBound, VariableBox};
+mod clusters;
 mod packing;
+pub use clusters::NetworkClusterBranching;
 pub use packing::{NetworkPackingAssignment, PackingBranching};
 #[path = "../tree/strong/model.rs"]
 mod model_strong;
@@ -98,14 +108,6 @@ pub struct Problem<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
 }
 
 impl<const D: usize> Problem<D> {
-    /// Compile routing data into this model's row/network representation,
-    /// retaining routing-specific cut, branch and witness metadata separately.
-    pub fn routing(
-        graph: Graph<D>,
-        vehicles: f64,
-    ) -> Result<crate::master::routing::RoutingContext<D>> {
-        crate::master::routing::RoutingContext::set_partitioning(graph, vehicles)
-    }
     /// Validate every network and shared coefficient, even before a zero-budget run.
     pub fn validate(&self) -> Result<()> {
         let mut ids = HashSet::new();
@@ -170,7 +172,28 @@ pub struct Options {
     pub cg: cg::Options,
     pub pricing_options: Vec<(String, f64)>,
     pub enumeration: Option<EnumerationOptions>,
+    /// Enumerate routes within the incumbent gap after exact pricing.
+    pub gap_enumeration: bool,
+    /// Known feasible objective of the original integer model, possibly outside
+    /// this node's branch. Used only for objective-dependent pricing restrictions,
+    /// never as a node-local witness or a published primal solution.
+    pub fixing_upper_bound: Option<f64>,
     pub preprocessing: PreprocessingOptions,
+    /// LP backend of the restricted master. IPM disables dual stabilization.
+    pub master_solver: crate::master::clp::MasterSolver,
+    /// HiGHS/Gurobi worker budget. Zero uses all CPUs available to the process.
+    pub master_threads: usize,
+    /// Clp-only scaling and reoptimization storage policy.
+    pub clp_options: crate::master::clp::ClpOptions,
+    /// Initial bucket widths in resource order for every network (each must
+    /// have exactly this many resources); empty or zero entries keep automatic
+    /// sizing.
+    pub bucket_steps: Vec<f64>,
+    /// Cut families separated between column-generation rounds.
+    pub separation: SeparationOptions,
+    /// Initial columns of a fresh solve (for example heuristic routes).
+    /// Their costs are replayed from the network graph.
+    pub seed_routes: Vec<NetworkRoute>,
 }
 impl Default for Options {
     fn default() -> Self {
@@ -189,7 +212,15 @@ impl Default for Options {
             cg,
             pricing_options: vec![],
             enumeration: None,
+            gap_enumeration: true,
+            fixing_upper_bound: None,
             preprocessing: PreprocessingOptions::default(),
+            master_solver: crate::master::clp::MasterSolver::Clp,
+            master_threads: 0,
+            clp_options: crate::master::clp::ClpOptions::default(),
+            bucket_steps: vec![],
+            separation: SeparationOptions::default(),
+            seed_routes: vec![],
         }
     }
 }
@@ -213,6 +244,10 @@ pub struct Output<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub master_values: Vec<(i32, f64)>,
     /// Actual network pricing calls, rather than aggregate pricing batches.
     pub oracle_calls: Vec<(i32, usize)>,
+    /// Automatically separated cut rows in this node's master.
+    pub cuts: usize,
+    /// LP value when separation first ran in this solve (NaN without it).
+    pub lp_before_cuts: f64,
 }
 
 struct Oracle<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
@@ -223,6 +258,7 @@ struct Oracle<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     costs: Vec<f64>,
     route_entries: Vec<(usize, f64)>,
     calls: usize,
+    enumerated: Arc<HashSet<Vec<i32>>>,
     nonlinear_rows: Vec<(usize, usize)>,
     knapsack_rows: Vec<(usize, usize)>,
     presence_rows: Vec<(usize, usize)>,
@@ -231,6 +267,9 @@ struct Oracle<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
         usize,
         crate::master::branching::AccumulatedResourceGroupBranch,
     )>,
+    /// Packing-set Ryan–Foster branch rows: coefficient one exactly for paths
+    /// violating the constraint, which pricing also excludes.
+    ryan_foster_rows: Vec<(usize, crate::pricing::restrictions::RyanFosterConstraint)>,
     synchronized_windows: Vec<(usize, usize, Window)>,
     proved_zero_arcs: Vec<bool>,
     proved_multiplicity_upper: Option<f64>,
@@ -269,6 +308,8 @@ type IntegerWitness = (f64, Vec<FixedRoute>, Vec<(i32, f64)>);
 struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     /// Original-model primal retained during this solve, separate from LP state.
     pricing_witness: Option<IntegerWitness>,
+    /// Global feasible objective used only for objective-dependent fixing.
+    tree_incumbent: f64,
     integer_primal_termination: bool,
     witness_tolerance: f64,
     /// Native unstabilized variable-bound pricing admission.
@@ -278,6 +319,13 @@ struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     original_variable_costs: Arc<Vec<OriginalVariableCosts>>,
     pricing_master: Option<(f64, f64)>,
     pricing_gap: (f64, f64),
+    previous_fixing_gap: f64,
+    gap_enumeration: bool,
+    fixing_bound: Option<f64>,
+    gap_checkpoint: Option<Box<gap_enumeration::GapCheckpoint<D>>>,
+    enumerated_routes: usize,
+    fixing_calls: usize,
+    objective_fixed: bool,
     /// Directed original-domain phase-I proof for this model or a restriction.
     phase_one_infeasible: bool,
     mapped_subtree_size: f64,
@@ -302,12 +350,47 @@ struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     preprocessing: PreprocessingReport,
     master_variables: Vec<MasterVariable>,
     route_upper_bounds: HashMap<usize, f64>,
+    /// Automatic cut separation state, inherited by descendants.
+    cuts: Option<separation::CutState>,
 }
+struct SavedNodePoint<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    master: ClpMaster,
+    output: cg::Output,
+    state: State<D>,
+}
+
+struct AutoRankOneCapture<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    pre_rank_one: Option<SavedNodePoint<D>>,
+    rank_one_started_at: Instant,
+    node_elapsed: std::time::Duration,
+}
+
+struct CheckpointStore<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    prior_cg: Option<cg::Output>,
+    rollback: Option<SavedNodePoint<D>>,
+    auto_rank_one: Option<AutoRankOneCapture<D>>,
+}
+impl<const D: usize> Default for CheckpointStore<D> {
+    fn default() -> Self {
+        Self {
+            prior_cg: None,
+            rollback: None,
+            auto_rank_one: None,
+        }
+    }
+}
+
 struct Coordinator<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }>(
     Rc<RefCell<State<D>>>,
     bool,
     bool,
     Option<f64>,
+    Option<EnumerationOptions>,
+    Option<(Vec<NetworkRoute>, Vec<(i32, usize)>, Instant)>,
+    Vec<usize>,
+    bool,
+    bool,
+    CheckpointStore<D>,
 );
 
 fn entries_base<const D: usize>(

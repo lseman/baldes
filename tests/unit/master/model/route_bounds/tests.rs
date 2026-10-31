@@ -392,3 +392,24 @@ fn activity_caps_preserve_the_lp_unless_integer_projection_is_requested() {
         1.5
     );
 }
+
+#[test]
+fn open_pricing_uses_quantity_row_without_redundant_column_caps() {
+    let mut graph = Graph::<2>::new(3, 0).unwrap();
+    graph.add_arc(0, 1, 1.).unwrap();
+    graph.add_arc(1, 2, 1.).unwrap();
+    let mut configured = Options::default();
+    configured.preprocessing.enabled = false;
+    configured.cg.artificial_cost = 100.;
+    configured.cg.stabilize = false;
+    let root = solve(Problem::set_partitioning(graph, 3.).unwrap(), configured).unwrap();
+    assert_eq!(root.master.status, cg::Status::Optimal);
+    assert!((root.master.lp - 2.).abs() < 1e-8);
+    let column = root
+        .master
+        .column_tags
+        .iter()
+        .position(|&tag| tag >= 0)
+        .unwrap();
+    assert_eq!(root.snapshot.master.upper[column], f64::MAX);
+}

@@ -534,7 +534,29 @@ pub struct SolveOptions {
     pub network_branch_priorities: NetworkBranchPriorities,
     pub network_branch_directions: BTreeMap<String, NetworkBranchDirection>,
     pub mapped_variables: Vec<MappedBranchVariable>,
+    /// Linear branching expressions over original variables (tree only;
+    /// they require original pricing variables or master variables).
+    pub branching_expressions: Vec<crate::master::model::BranchingExpression>,
+    /// Original variables summed over network copies (tree only).
+    pub aggregate_variable_branching: Vec<crate::master::model::AggregateVariableBranching>,
+    /// Diving primal heuristic (tree only); disabled when absent.
+    pub diving: Option<crate::master::tree::DivingOptions>,
+    /// Restricted-master integer heuristic (tree only, highs feature).
+    pub restricted_master_mip: Option<crate::master::model::tree_adapter::RestrictedMasterMip>,
+    /// Absolute and relative node-closing gaps (native defaults 1e-6, 1e-9).
+    pub absolute_gap: f64,
+    pub relative_gap: f64,
+    /// Round node bounds up for integer-valued objectives (validated).
+    pub integer_objective: bool,
+    /// Rank stored branching generators by history (native default on).
+    pub use_branching_history: bool,
+    /// Worker threads for concurrent node evaluation.
+    pub tree_threads: usize,
     pub packing: Option<PackingBranching>,
+    /// Cluster boundary and pair branching generators (tree only).
+    pub clusters: Vec<crate::master::model::NetworkClusterBranching>,
+    /// Packing-set Ryan–Foster branching (tree only).
+    pub ryan_foster: Option<crate::master::model::RyanFosterBranching>,
     pub mapped_strong_branching: bool,
     pub synchronized_services: Vec<SynchronizedService>,
     pub enumerate: bool,
@@ -577,6 +599,17 @@ impl Default for SolveOptions {
             network_branch_directions: BTreeMap::new(),
             mapped_variables: vec![],
             packing: None,
+            restricted_master_mip: None,
+            absolute_gap: 1e-6,
+            relative_gap: 1e-9,
+            integer_objective: false,
+            use_branching_history: true,
+            tree_threads: 1,
+            diving: None,
+            branching_expressions: vec![],
+            aggregate_variable_branching: vec![],
+            clusters: vec![],
+            ryan_foster: None,
             mapped_strong_branching: true,
             synchronized_services: vec![],
             enumerate: false,
@@ -619,8 +652,15 @@ impl SolveOptions {
     ) -> Result<ModelTreeOptions> {
         let mut unbound = self.clone();
         unbound.original_variable_boxes.clear();
+        unbound.branching_expressions.clear();
+        unbound.aggregate_variable_branching.clear();
         let mut tree = unbound.tree_options()?;
         registry.configure_tree(&mut tree)?;
+        registry.configure_expressions(
+            &mut tree,
+            &self.branching_expressions,
+            &self.aggregate_variable_branching,
+        )?;
         registry.configure_boxes(&mut tree.node, &self.original_variable_boxes)?;
         Ok(tree)
     }
@@ -648,6 +688,20 @@ impl SolveOptions {
         }
         if self.packing.is_some() && !self.tree {
             return Err(invalid("packing requires tree=true"));
+        }
+        if (!self.branching_expressions.is_empty() || !self.aggregate_variable_branching.is_empty())
+            && !self.tree
+        {
+            return Err(invalid("branching expressions require tree=true"));
+        }
+        if self.diving.is_some() && !self.tree {
+            return Err(invalid("diving requires tree=true"));
+        }
+        if self.ryan_foster.is_some() && !self.tree {
+            return Err(invalid("Ryan–Foster branching requires tree=true"));
+        }
+        if !self.clusters.is_empty() && !self.tree {
+            return Err(invalid("cluster branching requires tree=true"));
         }
         if self.network_share_inactive_columns && !self.tree {
             return Err(invalid("network_share_inactive_columns requires tree=true"));
@@ -707,6 +761,11 @@ impl SolveOptions {
         Ok(options)
     }
     pub fn tree_options(&self) -> Result<ModelTreeOptions> {
+        if !self.branching_expressions.is_empty() || !self.aggregate_variable_branching.is_empty() {
+            return Err(invalid(
+                "branching expressions require a pricing-variable registry",
+            ));
+        }
         let node = self.node_options()?;
         Ok(ModelTreeOptions {
             branching: self.network_branching,
@@ -719,6 +778,15 @@ impl SolveOptions {
             branch_directions: self.network_branch_directions.clone(),
             mapped_variables: self.mapped_variables.clone(),
             packing: self.packing.clone(),
+            clusters: self.clusters.clone(),
+            ryan_foster: self.ryan_foster.clone(),
+            diving: self.diving.clone(),
+            restricted_master_mip: self.restricted_master_mip.clone(),
+            absolute_gap: self.absolute_gap,
+            relative_gap: self.relative_gap,
+            integer_objective: self.integer_objective,
+            use_branching_history: self.use_branching_history,
+            threads: self.tree_threads,
             mapped_strong_branching: self
                 .mapped_strong_branching
                 .then(crate::master::tree::StrongBranchingOptions::default),
@@ -878,9 +946,14 @@ pub struct SolveResult {
     pub enumerated_mip_calls: usize,
     pub enumerated_mip_nodes: usize,
     pub enumerated_mip_failures: usize,
+    pub diving_nodes: usize,
     pub strong_branching_trials: usize,
     pub mapped_history_ranked: usize,
     pub mapped_branch_evaluations: Vec<MappedBranchEvaluation>,
+    /// Automatically separated cut rows and rounds (root solves only).
+    pub cuts: usize,
+    pub cut_rounds: usize,
+    pub lp_before_cuts: Option<f64>,
 }
 fn finite(value: f64) -> Option<f64> {
     value.is_finite().then_some(value)
@@ -953,9 +1026,13 @@ impl SolveResult {
             enumerated_mip_calls: 0,
             enumerated_mip_nodes: 0,
             enumerated_mip_failures: 0,
+            diving_nodes: 0,
             strong_branching_trials: 0,
             mapped_history_ranked: 0,
             mapped_branch_evaluations: vec![],
+            cuts: output.cuts,
+            cut_rounds: output.master.cut_rounds,
+            lp_before_cuts: finite(output.lp_before_cuts),
             seconds,
         }
     }
@@ -987,9 +1064,13 @@ impl SolveResult {
             enumerated_mip_calls: output.enumerated_mip_calls,
             enumerated_mip_nodes: output.enumerated_mip_nodes,
             enumerated_mip_failures: output.enumerated_mip_failures,
+            diving_nodes: output.diving_nodes,
             strong_branching_trials: output.strong_branching_trials,
             mapped_history_ranked: output.mapped_history_ranked,
             mapped_branch_evaluations: output.mapped_branch_evaluations.clone(),
+            cuts: 0,
+            cut_rounds: 0,
+            lp_before_cuts: None,
             seconds,
         }
     }
@@ -1027,11 +1108,15 @@ impl SolveResult {
             nodes: output.mip.nodes,
             tree_processed_nodes: 0,
             open_nodes: usize::from(!proof),
+            cuts: 0,
+            cut_rounds: 0,
+            lp_before_cuts: None,
             seconds,
             enumeration_reports: vec![report.clone()],
             enumerated_mip_calls: 1,
             enumerated_mip_nodes: output.mip.nodes,
             enumerated_mip_failures: 0,
+            diving_nodes: 0,
             strong_branching_trials: 0,
             mapped_history_ranked: 0,
             mapped_branch_evaluations: vec![],

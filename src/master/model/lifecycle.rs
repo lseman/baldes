@@ -47,6 +47,7 @@ impl<const D: usize> State<D> {
     pub(super) fn fork_state(&self) -> Self {
         State {
             pricing_witness: self.pricing_witness.clone(),
+            tree_incumbent: self.tree_incumbent,
             integer_primal_termination: self.integer_primal_termination,
             witness_tolerance: self.witness_tolerance,
             box_pricing_admission: self.box_pricing_admission,
@@ -55,6 +56,13 @@ impl<const D: usize> State<D> {
             original_variable_costs: self.original_variable_costs.clone(),
             pricing_master: None,
             pricing_gap: self.pricing_gap,
+            previous_fixing_gap: self.previous_fixing_gap,
+            gap_enumeration: self.gap_enumeration,
+            fixing_bound: None,
+            gap_checkpoint: None,
+            enumerated_routes: self.enumerated_routes,
+            fixing_calls: self.fixing_calls,
+            objective_fixed: self.objective_fixed,
             phase_one_infeasible: self.phase_one_infeasible,
             mapped_subtree_size: self.mapped_subtree_size,
             mapped_subtree_priority: self.mapped_subtree_priority,
@@ -73,11 +81,13 @@ impl<const D: usize> State<D> {
                     costs: vec![],
                     route_entries: o.route_entries.clone(),
                     calls: 0,
+                    enumerated: o.enumerated.clone(),
                     nonlinear_rows: o.nonlinear_rows.clone(),
                     knapsack_rows: o.knapsack_rows.clone(),
                     presence_rows: o.presence_rows.clone(),
                     activity_rows: o.activity_rows.clone(),
                     resource_groups: o.resource_groups.clone(),
+                    ryan_foster_rows: o.ryan_foster_rows.clone(),
                     synchronized_windows: o.synchronized_windows.clone(),
                     proved_zero_arcs: o.proved_zero_arcs.clone(),
                     proved_multiplicity_upper: o.proved_multiplicity_upper,
@@ -98,17 +108,48 @@ impl<const D: usize> State<D> {
             preprocessing: self.preprocessing.clone(),
             master_variables: self.master_variables.clone(),
             route_upper_bounds: self.route_upper_bounds.clone(),
+            cuts: self.cuts.clone(),
         }
+    }
+
+    pub(super) fn snapshot_for_checkpoint(&self) -> Self {
+        let mut forked = self.fork_state();
+        for (dst, src) in forked.oracles.iter_mut().zip(&self.oracles) {
+            dst.calls = src.calls;
+            dst.solver.rollback_point_saved = false;
+            dst.solver.requires_rollback = false;
+        }
+        forked
     }
 }
 
 impl<const D: usize> NodeSnapshot<D> {
     pub(crate) fn fork(&self) -> Result<Self> {
-        Ok(Self {
+        let mut node = Self {
             master: self.master.try_clone()?,
             warm: self.warm.clone(),
             state: self.state.fork_state(),
-        })
+        };
+        // Incumbents are supplied by each solve's owner, never inherited as
+        // authority from a reusable snapshot.
+        node.state.tree_incumbent = f64::INFINITY;
+        if node.state.objective_fixed {
+            // The old incumbent may not be feasible for a new branch, or the
+            // caller may resume this snapshot as an LP without an incumbent.
+            // Drop only cost-dependent bucket fixings; graph restrictions and
+            // dynamically strengthened relaxations remain in the solver.
+            for oracle in &mut node.state.oracles {
+                oracle.solver.restore_arcs();
+            }
+            node.state.objective_fixed = false;
+            node.state.previous_fixing_gap = 1e12;
+            node.warm.bound = f64::NEG_INFINITY;
+            node.warm.numerical_bound = f64::NEG_INFINITY;
+            node.warm.certified_bound = f64::NEG_INFINITY;
+            node.warm.stabilization = None;
+            node.warm.clear_proximal();
+        }
+        Ok(node)
     }
 
     /// Actual branch depth; resumes and row additions preserve this value.
@@ -509,22 +550,17 @@ impl<const D: usize> NodeSnapshot<D> {
     }
 }
 
-// Reuse the routing validator's exact-real resource replay rather than trusting
-// the rounded resource profile returned by labeling.
+// Use the graph's exact-real resource replay rather than trusting the rounded
+// resource profile returned by labeling.
 pub(super) fn integer_route_feasible<const D: usize>(
     oracle: &Oracle<D>,
     route: &Route,
 ) -> Result<bool> {
-    let problem = crate::master::routing::RoutingContext::set_partitioning(
-        super::resource_groups::domain_graph(oracle)?.into_owned(),
-        1.,
-    )?;
-    Ok(
-        crate::master::routing::exact_route_feasible(&problem, route).is_some()
-            && oracle
-                .solver
-                .route_satisfies_relaxation(&route.nodes, &route.arcs)?,
-    )
+    let problem = super::resource_groups::domain_graph(oracle)?;
+    Ok(problem.exact_route_feasible(route).is_some()
+        && oracle
+            .solver
+            .route_satisfies_relaxation(&route.nodes, &route.arcs)?)
 }
 
 /// Fixed reductions replay original contributions even when a later branch
@@ -534,16 +570,11 @@ pub(super) fn original_route_feasible<const D: usize>(
     oracle: &Oracle<D>,
     route: &Route,
 ) -> Result<bool> {
-    let problem = crate::master::routing::RoutingContext::set_partitioning(
-        oracle.network.graph.as_ref().clone(),
-        1.,
-    )?;
-    Ok(
-        crate::master::routing::exact_route_feasible(&problem, route).is_some()
-            && oracle
-                .solver
-                .route_satisfies_relaxation(&route.nodes, &route.arcs)?,
-    )
+    let problem = oracle.network.graph.as_ref();
+    Ok(problem.exact_route_feasible(route).is_some()
+        && oracle
+            .solver
+            .route_satisfies_relaxation(&route.nodes, &route.arcs)?)
 }
 
 /// Replay explicit fixed copies into a fresh model before preprocessing or pricing.

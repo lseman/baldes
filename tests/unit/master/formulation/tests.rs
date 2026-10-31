@@ -80,27 +80,24 @@ fn dynamic_rows_preserve_assigned_ids_and_reject_stale_prefixes() {
 }
 
 #[test]
-fn routing_registration_and_general_solver_consume_the_same_canonical_model() {
+fn set_partitioning_registration_and_solver_use_the_same_canonical_model() {
     let mut graph = crate::Graph::<2>::new(3, 0).unwrap();
     graph.add_arc(0, 1, 2.).unwrap();
     graph.add_arc(1, 2, 0.).unwrap();
-    let registration = crate::master::model::Problem::routing(graph, 1.).unwrap();
-    assert_eq!(registration.model.networks.len(), 1);
+    let registration = crate::master::model::Problem::set_partitioning(graph, 1.).unwrap();
+    assert_eq!(registration.networks.len(), 1);
+    let built = build_model(&registration, &Backend::default()).unwrap();
+    assert_eq!(built.quantity_rows.len(), 1);
+    assert_eq!(built.master.rhs.len(), 2);
     for bound_mode in [
         crate::master::cg::BoundMode::Numerical,
         crate::master::cg::BoundMode::Certified,
     ] {
-        let mut root = crate::master::routing::RootOptions::default();
-        root.bound_mode = bound_mode;
-        root.cg.stabilize = false;
-        root.enumerate = false;
-        let routing = crate::master::routing::solve(registration.clone(), root).unwrap();
         let mut options = crate::master::model::Options::default();
         options.cg.bound_mode = bound_mode;
         options.cg.stabilize = false;
-        let general = crate::master::model::solve(registration.model.clone(), options).unwrap();
-        assert_eq!(routing.master.lp, 2.);
-        assert_eq!(routing.master.lp, general.master.lp);
-        assert_eq!(routing.master.bound, general.master.bound);
+        let output = crate::master::model::solve(registration.clone(), options).unwrap();
+        assert_eq!(output.master.lp, 2.);
+        assert!((output.master.bound - 2.).abs() < 1e-6);
     }
 }

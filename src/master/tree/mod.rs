@@ -1,11 +1,6 @@
 //! Shared branch-and-price lifecycle and policies; model registrations are adapters.
-#[path = "adapters/routing/mod.rs"]
-mod routing;
-pub use routing::{
-    candidates, clusters, history, strong, BranchConstraint, BranchEvaluationHistory,
-    BranchHistoryOptions, BranchHistoryPolicy, BranchingOptions, DivingOptions,
-    StrongBranchingOptions, StrongPhase, TreeOptions, TreeOutput,
-};
+pub mod strong;
+pub use strong::{StrongBranchingOptions, StrongPhase};
 mod driver;
 mod frontier;
 pub(crate) use driver::{run, Decision, Limits, Model, Stop};
@@ -126,6 +121,6 @@ pub fn solve<I: TreeInput>(input: I, options: I::Options) -> crate::Result<I::Ou
 }
 
 pub use crate::master::model::tree_adapter::{
-    ModelTreeOptions, ModelTreeOutput, NetworkBranchDirection, NetworkBranchPriorities,
-    NetworkBranchingPolicy,
+    DivingOptions, ModelTreeOptions, ModelTreeOutput, NetworkBranchDirection,
+    NetworkBranchPriorities, NetworkBranchingPolicy, RestrictedMasterMip,
 };

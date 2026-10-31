@@ -1096,7 +1096,7 @@ fn bidirectional_pricing_and_non_elementary_memory_with_strong_k_path_cut() {
 #[cfg(feature = "clp")]
 #[test]
 fn root_master_with_kpath_cuts() {
-    use baldes::master::routing::{solve, KPathCutConfig, RootOptions, RoutingContext};
+    use baldes::master::model::{self, separation::KPathCutConfig, Options, Problem};
 
     let mut g = Graph::<2>::new(5, 1).unwrap();
     for v in 0..5 {
@@ -1118,9 +1118,10 @@ fn root_master_with_kpath_cuts() {
             g.arc_mut(id).unwrap().consumption[0] = d;
         }
     }
-    let problem = RoutingContext::set_partitioning(g, 3.0).unwrap();
-    let options = RootOptions::default().with_kpath_cuts(KPathCutConfig::new(demands, 4.0));
-    let out = solve(problem, options).unwrap();
+    let problem = Problem::set_partitioning(g, 3.0).unwrap();
+    let mut options = Options::default();
+    options.separation.kpath = Some(KPathCutConfig::new(demands, 4.0));
+    let out = model::solve(problem, options).unwrap();
     assert!(out.master.lp.is_finite());
 }
 
@@ -1310,11 +1311,11 @@ fn knapsack_root_cuts_close_fractional_capacity_gap_and_survive_snapshot() {
     use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
         cg::Status,
-        routing::{KnapsackCutConfig, RootOptions},
+        model::{separation::KnapsackCutConfig, EnumerationOptions, Options},
     };
     let instance = Instance::parse("knapsack-root\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
-    let scaled = RootOptions::default()
-        .with_knapsack_cuts(KnapsackCutConfig::new(vec![KnapsackRow::new(0, 1, 2., 6)]));
+    let mut scaled = Options::default();
+    scaled.separation.knapsack = Some(KnapsackCutConfig::new(vec![KnapsackRow::new(0, 1, 2., 6)]));
     let scaled = instance.solve(8, Rounding::None, scaled).unwrap();
     assert_eq!(scaled.master.status, Status::Optimal);
     assert!(scaled.master.lp.is_finite());
@@ -1328,26 +1329,51 @@ fn knapsack_root_cuts_close_fractional_capacity_gap_and_survive_snapshot() {
             }
             config.parameters.use_rounding = true;
             config.parameters.max_one_k = 0;
-            let mut options = RootOptions::default().with_knapsack_cuts(config);
-            options.enumerate = enumerate;
-            options.capture_state = true;
+            let mut options = Options::default();
+            options.separation.knapsack = Some(config);
+            options.enumeration = enumerate.then(EnumerationOptions::default);
             let out = instance.solve(8, Rounding::None, options).unwrap();
             assert_eq!(out.master.status, Status::Optimal);
             assert!(out.cuts > 0);
             assert!(out.master.cut_rounds > 0);
             assert!((out.master.lp - (4. + 2f64.sqrt())).abs() < 1e-8);
-            assert!(out.snapshot.as_ref().unwrap().active_cuts() > 0);
-            let mut child_options = RootOptions::default();
-            child_options.enumerate = enumerate;
-            child_options.node_depth = 1;
-            let child = baldes::master::routing::inherit(
-                out.snapshot.as_ref().unwrap(),
-                &[],
-                child_options,
-            )
-            .unwrap();
+            if original_resource == 7 {
+                use baldes::cuts::knapsack::{KnapsackKind, RouteLoadKnapsackCut};
+                use baldes::master::{
+                    formulation::Row, model::ResourceKnapsackCoefficients, RowSense,
+                };
+                let row = Row {
+                    sense: RowSense::LessEqual,
+                    rhs: 3.,
+                };
+                let coefficients = [ResourceKnapsackCoefficients {
+                    network: 0,
+                    resource: 1,
+                    scale: 1.,
+                    cut: RouteLoadKnapsackCut {
+                        kind: KnapsackKind::Steps,
+                        numerator: 1,
+                        denominator: 1,
+                        rhs: 1,
+                        lhs: 0.,
+                        violation: 0.,
+                        thresholds: vec![1],
+                        coefficients: BTreeMap::from([(1, 1)]),
+                    },
+                }];
+                let registered = out
+                    .snapshot
+                    .with_resource_knapsack_row(row, &coefficients)
+                    .unwrap();
+                let replay = registered.solve(Options::default()).unwrap();
+                assert_eq!(replay.master.status, Status::Optimal);
+                assert!((replay.master.lp - out.master.lp).abs() < 1e-8);
+            }
+            let mut child_options = Options::default();
+            child_options.enumeration = enumerate.then(EnumerationOptions::default);
+            let child = out.snapshot.solve(child_options).unwrap();
             assert_eq!(child.master.status, Status::Optimal);
-            assert!(child.inherited_cuts > 0);
+            assert!(child.cuts > 0);
             assert!((child.master.lp - out.master.lp).abs() < 1e-8);
         }
     }

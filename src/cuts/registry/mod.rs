@@ -20,19 +20,20 @@ pub enum MemoryKind {
     Vertex,
     Arc,
 }
-/// BALDESrankOneCutsMemoryType: 0 vertex, 1 arc, 2 default copy, 3 all vertices.
+/// BALDESrankOneCutsMemoryType: 0 automatic (root vertex/arc search), 1 arc,
+/// 2 vertex (default), 3 all vertices.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemoryType {
-    Vertex = 0,
+    Automatic = 0,
     Arc = 1,
-    Default = 2,
+    Vertex = 2,
     AllVertices = 3,
 }
 impl MemoryType {
     /// Compile-time policy for generated cuts. Explicit full-vertex memory
     /// modes retain their meaning; manually registered rows are not converted.
     pub(crate) fn for_build(self) -> Self {
-        if cfg!(feature = "rank-one-node-memory") && self == Self::Arc {
+        if cfg!(feature = "rank-one-node-memory") && matches!(self, Self::Automatic | Self::Arc) {
             Self::Vertex
         } else {
             self
@@ -157,6 +158,9 @@ pub struct SeparationParameters {
     /// Maximum cuts touching a vertex through support or memory; zero disables.
     pub max_per_vertex: usize,
     pub max_triplets: usize,
+    /// Packing-set neighbourhood cap for 4/5-row enumeration (native
+    /// `RCSPrankOneCutsNeighbourhoodSize`, default 16).
+    pub neighbourhood_size: usize,
     pub max_rank: i32,
     pub start_rank: i32,
     pub local_search_rounds: i32,
@@ -177,6 +181,7 @@ impl Default for SeparationParameters {
             max_cuts: 20,
             max_per_vertex: 0,
             max_triplets: 10000,
+            neighbourhood_size: 16,
             max_rank: 5,
             start_rank: 0,
             local_search_rounds: 10,
@@ -203,9 +208,9 @@ pub struct MemoryPolicy {
 }
 pub fn memory_policy(options: &Options) -> Result<MemoryPolicy> {
     let memory_type = match options.get("BALDESrankOneCutsMemoryType")? as i32 {
-        0 => MemoryType::Vertex,
+        0 => MemoryType::Automatic,
         1 => MemoryType::Arc,
-        2 => MemoryType::Default,
+        2 => MemoryType::Vertex,
         3 => MemoryType::AllVertices,
         _ => return Err(invalid("BALDESrankOneCutsMemoryType must be 0, 1, 2 or 3")),
     };

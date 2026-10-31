@@ -78,7 +78,10 @@ pub(crate) enum BestSource {
     /// Coefficients are recomputed from the route at the current rows.
     Route(Route),
     /// A retained-domain column, valid while the row count is unchanged.
-    Entries { entries: Vec<(usize, f64)>, rows: usize },
+    Entries {
+        entries: Vec<(usize, f64)>,
+        rows: usize,
+    },
 }
 pub(crate) struct BestPath {
     pub source: BestSource,

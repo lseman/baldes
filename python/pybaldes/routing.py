@@ -132,17 +132,11 @@ class RootResult:
     pricing_calls: int
     columns: int  # Route columns added over the run
     master_columns: int  # final master size, artificial columns included
-    fixing_calls: int
-    enumerated_routes: int
     pruned_by_bound: bool
     duals: Tuple[float, ...]
     seconds: float
-    pricing_seconds: float
-    solver_seconds: float
     routes: Tuple[RootRoute, ...]
     history: Tuple[Iteration, ...]
-    simplex_iterations: int = 0
-    ipm_iterations: int = 0
     feasibility: Tuple[FeasibilityReport, ...] = ()
     oracle_calls: int = 0
 

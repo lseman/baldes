@@ -162,8 +162,9 @@ impl<const D: usize> NodeSnapshot<D> {
                     == Some(&crate::graph::ResourceKind::Disposable)
                 && state.universe.is_none()
                 && oracle.knapsack_rows.iter().any(|&(index, _)| {
-                    oracle.solver.cuts.knapsack_cuts[index].graph_resources[&member.network].0
-                        == resource
+                    let id =
+                        oracle.solver.cuts.knapsack_cuts[index].graph_resources[&member.network].0;
+                    super::resource_rows::coordinate(oracle, id).is_none_or(|axis| axis == resource)
                 })
             {
                 return Err(invalid(

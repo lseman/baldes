@@ -258,6 +258,86 @@ with `--network-branching multiplicity-first`, JSON solve option
 `"network_branching": "multiplicity-first"`, or Python
 `solve(..., tree=True, network_branching="multiplicity-first")`.
 
+### Registered branching families
+
+These JSON solve options (tree only) add generators. Each one has a priority:
+higher priorities are searched first, and within a priority the most
+fractional candidate is preferred. They all take part in strong branching and
+branching history.
+
+- `"clusters": [{"network": 0, "partition": null, "theta": 1.0, "priority": 10}]`:
+  cluster boundaries (traversals entering a vertex group) and cluster pairs
+  (traversals between two groups) from Silva, Uchoa and Subramanian (2024).
+  Without `partition`, customers are grouped by cutting minimum-spanning-tree
+  edges longer than `mean + theta * std`. The source and sink form the depot
+  group.
+- `"ryan_foster": {"priority": 2, "sets": [...]}`: packing-set Ryan–Foster.
+  `sets` uses the `packing` vertex format; when it is empty, the `packing`
+  registration is used, and a single network otherwise uses each customer
+  vertex as its own set. Candidates are pairs whose LP co-occurrence lies
+  strictly between `1e-6` and `0.999999`, ranked by distance to one half.
+  The together child is the upper child. A branch is a `<= 0` row whose
+  column coefficient is one for violating paths, and pricing excludes those
+  paths, as in the native solver; columns are not capped.
+- `"branching_expressions": [{"name": "y", "priority": 3, "terms":
+  [{"network": 0, "id": 4, "coefficient": 1.0}, {"id": 9, "coefficient": 2.0}]}]`:
+  a linear expression over original pricing variables (`network` and `id`)
+  and master variables (`id` only), branched on as one integer variable.
+  The expression must be integer on every integer solution.
+- `"aggregate_variable_branching": [{"id": 4, "priority": 2, "networks": []}]`:
+  an original variable ID summed over every network that registers it (or the
+  listed networks), named `AGG_<id>`.
+
+Integer original pricing variables (`"integer": true` with `"priority"`)
+remain registered as `X_<network>_<id>` branching variables. The routing CLI
+offers these families through `--branching cluster`, `ryan-foster`,
+`vehicles` and `hybrid` (phased: route count, resource, clusters, assignment,
+Ryan–Foster and arc flow).
+
+### Heuristics, gaps and parallel evaluation
+
+These `ModelTreeOptions` (and JSON solve options) follow the native solver's
+controls and defaults:
+
+- `diving` (JSON `"diving": {...}`): the native diving heuristic, disabled
+  when absent. It runs at nodes up to `depth_limit`, at the root only when
+  `frequency` is zero and otherwise at every `frequency`-th selected node.
+  Each dive node fixes positive integer columns as fixed route copies, then
+  rounds the column closest to its ceiling up. With `strong_candidates > 1`,
+  that many rounded children are solved and sorted by LP value; within the
+  first `lds_depth` levels, `max_discrepancy + 1 - discrepancy` of them are
+  kept. Dive nodes are taken deepest first. `stop_after_first_solution`,
+  `fix_integer_columns`, `max_iterations`, `node_limit` and `time_limit`
+  (seconds) bound the work. Dives only supply incumbents; their bounds are
+  never published. Results count dive solves in `diving_nodes`.
+- `restricted_master_mip` (JSON `"restricted_master_mip": {"frequency": 0,
+  "time_limit": 10, "node_limit": 100000}`, highs feature): the native
+  restricted-master integer heuristic, disabled when absent. The node's
+  columns are solved as a MIP with artificial columns at zero; a solution is
+  accepted only after exact replay in the original model, and the MIP bound
+  is never used. Counted in `restricted_mip_calls`.
+- `absolute_gap` and `relative_gap` (defaults `1e-6` and `1e-9`, the native
+  `optimalityGapTolerance` and `relOptimalityGapTolerance`): a node closes when
+  its bound is within the larger of the tree tolerance, the absolute gap and
+  the relative gap times the incumbent. Larger gaps stop the search early;
+  `Optimal` then means optimal within that gap.
+- `integer_objective` (default off, native `integerValuedBound`): round node
+  bounds up before pruning. It is rejected unless every arc, master-variable
+  and fixed cost is an integer and there are no resource or original-variable
+  costs.
+- `use_branching_history` (default on, native `StrongBranchingUseHistory`):
+  rank stored branching generators by their recorded pseudocosts.
+- `threads` (JSON `"tree_threads"`, default 1): evaluate up to this many open
+  nodes concurrently. Each node copy is exported to owned data, solved on a
+  worker and rebuilt on the coordinator, which alone updates the frontier,
+  incumbent and branching. More than one thread changes the search
+  trajectory, not proof bounds. This is a BALDES extension.
+
+The routing CLI exposes these as `--diving`, `--restricted-mip`,
+`--mip-nodes N`, `--no-mip-heuristic`, `--absolute-gap X`,
+`--relative-gap X`, `--integer-objective`, `--no-branch-history` and
+`--tree-threads N`.
+
 Tree selection is independent of branch-family selection.
 `TreeSearchPolicy::Default` (default) processes the deepest open
 node first, then the lowest inherited numerical LP bound, then creation order. It uses the
@@ -1451,3 +1531,16 @@ primal/dual enclosure are distinct from an exact selector or a whole-model
 pricing certificate. Budget/arithmetic limits remain unknown. Generated controls
 can be retained with `with_route_controls`; paired shared-row pricing uses this
 same optimizer under a shared query budget.
+
+For integer solves, `Options::gap_enumeration` enables gap-triggered bucket
+fixing and retained-route pricing in eligible one-network models. It defaults
+to true. This retained pool covers improving integer solutions at the supplied
+objective bound; it does not mark whole-domain enumeration complete. Explicit
+`Options::enumeration` continues to request whole-domain enumeration separately.
+
+The tree supplies its current incumbent through `Options::fixing_upper_bound`
+at each solve, including worker and strong-branching evaluations. Direct callers
+may supply a known feasible original-model integer objective through this option.
+It is not a node-local witness or a published solution. Reusable snapshots do not
+carry that authority into another solve. LP-only solves do not apply these
+objective-dependent restrictions.

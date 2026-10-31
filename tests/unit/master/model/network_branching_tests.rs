@@ -14,15 +14,24 @@ fn multiplicity_first_matches_the_mapped_native_first_child_and_restores_parent(
     options.cg.artificial_cost = 100.;
     let root = solve_with_master_variables(problem, vec![], options.clone()).unwrap();
     assert_eq!(root.master.lp, 1.5);
-    let branches = children(
+    // The unified dispatcher with the MultiplicityFirst preset, no strong trials.
+    let configured = ModelTreeOptions {
+        mapped_strong_branching: None,
+        ..Default::default()
+    };
+    let proposals = super::super::proposals::collect(&root, &configured, &[]).unwrap();
+    let mut selection = model_strong::choose_proposals(
         &root,
-        1e-6,
-        NetworkBranchingPolicy::MultiplicityFirst,
-        &[],
-        &[],
+        &configured,
+        &mut model_strong::History::default(),
+        f64::INFINITY,
+        Instant::now() + std::time::Duration::from_secs(10),
+        proposals,
     )
     .unwrap()
     .unwrap();
+    selection.admit(NetworkBranchDirection::UpperFirst);
+    let branches = selection.children;
     assert_eq!(branches.len(), 2);
     let first = branches[0].solve(options.clone()).unwrap();
     // In the public native control, fractional network42 count .5 splits
@@ -142,6 +151,8 @@ fn registered_tree_pairs_network_identities_sides_ranks_and_feasible_node_bounds
         let mut options = ModelTreeOptions::default();
         options.node.cg.stabilize = false;
         options.node.cg.bound_mode = cg::BoundMode::Certified;
+        // The reference runner records these controls without strong branching.
+        options.mapped_strong_branching = None;
         let root = solve_with_master_variables(problem, vec![], options.node.clone()).unwrap();
         let mut result = ModelTreeOutput {
             status: TreeStatus::Incomplete,
@@ -169,6 +180,8 @@ fn registered_tree_pairs_network_identities_sides_ranks_and_feasible_node_bounds
             enumerated_mip_nodes: 0,
             enumerated_mip_failures: 0,
             enumeration_reports: vec![],
+            diving_nodes: 0,
+            restricted_mip_calls: 0,
         };
         let deadline = Instant::now() + std::time::Duration::from_secs(10);
         let mut subtree_history = None;
@@ -185,6 +198,7 @@ fn registered_tree_pairs_network_identities_sides_ranks_and_feasible_node_bounds
             mapped_history: &mut mapped_history,
             selected_nodes: &mut selected_nodes,
             unresolved: &mut unresolved,
+            workers: None,
         };
         let mut observer = Observed {
             inner,

@@ -22,7 +22,6 @@ pub enum RowSense {
 #[cfg(feature = "clp")]
 pub mod branching;
 #[cfg(feature = "clp")]
-#[cfg(feature = "clp")]
 pub mod formulation;
 #[cfg(feature = "clp")]
 pub mod model;
@@ -30,7 +29,5 @@ pub mod model;
 pub(crate) mod numerics;
 #[cfg(feature = "clp")]
 pub(crate) mod pricing;
-#[cfg(feature = "clp")]
-pub mod routing;
 #[cfg(feature = "clp")]
 pub mod tree;

@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::HashMap;
 
 impl CutRegistry {
     /// Separates with the current parameters and registers every emitted cut.
@@ -8,6 +9,39 @@ impl CutRegistry {
         customers: &[usize],
         columns: &[FractionalColumn],
     ) -> Result<usize> {
+        self.separate_graphs(&[(g, customers)], columns)
+    }
+
+    /// Separate over several pricing graphs sharing one packing-set space.
+    /// `graphs[k].1[row]` is graph k's vertex of packing set `row`; the first
+    /// graph is the registry's own. Cuts of several graphs carry a support per
+    /// graph, so each network prices them on its own vertices.
+    pub fn separate_graphs<const D: usize>(
+        &mut self,
+        graphs_in: &[(&Graph<D>, &[usize])],
+        columns: &[FractionalColumn],
+    ) -> Result<usize> {
+        let &[(g, customers), ..] = graphs_in else {
+            return Err(invalid("rank-one separation requires a graph"));
+        };
+        let multi = graphs_in.len() > 1;
+        let mut by_id: BTreeMap<i32, (&Graph<D>, Vec<i32>)> = BTreeMap::new();
+        for &(graph, rows) in graphs_in {
+            if rows.len() != customers.len() {
+                return Err(invalid("rank-one graphs must share their packing sets"));
+            }
+            let mut map = vec![-1i32; graph.vertices.len()];
+            for (row, &v) in rows.iter().enumerate() {
+                if v >= map.len() || map[v] >= 0 {
+                    return Err(invalid("native cut customer IDs"));
+                }
+                map[v] = row as i32;
+            }
+            if by_id.insert(graph.graph_id.max(0), (graph, map)).is_some() && multi {
+                return Err(invalid("rank-one graphs need distinct nonnegative IDs"));
+            }
+        }
+        let lookup = |id: i32| by_id.get(&id).map(|(graph, map)| (*graph, map));
         let mut parameters = self.parameters.clone();
         parameters.memory_type = parameters.memory_type.for_build();
         let p = &parameters;
@@ -49,18 +83,18 @@ impl CutRegistry {
                 } else {
                     0
                 };
+            let (gg, map) = lookup(id).unwrap_or((g, &row_of));
             let mut graph = GraphData {
                 id,
-                source: g.source as i32,
-                sink: g.sink as i32,
+                source: gg.source as i32,
+                sink: gg.sink as i32,
                 elem_set_count: rows,
                 packing_set_count: packing,
                 covering_set_count: covering,
                 packing_neighbourhood: vec![vec![]; packing as usize],
                 ..Default::default()
             };
-            for v in 0..vertices {
-                let row = row_of[v];
+            for (v, &row) in map.iter().enumerate() {
                 let mut vertex = VertexData {
                     id: v as i32,
                     ..Default::default()
@@ -76,7 +110,7 @@ impl CutRegistry {
                 }
                 graph.vertices.push(vertex);
             }
-            for a in &g.arcs {
+            for a in &gg.arcs {
                 graph.arcs.push(ArcData {
                     id: a.id,
                     tail: a.tail as i32,
@@ -94,7 +128,32 @@ impl CutRegistry {
             if !c.value.is_finite() || c.value < 0. {
                 return Err(invalid("fractional column value"));
             }
-            let arcs = self.route(g, &c.vertices)?;
+            let column_graph = if c.graph_id < 0 {
+                p.graph_id
+            } else {
+                c.graph_id
+            };
+            let arcs = match lookup(column_graph) {
+                Some((other, _)) if multi && other.graph_id.max(0) != g.graph_id.max(0) => {
+                    let ends: HashMap<(usize, usize), i32> = other
+                        .arcs
+                        .iter()
+                        .rev()
+                        .map(|a| ((a.tail, a.head), a.id))
+                        .collect();
+                    let mut walk = vec![other.source];
+                    walk.extend_from_slice(&c.vertices);
+                    walk.push(other.sink);
+                    walk.windows(2)
+                        .map(|w| {
+                            ends.get(&(w[0], w[1]))
+                                .map(|&id| (w[0], w[1], id))
+                                .ok_or_else(|| invalid("fractional column arc"))
+                        })
+                        .collect::<Result<Vec<_>>>()?
+                }
+                _ => self.route(g, &c.vertices)?,
+            };
             solutions.push(Solution {
                 graph_id: if c.graph_id < 0 {
                     p.graph_id
@@ -118,7 +177,7 @@ impl CutRegistry {
                 0
             },
             ls_iterations_negative: p.ls_iterations_negative,
-            neighbourhood_size: 16,
+            neighbourhood_size: p.neighbourhood_size.min(i32::MAX as usize) as i32,
             max_num_triplets: if p.mode == CandidateMode::CliqueEnumeration {
                 0
             } else {
@@ -141,8 +200,9 @@ impl CutRegistry {
                     continue;
                 }
                 for &graph in &graph_ids {
+                    let gg = lookup(graph).map_or(g, |(gg, _)| gg);
                     let mut touched = BTreeSet::new();
-                    for v in 0..vertices {
+                    for v in 0..gg.vertices.len() {
                         if cut.pricing_weight_for_graph(graph, v) != 0 {
                             touched.insert(v);
                         }
@@ -158,7 +218,7 @@ impl CutRegistry {
                         }
                         MemoryKind::Arc => {
                             let memory = cut.arc_memory_for_graph(graph);
-                            for arc in &g.arcs {
+                            for arc in &gg.arcs {
                                 if memory.contains(&arc.id) {
                                     touched.insert(arc.tail);
                                     touched.insert(arc.head);
@@ -236,7 +296,7 @@ impl CutRegistry {
             cut_memory_type: match p.memory_type {
                 MemoryType::Arc => 1,
                 MemoryType::AllVertices => 2,
-                _ => 0,
+                MemoryType::Automatic | MemoryType::Vertex => 0,
             },
             solutions_are_set_sequences: false,
             separation_phase: if p.start_rank > 0 {
@@ -290,19 +350,39 @@ impl CutRegistry {
                 ordered.push((vertex, weight));
             }
             cut.ordered_support = Some(ordered);
+            if multi {
+                for (&graph, (_, map)) in &by_id {
+                    let mut support: Vec<(usize, i32)> = (0..native.num_rows as usize)
+                        .filter_map(|r| {
+                            let row = native.set_ids[r];
+                            let vertex = map.iter().position(|&x| x == row)?;
+                            Some((vertex, native.numerators[r].abs()))
+                        })
+                        .collect();
+                    support.sort_unstable();
+                    cut.graph_support.insert(graph, support);
+                }
+            }
             for (&graph, memory) in &native.memory {
                 if native.memory_type == 1 {
                     cut.graph_arc_memories.insert(graph, memory.clone());
                     cut.arc_memory.extend(memory.iter().copied());
                 } else {
+                    let size = lookup(graph).map_or(vertices, |(gg, _)| gg.vertices.len());
                     let selected = cut
                         .graph_memories
                         .entry(graph)
-                        .or_insert_with(|| vec![false; vertices]);
-                    *selected = vec![false; vertices];
+                        .or_insert_with(|| vec![false; size]);
+                    *selected = vec![false; size];
                     for &v in memory {
-                        selected[v as usize] = true;
-                        cut.memory[v as usize] = true;
+                        if let Some(slot) = selected.get_mut(v as usize) {
+                            *slot = true;
+                        }
+                        if !multi || graph == p.graph_id {
+                            if let Some(slot) = cut.memory.get_mut(v as usize) {
+                                *slot = true;
+                            }
+                        }
                     }
                 }
             }
@@ -320,6 +400,19 @@ impl CutRegistry {
         customers: &[usize],
         columns: &[FractionalColumn],
     ) -> Result<usize> {
+        self.separate_default_graphs(&[(g, customers)], options, columns)
+    }
+
+    /// [`Self::separate_default`] over several graphs sharing packing sets.
+    pub fn separate_default_graphs<const D: usize>(
+        &mut self,
+        graphs: &[(&Graph<D>, &[usize])],
+        options: &Options,
+        columns: &[FractionalColumn],
+    ) -> Result<usize> {
+        let &[(g, _), ..] = graphs else {
+            return Err(invalid("rank-one separation requires a graph"));
+        };
         let rows = options.get("BALDESrankOneCutsMaxNumRows")?;
         let triplets = options.get("BALDESrankOneCutsMaxNumTriplets")?;
         if rows > 3. && triplets < 1. {
@@ -358,6 +451,13 @@ impl CutRegistry {
         p.violation_epsilon = 0.02;
         p.max_per_vertex = max_per_vertex as usize;
         p.max_triplets = triplets as usize;
+        let neighbourhood = options.get("BALDESrankOneCutsNeighbourhoodSize")?;
+        if neighbourhood < 1. {
+            return Err(invalid(
+                "BALDESrankOneCutsNeighbourhoodSize must be positive",
+            ));
+        }
+        p.neighbourhood_size = neighbourhood as usize;
         p.local_search_rounds = iterations.min(1e9) as i32;
         p.ls_iterations_negative = raw_iterations < 0.;
         p.max_rank = rows as i32;
@@ -387,7 +487,7 @@ impl CutRegistry {
             p.sp_dependent_memory = policy.sp_dependent;
             p.graph_id = g.graph_id.max(0);
             p.memory_type = policy.memory_type;
-            found += self.separate(g, customers, columns)?;
+            found += self.separate_graphs(graphs, columns)?;
         }
         Ok(found)
     }

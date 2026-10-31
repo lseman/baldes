@@ -48,6 +48,7 @@ pub(in crate::master::model) fn coupled<const D: usize>(
         || !oracle.knapsack_rows.is_empty()
         || !oracle.presence_rows.is_empty()
         || !oracle.resource_groups.is_empty()
+        || !oracle.ryan_foster_rows.is_empty()
     {
         return None;
     }

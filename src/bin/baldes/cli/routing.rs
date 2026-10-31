@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) const ROUTING_HELP: &str = "Usage: baldes <solve|hgs|ce> INSTANCE [OPTIONS]
+pub(super) const ROUTING_HELP: &str = "Usage: baldes <solve|hgs|ails-ii|ce> INSTANCE [OPTIONS]
 
 JSON pricing models use the same solve command, with one network or an array.
 Additional command: baldes pstep INSTANCE --p P --threads N (see pstep --help)
@@ -26,16 +26,24 @@ Options:
   --fenchel-cuts        Enable Fenchel cuts on the gcd-scaled integer-demand row
   --capacity-cuts        Enable capacity cuts (alias: --capacity)
   --two-path-cuts        Enable capacity and Kohl 2-path cuts using time windows
-  --tree                Run branch-and-price with a restricted-master MIP heuristic
-  --tree-threads N      Concurrent tree node evaluations (default 1)
+  --tree                Run branch-and-price
   --nodes N             Tree node limit (default: 10000)
-  --branching MODE      default, vehicles, ryan-foster, arc, cluster, resource, hybrid, edge
-  --branch-history      Enable branch history (default; observed native rules)
-  --no-branch-history   Disable history-based candidate ranking and recording
-  --no-strong-branching  Skip strong trials; history may still rank candidates
-  --no-diving           Disable strong diving in the tree
-  --no-mip-heuristic    Disable restricted-master integer search
-  --mip-nodes N         Restricted-master integer-search node budget per call
+  --branching MODE      default (route count, then arc flow), arc, edge,
+                        resource, cluster (route count, MST cluster boundaries/pairs,
+                        then arc flow), ryan-foster (route count, customer-pair
+                        Ryan–Foster, then arc flow) or hybrid (phased: route count,
+                        resource, clusters, assignment, Ryan–Foster, arc flow)
+  --no-strong-branching  Skip strong trials on mapped arc/edge variables
+  --diving              Strong limited-discrepancy diving every 10 nodes (off by default)
+  --no-diving           Disable diving (default)
+  --restricted-mip      Restricted-master integer heuristic at the root (HiGHS)
+  --mip-nodes N         Node budget of that heuristic (enables it)
+  --no-mip-heuristic    Disable it (default)
+  --tree-threads N      Evaluate up to N open nodes concurrently (default: 1)
+  --absolute-gap X      Close nodes within this absolute gap (default: 1e-6)
+  --relative-gap X      Close nodes within this relative gap (default: 1e-9)
+  --integer-objective   Round node bounds up (requires integer costs)
+  --no-branch-history   Do not rank branching candidates by history
   --master MODE         clp (default), highs, gurobi, or ipm (disables stabilization)
   --master-threads N    HiGHS/Gurobi worker budget; 0 = all available CPUs (default)
   --clp-scaling MODE    off (default), equilibrium, auto, geometric, or ruiz
@@ -46,7 +54,6 @@ Options:
   --no-stabilization    Disable dual stabilization
   --stabilization-max-tree-depth N  Activate only below depth N (default: 10000)
   --enumerated-mip      Solve complete enumerated node masters with HiGHS (--tree; highs feature)
-  --deluxing            Filter enumerated MIP columns (enables --enumerated-mip; requires --tree)
   --no-enumeration      Disable reduced-cost fixing and enumeration
   --upper-bound X       Initial incumbent
   --dynamic-ng P        Strengthen NG memories from master cycles at separator
@@ -55,27 +62,33 @@ Options:
   --option NAME=VALUE   Set a supported BALDES pricing option (repeatable)
   -v, --verbose, --log  Show solver progress (every 10 CG iterations)
   --log-interval N      Show progress every N CG iterations (enables logging)
-  --iterations N        Master iteration limit
-  --time SECONDS        Time limit (solve and hgs)
+  --iterations N        Master or AILS-II iteration limit
+  --time SECONDS        Time limit (solve, hgs and ails-ii)
   --json FILE           Write results as JSON (solve and hgs)
   --population-size N   HGS minimum population size (default: 25)
   --nb-iter N           HGS iterations without improvement before stopping, or
                         restarting under a time limit (default: 20000)
-  --seed N              HGS random seed (default: 0)
+  --seed N              Heuristic random seed (default: 0)
   -h, --help            Print help";
 
 struct RoutingOptions {
     ignore_time_windows: bool,
     customers: Option<usize>,
     ng: usize,
-    options: RootOptions,
+    options: model::Options,
+    enumerate: bool,
     all_cuts: bool,
     fenchel: bool,
     capacity: bool,
     two_path: bool,
-    tree_options: baldes::master::tree::TreeOptions,
+    branching: String,
+    strong_branching: bool,
+    diving: bool,
+    tree_controls: TreeControls,
+    enumerated_mip: bool,
     rounding: Option<Rounding>,
     hgs_extension: crate::hgs_cli::ExtensionOptions,
+    ails_iterations: Option<usize>,
     hgs_pop_size: Option<u32>,
     hgs_nb_iter: Option<u32>,
     hgs_seed: i32,
@@ -93,13 +106,21 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
     let mut ignore_time_windows = false;
     let mut customers = None;
     let mut ng = 8;
-    let mut options = RootOptions::default();
+    let mut options = model::Options::default();
+    // Master column clean-up: threshold 10000, keep ratio 0.66.
+    options.cg.column_cleanup_threshold = 10000.;
+    options.cg.column_cleanup_ratio = 0.66;
+    let mut enumerate = true;
     let mut all_cuts = false;
     let mut rank1 = false;
     let mut fenchel = false;
     let mut capacity = false;
     let mut two_path = false;
-    let mut tree_options = baldes::master::tree::TreeOptions::default();
+    let mut branching = "default".to_string();
+    let mut strong_branching = true;
+    let mut diving = false;
+    let mut tree_controls = TreeControls::default();
+    let mut enumerated_mip = false;
     let mut rounding = Some(Rounding::Tenth);
     let mut rounding_specified = false;
     let mut hgs_extension = crate::hgs_cli::ExtensionOptions::default();
@@ -171,7 +192,7 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
                 options.clp_options.scaling = args
                     .next()
                     .ok_or("missing Clp scaling mode")?
-                    .parse::<baldes::master::routing::ClpScaling>()
+                    .parse::<baldes::master::clp::ClpScaling>()
                     .map_err(|e| e.to_string())?
             }
             "--clp-work-areas" => {
@@ -194,15 +215,15 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
             }
             "--master" => {
                 options.master_solver = match args.next().ok_or("missing master mode")?.as_str() {
-                    "clp" => baldes::master::routing::MasterSolver::Clp,
-                    "ipm" => baldes::master::routing::MasterSolver::Ipm,
+                    "clp" => baldes::master::clp::MasterSolver::Clp,
+                    "ipm" => baldes::master::clp::MasterSolver::Ipm,
                     "highs" => {
-                        let solver = baldes::master::routing::MasterSolver::Highs;
+                        let solver = baldes::master::clp::MasterSolver::Highs;
                         solver.ensure_available().map_err(|e| e.to_string())?;
                         solver
                     }
                     "gurobi" => {
-                        let solver = baldes::master::routing::MasterSolver::Gurobi;
+                        let solver = baldes::master::clp::MasterSolver::Gurobi;
                         solver.ensure_available().map_err(|e| e.to_string())?;
                         solver
                     }
@@ -223,26 +244,23 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
                 hgs_time = Some(duration);
             }
             "--hgs-columns" => {
+                if kind == "ails-ii" {
+                    return Err("--hgs-columns does not apply to ails-ii".into());
+                }
                 hgs_columns = baldes::inputs::HgsColumns::parse(
                     &args.next().ok_or("missing HGS columns mode")?,
                 )
                 .map_err(|e| e.to_string())?
             }
             "--dynamic-ng" => {
-                options.relaxation_improvement_priority = args
+                options.separation.relaxation_improvement_priority = args
                     .next()
                     .ok_or("missing dynamic NG priority")?
                     .parse()
                     .map_err(|e: std::num::ParseFloatError| e.to_string())?
             }
-            "--no-enumeration" => options.enumerate = false,
-            "--enumerated-mip" => tree_options.enumerated_mip = Some(Default::default()),
-            "--deluxing" => {
-                tree_options.deluxing = Some(Default::default());
-                tree_options
-                    .enumerated_mip
-                    .get_or_insert_with(Default::default);
-            }
+            "--no-enumeration" => enumerate = false,
+            "--enumerated-mip" => enumerated_mip = true,
             "--rounding" => {
                 rounding_specified = true;
                 rounding = Some(
@@ -263,68 +281,71 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
                 capacity = true;
                 two_path = true;
             }
+            "--branching" => {
+                branching = args.next().ok_or("missing branching mode")?;
+                if ![
+                    "default",
+                    "arc",
+                    "edge",
+                    "resource",
+                    "hybrid",
+                    "cluster",
+                    "ryan-foster",
+                ]
+                .contains(&branching.as_str())
+                {
+                    return Err(format!("unknown branching mode: {branching}"));
+                }
+            }
+            "--no-strong-branching" => strong_branching = false,
+            "--diving" => diving = true,
+            "--no-diving" => diving = false,
+            "--restricted-mip" => tree_controls.restricted_mip = true,
+            "--no-mip-heuristic" => tree_controls.restricted_mip = false,
+            "--mip-nodes" => {
+                tree_controls.restricted_mip = true;
+                tree_controls.mip_nodes = Some(
+                    args.next()
+                        .ok_or("missing MIP node budget")?
+                        .parse()
+                        .map_err(|e: std::num::ParseIntError| e.to_string())?,
+                );
+            }
             "--tree-threads" => {
-                tree_options.threads = args
+                tree_controls.threads = args
                     .next()
                     .ok_or("missing tree thread count")?
-                    .parse::<usize>()
-                    .map_err(|e| e.to_string())?;
-                if tree_options.threads == 0 {
+                    .parse()
+                    .map_err(|e: std::num::ParseIntError| e.to_string())?;
+                if tree_controls.threads == 0 {
                     return Err("tree threads must be positive".into());
                 }
             }
-            "--branching" => {
-                use baldes::master::branching::BranchingOptions;
-                tree_options.branching = match args.next().ok_or("missing branching mode")?.as_str()
-                {
-                    "default" => BranchingOptions::default(),
-                    "arc" => BranchingOptions::arc_flow_only(),
-                    "cluster" => BranchingOptions {
-                        clusters: Some(Default::default()),
-                        ..BranchingOptions::arc_flow_only()
-                    },
-                    "resource" => BranchingOptions {
-                        accumulated_resource: true,
-                        ..BranchingOptions::arc_flow_only()
-                    },
-                    "hybrid" => BranchingOptions {
-                        clusters: Some(Default::default()),
-                        accumulated_resource: true,
-                        ..BranchingOptions::default()
-                    },
-                    "ryan-foster" => BranchingOptions {
-                        ryan_foster: true,
-                        ..BranchingOptions::arc_flow_only()
-                    },
-                    "vehicles" => BranchingOptions {
-                        number_of_vehicles: true,
-                        ..BranchingOptions::arc_flow_only()
-                    },
-                    "edge" => BranchingOptions {
-                        edge_flow: true,
-                        ..BranchingOptions::arc_flow_only()
-                    },
-                    mode => return Err(format!("unknown branching mode: {mode}")),
-                };
-            }
-            "--branch-history" => tree_options.branch_history = Some(Default::default()),
-            "--no-branch-history" => tree_options.branch_history = None,
-            "--no-strong-branching" => tree_options.strong_branching = None,
-            "--no-diving" => tree_options.diving = None,
-            "--no-mip-heuristic" => tree_options.mip_node_limit = 0,
-            "--mip-nodes" => {
-                tree_options.mip_node_limit = args
+            "--absolute-gap" | "--relative-gap" => {
+                let value: f64 = args
                     .next()
-                    .ok_or("missing MIP node budget")?
-                    .parse::<usize>()
-                    .map_err(|e| e.to_string())?
-            }
-            "--upper-bound" => {
-                options.incumbent = args
-                    .next()
-                    .ok_or("missing upper bound")?
+                    .ok_or("missing gap value")?
                     .parse()
-                    .map_err(|e: std::num::ParseFloatError| e.to_string())?
+                    .map_err(|e: std::num::ParseFloatError| e.to_string())?;
+                if !value.is_finite() || value < 0. {
+                    return Err("gaps must be finite and nonnegative".into());
+                }
+                if arg == "--absolute-gap" {
+                    tree_controls.absolute_gap = value;
+                } else {
+                    tree_controls.relative_gap = value;
+                }
+            }
+            "--integer-objective" => tree_controls.integer_objective = true,
+            "--branch-history" => tree_controls.history = true,
+            "--no-branch-history" => tree_controls.history = false,
+            "--upper-bound" => {
+                options.separation.upper_bound = Some(
+                    args.next()
+                        .ok_or("missing upper bound")?
+                        .parse()
+                        .map_err(|e: std::num::ParseFloatError| e.to_string())?,
+                )
             }
             "--population-size" => {
                 hgs_pop_size = Some(
@@ -352,14 +373,25 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
             _ => return Err(format!("unknown argument: {arg}")),
         }
     }
+    let ails_iterations = common.iterations;
     common.apply_routing(&mut options);
     hgs_extension.validate()?;
-    if hgs_extension.active() && kind != "hgs" {
+    if kind == "ails-ii" && (hgs_extension.intensify || hgs_extension.dri) {
+        return Err("ails-ii conflicts with --intensify and --dri".into());
+    }
+    if kind == "ails-ii" && (hgs_pop_size.is_some() || hgs_nb_iter.is_some() || hgs_time.is_some())
+    {
+        return Err(
+            "HGS population, iteration and warm-start options do not apply to ails-ii".into(),
+        );
+    }
+    if hgs_extension.active() && kind != "hgs" && kind != "ails-ii" {
         return Err("BKS seeding and intensification options require hgs".into());
     }
     if (hgs_extension.get_bks
         || hgs_extension.initial_solution.is_some()
         || hgs_extension.intensify
+        || kind == "ails-ii"
         || hgs_extension.dri)
         && !rounding_specified
     {
@@ -368,21 +400,25 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
     let tree = common.tree;
     let node_limit = common.nodes.unwrap_or(10000);
     let json_path = common.json;
-    if rank1 {
-        options = options.with_rank_one_cuts();
-    }
+    options.separation.rank_one.enabled = rank1;
     Ok(Some(RoutingOptions {
         ignore_time_windows,
         customers,
         ng,
         options,
+        enumerate,
         all_cuts,
         fenchel,
         capacity,
         two_path,
-        tree_options,
+        branching,
+        strong_branching,
+        diving,
+        tree_controls,
+        enumerated_mip,
         rounding,
         hgs_extension,
+        ails_iterations,
         hgs_pop_size,
         hgs_nb_iter,
         hgs_seed,
@@ -401,13 +437,19 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
         customers,
         ng,
         mut options,
+        enumerate,
         all_cuts,
         fenchel,
         capacity,
         mut two_path,
-        mut tree_options,
+        branching,
+        strong_branching,
+        diving,
+        tree_controls,
+        enumerated_mip,
         rounding,
         hgs_extension,
+        ails_iterations,
         hgs_pop_size,
         hgs_nb_iter,
         hgs_seed,
@@ -425,23 +467,45 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
     if let Some(n) = customers {
         instance.truncate(n).map_err(|e| e.to_string())?;
     }
-    // HGS heuristic path
-    if tree_options.deluxing.is_some() {
-        if !tree {
-            return Err("--deluxing requires --tree".into());
-        }
-        if !options.enumerate {
-            return Err("--deluxing conflicts with --no-enumeration".into());
-        }
-        if kind == "hgs" {
-            return Err("--deluxing requires a routing solve, not hgs".into());
-        }
-    }
-    if tree_options.threads > 1 && !tree {
-        return Err("--tree-threads requires --tree".into());
-    }
-    if tree_options.enumerated_mip.is_some() && !tree {
+    if enumerated_mip && !tree {
         return Err("--enumerated-mip requires --tree".into());
+    }
+    if kind == "ails-ii" {
+        if let Some(rounding) = rounding {
+            instance.rounding = rounding;
+        } else if hgs_extension.get_bks && instance.has_time_windows() {
+            instance.rounding = Rounding::Tenth;
+        }
+        let time = if options.cg.time_limit.is_zero() {
+            60.0
+        } else {
+            options.cg.time_limit.as_secs_f64()
+        };
+        let result = crate::ails_cli::run_command(
+            &instance,
+            hgs_extension.get_bks,
+            hgs_extension.initial_solution.as_deref(),
+            hgs_extension.output.as_deref(),
+            time,
+            hgs_seed,
+            ails_iterations,
+        )?;
+        if let Some(path) = json_path {
+            let json = serde_json::json!({"instance": instance.name, "status": "Found", "cost": result.best_cost, "iterations": result.iterations, "seconds": result.elapsed_secs, "routes": result.routes});
+            if write_json(&path, &json.to_string())? {
+                return Ok(());
+            }
+        }
+        println!(
+            "instance={} status=Found cost={:.2} iterations={} seconds={}",
+            instance.name, result.best_cost, result.iterations, result.elapsed_secs
+        );
+        for (i, route) in result.routes.iter().enumerate() {
+            if !route.is_empty() {
+                println!("route={i} customers={route:?}");
+            }
+        }
+        return Ok(());
     }
     if kind == "hgs" {
         if all_cuts {
@@ -526,25 +590,24 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
     if two_path && capacity_only {
         return Err("Kohl 2-path cuts require vrptw time windows".into());
     }
+    let separation = &mut options.separation;
     if fenchel {
         let mut config = instance.fenchel_cut_config().map_err(|e| e.to_string())?;
         if all_cuts {
             config.parameters.use_rounding = true;
             config.parameters.max_one_k = 1;
         }
-        options = options.with_knapsack_cuts(config);
+        separation.knapsack = Some(config);
     }
     if capacity {
         let config = instance.capacity_cut_config(rounding, two_path);
         if all_cuts {
-            let mut kpath = baldes::master::routing::KPathCutConfig::new(
-                config.demands.clone(),
-                config.capacity,
-            );
+            let mut kpath =
+                model::separation::KPathCutConfig::new(config.demands.clone(), config.capacity);
             kpath.time_windows = config.time_windows.clone();
-            options = options.with_kpath_cuts(kpath);
+            separation.kpath = Some(kpath);
         }
-        options = options.with_capacity_cuts(config);
+        separation.capacity = Some(config);
     }
     let started = std::time::Instant::now();
     let mut graph = if capacity_only {
@@ -571,155 +634,168 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
             .map_err(|e| e.to_string())?;
     }
     let n = instance.customers.len() - 1;
-    options.cg.multiplicity = n as f64;
-    let fleet = if tree {
-        instance.vehicles as f64
-    } else {
-        n as f64
-    };
-    let problem = baldes::master::routing::RoutingContext::set_partitioning(graph, fleet)
-        .map_err(|e| e.to_string())?;
+    // A root LP may use one route per customer; the tree enforces the fleet.
+    let fleet = if tree { instance.vehicles } else { n };
+    let mut node = options;
+    node.enumeration = enumerate.then(Default::default);
+    let mut initial_solution = None;
     if let Some(time_limit) = hgs_time {
-        let summary = instance
+        let seed = instance
             .seed_hgs(
-                &problem,
+                &graph,
                 rounding,
-                &mut options,
                 &baldes::inputs::HgsWarmStart {
                     time_limit,
                     columns: hgs_columns,
                     seed: hgs_seed,
                 },
+                node.cg.log_interval.is_some(),
+                &[],
             )
             .map_err(|e| e.to_string())?;
         eprintln!(
             "HGS seed: columns={} rejected={} incumbent={:?} seconds={:.3}",
-            summary.inserted_columns,
-            summary.rejected_columns,
-            summary.incumbent,
-            summary.elapsed_secs
+            seed.summary.inserted_columns,
+            seed.summary.rejected_columns,
+            seed.incumbent,
+            seed.summary.elapsed_secs
         );
-    }
-    if tree {
-        tree_options.node_limit = node_limit;
-        tree_options.time_limit = options.cg.time_limit;
-        tree_options.root = options;
-        let result =
-            baldes::master::tree::solve(problem, tree_options).map_err(|e| e.to_string())?;
-        if let Some(path) = json_path {
-            if write_json(&path, &result.to_json(&instance.name))? {
-                return Ok(());
+        if let Some(upper) = seed.incumbent {
+            let bound = node.separation.upper_bound.get_or_insert(upper);
+            *bound = bound.min(upper);
+            if let (true, Some(solution)) = (tree, &seed.solution) {
+                let routes = solution
+                    .iter()
+                    .map(|route| model::FixedRoute {
+                        route: model::NetworkRoute {
+                            network: 0,
+                            route: route.clone(),
+                        },
+                        quantity: 1.,
+                    })
+                    .collect();
+                initial_solution = Some((upper, routes));
             }
         }
-        println!(
-            "instance={} status={:?} incumbent={:.2} bound={:.2} nodes={} pricing_calls={} bound_mode={}",
-            instance.name,
-            result.status,
-            result.incumbent,
-            result.bound,
-            result.nodes,
-            result.pricing_calls,
-            result.bound_mode.as_str()
-        );
-        for route in &result.routes {
-            println!("cost={} nodes={:?}", route.original_cost, route.nodes);
-        }
-        return Ok(());
+        node.seed_routes = seed
+            .routes
+            .into_iter()
+            .map(|route| model::NetworkRoute { network: 0, route })
+            .collect();
     }
-    let output = baldes::master::routing::solve(problem, options).map_err(|e| e.to_string())?;
-    let seconds = started.elapsed().as_secs_f64();
-    if let Some(path) = json_path {
-        fn number(v: f64) -> String {
-            if v.is_finite() {
-                v.to_string()
+    let problem =
+        model::Problem::set_partitioning(graph, fleet as f64).map_err(|e| e.to_string())?;
+    let result = if tree {
+        use baldes::master::tree::{ModelTreeOptions, NetworkBranchingPolicy};
+        let mapped_variables = match branching.as_str() {
+            "edge" => problem.edge_flow_variables(1.),
+            // Phased collection already proposes every fractional arc flow.
+            "hybrid" => vec![],
+            _ => problem.arc_flow_variables(1.),
+        };
+        let configured = ModelTreeOptions {
+            branching: match branching.as_str() {
+                "resource" => NetworkBranchingPolicy::ResourceFirst,
+                "hybrid" => NetworkBranchingPolicy::Phased,
+                _ => NetworkBranchingPolicy::MultiplicityFirst,
+            },
+            mapped_variables,
+            clusters: if matches!(branching.as_str(), "cluster" | "hybrid") {
+                vec![baldes::master::model::NetworkClusterBranching::new(0)]
             } else {
-                "null".into()
-            }
-        }
-        let feasibility: Vec<_> = output
-            .master
-            .feasibility
-            .iter()
-            .map(|round| {
-                serde_json::json!({
-                    "status": round.status.as_str(),
-                    "iterations": round.iterations,
-                    "pricing_calls": round.pricing_calls,
-                    "simplex_iterations": round.simplex_iterations,
-                    "ipm_iterations": round.ipm_iterations,
-                    "seconds": round.seconds,
-                    "artificial_activity": round.artificial_activity,
-                    "lower_bound": round.lower_bound,
-                    "certified_infeasible": round.certified_infeasible,
-                })
-                .to_string()
-            })
-            .collect();
-        let history:Vec<_>=output.master.history.iter().map(|h|format!("{{\"iteration\":{},\"lp\":{},\"min_reduced_cost\":{},\"new_columns\":{},\"columns\":{},\"phase\":{},\"pricing_calls\":{},\"alpha\":{},\"misprices\":{}}}",h.iteration,number(h.lp),number(h.minimum),h.new_columns,h.columns,h.phase,h.pricing_calls,number(h.alpha),h.misprices)).collect();
-        let routes: Vec<_> = output
-            .master
-            .column_tags
-            .iter()
-            .zip(&output.values)
-            .filter_map(|(&tag, &value)| {
-                if tag >= 0 && value > 1e-9 {
-                    let r = &output.routes[tag as usize];
-                    Some(format!(
-                        "{{\"value\":{},\"nodes\":{:?},\"arcs\":{:?},\"cost\":{}}}",
-                        number(value),
-                        r.nodes,
-                        r.arcs,
-                        number(r.original_cost)
-                    ))
-                } else {
-                    None
+                vec![]
+            },
+            ryan_foster: matches!(branching.as_str(), "ryan-foster" | "hybrid")
+                .then(|| baldes::master::model::RyanFosterBranching::new(2.)),
+            mapped_strong_branching: strong_branching
+                .then(baldes::master::tree::StrongBranchingOptions::default),
+            restricted_master_mip: tree_controls.restricted_mip.then(|| {
+                let mut mip = baldes::master::tree::RestrictedMasterMip::default();
+                if let Some(nodes) = tree_controls.mip_nodes {
+                    mip.node_limit = nodes;
                 }
-            })
-            .collect();
-        // A bound strictly above the incumbent prunes the root: the C++ driver
-        // reports the LP sentinel 1e12 and status cutoff.
-        let bound = output.master.bound;
-        let cut_off = output.master.pruned_by_bound
-            && output.incumbent.is_finite()
-            && bound > output.incumbent + (bound.abs().max(output.incumbent.abs()) * 1e-10 + 1e-6);
-        let lp_value = if cut_off { 1e12 } else { output.master.lp };
-        // "columns" counts generated columns inserted over the
-        // run, including any later removed by the clean-ups. "master_columns" is
-        // the final master size, artificials included; "route_columns" the route
-        // columns still in it.
-        let route_columns = output
-            .master
-            .column_tags
-            .iter()
-            .filter(|&&t| t >= 0)
-            .count();
-        let json=format!("{{\"instance\":{:?},\"status\":\"{}\",\"lp\":{},\"cuts\":{},\"cut_rounds\":{},\"lp_before_cuts\":{},\"route_columns\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"incumbent\":{},\"bound\":{},\"bound_mode\":\"{}\",\"numerical_bound\":{},\"certified_bound\":{},\"iterations\":{},\"simplex_iterations\":{},\"ipm_iterations\":{},\"pricing_calls\":{},\"oracle_calls\":{},\"columns\":{},\"master_columns\":{},\"seconds\":{},\"pricing_seconds\":{},\"master_seconds\":{},\"feasibility\":[{}],\"history\":[{}],\"routes\":[{}]}}\n",instance.name,if cut_off {"Cutoff".to_string()} else {format!("{:?}",output.master.status)},number(lp_value),output.cuts,output.master.cut_rounds,number(output.lp_before_cuts),route_columns,output.fixing_calls,output.enumerated_routes,number(output.incumbent),number(output.master.bound),output.master.bound_mode.as_str(),number(output.master.numerical_bound),number(output.master.certified_bound),output.master.iterations,output.simplex_iterations,output.ipm_iterations,output.master.pricing_calls,output.oracle_calls,output.master.inserted_tags.len(),output.master.columns,seconds,output.pricing_seconds,output.solver_seconds-output.pricing_seconds,feasibility.join(","),history.join(","),routes.join(","));
-        if write_json(&path, &json)? {
+                mip
+            }),
+            absolute_gap: tree_controls.absolute_gap,
+            relative_gap: tree_controls.relative_gap,
+            integer_objective: tree_controls.integer_objective,
+            use_branching_history: tree_controls.history,
+            threads: tree_controls.threads,
+            diving: diving.then(|| baldes::master::tree::DivingOptions {
+                depth_limit: usize::MAX,
+                frequency: 10,
+                lds_depth: 30,
+                max_discrepancy: 2,
+                strong_candidates: 3,
+                stop_after_first_solution: true,
+                node_limit: 100,
+                time_limit: 2.,
+                ..Default::default()
+            }),
+            node_limit,
+            time_limit: node.cg.time_limit,
+            enumerated_mip: enumerated_mip.then(Default::default),
+            initial_solution,
+            node,
+            ..ModelTreeOptions::default()
+        };
+        let output = baldes::master::tree::solve(problem, configured).map_err(|e| e.to_string())?;
+        SolveResult::tree(&output, started.elapsed().as_secs_f64())
+    } else {
+        let output = model::solve(problem, node).map_err(|e| e.to_string())?;
+        SolveResult::root(&output, started.elapsed().as_secs_f64())
+    };
+    let data = result.to_json().map_err(|e| e.to_string())?;
+    if let Some(path) = json_path {
+        if write_json(&path, &data)? {
             return Ok(());
         }
     }
     println!(
-        "instance={} status={:?} lp={:.2} bound={:.2} solves={} pricing_calls={} columns={} master_columns={} cuts={} cut_rounds={} bound_mode={}",
+        "instance={} mode={} status={} lp={} incumbent={} bound={} bound_mode={} nodes={} iterations={} pricing_calls={} seconds={:.3}",
         instance.name,
-        output.master.status,
-        output.master.lp,
-        output.master.bound,
-        output.master.iterations,
-        output.master.pricing_calls,
-        output.master.inserted_tags.len(),
-        output.master.columns,
-        output.cuts,
-        output.master.cut_rounds,
-        output.master.bound_mode.as_str()
+        result.mode,
+        result.status,
+        result.lp.map_or("unknown".into(), |v| v.to_string()),
+        result.incumbent.map_or("unknown".into(), |v| v.to_string()),
+        result.bound.map_or("unknown".into(), |v| v.to_string()),
+        result.bound_mode,
+        result.nodes,
+        result.iterations,
+        result.pricing_calls,
+        result.seconds,
     );
-    for (&tag, &value) in output.master.column_tags.iter().zip(&output.values) {
-        if tag >= 0 && value > 1e-6 {
-            let route = &output.routes[tag as usize];
+    for route in &result.routes {
+        if route.value > 1e-6 {
             println!(
                 "value={:.2} cost={:.2} nodes={:?}",
-                value, route.original_cost, route.nodes
+                route.value, route.cost, route.nodes
             );
         }
     }
     Ok(())
+}
+
+/// Tree heuristic, gap and parallelism flags.
+struct TreeControls {
+    restricted_mip: bool,
+    mip_nodes: Option<usize>,
+    threads: usize,
+    absolute_gap: f64,
+    relative_gap: f64,
+    integer_objective: bool,
+    history: bool,
+}
+impl Default for TreeControls {
+    fn default() -> Self {
+        Self {
+            restricted_mip: false,
+            mip_nodes: None,
+            threads: 1,
+            absolute_gap: 1e-6,
+            relative_gap: 1e-9,
+            integer_objective: false,
+            history: true,
+        }
+    }
 }

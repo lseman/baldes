@@ -1,7 +1,7 @@
 use baldes::master::{
     cg::{BoundMode, Status},
+    formulation::Row,
     model::{self, format::Model, EnumerationOptions, Options},
-    routing::Row,
     RowSense,
 };
 use std::time::Duration;
@@ -16,6 +16,148 @@ fn options() -> Options {
     options.cg.artificial_cost = 100.;
     options.cg.stabilize = false;
     options
+}
+
+#[test]
+fn bounded_walks_reject_separators_without_a_simple_route_proof() {
+    use baldes::graph::RouteDomain;
+    let mut graph = baldes::Graph::<2>::new(3, 0).unwrap();
+    graph.add_arc(0, 1, 0.).unwrap();
+    graph.add_arc(1, 1, -10.).unwrap();
+    graph.add_arc(1, 2, 0.).unwrap();
+    graph
+        .set_route_domain(RouteDomain::BoundedWalks { max_arcs: 3 })
+        .unwrap();
+    let problem = model::Problem::set_partitioning(graph.clone(), 1.).unwrap();
+
+    let mut plain = options();
+    plain.preprocessing.enabled = false;
+    let output = model::solve(problem.clone(), plain.clone()).unwrap();
+    assert_eq!(output.master.status, Status::Optimal);
+    assert!((output.master.lp + 5.).abs() < 1e-6);
+
+    let mut rank_one = plain.clone();
+    rank_one.separation.rank_one.enabled = true;
+    let error = model::solve(problem.clone(), rank_one.clone()).unwrap_err();
+    assert!(error.to_string().contains("hard elementarity groups"));
+
+    let mut dynamic_ng = plain;
+    dynamic_ng.separation.relaxation_improvement_priority = 1.;
+    let error = model::solve(problem, dynamic_ng).unwrap_err();
+    assert!(error.to_string().contains("dynamic NG strengthening"));
+
+    graph.add_elementarity_set(&[1]).unwrap();
+    let output = model::solve(
+        model::Problem::set_partitioning(graph, 1.).unwrap(),
+        rank_one,
+    )
+    .unwrap();
+    assert_eq!(output.master.status, Status::Optimal);
+    assert!(output.master.lp.abs() < 1e-6);
+}
+
+#[test]
+fn relaxed_selection_is_tightened_without_enabling_cuts() {
+    use baldes::graph::coupled::CoupledResource;
+    for direction in [0., 1., 2.] {
+        let mut graph = baldes::Graph::<2>::new(4, 1).unwrap();
+        for vertex in 0..4 {
+            graph.set_bounds(vertex, 0, 0., 3.).unwrap();
+        }
+        for (tail, head, cost) in [(0, 1, 1.), (1, 2, -1.), (2, 3, 1.), (1, 3, 1.), (0, 2, 1.)] {
+            let arc = graph.add_arc(tail, head, cost).unwrap();
+            graph.arc_mut(arc).unwrap().consumption[0] = 1.;
+        }
+        graph
+            .set_coupled_resources(&[CoupledResource::Selection {
+                initial: 3,
+                allowed: vec![3; 5],
+                vertices: vec![3, 1, 2, 3],
+                relaxed: true,
+            }])
+            .unwrap();
+        let mut configured = options();
+        configured
+            .pricing_options
+            .push(("BALDESuseBidirectionalSearch".into(), direction));
+        let output = model::solve(
+            model::Problem::set_partitioning(graph, 2.).unwrap(),
+            configured,
+        )
+        .unwrap();
+        assert_eq!(output.master.status, Status::Optimal);
+        assert!((output.master.lp - 4.).abs() < 1e-8);
+        for (route, value) in output.routes.iter().zip(&output.values) {
+            if *value > 1e-9 {
+                assert_ne!(route.route.arcs, [0, 1, 2]);
+            }
+        }
+    }
+}
+
+#[test]
+fn relaxed_selections_are_tightened_independently_across_networks() {
+    use baldes::graph::coupled::CoupledResource;
+    let mut networks = Vec::new();
+    for (index, id) in [7, 42].into_iter().enumerate() {
+        let mut graph = baldes::Graph::<2>::new(4, 1).unwrap();
+        for vertex in 0..4 {
+            graph.set_bounds(vertex, 0, 0., 3.).unwrap();
+        }
+        for (tail, head, cost) in [(0, 1, 1.), (1, 2, -1.), (2, 3, 1.), (1, 3, 1.), (0, 2, 1.)] {
+            let arc = graph.add_arc(tail, head, cost).unwrap();
+            graph.arc_mut(arc).unwrap().consumption[0] = 1.;
+        }
+        graph
+            .set_coupled_resources(&[CoupledResource::Selection {
+                initial: 3,
+                allowed: vec![3; 5],
+                vertices: vec![3, 1, 2, 3],
+                relaxed: true,
+            }])
+            .unwrap();
+        let arc_entries = graph
+            .arcs
+            .iter()
+            .map(|arc| match arc.head {
+                1 | 2 => vec![(index * 2 + arc.head - 1, 1.)],
+                _ => vec![],
+            })
+            .collect();
+        networks.push(model::Network {
+            id,
+            graph,
+            multiplicity: baldes::graph::Window::new(0., 2.).unwrap(),
+            arc_entries,
+            route_entries: vec![],
+            activity_entries: vec![],
+        });
+    }
+    let problem = model::Problem {
+        rows: vec![
+            Row {
+                sense: RowSense::Equal,
+                rhs: 1.
+            };
+            4
+        ],
+        networks,
+    };
+    for enumerate in [false, true] {
+        let mut configured = options();
+        // Tightening is required for correctness even when optional cut
+        // separation is disabled by the caller's round limit.
+        configured.cg.max_cut_rounds = 0;
+        configured.enumeration = enumerate.then(EnumerationOptions::default);
+        let output = model::solve(problem.clone(), configured).unwrap();
+        assert_eq!(output.master.status, Status::Optimal);
+        assert!((output.master.lp - 8.).abs() < 1e-8, "{:?}", output.master);
+        for (route, value) in output.routes.iter().zip(&output.values) {
+            if *value > 1e-9 {
+                assert_ne!(route.route.arcs, [0, 1, 2]);
+            }
+        }
+    }
 }
 
 #[test]
@@ -321,6 +463,9 @@ mod mip {
         let mut configured = baldes::master::tree::ModelTreeOptions::default();
         configured.node = options();
         configured.enumerated_mip = Some(MipOptions::default());
+        // Route-count strong trials would close these children before the
+        // enumerated-MIP path that this test exercises.
+        configured.mapped_strong_branching = None;
         let tree = baldes::master::tree::solve(problem(), configured.clone()).unwrap();
         assert_eq!(tree.status, TreeStatus::Optimal);
         assert_eq!(tree.incumbent, 2.);

@@ -125,8 +125,11 @@ impl<const D: usize> NodeSnapshot<D> {
                 // Both children must be supported before advertising the split.
                 if self.state.universe.is_none()
                     && oracle.knapsack_rows.iter().any(|&(i, _)| {
-                        oracle.solver.cuts.knapsack_cuts[i].graph_resources[&oracle.network.id].0
-                            == resource
+                        let id = oracle.solver.cuts.knapsack_cuts[i].graph_resources
+                            [&oracle.network.id]
+                            .0;
+                        super::super::resource_rows::coordinate(oracle, id)
+                            .is_none_or(|axis| axis == resource)
                     })
                 {
                     continue;

@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn scaling_defaults_to_off() {
-    let root = crate::master::routing::RootOptions::default();
+    let root = crate::master::model::Options::default();
     assert_eq!(root.clp_options.scaling, ClpScaling::Off);
     assert!(root.clp_options.keep_work_areas);
     assert_eq!(ClpOptions::default().scaling, ClpScaling::Off);

@@ -534,21 +534,14 @@ fn paired_column_values_match_registered_native_values_and_reject_stale_pool_met
     // to dependent value2; the arc variables carry physical cost-20.
     assert_eq!(route.coupled_values, vec![(0, 2.)]);
     assert!(compatible_schedule(oracle, route));
-    let domain = crate::master::routing::RoutingContext::set_partitioning(
-        oracle.network.graph.as_ref().clone(),
-        1.,
-    )
-    .unwrap();
-    assert!(crate::master::routing::exact_route_feasible(&domain, route).is_some());
+    let domain = oracle.network.graph.as_ref();
+    assert!(domain.exact_route_feasible(route).is_some());
     let mut stale = route.clone();
     stale.coupled_values[0].1 = 3.;
     assert!(!compatible_schedule(oracle, &stale));
-    assert_eq!(
-        crate::master::routing::exact_route_feasibility(&domain, &stale),
-        Some(true)
-    );
-    assert!(crate::master::routing::exact_route_feasible(&domain, &stale).is_none());
+    assert_eq!(domain.exact_route_feasibility(&stale), Some(true));
+    assert!(domain.exact_route_feasible(&stale).is_none());
     stale.coupled_values.clear();
     assert!(!compatible_schedule(oracle, &stale));
-    assert!(crate::master::routing::exact_route_feasible(&domain, &stale).is_none());
+    assert!(domain.exact_route_feasible(&stale).is_none());
 }

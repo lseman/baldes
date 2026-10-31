@@ -60,7 +60,7 @@ fn lp_bound_grows_with_the_time_budget() {
 #[test]
 fn bucket_root_lp_matches_the_independent_reference_master() {
     use crate::master::cg::Status;
-    use crate::master::routing::{self, RootOptions, RoutingContext};
+    use crate::master::model::{self, Options, Problem};
     let mut feasible = 0;
     for seed in 1..=8 {
         for (gq, gt) in [(0, 0), (1, 2), (3, 1), (8, 8)] {
@@ -71,24 +71,24 @@ fn bucket_root_lp_matches_the_independent_reference_master() {
                 .pricing_graph(&vec![0.; p.nodes.len()], 0., p.nodes.len())
                 .unwrap();
             let customers = p.nodes.len() - 1;
-            let mut options = RootOptions::default();
-            options.enumerate = false;
+            let mut options = Options::default();
             options.cg.stabilize = false;
             options.cg.multiplicity = customers as f64;
             options.cg.artificial_cost = 1e4;
-            let result = routing::solve(
-                RoutingContext::set_partitioning(graph, customers as f64).unwrap(),
+            let result = model::solve(
+                Problem::set_partitioning(graph, customers as f64).unwrap(),
                 options,
             )
             .unwrap();
-            let artificial: f64 = result
-                .master
-                .artificials
-                .iter()
-                .map(|&c| result.values[c].max(0.))
-                .sum();
             if reference.artificial_usage > 1e-6 {
-                assert!(artificial > 1e-6 || result.master.status == Status::Infeasible);
+                assert!(
+                    result.master.status == Status::Infeasible
+                        || result
+                            .master
+                            .feasibility
+                            .iter()
+                            .any(|report| report.artificial_activity.is_some_and(|a| a > 1e-6))
+                );
                 continue;
             }
             feasible += 1;
@@ -97,16 +97,15 @@ fn bucket_root_lp_matches_the_independent_reference_master() {
                 Status::Optimal,
                 "seed {seed} ({gq},{gt})"
             );
-            assert!(artificial <= 1e-6);
             assert!(
                 (result.master.lp - reference.lp_objective.unwrap()).abs() < 1e-6,
                 "seed {seed} ({gq},{gt}): {} vs {:?}",
                 result.master.lp,
                 reference.lp_objective
             );
-            for (route, value) in result.route_values() {
-                if value > 1e-6 {
-                    p.replay(&p.route_nodes(&route.nodes)).unwrap();
+            for (route, value) in result.routes.iter().zip(&result.values) {
+                if *value > 1e-6 {
+                    p.replay(&p.route_nodes(&route.route.nodes)).unwrap();
                 }
             }
         }

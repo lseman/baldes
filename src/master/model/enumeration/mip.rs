@@ -133,6 +133,91 @@ fn exact_integer_encoding<const D: usize>(
 }
 
 impl<const D: usize> NodeSnapshot<D> {
+    /// Restricted-master integer heuristic (native
+    /// `RestrictedMasterIpHeuristic`): the node's current columns, with
+    /// artificial columns at zero, solved as an integer program on a copy.
+    /// A solution is accepted only after exact replay in the original model;
+    /// its objective is that replay's upward bound. The MIP bound is never
+    /// used, because absent columns can be cheaper.
+    pub fn solve_restricted_mip(
+        &self,
+        options: &MipOptions,
+    ) -> Result<Option<(f64, Vec<FixedRoute>, Vec<(i32, f64)>)>> {
+        #[cfg(not(feature = "highs"))]
+        {
+            let _ = options;
+            Err(invalid("restricted master MIP requires the highs feature"))
+        }
+        #[cfg(feature = "highs")]
+        {
+            let mut master = self.master.try_clone()?;
+            for &column in &self.warm.artificials {
+                master.set_upper(column, 0.)?;
+            }
+            let columns = &self.warm.columns;
+            let integers = columns
+                .iter()
+                .enumerate()
+                .filter_map(|(c, meta)| {
+                    meta.as_ref().and_then(|m| {
+                        let integer = super::super::master_variables::decode(m.tag)
+                            .map_or(true, |(index, _)| {
+                                self.state.master_variables[index].integer
+                            });
+                        integer.then_some(c)
+                    })
+                })
+                .collect::<Vec<_>>();
+            let mip = crate::master::solvers::highs::solve_integer(&master, &integers, options)?;
+            let Some(solution) = mip.solution else {
+                return Ok(None);
+            };
+            let mut routes = self.state.fixed_routes.clone();
+            let mut master_values: Vec<_> = self
+                .state
+                .master_variables
+                .iter()
+                .map(|v| (v.id, 0.))
+                .collect();
+            for (column, metadata) in columns.iter().enumerate() {
+                let value = solution.values[column];
+                if value == 0. {
+                    continue;
+                }
+                let Some(metadata) = metadata else {
+                    return Ok(None);
+                };
+                let static_variable = super::super::master_variables::decode(metadata.tag);
+                let integer = static_variable.map_or(true, |(index, _)| {
+                    self.state.master_variables[index].integer
+                });
+                if value < 0.
+                    || integer && value.fract() != 0.
+                    || value > master.upper[column]
+                    || value > 9_007_199_254_740_992.
+                    || metadata.tag < 0
+                {
+                    return Ok(None);
+                }
+                if let Some((index, sign)) = static_variable {
+                    master_values[index].1 += sign * value;
+                    continue;
+                }
+                routes.push(FixedRoute {
+                    route: self.state.routes[metadata.tag as usize].as_ref().clone(),
+                    quantity: value,
+                });
+            }
+            let Some(routes) = synchronization::witness(&self.state, &routes)? else {
+                return Ok(None);
+            };
+            Ok(
+                super::super::tree_adapter::validate_routes(&self.state, &routes, &master_values)?
+                    .map(|objective| (objective, routes, master_values)),
+            )
+        }
+    }
+
     /// HiGHS solves only fully transferred copies. No source model is mutated.
     pub fn solve_enumerated_mip(
         &self,

@@ -48,8 +48,9 @@ rank-one cuts with node memory instead of arc memory. In `make config`, select
 **Rank-one memory → Node**, or set `CONFIG_RANK_ONE_MEMORY=node` in the saved
 configuration. `CONFIG_RANK_ONE_MEMORY=arc` preserves the existing runtime policy.
 
-The feature maps arc-memory requests (`BALDESrankOneCutsMemoryType=1` or Rust
-`MemoryType::Arc`) to vertex memory during cut generation. The default-copy and
+The feature maps automatic and arc-memory requests
+(`BALDESrankOneCutsMemoryType=0` or `1`, or Rust `MemoryType::Automatic` /
+`MemoryType::Arc`) to vertex memory during cut generation. The vertex and
 all-vertices modes already use vertex memory and retain their meaning. Explicitly
 registered cuts retain their declared representation. Node memory retains a
 cut's remainder through remembered vertices, while arc memory can distinguish

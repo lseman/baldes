@@ -1,22 +1,23 @@
 //! Conventional routing solve with independently evaluated HGS seeds.
 use super::{HgsWarmStart, HgsWarmStartSummary, Policy, Problem};
 use crate::labeling::Route;
-use crate::master::routing::RoutingContext;
-use crate::master::tree::{TreeOptions, TreeOutput};
+use crate::master::model::{FixedRoute, NetworkRoute};
+use crate::master::tree::{ModelTreeOptions, ModelTreeOutput};
+use crate::Graph;
 use crate::{invalid, Result};
 use std::time::Instant;
 
 /// Stochastic routing controls. HGS and routing share `tree.time_limit`.
 #[derive(Clone, Debug)]
 pub struct SolveOptions {
-    pub tree: TreeOptions,
+    pub tree: ModelTreeOptions,
     pub ng_size: usize,
     pub hgs_warm_start: Option<HgsWarmStart>,
 }
 impl Default for SolveOptions {
     fn default() -> Self {
         Self {
-            tree: TreeOptions::default(),
+            tree: ModelTreeOptions::default(),
             ng_size: 8,
             hgs_warm_start: None,
         }
@@ -25,7 +26,7 @@ impl Default for SolveOptions {
 
 #[derive(Debug)]
 pub struct SolveResult {
-    pub tree: TreeOutput,
+    pub tree: ModelTreeOutput,
     pub hgs_warm_start: Option<HgsWarmStartSummary>,
 }
 
@@ -48,38 +49,41 @@ impl Problem {
                 warm,
                 options.tree.time_limit.saturating_sub(started.elapsed()),
             )?;
-            let context = self.theta_cut_context(policy, vehicles, options.ng_size)?;
+            let graph = self.theta_cut_graph(options.ng_size)?;
             for customers in columns {
-                options
-                    .tree
-                    .root
-                    .initial_routes
-                    .push(seed_route(&context, &customers)?);
+                options.tree.node.seed_routes.push(NetworkRoute {
+                    network: 0,
+                    route: seed_route(&graph, &customers)?,
+                });
             }
             if let Some(solution) = solution {
                 let routes = solution
                     .routes
                     .iter()
-                    .map(|customers| seed_route(&context, customers))
+                    .map(|customers| {
+                        Ok(FixedRoute {
+                            route: NetworkRoute {
+                                network: 0,
+                                route: seed_route(&graph, customers)?,
+                            },
+                            quantity: 1.,
+                        })
+                    })
                     .collect::<Result<Vec<_>>>()?;
-                let old = if options.tree.initial_solution.is_empty() {
-                    None
-                } else {
-                    Some(
-                        context
-                            .unit_route_incumbent(&options.tree.initial_solution)
-                            .ok_or_else(|| invalid("invalid supplied initial solution"))?,
-                    )
-                };
+                let old = options
+                    .tree
+                    .initial_solution
+                    .as_ref()
+                    .map(|(cost, _)| *cost);
                 if old.is_none_or(|cost| solution.total_cost < cost) {
-                    options.tree.initial_solution = routes;
+                    options.tree.initial_solution = Some((solution.total_cost, routes));
                 }
             }
             summary = Some(counts);
         }
         options.tree.time_limit = options.tree.time_limit.saturating_sub(started.elapsed());
-        options.tree.root.cg.time_limit =
-            options.tree.root.cg.time_limit.min(options.tree.time_limit);
+        options.tree.node.cg.time_limit =
+            options.tree.node.cg.time_limit.min(options.tree.time_limit);
         let tree = self.solve_theta_cuts(policy, vehicles, options.ng_size, options.tree)?;
         Ok(SolveResult {
             tree,
@@ -88,8 +92,7 @@ impl Problem {
     }
 }
 
-fn seed_route(context: &RoutingContext, customers: &[usize]) -> Result<Route> {
-    let graph = &context.model.networks[0].graph;
+fn seed_route(graph: &Graph, customers: &[usize]) -> Result<Route> {
     let mut from = graph.source;
     let mut arcs = Vec::with_capacity(customers.len() + 1);
     for to in customers.iter().copied().chain(std::iter::once(graph.sink)) {
@@ -101,7 +104,7 @@ fn seed_route(context: &RoutingContext, customers: &[usize]) -> Result<Route> {
         arcs.push(arc.id);
         from = to;
     }
-    context
-        .elementary_route(&arcs)
+    graph
+        .elementary_route(&arcs)?
         .ok_or_else(|| invalid("HGS route failed routing resource replay"))
 }

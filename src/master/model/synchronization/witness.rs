@@ -207,14 +207,11 @@ fn schedule_at<const D: usize>(
     }
     let mut scheduled = routes.to_vec();
     for fixed in &mut scheduled {
-        let problem = crate::master::routing::RoutingContext::set_partitioning(
-            domains[&fixed.route.network].clone(),
-            1.,
-        )?;
-        if crate::master::routing::exact_route_feasible(&problem, &fixed.route.route).is_none() {
+        let problem = &domains[&fixed.route.network];
+        if problem.exact_route_feasible(&fixed.route.route).is_none() {
             return Ok(None);
         }
-        let Some(route) = problem.elementary_route(&fixed.route.route.arcs) else {
+        let Some(route) = problem.elementary_route(&fixed.route.route.arcs)? else {
             return Ok(None);
         };
         let Some(positions) = fixed
@@ -230,7 +227,7 @@ fn schedule_at<const D: usize>(
         if !fixed
             .route
             .route
-            .selected_values_match(&problem.model.networks[0].graph, &positions)?
+            .selected_values_match(problem, &positions)?
         {
             return Ok(None);
         }

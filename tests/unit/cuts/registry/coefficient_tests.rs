@@ -4,6 +4,15 @@ use super::*;
 fn build_memory_policy_and_generated_cut_pricing_agree() {
     let node = cfg!(feature = "rank-one-node-memory");
     let mut options = Options::default();
+    options.set("BALDESrankOneCutsMemoryType", 0.).unwrap();
+    assert_eq!(
+        memory_policy(&options).unwrap().memory_type,
+        if node {
+            MemoryType::Vertex
+        } else {
+            MemoryType::Automatic
+        }
+    );
     options.set("BALDESrankOneCutsMemoryType", 1.).unwrap();
     assert_eq!(
         memory_policy(&options).unwrap().memory_type,
@@ -13,7 +22,7 @@ fn build_memory_policy_and_generated_cut_pricing_agree() {
             MemoryType::Arc
         }
     );
-    assert_eq!(MemoryType::Default.for_build(), MemoryType::Default);
+    assert_eq!(MemoryType::Vertex.for_build(), MemoryType::Vertex);
     assert_eq!(MemoryType::AllVertices.for_build(), MemoryType::AllVertices);
     let mut graph = Graph::<2>::new(6, 1).unwrap();
     graph.elementary = true;
@@ -237,9 +246,9 @@ fn rank_one_rounds_inherit_only_active_arc_memories() {
 #[test]
 fn vertex_budget_includes_active_cuts_and_releases_retired_cuts() {
     for memory_type in [
-        MemoryType::Vertex,
+        MemoryType::Automatic,
         MemoryType::Arc,
-        MemoryType::Default,
+        MemoryType::Vertex,
         MemoryType::AllVertices,
     ] {
         let mut graph = Graph::<2>::new(5, 1).unwrap();

@@ -1,4 +1,16 @@
 use super::*;
+
+/// The production selection over the registered generators.
+fn choose_registered<const D: usize>(
+    output: &Output<D>,
+    options: &ModelTreeOptions,
+    history: &mut History,
+    incumbent: f64,
+    deadline: Instant,
+) -> Result<Option<Selection<D>>> {
+    let proposals = registered_proposals(output, options)?;
+    choose_proposals(output, options, history, incumbent, deadline, proposals)
+}
 use crate::master::{
     preprocessing::Bounds,
     tree::{StrongBranchingOptions, StrongPhase},
@@ -42,6 +54,76 @@ fn mapping(name: &str, network: i32) -> MappedBranchVariable {
 }
 
 #[test]
+fn mapped_near_ties_keep_registration_order_without_moving_other_families() {
+    let variables = vec![mapping("z-first", 42), mapping("a-second", 42)];
+    let mapped = |variable: &MappedBranchVariable, value| Proposal {
+        name: variable.name.clone(),
+        history_key: variable.name.clone(),
+        priority: 1.,
+        value,
+        restriction: Restriction::Mapped(variable.clone()),
+        history_eligible: true,
+        fresh: true,
+    };
+    let count = Proposal {
+        name: "multiplicity".into(),
+        history_key: "multiplicity".into(),
+        priority: 1.,
+        value: 0.5,
+        restriction: Restriction::Multiplicity { network: 42 },
+        history_eligible: false,
+        fresh: true,
+    };
+    // This is the old exact/name sort: a is marginally closer to one half.
+    let mut proposals = vec![
+        mapped(&variables[1], 0.5),
+        count,
+        mapped(&variables[0], 0.4999995),
+    ];
+    let mut order = vec![0, 1, 2];
+    rank_mapped_slots(&proposals, &variables, &mut order);
+    assert_eq!(order, [2, 1, 0]);
+    // An actual difference outside the tolerance band wins over registration.
+    proposals[2].value = 0.49;
+    let mut order = vec![0, 1, 2];
+    rank_mapped_slots(&proposals, &variables, &mut order);
+    assert_eq!(order, [0, 1, 2]);
+}
+
+#[test]
+fn strong_branching_trials_the_first_registered_equal_candidate() {
+    let output = root();
+    let mut options = ModelTreeOptions::default();
+    options.mapped_variables = vec![mapping("z-first", 42), mapping("a-second", 42)];
+    options.mapped_strong_branching = Some(StrongBranchingOptions {
+        phases: vec![StrongPhase {
+            candidates: 1,
+            subtree_ratio: 0.,
+            pricing_phase_floor: 0,
+            max_iterations: 1,
+            tree_depth_score: false,
+            restricted_master_only: true,
+        }],
+        ..Default::default()
+    });
+    let mut history = History::default();
+    choose_registered(
+        &output,
+        &options,
+        &mut history,
+        2.,
+        Instant::now() + Duration::from_secs(10),
+    )
+    .unwrap()
+    .unwrap();
+    assert!(!history.evaluations.is_empty());
+    assert!(history
+        .evaluations
+        .iter()
+        .all(|evaluation| evaluation.name == "z-first"));
+}
+
+#[test]
 fn native_mapped_direction_orders_trials_and_preserves_paired_child_bounds() {
     let output = root();
     for direction in [None, Some(NetworkBranchDirection::LowerFirst)] {
@@ -55,7 +137,7 @@ fn native_mapped_direction_orders_trials_and_preserves_paired_child_bounds() {
                 .insert("count42".into(), direction);
         }
         let mut history = History::default();
-        let mut selected = choose(
+        let mut selected = choose_registered(
             &output,
             &options,
             &mut history,
@@ -116,7 +198,7 @@ fn native_direction_without_trials_orders_the_original_disjunction() {
         .branch_directions
         .insert("count42".into(), NetworkBranchDirection::LowerFirst);
     let mut history = History::default();
-    let mut selected = choose(
+    let mut selected = choose_registered(
         &output,
         &options,
         &mut history,
@@ -177,7 +259,7 @@ fn mapped_native_phase_skips_preserve_parent_and_reuse_exact_children() {
     options.node.cg.stabilize = false;
     options.mapped_variables = vec![mapping("network42", 42)];
     let mut history = History::default();
-    let children = choose(
+    let children = choose_registered(
         &output,
         &options,
         &mut history,
@@ -221,7 +303,7 @@ fn strong_trials_retain_original_incumbents_and_only_completed_exact_bounds() {
             }];
         }
         let mut history = History::default();
-        let children = choose(
+        let children = choose_registered(
             &output,
             &options,
             &mut history,
@@ -277,7 +359,7 @@ fn mapped_native_subtree_budget_limits_actual_restricted_trials() {
         ..Default::default()
     });
     let mut history = History::default();
-    let children = choose(
+    let children = choose_registered(
         &output,
         &options,
         &mut history,
@@ -327,7 +409,7 @@ fn heuristic_and_incomplete_trials_never_prepare_child_proof_bounds() {
             restricted_master_only: false,
         }];
         let mut history = History::default();
-        let selected = choose(
+        let selected = choose_registered(
             &output,
             &options,
             &mut history,
@@ -364,7 +446,7 @@ fn mapped_scoring_uses_numerical_parent_without_changing_selected_proof_channel(
         options.node.cg.stabilize = false;
         options.mapped_variables = vec![mapping("count42", 42)];
         let mut history = History::default();
-        choose(
+        choose_registered(
             &output,
             &options,
             &mut history,
@@ -390,7 +472,7 @@ fn trial_incumbent_is_published_after_the_scoring_pass() {
     total.networks.extend(mapping("other", 42).networks);
     options.mapped_variables = vec![total];
     let mut history = History::default();
-    let selected = choose(
+    let selected = choose_registered(
         &output,
         &options,
         &mut history,
@@ -429,7 +511,7 @@ fn scoring_cutoff_margin_changes_subtree_prediction_without_changing_proof_bound
         options.scoring_gap_tolerance = margin;
         options.mapped_variables = vec![mapping("count42", 42)];
         let mut history = History::default();
-        let selected = choose(
+        let selected = choose_registered(
             &output,
             &options,
             &mut history,
@@ -465,7 +547,7 @@ fn exact_infeasible_trials_retain_original_phase_one_proof_but_heuristics_do_not
             restricted_master_only: false,
         }];
         let mut history = History::default();
-        let selected = choose(
+        let selected = choose_registered(
             &output,
             &options,
             &mut history,
@@ -564,7 +646,7 @@ fn phase_survivor_retains_priced_columns_through_restricted_lp_and_commit_withou
     let parent_rows = output.snapshot.state.shared_rows.len();
     let options = continuation_options(false);
     let mut history = History::default();
-    let selected = choose(
+    let selected = choose_registered(
         &output,
         &options,
         &mut history,
@@ -610,7 +692,7 @@ fn heuristic_survivor_restores_full_schedule_before_exact_phase_and_reuses_only_
     let parent_columns = output.snapshot.master.costs.len();
     let options = continuation_options(true);
     let mut history = History::default();
-    let selected = choose(
+    let selected = choose_registered(
         &output,
         &options,
         &mut history,
@@ -721,7 +803,7 @@ fn selected_heuristic_workspace_survives_final_phase_and_resumes_exact_pricing()
             .phases
             .truncate(1);
         let mut history = History::default();
-        let selected = choose(
+        let selected = choose_registered(
             &output,
             &options,
             &mut history,
@@ -764,7 +846,7 @@ fn interrupted_exact_survivor_keeps_columns_without_publishing_a_completed_outpu
     let mut options = continuation_options(true);
     options.mapped_strong_branching.as_mut().unwrap().phases[1].max_iterations = 1;
     let mut history = History::default();
-    let selected = choose(
+    let selected = choose_registered(
         &output,
         &options,
         &mut history,
@@ -829,7 +911,7 @@ fn incomplete_exact_trial_keeps_independent_published_bounds_without_a_completed
     }];
     let parent_columns = output.snapshot.master.costs.len();
     let mut history = History::default();
-    let selected = choose(
+    let selected = choose_registered(
         &output,
         &options,
         &mut history,
@@ -878,7 +960,7 @@ fn admitted_zero_budget_trials_keep_unknown_estimates_and_inherited_proofs() {
         restricted_master_only: false,
     }];
     let mut history = History::default();
-    let selected = choose(
+    let selected = choose_registered(
         &output,
         &options,
         &mut history,

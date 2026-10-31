@@ -3,6 +3,94 @@
 use super::*;
 use crate::master::model::model_strong::{Proposal, Restriction};
 
+pub(super) fn multiplicity(network: i32, value: f64, priority: f64) -> Proposal {
+    let name = format!("multiplicity:{network}");
+    Proposal {
+        history_key: name.clone(),
+        name,
+        priority,
+        value,
+        restriction: Restriction::Multiplicity { network },
+        history_eligible: false,
+        fresh: true,
+    }
+}
+
+/// The inferred families, in the order of the former fixed cascades.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Inferred {
+    Multiplicity,
+    Resource,
+    Assignment,
+    Master,
+    Arc,
+    Window,
+}
+
+fn inferred(proposal: &Proposal) -> Option<Inferred> {
+    Some(match &proposal.restriction {
+        Restriction::Multiplicity { .. } => Inferred::Multiplicity,
+        Restriction::Resource(_) => Inferred::Resource,
+        Restriction::Assignment { .. } => Inferred::Assignment,
+        Restriction::Master { .. } => Inferred::Master,
+        Restriction::Activity { .. } if proposal.name.starts_with("arc:") => Inferred::Arc,
+        Restriction::Activity { .. } if proposal.name.starts_with("window:") => Inferred::Window,
+        _ => return None,
+    })
+}
+
+/// `MultiplicityFirst` and `ResourceFirst` are presets over the same
+/// priority dispatcher as `Phased`. Registered families (mapped variables,
+/// clusters, Ryan–Foster, packing) keep their configured priorities.
+/// Inferred families are ranked below the lowest registered priority in the
+/// order of the former cascades: resource, assignment, master variable, arc
+/// and window flow; route count comes first under `MultiplicityFirst` and
+/// after master variables under `ResourceFirst`. `Phased` uses
+/// `branch_priorities` unchanged.
+fn preset_priorities(proposals: &mut [Proposal], options: &ModelTreeOptions) {
+    let order: &[Inferred] = match options.branching {
+        NetworkBranchingPolicy::Phased => return,
+        NetworkBranchingPolicy::MultiplicityFirst => &[
+            Inferred::Resource,
+            Inferred::Assignment,
+            Inferred::Master,
+            Inferred::Arc,
+            Inferred::Window,
+        ],
+        NetworkBranchingPolicy::ResourceFirst => &[
+            Inferred::Resource,
+            Inferred::Assignment,
+            Inferred::Master,
+            Inferred::Multiplicity,
+            Inferred::Arc,
+            Inferred::Window,
+        ],
+    };
+    let registered: Vec<f64> = options
+        .mapped_variables
+        .iter()
+        .map(|v| v.priority)
+        .chain(options.clusters.iter().map(|c| c.priority))
+        .chain(options.ryan_foster.iter().map(|r| r.priority))
+        .chain(options.packing.iter().map(|p| p.priority))
+        .collect();
+    let low = registered.iter().copied().fold(0., f64::min);
+    let high = registered.iter().copied().fold(0., f64::max);
+    for proposal in proposals {
+        let Some(family) = inferred(proposal) else {
+            continue;
+        };
+        proposal.priority = if family == Inferred::Multiplicity
+            && options.branching == NetworkBranchingPolicy::MultiplicityFirst
+        {
+            high + 1.
+        } else {
+            let rank = order.iter().position(|&f| f == family).unwrap();
+            low - 1. - rank as f64
+        };
+    }
+}
+
 pub(super) fn collect<const D: usize>(
     output: &Output<D>,
     options: &ModelTreeOptions,
@@ -11,8 +99,7 @@ pub(super) fn collect<const D: usize>(
     let node = &output.snapshot;
     let tolerance = options.tolerance;
     let priorities = &options.branch_priorities;
-    let mut proposals =
-        model_strong::mapped_proposals(output, &options.mapped_variables, tolerance)?;
+    let mut proposals = model_strong::registered_proposals(output, options)?;
     for candidate in node.resource_group_candidates(tolerance)? {
         proposals.push(resource_proposal(candidate, priorities.resource));
     }
@@ -87,18 +174,11 @@ pub(super) fn collect<const D: usize>(
             }
         }
         if count >= 0. && branching::fractional(count, tolerance) {
-            let name = format!("multiplicity:{}", oracle.network.id);
-            proposals.push(Proposal {
-                history_key: name.clone(),
-                name,
-                priority: priorities.multiplicity,
-                value: count,
-                restriction: Restriction::Multiplicity {
-                    network: oracle.network.id,
-                },
-                history_eligible: false,
-                fresh: true,
-            });
+            proposals.push(multiplicity(
+                oracle.network.id,
+                count,
+                priorities.multiplicity,
+            ));
         }
         for (position, &value) in arcs.iter().enumerate() {
             if value < 0. || !branching::fractional(value, tolerance) {
@@ -151,6 +231,7 @@ pub(super) fn collect<const D: usize>(
             });
         }
     }
+    preset_priorities(&mut proposals, options);
     Ok(proposals)
 }
 

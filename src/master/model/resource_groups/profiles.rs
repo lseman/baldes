@@ -9,20 +9,13 @@ pub(in crate::master::model) fn refresh<const D: usize>(
     let mut domains = HashMap::new();
     for oracle in &node.state.oracles {
         if touched.contains(&oracle.network.id) {
-            domains.insert(
-                oracle.network.id,
-                crate::master::routing::RoutingContext::set_partitioning(
-                    domain_graph(oracle)?.into_owned(),
-                    1.,
-                )?,
-            );
+            domains.insert(oracle.network.id, domain_graph(oracle)?.into_owned());
         }
     }
     let fixed_impossible = node.state.fixed_routes.iter().any(|fixed| {
-        domains.get(&fixed.route.network).is_some_and(|domain| {
-            crate::master::routing::exact_route_feasibility(domain, &fixed.route.route)
-                == Some(false)
-        })
+        domains
+            .get(&fixed.route.network)
+            .is_some_and(|domain| domain.exact_route_feasibility(&fixed.route.route) == Some(false))
     });
     if !fixed_impossible {
         let mut rhs = node.state.rhs.clone();
@@ -30,9 +23,7 @@ pub(in crate::master::model) fn refresh<const D: usize>(
             let Some(domain) = domains.get(&fixed.route.network) else {
                 continue;
             };
-            if crate::master::routing::exact_route_feasibility(domain, &fixed.route.route)
-                != Some(true)
-            {
+            if domain.exact_route_feasibility(&fixed.route.route) != Some(true) {
                 return Err(incomplete("fixed route schedule refresh is unsupported"));
             }
             let old_oracle = previous
@@ -50,6 +41,8 @@ pub(in crate::master::model) fn refresh<const D: usize>(
                 super::super::entries(old_oracle, &fixed.route.route, previous.shared_offset)?;
             let canonical = domain
                 .elementary_route(&fixed.route.route.arcs)
+                .ok()
+                .flatten()
                 .ok_or_else(|| incomplete("fixed route canonical schedule reconstruction"))?;
             let positions = fixed
                 .route
@@ -62,7 +55,7 @@ pub(in crate::master::model) fn refresh<const D: usize>(
             if !fixed
                 .route
                 .route
-                .selected_values_match(&domain.model.networks[0].graph, &positions)?
+                .selected_values_match(domain, &positions)?
             {
                 return Err(incomplete(
                     "fixed route paired selection is unavailable in the refreshed domain",
@@ -96,6 +89,7 @@ pub(in crate::master::model) fn refresh<const D: usize>(
             node.state.rhs = rhs;
         }
     }
+    let complete_universe = node.state.universe.is_some();
     for (tag, route) in node.state.routes.iter_mut().enumerate() {
         let Some(domain) = domains.get(&route.network) else {
             continue;
@@ -109,14 +103,16 @@ pub(in crate::master::model) fn refresh<const D: usize>(
         let compatible = entries(oracle, &route.route).iter().all(|&(_, a)| a == 0.);
         // Integer validation is exact-real; a rounded reconstruction failure
         // cannot silently remove an original-feasible path from the universe.
-        match crate::master::routing::exact_route_feasibility(domain, &route.route) {
-            // Like the reference's packing-set resource branch, an existing
-            // column is never capped: its Boolean violation coefficient on the
+        match domain.exact_route_feasibility(&route.route) {
+            // During ordinary pricing, an existing column is not capped: its
+            // Boolean violation coefficient on the
             // rhs-zero branch row blocks it, and that row's dual reaches
             // pricing. A zero cap would hide the column from the row while
             // pricing can still return it, so pricing could never certify the
-            // LP. Synchronized windows have no such row and keep the cap.
-            Some(false) if oracle.synchronized_windows.is_empty() => continue,
+            // LP. A complete retained universe can exclude a proved-impossible
+            // path without competing with an open pricing oracle. Synchronized
+            // windows have no such row and also keep the cap.
+            Some(false) if !complete_universe && oracle.synchronized_windows.is_empty() => continue,
             Some(false) => {
                 node.state.route_upper_bounds.insert(tag, 0.);
                 continue;
@@ -134,6 +130,8 @@ pub(in crate::master::model) fn refresh<const D: usize>(
         }
         let canonical = domain
             .elementary_route(&route.route.arcs)
+            .ok()
+            .flatten()
             .ok_or_else(|| incomplete("resource branch canonical schedule reconstruction"))?;
         let positions = route
             .route
@@ -142,10 +140,7 @@ pub(in crate::master::model) fn refresh<const D: usize>(
             .map(|id| domain.arc_position(*id))
             .collect::<Option<Vec<_>>>()
             .ok_or_else(|| invalid("unknown route arc"))?;
-        if !route
-            .route
-            .selected_values_match(&domain.model.networks[0].graph, &positions)?
-        {
+        if !route.route.selected_values_match(domain, &positions)? {
             return Err(incomplete(
                 "route paired selection is unavailable in the refreshed domain",
             ));

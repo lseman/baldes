@@ -669,7 +669,7 @@ fn selection_simultaneous_loads_and_signed_cumulative_dependencies_match_tiny_pa
 fn root_phase_i_recovers_nonlinear_cost_columns_then_restores_original_objective() {
     use baldes::master::{
         cg::{FeasibilityStatus, Status},
-        routing::{self, RootOptions, RoutingContext},
+        model::{self, Options, Problem},
     };
     let mut graph: Graph<2> = Graph::new(4, 1).unwrap();
     for vertex in 0..4 {
@@ -702,35 +702,25 @@ fn root_phase_i_recovers_nonlinear_cost_columns_then_restores_original_objective
             },
         ])
         .unwrap();
-    let mut options = RootOptions::default();
-    options.enumerate = false;
-    options.round_reduced_costs = false;
+    let mut options = Options::default();
     options.cg.artificial_cost = 1.;
     options.cg.max_penalty_updates = 0;
     options.cg.insert_non_negative = false;
     options.cg.stabilize = false;
-    let output = routing::solve(
-        RoutingContext::set_partitioning(graph, 2.).unwrap(),
-        options,
-    )
-    .unwrap();
+    let output = model::solve(Problem::set_partitioning(graph, 2.).unwrap(), options).unwrap();
     assert_eq!(output.master.status, Status::Optimal, "{output:?}");
     assert!((output.master.lp - 60.).abs() < 1e-7, "{output:?}");
-    assert!(output
-        .master
-        .feasibility
-        .iter()
-        .any(|round| round.status == FeasibilityStatus::Feasible));
-    assert!(output
-        .master
-        .artificials
-        .iter()
-        .all(|&column| output.values[column].abs() < 1e-7));
+    assert!(output.master.feasibility.iter().any(|round| round.status
+        == FeasibilityStatus::Feasible
+        && round
+            .artificial_activity
+            .is_some_and(|activity| activity.abs() < 1e-7)));
     assert_eq!(
         output
-            .route_values()
+            .routes
             .iter()
-            .map(|(route, value)| route.original_cost * value)
+            .zip(&output.values)
+            .map(|(route, value)| route.route.original_cost * value)
             .sum::<f64>(),
         60.
     );
@@ -1003,7 +993,7 @@ fn interval_front_pricing_cuts_fixing_retention_and_forks_preserve_physical_path
 fn interval_cost_phase_i_keeps_domains_and_restores_original_front_objective() {
     use baldes::master::{
         cg::{FeasibilityStatus, Status},
-        routing::{self, RootOptions, RoutingContext},
+        model::{self, Options, Problem},
     };
     let mut graph = Graph::<2>::new(4, 1).unwrap();
     for v in 0..4 {
@@ -1032,20 +1022,12 @@ fn interval_cost_phase_i_keeps_domains_and_restores_original_front_objective() {
         .unwrap();
     let kernel = graph.coupled_kernel().unwrap();
     assert_eq!(kernel.replay(&[0, 1]).unwrap(), Some(20.));
-    let mut options = RootOptions {
-        enumerate: false,
-        round_reduced_costs: false,
-        ..Default::default()
-    };
+    let mut options = Options::default();
     options.cg.artificial_cost = 1.;
     options.cg.max_penalty_updates = 0;
     options.cg.insert_non_negative = false;
     options.cg.stabilize = false;
-    let output = routing::solve(
-        RoutingContext::set_partitioning(graph, 2.).unwrap(),
-        options,
-    )
-    .unwrap();
+    let output = model::solve(Problem::set_partitioning(graph, 2.).unwrap(), options).unwrap();
     assert_eq!(output.master.status, Status::Optimal, "{output:?}");
     assert!((output.master.lp - 40.).abs() < 1e-8);
     assert!(output
@@ -1055,9 +1037,10 @@ fn interval_cost_phase_i_keeps_domains_and_restores_original_front_objective() {
         .any(|r| r.status == FeasibilityStatus::Feasible));
     assert!(
         (output
-            .route_values()
+            .routes
             .iter()
-            .map(|(r, x)| r.original_cost * x)
+            .zip(&output.values)
+            .map(|(r, x)| r.route.original_cost * x)
             .sum::<f64>()
             - 40.)
             .abs()

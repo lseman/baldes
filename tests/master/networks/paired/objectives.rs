@@ -157,7 +157,6 @@ fn paired_integer_registration_retains_fractional_selected_activity() {
 
 #[test]
 fn direct_routing_signed_owner_objective_never_uses_unit_raw_pricing_as_a_bound() {
-    use baldes::master::routing::{self, RootOptions, RoutingContext};
     let corpus: serde_json::Value = serde_json::from_str(include_str!(
         "../../../fixtures/coupled/metasolver-paired-preparation.json"
     ))
@@ -178,16 +177,15 @@ fn direct_routing_signed_owner_objective_never_uses_unit_raw_pricing_as_a_bound(
         graph
             .set_coupled_objective_coefficients(&[(0, -1.)])
             .unwrap();
-        let mut context = RoutingContext::set_partitioning(graph, 1.).unwrap();
+        let mut context = Problem::set_partitioning(graph, 1.).unwrap();
         // Optional path selection, including the unused interior vertex.
-        for row in &mut context.model.rows {
+        for row in &mut context.rows {
             row.sense = RowSense::LessEqual;
         }
-        let mut options = RootOptions::default();
-        options.enumerate = false;
+        let mut options = Options::default();
         options.cg.stabilize = false;
-        options.bound_mode = mode;
-        let output = routing::solve(context, options).unwrap();
+        options.cg.bound_mode = mode;
+        let output = model::solve(context, options).unwrap();
         assert!((output.master.lp + 22.).abs() < 1e-8, "{:?}", output.master);
         assert_eq!(output.master.status, Status::Stalled);
         assert_eq!(output.master.numerical_bound, f64::NEG_INFINITY);
@@ -521,7 +519,6 @@ fn paired_owner_bound_propagation_keeps_mixed_signed_rows_and_callback_tolerance
 
 #[test]
 fn direct_routing_paired_row_uses_selected_activity_and_rejects_fractional_route_witness() {
-    use baldes::master::routing::{self, RootOptions, RoutingContext};
     let corpus: serde_json::Value = serde_json::from_str(include_str!(
         "../../../fixtures/coupled/metasolver-paired-preparation.json"
     ))
@@ -534,25 +531,24 @@ fn direct_routing_paired_row_uses_selected_activity_and_rejects_fractional_route
     graph
         .set_paired_owner_registration_bounds(&[(0, [0., 100.])])
         .unwrap();
-    let mut context = RoutingContext::set_partitioning(graph, 1.).unwrap();
-    for row in &mut context.model.rows {
+    let mut context = Problem::set_partitioning(graph, 1.).unwrap();
+    for row in &mut context.rows {
         row.sense = RowSense::LessEqual;
     }
     // Vertex1 is unused, so its pre-existing row has no physical arc terms.
     // Replace it with gamma<=2, the captured owner-bound-upper-row2 case.
-    context.model.rows[1].rhs = 2.;
-    context.model.networks[0]
+    context.rows[0].rhs = 2.;
+    context.networks[0]
         .activity_entries
         .push(model::AccumulatedActivityEntry {
-            row: 1,
+            row: 0,
             resource: 0,
             coefficient: 1.,
         });
-    let mut options = RootOptions::default();
-    options.enumerate = false;
+    let mut options = Options::default();
     options.cg.stabilize = false;
     options.cg.max_iterations = 12;
-    let output = routing::solve(context, options).unwrap();
+    let output = model::solve(context, options).unwrap();
     // Captured native RMP=-11.333333; native owner terminates with a fatal
     // duality gap. Source output keeps that RMP without claiming its optimum.
     assert!(
@@ -562,8 +558,11 @@ fn direct_routing_paired_row_uses_selected_activity_and_rejects_fractional_route
     );
     assert_eq!(output.master.status, Status::Stalled);
     assert!(
-        output.incumbent >= -1e-8,
-        "a fractional selected route is not an integer witness"
+        output
+            .values
+            .iter()
+            .any(|value| (value - value.round()).abs() > 1e-6),
+        "the selected route must remain fractional"
     );
     assert_eq!(output.master.numerical_bound, f64::NEG_INFINITY);
 }

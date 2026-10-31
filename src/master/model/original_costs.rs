@@ -92,10 +92,20 @@ pub(super) fn route_cost<const D: usize>(oracle: &Oracle<D>, route: &Route) -> R
         .iter()
         .map(|id| oracle.index[id])
         .collect::<Vec<_>>();
-    let physical = ids
-        .iter()
-        .map(|id| oracle.network.graph.arcs[oracle.index[id]].cost)
-        .sum::<f64>();
+    // Aggregate each physical variable once, in ID order. In particular,
+    // repeated arcs in relaxed walks use the same multiplication and sum
+    // order as the original master-variable objective.
+    let mut physical = 0.;
+    let mut start = 0;
+    while start < ids.len() {
+        let mut end = start + 1;
+        while end < ids.len() && ids[end] == ids[start] {
+            end += 1;
+        }
+        physical +=
+            oracle.network.graph.arcs[oracle.index[&ids[start]]].cost * (end - start) as f64;
+        start = end;
+    }
     let associated = oracle
         .network
         .graph
@@ -176,3 +186,7 @@ impl<const D: usize> State<D> {
             })
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/master/model/original_costs_tests.rs"]
+mod tests;

@@ -2,6 +2,10 @@ use super::*;
 
 /// The controller owns incumbent tracking and the pricing route universe.
 pub trait Controller<M> {
+    /// A whole-domain LP infeasibility proof obtained before pricing.
+    fn proven_infeasible(&self) -> bool {
+        false
+    }
     /// Explicit physical-row roles; append position and row sense do not
     /// identify dynamic constraints. Only active ordinary rows form the mean.
     fn curvature_rows(&self, row_count: usize) -> Vec<CurvatureRow> {

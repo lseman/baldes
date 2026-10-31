@@ -827,7 +827,6 @@ fn tree_branching_mode_is_explicit_and_validated() {
     std::fs::write(&path,"triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     for mode in [
         "default",
-        "vehicles",
         "ryan-foster",
         "arc",
         "cluster",

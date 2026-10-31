@@ -82,6 +82,7 @@ reconfigure its existing separator.
 | `BALDESresConsKnapsackCutsMaxNumPerRound` | Int | `100.0` | [src/master/routing/mod.rs](../../src/master/routing/mod.rs); [src/cuts/knapsack/mod.rs](../../src/cuts/knapsack/mod.rs) |
 | `BALDESrankOneCutsArcMemoryType` | Int | `2.0` | [src/cuts/registry/rank_one.rs](../../src/cuts/registry/rank_one.rs) |
 | `BALDESrankOneCutsSpDependentMemory` | Bool | `0.0` | [src/cuts/registry/rank_one.rs](../../src/cuts/registry/rank_one.rs) |
+| `BALDESrankOneCutsNeighbourhoodSize` | Int | `16.0` | [src/cuts/registry/rank_one.rs](../../src/cuts/registry/rank_one.rs) |
 | `BALDESrankOneCutsMaxNumTriplets` | Int | `10000.0` | [src/cuts/registry/rank_one.rs](../../src/cuts/registry/rank_one.rs) |
 | `BALDESrankOneCutsTypeToSeparate` | Int | `0.0` | [src/cuts/registry/rank_one.rs](../../src/cuts/registry/rank_one.rs) |
 | `BALDESuseCovSetsForSepOneRowPackingCuts` | Bool | `0.0` | [src/cuts/registry/rank_one.rs](../../src/cuts/registry/rank_one.rs) |

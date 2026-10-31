@@ -2,6 +2,12 @@
 use super::*;
 
 pub(super) fn validate_options(options: &Options) -> Result<()> {
+    if options
+        .fixing_upper_bound
+        .is_some_and(|bound| !bound.is_finite())
+    {
+        return Err(invalid("fixing upper bound must be finite"));
+    }
     if options.network_promising_limit == 0 {
         return Err(invalid("network_promising_limit must be positive"));
     }
@@ -85,6 +91,9 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
         &mut variables,
         std::mem::take(&mut options.synchronized_services),
     )?;
+    if options.separation.route_recourse.is_some() {
+        variables.extend(separation::theta_variables(&problem)?);
+    }
     master_variables::install(&mut problem, &mut variables)?;
     if options.cg.warm_start.is_some() || !options.cg.known.is_empty() {
         return Err(invalid("shared root requires a fresh column registry"));
@@ -94,9 +103,25 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
     let deadline = Instant::now()
         .checked_add(options.cg.time_limit)
         .ok_or_else(|| invalid("network time limit"))?;
+    if options.master_solver == crate::master::clp::MasterSolver::Ipm {
+        options.cg.stabilize = false;
+        options.cg.smoothing.initial_alpha = 0.;
+    }
+    if options
+        .bucket_steps
+        .iter()
+        .any(|step| !step.is_finite() || *step < 0.)
+    {
+        return Err(invalid("bucket steps must be finite, nonnegative widths"));
+    }
     let built = crate::master::formulation::build_model(
         &problem,
-        &crate::master::formulation::Backend::default(),
+        &crate::master::formulation::Backend {
+            solver: options.master_solver,
+            threads: options.master_threads,
+            clp: options.clp_options,
+            ..Default::default()
+        },
     )?;
     let mut master = built.master;
     let network_rows = built.quantity_rows;
@@ -108,6 +133,14 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
         let mut solver = Solver::new(network.graph.vertices.len(), network.graph.resources.len())?;
         solver.graph = network.graph.clone();
         solver.graph.graph_id = network.id;
+        if !options.bucket_steps.is_empty() {
+            if options.bucket_steps.len() != network.graph.resources.len() {
+                return Err(invalid("bucket steps must list every network resource"));
+            }
+            for (slot, &step) in options.bucket_steps.iter().enumerate() {
+                solver.bucket_steps[slot] = step;
+            }
+        }
         for (index, arc) in solver.graph.arcs.iter_mut().enumerate() {
             arc.cost = 0.;
             arc.variables = vec![(index, 1.)];
@@ -128,11 +161,13 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
             costs: vec![],
             route_entries,
             calls: 0,
+            enumerated: Arc::new(HashSet::new()),
             nonlinear_rows: vec![],
             knapsack_rows: vec![],
             presence_rows: vec![],
             activity_rows,
             resource_groups: vec![],
+            ryan_foster_rows: vec![],
             synchronized_windows: vec![],
             proved_zero_arcs: vec![],
             proved_multiplicity_upper: None,
@@ -141,6 +176,7 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
     let master_only = oracles.is_empty();
     let mut state = State {
         pricing_witness: None,
+        tree_incumbent: options.fixing_upper_bound.unwrap_or(f64::INFINITY),
         integer_primal_termination: options.integer_primal_termination,
         witness_tolerance: options.cg.tolerance,
         box_pricing_admission: false,
@@ -149,6 +185,13 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
         original_variable_costs: Arc::new(vec![]),
         pricing_master: None,
         pricing_gap: (options.cg.gap_absolute, options.cg.gap_relative),
+        previous_fixing_gap: 1e12,
+        gap_enumeration: options.gap_enumeration,
+        fixing_bound: None,
+        gap_checkpoint: None,
+        enumerated_routes: 0,
+        fixing_calls: 0,
+        objective_fixed: false,
         phase_one_infeasible: false,
         mapped_subtree_size: 1e12,
         mapped_subtree_priority: 1e12,
@@ -190,6 +233,7 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
         preprocessing: PreprocessingReport::default(),
         master_variables: variables,
         route_upper_bounds: HashMap::new(),
+        cuts: None,
     };
     for (shared, kernels) in nonlinear {
         kernels.install(&mut state, *shared)?;
@@ -197,6 +241,13 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
     lifecycle::install_fixed_routes(&mut master, &mut state, fixed)?;
     options.cg.known = master_variables::load(&mut master, &state)?;
     lifecycle::install_seed_routes(&mut master, &mut state, &mut options.cg.known, seeds)?;
+    let caller_seeds = std::mem::take(&mut options.seed_routes);
+    lifecycle::install_seed_routes(
+        &mut master,
+        &mut state,
+        &mut options.cg.known,
+        &caller_seeds,
+    )?;
     run(master, state, options)
 }
 
@@ -205,6 +256,7 @@ pub(super) fn run<const D: usize>(
     mut state: State<D>,
     mut options: Options,
 ) -> Result<Output<D>> {
+    let eval_started = Instant::now();
     // A finished directed infeasibility report publishes +infinity, whereas
     // the generic CG warm-start contract only accepts finite/-infinity bounds.
     // An owned proven-infeasible snapshot may safely discard its cached bounds
@@ -260,6 +312,8 @@ pub(super) fn run<const D: usize>(
             )
         }),
     )?;
+    state.tree_incumbent = options.fixing_upper_bound.unwrap_or(f64::INFINITY);
+    state.gap_enumeration = options.gap_enumeration;
     state.pricing_witness = None;
     state.pricing_master = None;
     state.pricing_gap = (options.cg.gap_absolute, options.cg.gap_relative);
@@ -273,6 +327,21 @@ pub(super) fn run<const D: usize>(
         options.cg.tolerance,
     );
     state.scheduler.max_unpromising = options.network_unpromising_limit;
+    if options.separation.route_recourse.is_some() {
+        // Enumerated routes would be selected by their arc costs alone; with
+        // route recourse a node may only close through Theta-cut separation.
+        options.enumeration = None;
+        state.gap_enumeration = false;
+        // Certificates rebuild the master from route columns alone.
+        if options.cg.bound_mode == cg::BoundMode::Certified {
+            return Err(invalid("certified bounds do not support route recourse"));
+        }
+    }
+    separation::prepare(&mut state, &options)?;
+    options.separation.configure(&mut options.cg);
+    if options.cg.warm_start.is_none() && separation::supports_row_cleanup(&state) {
+        options.cg.remove_basic_cuts = true;
+    }
     state.scheduler.max_promising = options.network_promising_limit;
     options.cg.node_depth = state.node_depth;
     options.cg.time_limit = options
@@ -304,6 +373,29 @@ pub(super) fn run<const D: usize>(
                 .set_option("BALDESuseBidirectionalSearch", 0.)?;
         }
     }
+    if let Some(memory) = state.cuts.as_ref().and_then(|c| c.resolved_memory_type) {
+        for oracle in &mut state.oracles {
+            oracle
+                .solver
+                .set_option("BALDESrankOneCutsMemoryType", (memory as i32) as f64)?;
+        }
+    }
+    let auto_search = if state
+        .cuts
+        .as_ref()
+        .is_some_and(|c| c.options.enabled && !state.oracles.is_empty())
+    {
+        let policy = crate::cuts::memory_policy(&state.oracles[0].solver.options)?;
+        state.node_depth == 0
+            && options.cg.warm_start.is_none()
+            && state
+                .cuts
+                .as_ref()
+                .is_some_and(|c| c.resolved_memory_type.is_none())
+            && policy.memory_type == crate::cuts::MemoryType::Automatic
+    } else {
+        false
+    };
     let loaded: Vec<_> = if let Some(warm) = &options.cg.warm_start {
         warm.columns
             .iter()
@@ -333,6 +425,167 @@ pub(super) fn run<const D: usize>(
         &mut options.cg.known,
         options.cg.warm_start.as_mut(),
     )?;
+    if !auto_search {
+        let (output, _) = execute_node_cg(master, state, options, None, false)?;
+        return Ok(output);
+    }
+    let mut pass2_options = options.clone();
+    state.cuts.as_mut().unwrap().resolved_memory_type = Some(crate::cuts::MemoryType::Vertex);
+    for oracle in &mut state.oracles {
+        oracle.solver.set_option(
+            "BALDESrankOneCutsMemoryType",
+            (crate::cuts::MemoryType::Vertex as i32) as f64,
+        )?;
+    }
+    let (mut pass1, capture) = execute_node_cg(master, state, options, None, true)?;
+    let upper_bound = pass2_options
+        .separation
+        .upper_bound
+        .unwrap_or(f64::INFINITY);
+    let pass1_incumbent = pass1
+        .snapshot
+        .state
+        .pricing_witness
+        .as_ref()
+        .map_or(f64::INFINITY, |w| w.0)
+        .min(upper_bound);
+    let pass1_closed = pass1.snapshot.state.phase_one_infeasible
+        || separation::separation_gap_closed(pass1.master.bound, pass1_incumbent);
+    let pass1_tailed_off = pass1
+        .snapshot
+        .state
+        .cuts
+        .as_ref()
+        .is_some_and(|c| c.stopped_by_tailing_off);
+    let Some(auto) = capture.filter(|auto| {
+        pass1.master.status == cg::Status::Optimal
+            && !pass1_closed
+            && !pass1_tailed_off
+            && Instant::now() < pass1.snapshot.state.deadline
+            && auto.pre_rank_one.is_some()
+    }) else {
+        return Ok(pass1);
+    };
+    let node_elapsed_secs = auto.node_elapsed.as_secs_f64();
+    let SavedNodePoint {
+        master: ckpt_master,
+        output: mut ckpt_output,
+        state: mut ckpt_state,
+    } = auto.pre_rank_one.unwrap();
+    if let Some(witness) = &pass1.snapshot.state.pricing_witness {
+        if ckpt_state
+            .pricing_witness
+            .as_ref()
+            .map_or(true, |old| witness.0 < old.0)
+        {
+            ckpt_state.pricing_witness = Some(witness.clone());
+        }
+    }
+    if let Some(cuts) = ckpt_state.cuts.as_mut() {
+        cuts.resolved_memory_type = Some(crate::cuts::MemoryType::Arc);
+        cuts.stopped_by_tailing_off = false;
+    }
+    for oracle in &mut ckpt_state.oracles {
+        oracle.solver.set_option(
+            "BALDESrankOneCutsMemoryType",
+            (crate::cuts::MemoryType::Arc as i32) as f64,
+        )?;
+    }
+    let pre_cut_rounds = ckpt_output.cut_rounds;
+    pass2_options.cg.known.clear();
+    pass2_options.cg.warm_start = Some(std::mem::replace(
+        &mut ckpt_output.warm_start,
+        cg::WarmStart::empty(ckpt_output.bound_mode),
+    ));
+    pass2_options.cg.max_cut_rounds = pass2_options
+        .cg
+        .max_cut_rounds
+        .saturating_sub(pre_cut_rounds);
+    if ckpt_state.universe.is_some() {
+        pass2_options.enumeration = None;
+    }
+    let (pass2, _) = execute_node_cg(
+        ckpt_master,
+        ckpt_state,
+        pass2_options,
+        Some(ckpt_output),
+        false,
+    )?;
+    let arc_elapsed_secs = eval_started.elapsed().as_secs_f64();
+    if let Some(witness) = &pass2.snapshot.state.pricing_witness {
+        if pass1
+            .snapshot
+            .state
+            .pricing_witness
+            .as_ref()
+            .map_or(true, |old| witness.0 < old.0)
+        {
+            pass1.snapshot.state.pricing_witness = Some(witness.clone());
+        }
+    }
+    if pass2.snapshot.state.phase_one_infeasible {
+        return Ok(pass2);
+    }
+    if pass2.master.status != cg::Status::Optimal {
+        return Ok(pass1);
+    }
+    let incumbent = pass1
+        .snapshot
+        .state
+        .pricing_witness
+        .as_ref()
+        .map_or(f64::INFINITY, |w| w.0)
+        .min(upper_bound);
+    if separation::separation_gap_closed(pass2.master.bound, incumbent) {
+        return Ok(pass2);
+    }
+    let (prefer_arc, _score) = separation::prefer_arc_memory(
+        pass1.master.bound,
+        pass2.master.bound,
+        incumbent,
+        node_elapsed_secs,
+        arc_elapsed_secs,
+    );
+    if prefer_arc {
+        Ok(pass2)
+    } else {
+        Ok(pass1)
+    }
+}
+
+pub(super) fn prepend_cg_output(prior: &cg::Output, current: &mut cg::Output) {
+    if current.enumeration_failure.is_none() {
+        current
+            .enumeration_failure
+            .clone_from(&prior.enumeration_failure);
+    }
+    for row in &mut current.history {
+        row.iteration += prior.iterations;
+        row.pricing_calls += prior.pricing_calls;
+    }
+    current.iterations += prior.iterations;
+    current.pricing_calls += prior.pricing_calls;
+    current.penalty_updates += prior.penalty_updates;
+    current.cut_rounds += prior.cut_rounds;
+    let mut history = prior.history.clone();
+    history.append(&mut current.history);
+    current.history = history;
+    let mut inserted_tags = prior.inserted_tags.clone();
+    inserted_tags.append(&mut current.inserted_tags);
+    current.inserted_tags = inserted_tags;
+}
+
+fn execute_node_cg<const D: usize>(
+    mut master: ClpMaster,
+    mut state: State<D>,
+    mut options: Options,
+    mut previous: Option<cg::Output>,
+    capture_auto_rank_one: bool,
+) -> Result<(Output<D>, Option<AutoRankOneCapture<D>>)> {
+    for oracle in &mut state.oracles {
+        oracle.solver.rollback_point_saved = false;
+        oracle.solver.requires_rollback = false;
+    }
     let schedule = state.oracles.first().map_or_else(
         || {
             vec![crate::pricing::phases::Phase {
@@ -343,50 +596,60 @@ pub(super) fn run<const D: usize>(
         },
         |oracle| oracle.solver.phases.clone(),
     );
+    let request_initial_enumeration = options.enumeration.is_some() && previous.is_none();
     let state = Rc::new(RefCell::new(state));
     let mut controller = Coordinator(
         state.clone(),
-        options.enumeration.is_some(),
+        request_initial_enumeration,
         options.search_inactive_columns,
         None,
+        options.enumeration.clone(),
+        None,
+        Vec::new(),
+        !options.preprocessing.integer_domains,
+        options.cg.bound_mode == cg::BoundMode::Numerical,
+        CheckpointStore {
+            prior_cg: None,
+            rollback: None,
+            auto_rank_one: capture_auto_rank_one.then(|| AutoRankOneCapture {
+                pre_rank_one: None,
+                rank_one_started_at: Instant::now(),
+                node_elapsed: std::time::Duration::ZERO,
+            }),
+        },
     );
     let gap = (options.cg.gap_absolute, options.cg.gap_relative);
     let started = Instant::now();
     let time_limit = options.cg.time_limit;
     let max_iterations = options.cg.max_iterations;
-    let mut previous: Option<cg::Output> = None;
     let mut result = loop {
         let spent = previous.as_ref().map_or(0, |out| out.iterations);
-        options.cg.max_iterations = max_iterations - spent;
+        options.cg.max_iterations = max_iterations.saturating_sub(spent);
         options.cg.time_limit = time_limit.saturating_sub(started.elapsed()).min(
             state
                 .borrow()
                 .deadline
                 .saturating_duration_since(Instant::now()),
         );
-        let mut current = cg::optimize(
+        controller.9.prior_cg = previous.clone();
+        let optimized = cg::optimize(
             &mut master,
             &schedule,
             |phase, duals| state.borrow_mut().price(phase, duals),
             &mut controller,
             options.cg.take_continuation(),
-        )?;
-        if let Some(mut prior) = previous.take() {
-            if current.enumeration_failure.is_none() {
-                current.enumeration_failure = prior.enumeration_failure.take();
+        );
+        let mut current = match optimized {
+            Ok(current) => current,
+            Err(error) => {
+                let (restored_master, restored_output) =
+                    controller.recover_pricing_timeout(error)?;
+                master = restored_master;
+                break restored_output;
             }
-            for row in &mut current.history {
-                row.iteration += prior.iterations;
-                row.pricing_calls += prior.pricing_calls;
-            }
-            current.iterations += prior.iterations;
-            current.pricing_calls += prior.pricing_calls;
-            current.penalty_updates += prior.penalty_updates;
-            current.cut_rounds += prior.cut_rounds;
-            prior.history.append(&mut current.history);
-            current.history = prior.history;
-            prior.inserted_tags.append(&mut current.inserted_tags);
-            current.inserted_tags = prior.inserted_tags;
+        };
+        if let Some(prior) = previous.take() {
+            prepend_cg_output(&prior, &mut current);
         }
         if !current.enumeration_requested {
             break current;
@@ -406,11 +669,17 @@ pub(super) fn run<const D: usize>(
         ));
         // transfer stages every model/registry change on private copies. On a
         // backend failure the checkpoint is still valid for ordinary pricing.
-        if let Err(error) = enumeration::transfer(
+        let (routes, counts, deadline) = controller
+            .5
+            .take()
+            .ok_or_else(|| invalid("missing enumeration checkpoint"))?;
+        if let Err(error) = enumeration::install_collected(
             &mut master,
             &mut state.borrow_mut(),
             &mut options.cg,
-            options.enumeration.as_ref().unwrap(),
+            routes,
+            counts,
+            deadline,
         ) {
             state.borrow_mut().enumeration_report.failure = Some(error.to_string());
         }
@@ -448,6 +717,8 @@ pub(super) fn run<const D: usize>(
     };
     // A finite artificial penalty cannot prove original-model infeasibility.
     if result.status == cg::Status::Infeasible
+        && !(state.borrow().preprocessing.propagation.infeasible
+            && !options.preprocessing.integer_domains)
         && !result.feasibility.iter().any(|r| {
             r.certified_infeasible
                 || (result.bound_mode == cg::BoundMode::Numerical
@@ -468,42 +739,67 @@ pub(super) fn run<const D: usize>(
     {
         eprintln!("BALDES warning: paired pricing retains the unit resource objective; the associated owner objective or active row dual differs. The restricted master value is available, but raw pricing cannot certify this owner optimum (status Stalled).");
     }
-    if result.feasibility.iter().any(|r| r.certified_infeasible) {
+    let preprocessing_proof = result.status == cg::Status::Infeasible
+        && state.borrow().preprocessing.propagation.infeasible
+        && !options.preprocessing.integer_domains;
+    if preprocessing_proof || result.feasibility.iter().any(|r| r.certified_infeasible) {
         state.borrow_mut().phase_one_infeasible = true;
     }
+    let auto_rank_one = controller.9.auto_rank_one.take();
     drop(controller);
     let state = Rc::try_unwrap(state)
         .map_err(|_| invalid("network state still borrowed"))?
         .into_inner();
     let mut values = vec![0.; state.routes.len()];
     let mut master_values: Vec<_> = state.master_variables.iter().map(|v| (v.id, 0.)).collect();
-    for (&tag, &value) in result.column_tags.iter().zip(master.values().iter()) {
-        if tag >= 0 {
-            values[tag as usize] += value;
-        } else if let Some((index, sign)) = master_variables::decode(tag) {
-            master_values[index].1 += sign * value;
+    if !preprocessing_proof {
+        for (&tag, &value) in result.column_tags.iter().zip(master.values().iter()) {
+            if tag >= 0 {
+                values[tag as usize] += value;
+            } else if let Some((index, sign)) = master_variables::decode(tag) {
+                master_values[index].1 += sign * value;
+            }
         }
     }
-    Ok(Output {
-        master_values,
-        routes: state
-            .routes
-            .iter()
-            .map(|route| route.as_ref().clone())
-            .collect(),
-        fixed_routes: state.fixed_routes.clone(),
-        values,
-        duals: master.duals(),
-        oracle_calls: state
-            .oracles
-            .iter()
-            .map(|oracle| (oracle.network.id, oracle.calls))
-            .collect(),
-        snapshot: NodeSnapshot {
-            master,
-            warm: result.warm_start.clone(),
-            state,
+    let (cuts, lp_before_cuts) = state.cuts.as_ref().map_or((0, f64::NAN), |cuts| {
+        (
+            cuts.cut_count()
+                + state
+                    .oracles
+                    .first()
+                    .map_or(0, |o| o.solver.cuts.knapsack_cuts.len()),
+            cuts.lp_before_cuts,
+        )
+    });
+    Ok((
+        Output {
+            cuts,
+            lp_before_cuts,
+            master_values,
+            routes: state
+                .routes
+                .iter()
+                .map(|route| route.as_ref().clone())
+                .collect(),
+            fixed_routes: state.fixed_routes.clone(),
+            values,
+            duals: if preprocessing_proof {
+                vec![0.; master.rhs.len()]
+            } else {
+                master.duals()
+            },
+            oracle_calls: state
+                .oracles
+                .iter()
+                .map(|oracle| (oracle.network.id, oracle.calls))
+                .collect(),
+            snapshot: NodeSnapshot {
+                master,
+                warm: result.warm_start.clone(),
+                state,
+            },
+            master: result,
         },
-        master: result,
-    })
+        auto_rank_one,
+    ))
 }

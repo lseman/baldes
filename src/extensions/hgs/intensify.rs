@@ -297,67 +297,6 @@ fn subproblem(
     (sub, map, seed)
 }
 
-/// Slack induction by string removals: destroy a contiguous segment from a
-/// route, then greedily reinsert its customers at minimum added distance.
-/// The caller validates the complete plan before using it as an HGS seed.
-pub(super) fn sisr_kick(
-    instance: &Instance,
-    seed: &mut Vec<Vec<usize>>,
-    rng: &mut Xoroshiro128Plus,
-    strength: usize,
-) {
-    let eligible: Vec<_> = seed
-        .iter()
-        .enumerate()
-        .filter(|(_, r)| !r.is_empty())
-        .map(|(i, _)| i)
-        .collect();
-    if eligible.is_empty() {
-        return;
-    }
-    let route_idx = eligible[rng.next() as usize % eligible.len()];
-    let route = &mut seed[route_idx];
-    let len = strength.clamp(1, route.len());
-    // Start from a random seed customer and grow a spatial string. This keeps
-    // the removed set coherent while allowing it to cross route order gaps.
-    let mut removed = vec![route.remove(rng.next() as usize % route.len())];
-    while removed.len() < len {
-        let anchor = removed[rng.next() as usize % removed.len()];
-        let Some((position, _)) = route.iter().enumerate().min_by(|(_, a), (_, b)| {
-            instance
-                .distance(anchor, **a, instance.rounding)
-                .total_cmp(&instance.distance(anchor, **b, instance.rounding))
-        }) else {
-            break;
-        };
-        removed.push(route.remove(position));
-    }
-    for customer in removed {
-        let mut best = None;
-        for (r, route) in seed.iter().enumerate() {
-            let mut previous = 0;
-            for pos in 0..=route.len() {
-                let next = route.get(pos).copied().unwrap_or(0);
-                let delta = instance.distance(previous, customer, instance.rounding)
-                    + instance.distance(customer, next, instance.rounding)
-                    - instance.distance(previous, next, instance.rounding);
-                if best.is_none_or(|(_, _, cost)| delta < cost) {
-                    best = Some((r, pos, delta));
-                }
-                previous = next;
-            }
-        }
-        if let Some((r, pos, _)) = best {
-            seed[r].insert(pos, customer);
-        }
-    }
-    if validate_plan(instance, seed).is_err() {
-        // Keep the kick bounded and always return a valid seed to HGS.
-        // The caller has the original plan available through its own snapshot.
-        let _ = rng;
-    }
-}
-
 struct Job {
     selected: Vec<usize>,
     instance: Instance,
@@ -563,7 +502,7 @@ pub fn intensify_with_callback(
                     // kicks intensify, while prolonged stalls broaden the ruin.
                     let strength = 1 + (stall / 4).min(12);
                     let before = sub_seed.clone();
-                    sisr_kick(&sub, &mut sub_seed, &mut rng, strength);
+                    crate::extensions::common::sisr_kick(&sub, &mut sub_seed, &mut rng, strength);
                     if validate_plan(&sub, &sub_seed).is_err() {
                         sub_seed = before;
                     }

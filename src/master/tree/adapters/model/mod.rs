@@ -3,6 +3,10 @@
 use super::*;
 mod adapter;
 mod branching;
+mod diving;
+mod integer_objective;
+mod parallel;
+pub use diving::DivingOptions;
 pub(super) mod proposals;
 mod time_windows;
 use crate::master::{tree::TreeStatus, LpMaster};
@@ -114,13 +118,35 @@ pub struct ModelTreeOptions {
     /// scoring. This margin does not change published proof bounds.
     pub scoring_gap_tolerance: f64,
     pub branch_priorities: NetworkBranchPriorities,
-    /// Named generator directions, requiring Phased (also selected by
-    /// native packing). Side zero remains the lower bound side in history
+    /// Named generator directions, under every policy. Without one, a
+    /// family's native direction applies (Ryan–Foster: together first), then
+    /// the policy default. Side zero remains the lower bound side in history
     /// and proof storage, independently of trial/admission order.
     pub branch_directions: BTreeMap<String, NetworkBranchDirection>,
     /// Explicit original integer variables spanning networks and static masters.
     pub mapped_variables: Vec<MappedBranchVariable>,
     pub packing: Option<PackingBranching>,
+    /// Cluster boundary and pair generators, each on one network's arcs.
+    pub clusters: Vec<NetworkClusterBranching>,
+    /// Packing-set Ryan–Foster generators; the together child is upper.
+    pub ryan_foster: Option<RyanFosterBranching>,
+    /// Diving primal heuristic; disabled by default, as in the native solver.
+    pub diving: Option<DivingOptions>,
+    /// Restricted-master integer heuristic; disabled by default, as in native.
+    pub restricted_master_mip: Option<RestrictedMasterMip>,
+    /// Native `optimalityGapTolerance`: a node closes when its bound is within
+    /// this absolute gap of the incumbent.
+    pub absolute_gap: f64,
+    /// Native `relOptimalityGapTolerance`, relative to the incumbent.
+    pub relative_gap: f64,
+    /// Every integer solution has an integer objective, so node bounds are
+    /// rounded up before pruning (native `integerValuedBound`). Validated.
+    pub integer_objective: bool,
+    /// Native `StrongBranchingUseHistory`: rank stored generators by history.
+    pub use_branching_history: bool,
+    /// Worker threads evaluating a batch of open nodes concurrently. One keeps
+    /// the sequential native search; more change the trajectory, never proofs.
+    pub threads: usize,
     /// Reprice paths discovered in other tree nodes/trials in this recipient.
     /// Disabled by default; the retained native inactive-search gate is zero.
     pub share_inactive_columns: bool,
@@ -135,7 +161,61 @@ pub struct ModelTreeOptions {
     /// only). Arcs into multi-window vertices are copied once per window;
     /// reported routes use the input arc IDs.
     pub time_window_selection: Option<usize>,
+    /// Caller-validated integer solution (for example a heuristic one) and
+    /// its full objective, including any recourse paid by master variables.
+    /// The objective is the initial incumbent; the routes are its witness.
+    pub initial_solution: Option<(f64, Vec<FixedRoute>)>,
 }
+/// Native `RestrictedMasterIpHeuristic` controls.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct RestrictedMasterMip {
+    /// Run at every `frequency`-th selected node; zero runs at the root only.
+    pub frequency: usize,
+    /// Seconds per MIP solve.
+    pub time_limit: f64,
+    pub node_limit: usize,
+}
+impl Default for RestrictedMasterMip {
+    fn default() -> Self {
+        Self {
+            frequency: 0,
+            time_limit: 10.,
+            node_limit: 100_000,
+        }
+    }
+}
+impl RestrictedMasterMip {
+    pub(super) fn due(&self, depth: usize, selected: usize) -> bool {
+        if self.frequency == 0 {
+            depth == 0
+        } else {
+            selected.saturating_sub(1) % self.frequency == 0
+        }
+    }
+}
+
+impl ModelTreeOptions {
+    /// Whether a node bound closes it against the incumbent: integer-valued
+    /// objectives round the bound up first, and the gap is the largest of
+    /// the tree tolerance and the absolute and relative gaps.
+    pub(super) fn closes(&self, bound: f64, incumbent: f64) -> bool {
+        let bound = if self.integer_objective && bound.is_finite() {
+            (bound - (1e-6 + 1e-10 * bound.abs())).ceil()
+        } else {
+            bound
+        };
+        let gap = if incumbent.is_finite() {
+            self.tolerance
+                .max(self.absolute_gap)
+                .max(self.relative_gap * incumbent.abs())
+        } else {
+            self.tolerance
+        };
+        bound >= incumbent - gap
+    }
+}
+
 impl Default for ModelTreeOptions {
     fn default() -> Self {
         Self {
@@ -149,6 +229,15 @@ impl Default for ModelTreeOptions {
             branch_directions: BTreeMap::new(),
             mapped_variables: vec![],
             packing: None,
+            clusters: vec![],
+            ryan_foster: None,
+            diving: None,
+            restricted_master_mip: None,
+            absolute_gap: 1e-6,
+            relative_gap: 1e-9,
+            integer_objective: false,
+            use_branching_history: true,
+            threads: 1,
             share_inactive_columns: false,
             mapped_strong_branching: Some(crate::master::tree::StrongBranchingOptions::default()),
             node_limit: 10000,
@@ -156,6 +245,7 @@ impl Default for ModelTreeOptions {
             tolerance: 1e-6,
             enumerated_mip: None,
             time_window_selection: None,
+            initial_solution: None,
         }
     }
 }
@@ -184,6 +274,10 @@ pub struct ModelTreeOutput {
     pub enumerated_mip_nodes: usize,
     pub enumerated_mip_failures: usize,
     pub enumeration_reports: Vec<EnumerationReport>,
+    /// Column-generation solves inside diving heuristics (not tree nodes).
+    pub diving_nodes: usize,
+    /// Restricted-master integer heuristic solves.
+    pub restricted_mip_calls: usize,
 }
 
 type TreeFrontier<const D: usize> = crate::master::tree::TreeFrontier<NodeSnapshot<D>, Output<D>>;
@@ -481,6 +575,30 @@ fn solve_split<const D: usize>(
     if let Some(strong) = &options.mapped_strong_branching {
         model_strong::validate(strong)?;
     }
+    if let Some(diving) = &options.diving {
+        diving.validate()?;
+    }
+    if !options.absolute_gap.is_finite()
+        || options.absolute_gap < 0.
+        || !options.relative_gap.is_finite()
+        || options.relative_gap < 0.
+        || options.threads == 0
+    {
+        return Err(invalid(
+            "tree gaps must be finite and nonnegative and threads positive",
+        ));
+    }
+    if let Some(mip) = &options.restricted_master_mip {
+        if !cfg!(feature = "highs") {
+            return Err(invalid("restricted master MIP requires the highs feature"));
+        }
+        if !mip.time_limit.is_finite() || mip.time_limit < 0. {
+            return Err(invalid("restricted master MIP time limit"));
+        }
+    }
+    if options.integer_objective {
+        integer_objective::validate(&start, &options)?;
+    }
     if options.enumerated_mip.is_some() {
         if !cfg!(feature = "highs") {
             return Err(invalid("enumerated MIP requires the highs feature"));
@@ -539,9 +657,33 @@ fn solve_split<const D: usize>(
         }
         options.branching = NetworkBranchingPolicy::Phased;
     }
-    if !options.branch_directions.is_empty() && options.branching != NetworkBranchingPolicy::Phased
-    {
-        return Err(invalid("named branch directions require phased branching"));
+    for clusters in &mut options.clusters {
+        match &start {
+            Start::Fresh(problem, _) => {
+                clusters.prepare(problem.networks.iter().map(|n| (n.id, &n.graph)))?
+            }
+            Start::Snapshot(node) => clusters.prepare(
+                node.state
+                    .oracles
+                    .iter()
+                    .map(|o| (o.network.id, o.network.graph.as_ref())),
+            )?,
+        }
+    }
+    if let Some(ryan_foster) = &mut options.ryan_foster {
+        match &start {
+            Start::Fresh(problem, _) => ryan_foster.prepare(
+                problem.networks.iter().map(|n| (n.id, &n.graph)),
+                options.packing.as_ref(),
+            )?,
+            Start::Snapshot(node) => ryan_foster.prepare(
+                node.state
+                    .oracles
+                    .iter()
+                    .map(|o| (o.network.id, o.network.graph.as_ref())),
+                options.packing.as_ref(),
+            )?,
+        }
     }
     match &start {
         Start::Fresh(problem, variables) => model_mapping::validate::<D>(
@@ -611,7 +753,16 @@ fn solve_split<const D: usize>(
         enumerated_mip_nodes: 0,
         enumerated_mip_failures: 0,
         enumeration_reports: vec![],
+        diving_nodes: 0,
+        restricted_mip_calls: 0,
     };
+    if let Some((cost, routes)) = &options.initial_solution {
+        if !cost.is_finite() {
+            return Err(invalid("initial solution cost"));
+        }
+        result.incumbent = *cost;
+        result.routes = routes.clone();
+    }
     if options.node_limit == 0 {
         result.status = TreeStatus::NodeLimit;
         return Ok(result);
@@ -620,9 +771,11 @@ fn solve_split<const D: usize>(
         result.status = TreeStatus::TimeLimit;
         return Ok(result);
     }
+    let initial_incumbent = result.incumbent;
     let node_options = |remaining: Duration| {
         let mut node = options.node.clone();
         node.search_inactive_columns |= options.share_inactive_columns;
+        node.fixing_upper_bound = initial_incumbent.is_finite().then_some(initial_incumbent);
         node.cg.time_limit = node.cg.time_limit.min(remaining);
         node
     };
@@ -650,6 +803,7 @@ fn solve_split<const D: usize>(
     let mut unresolved = None;
     let mut mapped_history = model_strong::History::default();
     let mut selected_nodes = 0;
+    let workers = parallel::workers(options.threads)?;
     let stop = crate::master::tree::run(
         &mut adapter::NetworkSearch {
             options: &options,
@@ -661,6 +815,7 @@ fn solve_split<const D: usize>(
             mapped_history: &mut mapped_history,
             selected_nodes: &mut selected_nodes,
             unresolved: &mut unresolved,
+            workers: workers.as_ref(),
         },
         &mut pending,
         Some(root),
@@ -692,8 +847,8 @@ fn solve_split<const D: usize>(
     // if its LP was not re-solved. Unknown bounds remain negative infinity.
     let mut pending = pending.into_nodes();
     pending.retain(|node| {
-        let keep = !node.proven_infeasible()
-            && node.node.warm.bound < result.incumbent - options.tolerance;
+        let keep =
+            !node.proven_infeasible() && !options.closes(node.node.warm.bound, result.incumbent);
         if !keep {
             if let Some(history) = &mut subtree_history {
                 history.close(node.node.state.mapped_lineage);

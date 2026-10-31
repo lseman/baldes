@@ -1,6 +1,7 @@
 //! Compile original variable associations into the physical pricing model.
 use super::*;
 use crate::master::preprocessing::Bounds;
+use std::collections::BTreeSet;
 
 /// One original variable, scoped by its pricing network and model ID.
 /// Graph resources define its per-pattern feasibility. This registration does
@@ -32,6 +33,44 @@ pub struct OriginalPricingVariable {
     pub integer: bool,
     #[serde(default)]
     pub priority: f64,
+}
+
+/// One term of a branching expression: an original pricing variable of a
+/// network, or a static master variable when `network` is absent.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BranchingTerm {
+    #[serde(default)]
+    pub network: Option<i32>,
+    pub id: i32,
+    pub coefficient: f64,
+}
+
+/// A registered linear branching expression over original variables
+/// (native `registerBranchingExpression`/`addBranchingExpression`). It is
+/// branched on as one integer mapped variable, so its value must be integer
+/// on every integer solution; registration rejects expressions without that
+/// proof.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BranchingExpression {
+    pub name: String,
+    #[serde(default)]
+    pub priority: f64,
+    pub terms: Vec<BranchingTerm>,
+}
+
+/// Branch on an original variable ID summed over every network copy that
+/// registers it, or over `networks` when given (native
+/// `addAggrSubProbVarBranching`). Named `AGG_<id>`.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AggregateVariableBranching {
+    pub id: i32,
+    #[serde(default)]
+    pub priority: f64,
+    #[serde(default)]
+    pub networks: Vec<i32>,
 }
 
 /// Captured intrinsic program and its original physical arc identities.
@@ -368,6 +407,145 @@ impl PricingVariableRegistry {
 
     pub fn branch_variables(&self) -> &[MappedBranchVariable] {
         &self.branches
+    }
+
+    /// Compile a branching expression into one mapped integer variable.
+    /// Arc associations and accumulated activities of the same network are
+    /// summed; paired associations have no integer activity and are rejected.
+    pub fn expression(&self, expression: &BranchingExpression) -> Result<MappedBranchVariable> {
+        if expression.name.trim().is_empty()
+            || !expression.priority.is_finite()
+            || expression.terms.is_empty()
+        {
+            return Err(invalid(
+                "branching expression requires a name, finite priority and terms",
+            ));
+        }
+        let mut arcs = BTreeMap::<i32, BTreeMap<i32, f64>>::new();
+        let mut activities = BTreeMap::<i32, BTreeMap<usize, f64>>::new();
+        let mut masters = BTreeMap::<i32, f64>::new();
+        for term in &expression.terms {
+            if !term.coefficient.is_finite() {
+                return Err(invalid("branching expression coefficient"));
+            }
+            let Some(network) = term.network else {
+                *masters.entry(term.id).or_default() += term.coefficient;
+                continue;
+            };
+            let variable = self
+                .variables
+                .iter()
+                .find(|v| v.network == network && v.id == term.id)
+                .ok_or_else(|| invalid("unknown branching expression variable"))?;
+            if let Some(resource) = variable.accumulated_resource {
+                let paired = self.activity_sources.get(&network).is_some_and(|source| {
+                    matches!(
+                        source.kernel.definitions().get(resource),
+                        Some(crate::graph::coupled::CoupledResource::PairedFront { .. })
+                    )
+                });
+                if paired {
+                    return Err(invalid(
+                        "a paired original variable has no integer branching activity",
+                    ));
+                }
+                *activities
+                    .entry(network)
+                    .or_default()
+                    .entry(resource)
+                    .or_default() += term.coefficient;
+            } else {
+                let entry = arcs.entry(network).or_default();
+                for &(arc, value) in &variable.arcs {
+                    *entry.entry(arc).or_default() += term.coefficient * value;
+                }
+            }
+        }
+        let ids: BTreeSet<i32> = arcs.keys().chain(activities.keys()).copied().collect();
+        let networks = ids
+            .into_iter()
+            .map(|network| MappedNetworkVariable {
+                network,
+                arcs: arcs
+                    .remove(&network)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|(_, a)| *a != 0.)
+                    .collect(),
+                activities: activities
+                    .remove(&network)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|(_, a)| *a != 0.)
+                    .collect(),
+                per_route: 0.,
+            })
+            .collect();
+        Ok(MappedBranchVariable {
+            name: expression.name.clone(),
+            priority: expression.priority,
+            networks,
+            masters: masters.into_iter().filter(|(_, a)| *a != 0.).collect(),
+        })
+    }
+
+    /// Compile an aggregated subproblem-variable branch.
+    pub fn aggregate(
+        &self,
+        aggregate: &AggregateVariableBranching,
+    ) -> Result<MappedBranchVariable> {
+        let terms: Vec<_> = self
+            .variables
+            .iter()
+            .filter(|v| {
+                v.id == aggregate.id
+                    && (aggregate.networks.is_empty() || aggregate.networks.contains(&v.network))
+            })
+            .map(|v| BranchingTerm {
+                network: Some(v.network),
+                id: v.id,
+                coefficient: 1.,
+            })
+            .collect();
+        if terms.is_empty()
+            || aggregate
+                .networks
+                .iter()
+                .any(|n| !terms.iter().any(|t| t.network == Some(*n)))
+        {
+            return Err(invalid("aggregated branching variable is not registered"));
+        }
+        self.expression(&BranchingExpression {
+            name: format!("AGG_{}", aggregate.id),
+            priority: aggregate.priority,
+            terms,
+        })
+    }
+
+    /// Add compiled expressions and aggregates to a tree's mapped variables.
+    pub fn configure_expressions(
+        &self,
+        options: &mut ModelTreeOptions,
+        expressions: &[BranchingExpression],
+        aggregates: &[AggregateVariableBranching],
+    ) -> Result<()> {
+        let mut compiled = expressions
+            .iter()
+            .map(|e| self.expression(e))
+            .collect::<Result<Vec<_>>>()?;
+        for aggregate in aggregates {
+            compiled.push(self.aggregate(aggregate)?);
+        }
+        let mut names: HashSet<_> = options
+            .mapped_variables
+            .iter()
+            .map(|v| v.name.clone())
+            .collect();
+        if compiled.iter().any(|v| !names.insert(v.name.clone())) {
+            return Err(invalid("branching expression name conflict"));
+        }
+        options.mapped_variables.extend(compiled);
+        Ok(())
     }
 
     /// Add registered integer activities to a tree without replacing explicit

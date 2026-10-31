@@ -184,10 +184,15 @@ impl ProgressLog {
                 }
                 let mut out = io::stderr().lock();
                 let _ = writeln!(out, "{}", "─".repeat(115 + self.cuts.len() * 9));
+                let status = if output.enumeration_requested {
+                    "Enumeration checkpoint".to_owned()
+                } else {
+                    format!("{:?}", output.status)
+                };
                 let _ = writeln!(
                     out,
-                    "  CG {:?} | {} iterations | {} pricing calls | {} columns | {:.2}s\n",
-                    output.status, output.iterations, output.pricing_calls, output.columns, seconds
+                    "  CG {} | {} iterations | {} pricing calls | {} columns | {:.2}s\n",
+                    status, output.iterations, output.pricing_calls, output.columns, seconds
                 );
             }
             Err(error) => {

@@ -1,7 +1,7 @@
 //! Collect complete or cost-bounded route universes under shared budgets.
 use super::*;
 
-pub(super) fn collect_routes<const D: usize>(
+pub(in crate::master::model) fn collect_routes<const D: usize>(
     state: &State<D>,
     options: &EnumerationOptions,
 ) -> std::result::Result<(Vec<NetworkRoute>, Vec<(i32, usize)>), String> {
@@ -145,8 +145,7 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
         paths_left -= paths.len();
         work_left -= work_used;
         arcs_left -= stored_arcs;
-        let problem = crate::master::routing::RoutingContext::set_partitioning(graph.clone(), 1.)
-            .map_err(|e| e.to_string())?;
+        let problem = graph;
         let before = routes.len();
         for path in paths {
             if Instant::now() >= deadline {
@@ -175,12 +174,7 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
                 resources: vec![],
                 resource_profile: vec![],
             };
-            match crate::master::routing::exact_route_feasibility_with_budget(
-                &problem,
-                &probe,
-                &mut work_left,
-                deadline,
-            ) {
+            match problem.exact_route_feasibility_with_budget(&probe, &mut work_left, deadline) {
                 Some(false) => continue,
                 Some(true) => {}
                 None => return Err("Arithmetic: exact resource replay is unknown".into()),
@@ -196,6 +190,8 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
             // schedule cannot be reconstructed by the current scalar kernel.
             let canonical = problem
                 .elementary_route(&probe.arcs)
+                .ok()
+                .flatten()
                 .ok_or("Arithmetic: canonical resource replay")?;
             probe.resources = canonical.resources;
             probe.resource_profile = canonical.resource_profile;
@@ -283,8 +279,7 @@ fn collect_paired_program_routes<const D: usize>(
     }
     let mut work = enumeration.generated;
     let mut stored_arcs = 0usize;
-    let problem = crate::master::routing::RoutingContext::set_partitioning(graph.clone(), 1.)
-        .map_err(|error| error.to_string())?;
+    let problem = graph;
     let mut routes = Vec::with_capacity(candidates.len());
     for candidate in candidates {
         if Instant::now() >= deadline {
@@ -328,12 +323,7 @@ fn collect_paired_program_routes<const D: usize>(
             continue;
         }
         let mut remaining = max_work - work;
-        match crate::master::routing::exact_route_feasibility_with_budget(
-            &problem,
-            &candidate,
-            &mut remaining,
-            deadline,
-        ) {
+        match problem.exact_route_feasibility_with_budget(&candidate, &mut remaining, deadline) {
             Some(false) => {
                 work = max_work - remaining;
                 continue;
@@ -344,6 +334,8 @@ fn collect_paired_program_routes<const D: usize>(
         work = max_work - remaining;
         let route = problem
             .elementary_route(&candidate.arcs)
+            .ok()
+            .flatten()
             .ok_or("Arithmetic: paired route reconstruction")?;
         routes.push(route);
     }

@@ -204,27 +204,24 @@ fn root_fenchel_only_cuts_survive_enumeration_and_child_restore() {
     use crate::inputs::{Instance, Rounding};
     use crate::master::{
         cg::Status,
-        routing::{inherit, RootOptions},
+        model::{EnumerationOptions, Options},
     };
     let instance = Instance::parse("fenchel-root\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     for enumerate in [false, true] {
         let config = instance.fenchel_cut_config().unwrap();
         assert_eq!(config.parameters.max_one_k, 0);
-        let mut options = RootOptions::default().with_knapsack_cuts(config);
-        options.enumerate = enumerate;
-        options.capture_state = true;
+        let mut options = Options::default();
+        options.separation.knapsack = Some(config);
+        options.enumeration = enumerate.then(EnumerationOptions::default);
         let out = instance.solve(8, Rounding::None, options).unwrap();
         assert_eq!(out.master.status, Status::Optimal);
         assert!(out.cuts > 0);
         assert!((out.master.lp - (4.0 + 2.0_f64.sqrt())).abs() < 1e-7);
-        let snapshot = out.snapshot.as_ref().unwrap();
-        assert!(snapshot.active_cuts() > 0);
-        let mut child_options = RootOptions::default();
-        child_options.enumerate = enumerate;
-        child_options.node_depth = 1;
-        let child = inherit(snapshot, &[], child_options).unwrap();
+        let mut child_options = Options::default();
+        child_options.enumeration = enumerate.then(EnumerationOptions::default);
+        let child = out.snapshot.solve(child_options).unwrap();
         assert_eq!(child.master.status, Status::Optimal);
-        assert!(child.inherited_cuts > 0);
+        assert!(child.cuts > 0);
         assert!((child.master.lp - out.master.lp).abs() < 1e-7);
     }
     let mut scaled = instance.clone();

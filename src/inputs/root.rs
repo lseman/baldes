@@ -4,7 +4,9 @@ impl Instance {
     /// Global integer-load packing row obtained by summing customer-cover
     /// equalities. Demands are gcd-scaled; the pricing load is coordinate 1.
     /// Fenchel-only separation is opt in; no rounding/1K cuts are enabled here.
-    pub fn fenchel_cut_config(&self) -> Result<crate::master::routing::KnapsackCutConfig> {
+    pub fn fenchel_cut_config(
+        &self,
+    ) -> Result<crate::master::model::separation::KnapsackCutConfig> {
         use crate::cuts::knapsack::{FenchelParameters, KnapsackRow};
         let mut divisor = 0_i64;
         let mut demands = Vec::new();
@@ -32,13 +34,14 @@ impl Instance {
         if total > limits.max_capacity as i64 {
             return Err(invalid("Fenchel normalized total demand exceeds the default capacity limit; use explicit Rust resource rows and limits"));
         }
-        let mut config = crate::master::routing::KnapsackCutConfig::new(vec![KnapsackRow::new(
-            0,
-            1,
-            1.0 / divisor as f64,
-            total as i32,
-        )])
-        .with_fenchel(limits);
+        let mut config =
+            crate::master::model::separation::KnapsackCutConfig::new(vec![KnapsackRow::new(
+                0,
+                1,
+                1.0 / divisor as f64,
+                total as i32,
+            )])
+            .with_fenchel(limits);
         config.parameters.max_one_k = 0;
         config.parameters.use_rounding = false;
         Ok(config)
@@ -49,9 +52,9 @@ impl Instance {
         &self,
         rounding: Rounding,
         two_path: bool,
-    ) -> crate::master::routing::CapacityCutConfig {
+    ) -> crate::master::model::separation::CapacityCutConfig {
         use crate::cuts::capacity::TimeWindows;
-        let config = crate::master::routing::CapacityCutConfig::new(
+        let config = crate::master::model::separation::CapacityCutConfig::new(
             self.customers.iter().map(|c| c.demand).collect(),
             self.capacity,
         );
@@ -71,19 +74,20 @@ impl Instance {
                 .collect(),
         })
     }
+    /// Root LP of the one-network set-partitioning model with one route per
+    /// customer allowed.
     #[cfg(feature = "clp")]
     pub fn solve(
         &self,
         ng_size: usize,
         rounding: Rounding,
-        mut options: crate::master::routing::RootOptions,
-    ) -> Result<crate::master::routing::RootOutput> {
+        options: crate::master::model::Options,
+    ) -> Result<crate::master::model::Output> {
         let graph = self.graph(ng_size, rounding)?;
-        options.cg.multiplicity = (self.customers.len() - 1) as f64;
-        let problem = crate::master::routing::RoutingContext::set_partitioning(
+        let problem = crate::master::model::Problem::set_partitioning(
             graph,
             (self.customers.len() - 1) as f64,
         )?;
-        crate::master::routing::solve(problem, options)
+        crate::master::model::solve(problem, options)
     }
 }

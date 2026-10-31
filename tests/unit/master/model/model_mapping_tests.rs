@@ -329,7 +329,11 @@ fn near_tied_fractionality_keeps_registration_order_like_the_reference() {
         networks: vec![],
         masters: vec![],
     };
-    let (z, a, b) = (named("z-first", 0.), named("a-second", 0.), named("m-third", 0.));
+    let (z, a, b) = (
+        named("z-first", 0.),
+        named("a-second", 0.),
+        named("m-third", 0.),
+    );
     // z and a lie within the reference band (1e-10 relative, 1e-6 absolute) of
     // each other: registration order wins, not the name or the tiny margin.
     let ranked = rank_candidates([(&z, 0.4999995), (&a, 0.5)].into_iter());

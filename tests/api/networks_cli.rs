@@ -368,6 +368,121 @@ fn enumeration_reporting_is_shared_with_python_and_partial_transfer_falls_back()
     }
 }
 
+#[test]
+fn enumeration_checkpoint_is_not_reported_as_an_iteration_limit() {
+    let output = command()
+        .arg("solve")
+        .arg(fixture())
+        .args(["--enumerate", "--log", "--json", "-"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let log = String::from_utf8_lossy(&output.stderr);
+    assert!(log.contains("CG Enumeration checkpoint"), "{log}");
+    assert!(!log.contains("CG IterationLimit"), "{log}");
+}
+
+#[test]
+fn incomplete_enumeration_continues_the_same_column_generation_pass() {
+    let output = command()
+        .arg("solve")
+        .arg(fixture())
+        .args([
+            "--enumerate",
+            "--enumeration-route-limit",
+            "5",
+            "--log",
+            "--json",
+            "-",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let log = String::from_utf8_lossy(&output.stderr);
+    assert!(!log.contains("CG Enumeration checkpoint"), "{log}");
+    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["status"], "Optimal");
+    assert_eq!(result["lp"], 1.5);
+    assert_eq!(result["enumeration_reports"][0]["attempts"], 1);
+    assert_eq!(result["enumeration_reports"][0]["complete"], false);
+    assert!(result["enumeration_reports"][0]["failure"].is_string());
+}
+
+#[test]
+fn routing_input_uses_network_tree_and_solves_fractional_root() {
+    let instance = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("instances/Solomon/R101.txt");
+    let output = command()
+        .arg("solve")
+        .arg(instance)
+        .args([
+            "--customers",
+            "50",
+            "--master",
+            "clp",
+            "--tree",
+            "--nodes",
+            "50",
+            "--no-strong-branching",
+            "--no-enumeration",
+            "--json",
+            "-",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["status"], "Optimal");
+    assert_eq!(result["mode"], "tree");
+    assert!((result["incumbent"].as_f64().unwrap() - 1044.).abs() < 1e-6);
+    assert!((result["bound"].as_f64().unwrap() - 1044.).abs() < 1e-6);
+    assert!(result["nodes"].as_u64().unwrap() > 1);
+}
+
+#[test]
+fn routing_root_cut_rounds_keep_the_original_lp_bound() {
+    let instance = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("instances/Solomon/R201.txt");
+    let output = command()
+        .arg("solve")
+        .arg(instance)
+        .args([
+            "--customers",
+            "100",
+            "--master",
+            "clp",
+            "--rank1",
+            "--capacity",
+            "--no-enumeration",
+            "--json",
+            "-",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["mode"], "root");
+    assert_eq!(result["status"], "Optimal");
+    assert!((result["lp"].as_f64().unwrap() - 1143.2).abs() < 1e-5);
+    assert!((result["bound"].as_f64().unwrap() - 1143.2).abs() < 1e-5);
+    assert!(result["cut_rounds"].as_u64().unwrap() >= 2);
+    assert!(result["lp_before_cuts"].as_f64().unwrap() < 1140.);
+}
+
 #[cfg(feature = "highs")]
 #[test]
 fn cutoff_pool_is_explicit_and_cannot_claim_original_infeasibility() {

@@ -2,15 +2,14 @@ use baldes::{
     graph::{Graph, Window},
     master::{
         cg::{BoundMode, Status},
+        formulation::Row,
         model::{self, Network, Options, Output, Problem, RowCoefficients},
-        routing::Row,
         RowSense,
     },
 };
 
 #[test]
-fn root_and_one_network_adapters_share_raw_pricing_results() {
-    use baldes::master::routing::{self, RootOptions, RoutingContext};
+fn set_partitioning_and_explicit_one_network_share_raw_pricing_results() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let mut graph = Graph::<2>::new(4, 1).unwrap();
         for v in 0..4 {
@@ -26,29 +25,14 @@ fn root_and_one_network_adapters_share_raw_pricing_results() {
             let id = graph.add_arc(tail, head, cost).unwrap();
             graph.arc_mut(id).unwrap().consumption[0] = 1.;
         }
-        let routing = RoutingContext::set_partitioning(graph.clone(), 2.).unwrap();
-        let rows = routing.model.rows[1..].to_vec();
-        let arc_entries = routing.model.networks[0]
-            .arc_entries
-            .iter()
-            .map(|entries| {
-                entries
-                    .iter()
-                    .filter_map(|&(r, a)| (r > 0).then(|| (r - 1, a)))
-                    .collect()
-            })
-            .collect();
+        let routing = Problem::set_partitioning(graph.clone(), 2.).unwrap();
+        let rows = routing.rows.clone();
+        let arc_entries = routing.networks[0].arc_entries.clone();
         let mut options = Options::default();
         options.cg.stabilize = false;
         options.cg.bound_mode = mode;
         options.preprocessing.enabled = false;
-        let mut root_options = RootOptions::default();
-        root_options.cg = options.cg.clone();
-        root_options.bound_mode = mode;
-        root_options.round_reduced_costs = true;
-        root_options.enumerate = false;
-        root_options.clp_options = Default::default();
-        let single = routing::solve(routing, root_options).unwrap();
+        let single = model::solve(routing, options.clone()).unwrap();
         let multiple = model::solve(
             Problem {
                 rows,
@@ -68,13 +52,10 @@ fn root_and_one_network_adapters_share_raw_pricing_results() {
         assert_eq!(multiple.master.status, Status::Optimal);
         assert_eq!(single.master.lp, 1.500000004);
         assert_eq!(single.master.lp, multiple.master.lp);
-        assert!(single.oracle_calls > 0);
-        // The routing fleet row and network multiplicity have different LP
-        // representations. Degenerate optimal dual bases can therefore admit
-        // different numbers of oracle calls through the same coordinator.
+        assert!(single.oracle_calls[0].1 > 0);
         assert!(multiple.oracle_calls[0].1 > 0);
         assert!((single.master.bound - multiple.master.bound).abs() < 1e-12);
-        let mut root_paths: Vec<_> = single.routes.iter().map(|r| r.arcs.clone()).collect();
+        let mut root_paths: Vec<_> = single.routes.iter().map(|r| r.route.arcs.clone()).collect();
         let mut network_paths: Vec<_> = multiple
             .routes
             .iter()

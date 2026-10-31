@@ -1,6 +1,5 @@
-//! Phased strong-branching decision rules for arc-flow candidates.
-use super::*;
-use crate::master::{clp::ClpMaster, LpMaster};
+//! Strong-branching controls, child scores and candidate budgets.
+use std::time::Duration;
 mod budget;
 pub(in crate::master) use budget::{CandidateBudget, SubtreeEstimate};
 mod subtree_history;
@@ -16,12 +15,6 @@ pub struct StrongPhase {
     pub max_iterations: usize,
     pub tree_depth_score: bool,
     pub restricted_master_only: bool,
-}
-impl StrongPhase {
-    fn requires_evaluation(&self, next: Option<&Self>, candidates: usize) -> bool {
-        (!self.restricted_master_only && self.pricing_phase_floor == 0)
-            || !next.is_some_and(|next| next.candidates > 0 && candidates <= next.candidates)
-    }
 }
 #[derive(Clone, Debug)]
 pub struct StrongBranchingOptions {
@@ -180,288 +173,35 @@ pub(in crate::master) fn retain_distinct_trials<T>(
     });
 }
 
-struct Candidate {
-    branch: super::candidates::BranchCandidate,
-    order: usize,
-    score: f64,
-    estimates: [f64; 2],
-    bounds: [f64; 2],
-    stages: [usize; 2],
-}
-fn restricted_value<const D: usize>(
-    parent: Option<&Rc<routing::NodeSnapshot<D>>>,
-    problem: &RoutingContext<D>,
-    branches: &[Branch],
-    pool: &Pool,
-    options: &TreeOptions,
-) -> Result<f64> {
-    let penalty = options.root.cg.artificial_cost;
-    if let Some(parent) = parent {
-        let depth = parent.branch_depth();
-        if depth <= branches.len() {
-            return Ok(parent.restricted_value(&branches[depth..], penalty)?.0);
+/// Admit fresh candidates by decreasing priority bucket until the quota is
+/// filled; a bucket started below the first selected integer group stops it.
+/// Returns the candidates and the actual loop cutoff.
+pub(in crate::master) fn fresh_batches_with_budget<T>(
+    mut quota: usize,
+    buckets: &[f64],
+    mut budget: Option<&mut CandidateBudget>,
+    mut generate: impl FnMut(f64) -> Vec<T>,
+) -> (Vec<T>, f64) {
+    let mut selected = vec![];
+    let mut cutoff = buckets.first().copied().unwrap_or(f64::NEG_INFINITY);
+    let mut group = f64::INFINITY;
+    if quota == 0 {
+        return (selected, cutoff);
+    }
+    for &priority in buckets {
+        cutoff = priority;
+        if let Some(budget) = budget.as_deref_mut() {
+            budget.visit(priority);
+            quota = budget.quota;
         }
-    }
-    let child = branch_problem(problem, branches)?;
-    let mut master = ClpMaster::new()?;
-    master.set_solver(options.root.master_solver);
-    master.set_backend_threads(options.root.master_threads)?;
-    master.set_tolerances(1e-7, 1e-7)?;
-    for row in &child.model.rows {
-        master.add_row(row.sense, row.rhs, &[])?;
-    }
-    for route in &pool.routes {
-        let entries = child.base_entries(route)?;
-        master.add_column(route.original_cost, &entries)?;
-    }
-    for (r, row) in child.model.rows.iter().enumerate() {
-        if row.sense != RowSense::LessEqual {
-            master.add_column(penalty, &[(r, 1.)])?;
-        }
-        if row.sense != RowSense::GreaterEqual {
-            master.add_column(penalty, &[(r, -1.)])?;
-        }
-    }
-    Ok(if master.solve() {
-        master.objective()
-    } else {
-        1e12
-    })
-}
-/// Return a chosen candidate and its selected-mode child bounds. Restricted LP
-/// objectives and heuristic pricing values affect scores only.
-pub(super) fn choose<const D: usize>(
-    parent: Option<&Rc<routing::NodeSnapshot<D>>>,
-    problem: &RoutingContext<D>,
-    node: &Node<D>,
-    supplied: Vec<super::candidates::BranchCandidate>,
-    fresh_count: usize,
-    quota: usize,
-    cutoff: f64,
-    pool: &mut Pool,
-    options: &TreeOptions,
-    output: &mut TreeOutput,
-    deadline: Instant,
-) -> Result<
-    Option<(
-        super::candidates::BranchCandidate,
-        [f64; 2],
-        SubtreeEstimate,
-    )>,
-> {
-    let mut supplied = supplied;
-    if options
-        .branch_history
-        .as_ref()
-        .is_some_and(|h| h.policy == BranchHistoryPolicy::Reliable)
-    {
-        if !node.branches.is_empty() {
-            if let Some(history) = &options.branch_history {
-                let limit = options
-                    .strong_branching
-                    .as_ref()
-                    .map_or(supplied.len().saturating_mul(2), |strong| {
-                        strong.phases.first().map_or(0, |p| p.candidates)
-                    });
-                output.branch_history.prioritize(
-                    &mut supplied,
-                    limit,
-                    history,
-                    output.incumbent - node.bound,
-                );
-            }
-        }
-    } else {
-        let limit = if options.strong_branching.is_some() {
-            quota
-        } else {
-            fresh_count.saturating_mul(2).max(2)
-        };
-        output.branch_history.select_admitted(
-            &mut supplied,
-            fresh_count,
-            limit,
-            &options.branching,
-            options
-                .branch_history
-                .as_ref()
-                .filter(|_| !node.branches.is_empty()),
-            output.incumbent - node.bound,
-        );
-    }
-    let mut candidates: Vec<_> = supplied
-        .into_iter()
-        .enumerate()
-        .map(|(order, branch)| Candidate {
-            branch,
-            order,
-            score: 0.,
-            estimates: [node.bound; 2],
-            bounds: [node.bound; 2],
-            stages: [0; 2],
-        })
-        .collect();
-    let Some(config) = &options.strong_branching else {
-        return Ok(candidates
-            .first()
-            .map(|c| (c.branch.clone(), c.bounds, SubtreeEstimate::default())));
-    };
-    let adaptive = !options
-        .branch_history
-        .as_ref()
-        .is_some_and(|history| history.policy == BranchHistoryPolicy::Reliable);
-    let budget = CandidateBudget::new(quota, 0., node.subtree);
-    let mut subtree = SubtreeEstimate {
-        size: 1e12,
-        priority: cutoff,
-    };
-    let mut best_score = -1e12;
-    let end = deadline.min(Instant::now() + config.time_limit);
-    for (phase_index, phase) in config.phases.iter().enumerate() {
-        candidates.truncate(phase.candidates);
-        if candidates.is_empty() || Instant::now() >= end {
+        if !selected.is_empty() && priority < group {
             break;
         }
-        // Intermediate ranking is unnecessary if every candidate fits in the
-        // next phase. Native history stages count evaluations actually run on
-        // each side, so a skipped phase must not consume a stage number.
-        // Explicit heuristic-only terminal phases still run their trials.
-        if !phase.requires_evaluation(config.phases.get(phase_index + 1), candidates.len()) {
-            continue;
-        }
-        let mut evaluated = 0;
-        for candidate in &mut candidates {
-            if adaptive && !budget.permits(evaluated, phase.subtree_ratio, subtree.size) {
-                break;
-            }
-            evaluated += 1;
-            let mut estimates = [node.bound; 2];
-            for (side, constraint) in [candidate.branch.down.clone(), candidate.branch.up.clone()]
-                .into_iter()
-                .enumerate()
-            {
-                if Instant::now() >= end {
-                    break;
-                }
-                if closed(candidate.bounds[side], output.incumbent, options) {
-                    estimates[side] = candidate.bounds[side];
-                    continue;
-                }
-                candidate.stages[side] += 1;
-                let mut branches = node.branches.clone();
-                branches.push(constraint);
-                let trial_started = Instant::now();
-                let mut observation = None;
-                output.strong_branching_trials += 1;
-                if phase.restricted_master_only {
-                    estimates[side] = restricted_value(parent, problem, &branches, pool, options)?;
-                    observation = Some(history::EvaluationKind::RestrictedMaster);
-                } else {
-                    let result = evaluate(
-                        parent,
-                        None,
-                        problem,
-                        &branches,
-                        pool,
-                        options,
-                        output.incumbent,
-                        end.min(Instant::now() + config.trial_time_limit),
-                        phase.max_iterations,
-                        phase.pricing_phase_floor,
-                        false,
-                    );
-                    match result {
-                        Ok(result) => {
-                            output.pricing_calls += result.master.pricing_calls;
-                            output.fixing_calls += result.fixing_calls;
-                            output.enumerated_routes += result.enumerated_routes;
-                            let artificial_zero = result.master.artificials.iter().all(|&c| {
-                                result.values.get(c).copied().unwrap_or(0.).abs() <= 1e-6
-                            });
-                            estimates[side] = if artificial_zero {
-                                result.master.lp.min(1e12)
-                            } else {
-                                1e12
-                            };
-                            if artificial_zero {
-                                if result.master.status == Status::Optimal
-                                    && !result.master.pruned_by_bound
-                                    && phase.pricing_phase_floor == 0
-                                {
-                                    observation = Some(history::EvaluationKind::ExactPricing);
-                                } else if phase.pricing_phase_floor > 0 {
-                                    observation = Some(history::EvaluationKind::HeuristicPricing);
-                                }
-                            }
-                            if result.preprocessing.infeasible
-                                || (result.master.status == Status::Infeasible
-                                    && result.master.bound == f64::INFINITY)
-                            {
-                                candidate.bounds[side] = f64::INFINITY;
-                            } else if result.master.bound.is_finite() {
-                                candidate.bounds[side] =
-                                    candidate.bounds[side].max(result.master.bound);
-                            }
-                            for route in &result.routes {
-                                pool.add(problem, &route.arcs);
-                            }
-                            output.mip_nodes += integer_heuristic(
-                                problem,
-                                pool,
-                                &mut output.incumbent,
-                                &mut output.routes,
-                                options,
-                                end,
-                            );
-                        }
-                        Err(e) if budget_error(&e) => {}
-                        Err(e) => return Err(e),
-                    }
-                }
-                if options.branch_history.is_some() {
-                    if let Some(kind) = observation {
-                        output.branch_history.record_at_stage(
-                            &candidate.branch,
-                            side,
-                            node.branches.len(),
-                            kind,
-                            Some(candidate.stages[side]),
-                            node.bound,
-                            estimates[side],
-                            trial_started.elapsed().as_secs_f64(),
-                        );
-                    }
-                }
-            }
-            candidate.estimates = estimates;
-            candidate.score = if phase.tree_depth_score {
-                let (score, size) =
-                    tree_metrics(node.bound, output.incumbent.min(1e12), estimates, 1.);
-                if !phase.restricted_master_only
-                    && phase.pricing_phase_floor == 0
-                    && budget::exceeds(score, best_score)
-                {
-                    best_score = score;
-                    subtree.size = size;
-                }
-                score
-            } else {
-                product_score(node.bound, output.incumbent.min(1e12), estimates)
-            };
-        }
-        if evaluated > 0 {
-            candidates.truncate(evaluated);
-        }
-        candidates.sort_by(|a, b| b.score.total_cmp(&a.score).then(a.order.cmp(&b.order)));
-        if adaptive && evaluated > 0 && !phase.tree_depth_score {
-            retain_distinct_trials(&mut candidates, |c| (c.score, c.estimates));
+        group = priority.floor();
+        selected.extend(generate(priority));
+        if selected.len() >= quota {
+            break;
         }
     }
-    Ok(candidates
-        .first()
-        .map(|c| (c.branch.clone(), c.bounds, subtree)))
+    (selected, cutoff)
 }
-
-#[cfg(test)]
-#[path = "../../../../tests/unit/master/tree/strong/trial_equivalence_tests.rs"]
-mod trial_equivalence_tests;

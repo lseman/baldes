@@ -48,6 +48,7 @@ pub(super) fn deterministic_entries<const D: usize>(
         && oracle.knapsack_rows.is_empty()
         && oracle.presence_rows.is_empty()
         && oracle.resource_groups.is_empty()
+        && oracle.ryan_foster_rows.is_empty()
         && oracle.activity_rows.is_empty()
     {
         return Ok(vec![]);
@@ -72,7 +73,7 @@ pub(super) fn deterministic_entries<const D: usize>(
             &oracle.solver.graph,
             cut,
             &physical,
-            false,
+            oracle.is_enumerated(route),
         )?);
         let sum = sums.entry(row).or_default();
         *sum = sum
@@ -84,6 +85,7 @@ pub(super) fn deterministic_entries<const D: usize>(
     result.extend(super::resource_rows::entries(oracle, route)?);
     result.extend(super::presence_rows::entries(oracle, route)?);
     result.extend(super::resource_groups::entries(oracle, route));
+    result.extend(super::ryan_foster::entries(oracle, route)?);
     result.extend(super::activity_rows::deterministic_entries(oracle, route)?);
     Ok(result)
 }

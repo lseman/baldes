@@ -383,6 +383,9 @@ class NetworkResult:
     mapped_history_ranked: int = 0
     mapped_branch_evaluations: Tuple[MappedBranchEvaluation, ...] = ()
     original_variables: Tuple[Mapping[str, Any], ...] = ()
+    cuts: int = 0
+    cut_rounds: int = 0
+    lp_before_cuts: Optional[float] = None
     snapshot: Optional[NetworkNode] = field(default=None, repr=False, compare=False)
 
     def to_json(self, *, indent: Optional[int] = 2) -> str:

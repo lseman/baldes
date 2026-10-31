@@ -1,5 +1,7 @@
+mod ails_cli;
 mod ce_cli;
 mod cli;
+mod common_cli;
 mod hgs_cli;
 mod pstep_cli;
 

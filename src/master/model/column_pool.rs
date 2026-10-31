@@ -118,22 +118,19 @@ impl Pool {
             let domain = match domains.entry(seed.network) {
                 std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
                 std::collections::hash_map::Entry::Vacant(entry) => {
-                    entry.insert(crate::master::routing::RoutingContext::set_partitioning(
-                        resource_groups::domain_graph(oracle)?.into_owned(),
-                        1.,
-                    )?)
+                    entry.insert(resource_groups::domain_graph(oracle)?.into_owned())
                 }
             };
             let route = if let Some(tag) = existing {
                 registry[tag].route.clone()
             } else if compatible_schedule(oracle, &seed.route) {
                 seed.route.clone()
-            } else if let Some(route) = domain.elementary_route(&seed.route.arcs) {
+            } else if let Some(route) = domain.elementary_route(&seed.route.arcs).ok().flatten() {
                 route
             } else {
                 continue;
             };
-            if crate::master::routing::exact_route_feasible(domain, &route).is_none()
+            if domain.exact_route_feasible(&route).is_none()
                 || !oracle
                     .solver
                     .route_satisfies_relaxation(&route.nodes, &route.arcs)?

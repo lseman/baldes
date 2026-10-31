@@ -16,6 +16,7 @@ pub(crate) struct MasterTransfer {
     upper: Vec<f64>,
     objective_offset: f64,
     basis: Option<Vec<u8>>,
+    solved: bool,
 }
 
 impl ClpMaster {
@@ -51,6 +52,7 @@ impl ClpMaster {
             upper: self.upper.clone(),
             objective_offset: self.objective_offset,
             basis,
+            solved: self.solved,
         })
     }
 }
@@ -92,6 +94,12 @@ impl MasterTransfer {
         master.objective_offset = self.objective_offset;
         master.set_solver(self.solver);
         master.set_backend_threads(self.threads)?;
+        // A solved source carries an optimal basis; re-solving from it restores
+        // the cached primal/dual solution without pivots, so the receiver can
+        // read values and branch on the node.
+        if self.solved && !master.solve() {
+            return Err(invalid("transferred master no longer solves to optimality"));
+        }
         Ok(master)
     }
 }

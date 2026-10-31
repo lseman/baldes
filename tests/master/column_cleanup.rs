@@ -1,6 +1,6 @@
 #![cfg(feature = "clp")]
 use baldes::inputs::{Instance, Rounding};
-use baldes::master::{cg::Status, routing::RootOptions};
+use baldes::master::{cg::Status, model::Options as RootOptions};
 
 fn r101_25() -> Instance {
     let mut instance = Instance::read(concat!(
@@ -14,8 +14,7 @@ fn r101_25() -> Instance {
 
 #[test]
 fn column_cleanup_shrinks_the_master_and_keeps_the_root_bound() {
-    let mut plain = RootOptions::default();
-    plain.enumerate = false;
+    let plain = RootOptions::default();
     let reference = r101_25().solve(8, Rounding::None, plain.clone()).unwrap();
     assert_eq!(reference.master.status, Status::Optimal);
 

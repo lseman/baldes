@@ -2,7 +2,6 @@
 use crate::{
     core::rounding::add_down,
     enumeration::{CompleteResourceRelaxation, PathDomainLimits},
-    master::routing::{exact_route_feasibility, RoutingContext},
     Graph, Route,
 };
 use std::time::Instant;
@@ -73,7 +72,7 @@ pub(super) fn minimum<const D: usize>(
     )
     .ok()?;
     left = left.checked_sub(paths.work_used())?;
-    let original = RoutingContext::set_partitioning(graph.clone(), 1.).ok()?;
+    let original = graph.clone();
     let mut minimum: Option<f64> = None;
     for path in paths.paths() {
         if Instant::now() >= deadline {
@@ -105,7 +104,7 @@ pub(super) fn minimum<const D: usize>(
             resources: vec![],
             resource_profile: vec![],
         };
-        match exact_route_feasibility(&original, &route) {
+        match original.exact_route_feasibility(&route) {
             Some(false) => continue,
             Some(true) => {}
             None => return None,

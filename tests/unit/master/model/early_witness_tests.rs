@@ -76,6 +76,21 @@ fn ordinary_root_lp_and_open_integer_gap_still_price() {
 }
 
 #[test]
+fn root_cut_separation_tracks_witness_without_integer_pruning() {
+    let mut output = root();
+    output.snapshot.warm.bound = 1.;
+    output.snapshot.warm.numerical_bound = 1.;
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    options.preprocessing.enabled = false;
+    options.separation.rank_one.enabled = true;
+    let resumed = output.snapshot.solve(options).unwrap();
+    assert!(resumed.snapshot.state.pricing_witness.is_some());
+    assert!(!resumed.master.pruned_by_bound);
+    assert!(resumed.master.pricing_calls > 0);
+}
+
+#[test]
 fn retained_original_primal_survives_master_invalidation_but_not_new_rows() {
     let mut output = root();
     let witness = output.snapshot.integer_witness(1e-6).unwrap().unwrap();

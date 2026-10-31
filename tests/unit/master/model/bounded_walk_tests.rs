@@ -115,9 +115,8 @@ fn bounded_walk_arc_elementarity_groups_remain_hard_in_pricing_enumeration_and_w
     assert_eq!(complete.paths().len(), 1);
     assert_eq!(complete.paths()[0].arc_positions(), [3, 4]);
 
-    let root = crate::master::routing::RoutingContext::set_partitioning(graph, 1.).unwrap();
-    assert!(root.elementary_route(&[0, 1, 2]).is_none());
-    assert!(root.elementary_route(&[3, 4]).is_some());
+    assert!(graph.elementary_route(&[0, 1, 2]).unwrap().is_none());
+    assert!(graph.elementary_route(&[3, 4]).unwrap().is_some());
 }
 
 #[test]
@@ -130,24 +129,26 @@ fn bounded_walk_root_master_guards_repeated_walks_but_allows_proven_simple_route
         .set_route_domain(RouteDomain::BoundedWalks { max_arcs: 3 })
         .unwrap();
 
-    let problem = crate::master::routing::RoutingContext::set_partitioning(graph, 1.).unwrap();
-    let mut options = crate::master::routing::RootOptions::default();
-    options.enumerate = false;
+    let problem = Problem::set_partitioning(graph, 1.).unwrap();
+    let mut options = Options::default();
     options.cg.stabilize = false;
-    let output = crate::master::routing::solve(problem.clone(), options.clone()).unwrap();
+    let output = solve(problem.clone(), options.clone()).unwrap();
     assert_eq!(output.master.status, crate::master::cg::Status::Optimal);
     assert!((output.master.lp + 5.).abs() < 1e-6);
-    assert!(output.routes.iter().any(|route| route.arcs == [0, 1, 2]));
+    assert!(output
+        .routes
+        .iter()
+        .any(|route| route.route.arcs == [0, 1, 2]));
 
     let mut ng_options = options.clone();
-    ng_options.relaxation_improvement_priority = 1.;
-    let error = crate::master::routing::solve(problem.clone(), ng_options).unwrap_err();
+    ng_options.separation.relaxation_improvement_priority = 1.;
+    let error = solve(problem.clone(), ng_options).unwrap_err();
     assert!(error
         .to_string()
         .contains("dynamic NG strengthening is unsupported"));
 
-    options.cuts.enabled = true;
-    let error = crate::master::routing::solve(problem, options.clone()).unwrap_err();
+    options.separation.rank_one.enabled = true;
+    let error = solve(problem, options.clone()).unwrap_err();
     assert!(error.to_string().contains("hard elementarity groups"));
 
     let mut elementary = Graph::<2>::new(3, 0).unwrap();
@@ -170,10 +171,10 @@ fn bounded_walk_root_master_guards_repeated_walks_but_allows_proven_simple_route
         )
         .unwrap();
     assert_eq!(ng.columns_forbidden, 0);
-    let problem = crate::master::routing::RoutingContext::set_partitioning(elementary, 1.).unwrap();
-    options.cuts.enabled = true;
-    options.relaxation_improvement_priority = 1.;
-    let output = crate::master::routing::solve(problem, options.clone()).unwrap();
+    let problem = Problem::set_partitioning(elementary, 1.).unwrap();
+    options.separation.rank_one.enabled = true;
+    options.separation.relaxation_improvement_priority = 1.;
+    let output = solve(problem, options.clone()).unwrap();
     assert_eq!(output.master.status, crate::master::cg::Status::Optimal);
     assert!((output.master.lp - 1.).abs() < 1e-6);
 
@@ -197,8 +198,8 @@ fn bounded_walk_root_master_guards_repeated_walks_but_allows_proven_simple_route
             .columns_forbidden,
         0
     );
-    let problem = crate::master::routing::RoutingContext::set_partitioning(dag, 1.).unwrap();
-    let output = crate::master::routing::solve(problem, options).unwrap();
+    let problem = Problem::set_partitioning(dag, 1.).unwrap();
+    let output = solve(problem, options).unwrap();
     assert_eq!(output.master.status, crate::master::cg::Status::Optimal);
 }
 
@@ -349,15 +350,17 @@ fn default_simple_contract_and_walk_domain_guards_are_explicit() {
         g
     };
     assert!(!graph.same_topology(&simple));
-    let original = crate::master::routing::RoutingContext::set_partitioning(simple, 1.).unwrap();
-    assert!(original.elementary_route(&[0, 1, 2, 3]).is_none());
+    assert!(simple.elementary_route(&[0, 1, 2, 3]).unwrap().is_none());
     assert!(graph
         .set_route_domain(RouteDomain::BoundedWalks { max_arcs: 0 })
         .is_err());
-    let root = crate::master::routing::RoutingContext::set_partitioning(graph.clone(), 1.).unwrap();
-    let output = crate::master::routing::solve(root, Default::default()).unwrap();
+    let root = Problem::set_partitioning(graph.clone(), 1.).unwrap();
+    let output = solve(root, Default::default()).unwrap();
     assert_eq!(output.master.status, crate::master::cg::Status::Optimal);
-    assert!(output.routes.iter().all(|route| route.arcs.len() <= 5));
+    assert!(output
+        .routes
+        .iter()
+        .all(|route| route.route.arcs.len() <= 5));
     graph.elementary = true;
     assert!(graph
         .set_route_domain(RouteDomain::BoundedWalks { max_arcs: 5 })
@@ -367,9 +370,7 @@ fn default_simple_contract_and_walk_domain_guards_are_explicit() {
     direct
         .set_route_domain(RouteDomain::BoundedWalks { max_arcs: 1 })
         .unwrap();
-    let single_network =
-        crate::master::routing::RoutingContext::set_partitioning(direct.clone(), 1.).unwrap();
-    assert!(single_network.elementary_route(&[0]).is_some());
+    assert!(direct.elementary_route(&[0]).unwrap().is_some());
     let direct_problem = Problem {
         rows: vec![Row {
             sense: RowSense::Equal,

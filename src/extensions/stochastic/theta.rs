@@ -4,8 +4,9 @@
 //! the head customer's recourse lower bound. The routing master separates a
 //! Theta cut for every integral route whose expected cost exceeds that.
 use super::{Policy, Problem};
-use crate::master::routing::{CapacityCutConfig, RouteRecourse, RoutingContext};
-use crate::master::tree::{TreeOptions, TreeOutput};
+use crate::master::model::separation::{CapacityCutConfig, Recourse, RouteRecourse};
+use crate::master::model::Problem as Model;
+use crate::master::tree::{ModelTreeOptions, ModelTreeOutput};
 use crate::{invalid, Graph, Result};
 use std::sync::Arc;
 
@@ -152,22 +153,25 @@ impl Problem {
         Ok(graph)
     }
 
-    /// Set-partitioning routing context with at most `vehicles` routes whose
-    /// expected recourse is imposed by Theta cuts.
-    pub fn theta_cut_context(
+    /// One-network set-partitioning model with at most `vehicles` routes and
+    /// the recourse oracle whose excess Theta cuts impose.
+    pub fn theta_cut_model(
         &self,
         policy: Policy,
         vehicles: usize,
         ng: usize,
-    ) -> Result<RoutingContext> {
+    ) -> Result<(Model, Recourse)> {
         if vehicles == 0 {
             return Err(invalid("Theta-cut routing requires at least one vehicle"));
         }
-        let context = RoutingContext::set_partitioning(self.theta_cut_graph(ng)?, vehicles as f64)?;
-        Ok(context.with_route_recourse(Arc::new(ExpectedRecourse {
-            problem: self.clone(),
-            policy,
-        })))
+        let problem = Model::set_partitioning(self.theta_cut_graph(ng)?, vehicles as f64)?;
+        Ok((
+            problem,
+            Recourse(Arc::new(ExpectedRecourse {
+                problem: self.clone(),
+                policy,
+            })),
+        ))
     }
 
     /// Rounded capacity cuts on mean demands; every route respects them.
@@ -178,13 +182,14 @@ impl Problem {
         CapacityCutConfig::new(demands, self.capacity as f64 * (1. + 1e-9))
     }
 
-    /// Branch-cut-and-price with Theta optimality cuts: the BALDES routing
-    /// tree with this problem's recourse oracle. Rank-one cuts are enabled,
-    /// with eight cuts per round unless explicitly overridden. Capacity cuts
-    /// on mean demands are added unless `options.root` already configures them.
-    /// Dynamic NG strengthening runs after capacity separation, with up to
-    /// 15 remembered customers per vertex and on average. Explicit pricing
-    /// options override these limits; `BALDESdynamicNGmode = 0` disables it.
+    /// Branch-cut-and-price with Theta optimality cuts on the network-model
+    /// tree, branching on route count and then arc flow. Rank-one cuts are
+    /// enabled, with eight cuts per round unless explicitly overridden.
+    /// Capacity cuts on mean demands are added unless `options.node`
+    /// already configures them. Dynamic NG strengthening runs after capacity
+    /// separation, with up to 15 remembered customers per vertex and on
+    /// average. Explicit pricing options override these limits;
+    /// `BALDESdynamicNGmode = 0` disables it.
     /// Load-indexed walk bounds prune non-improving exact-pricing completions by
     /// default, conditioning on up to four selected NG elements.
     /// `BALDESloadCompletionSubsetSize = 0` keeps unconditional bounds only;
@@ -196,79 +201,40 @@ impl Problem {
         policy: Policy,
         vehicles: usize,
         ng: usize,
-        mut options: TreeOptions,
-    ) -> Result<TreeOutput> {
-        options.root.normalize_pricing_options()?;
-        options.root = options.root.with_rank_one_cuts();
-        if !options
-            .root
-            .pricing_options
-            .iter()
-            .any(|(key, _)| key == "BALDESrankOneCutsMaxNumPerRound")
-        {
-            options
-                .root
-                .pricing_options
-                .push(("BALDESrankOneCutsMaxNumPerRound".into(), 8.));
+        mut options: ModelTreeOptions,
+    ) -> Result<ModelTreeOutput> {
+        let node = &mut options.node;
+        for (name, _) in &mut node.pricing_options {
+            *name = crate::core::options::Options::canonical_name(name)?.into();
         }
-        // Fleet, customer, capacity and Theta prices are all on physical arcs
-        // in this formulation, so zero is the improving-route threshold.
-        if !options
-            .root
-            .pricing_options
-            .iter()
-            .any(|(k, _)| k == "BALDESloadCompletionResource")
-        {
-            options
-                .root
-                .pricing_options
-                .push(("BALDESloadCompletionResource".into(), 1.));
+        let separation = &mut node.separation;
+        separation.rank_one.enabled = true;
+        if separation.relaxation_improvement_priority == 0. {
+            separation.relaxation_improvement_priority = 1.;
         }
-        if !options
-            .root
-            .pricing_options
-            .iter()
-            .any(|(k, _)| k == "BALDESloadCompletionSubsetSize")
-        {
-            options
-                .root
-                .pricing_options
-                .push(("BALDESloadCompletionSubsetSize".into(), 4.));
-        }
-        if options.root.relaxation_improvement_priority == 0. {
-            options.root.relaxation_improvement_priority = 1.;
-        }
-        if options.root.cuts.enabled
-            && !options
-                .root
-                .pricing_options
-                .iter()
-                .any(|(key, _)| key == "BALDESdynamicNGmode")
-        {
-            options
-                .root
-                .pricing_options
-                .push(("BALDESdynamicNGmode".into(), -1.));
+        if separation.capacity.is_none() {
+            separation.capacity = Some(self.mean_capacity_cut_config());
         }
         let size = 15.min(crate::graph::ng::NG_MEMORY_CAPACITY) as f64;
-        for name in [
-            "BALDESmaxNGneighbourhoodSize",
-            "BALDESmaxNGaverNeighbourhoodSize",
+        // Fleet, customer, capacity and Theta prices are all on physical arcs
+        // in this formulation, so zero is the improving-route threshold.
+        for (name, value) in [
+            ("BALDESrankOneCutsMaxNumPerRound", 8.),
+            ("BALDESloadCompletionResource", 1.),
+            ("BALDESloadCompletionSubsetSize", 4.),
+            ("BALDESdynamicNGmode", -1.),
+            ("BALDESmaxNGneighbourhoodSize", size),
+            ("BALDESmaxNGaverNeighbourhoodSize", size),
         ] {
-            if !options
-                .root
-                .pricing_options
-                .iter()
-                .any(|(key, _)| key == name)
-            {
-                options.root.pricing_options.push((name.into(), size));
+            if !node.pricing_options.iter().any(|(key, _)| key == name) {
+                node.pricing_options.push((name.into(), value));
             }
         }
-        if options.root.capacity_cuts.is_none() {
-            options.root = options
-                .root
-                .with_capacity_cuts(self.mean_capacity_cut_config());
+        let (problem, recourse) = self.theta_cut_model(policy, vehicles, ng)?;
+        node.separation.route_recourse = Some(recourse);
+        if options.mapped_variables.is_empty() {
+            options.mapped_variables = problem.arc_flow_variables(1.);
         }
-        crate::master::tree::solve(self.theta_cut_context(policy, vehicles, ng)?, options)
+        crate::master::tree::solve(problem, options)
     }
 }

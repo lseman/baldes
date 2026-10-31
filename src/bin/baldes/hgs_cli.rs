@@ -1,7 +1,7 @@
 //! Opt-in BKS seeding and decomposition for the HGS command.
+use crate::common_cli::{download_bks, write_checkpoint};
 use std::path::Path;
 
-use baldes::extensions::hgs::ails_ii::{run_ails_ii, AilsIiOptions};
 use baldes::extensions::hgs::dri::{run_dri, DriOptions};
 use baldes::extensions::hgs::intensify::{intensify_with_callback, IntensifyOptions, Objective};
 use baldes::extensions::hgs::solution::{format_solution, parse_solution, validate_plan};
@@ -12,7 +12,6 @@ pub const HELP: &str = "HGS extensions (all opt-in):
   --get-bks                 Download and seed from the current CVRPLib BKS (Python 3 + internet)
   --initial-solution FILE   Seed from a local CVRPLib route file instead
   --intensify               Re-solve route subsets with threshold acceptance and elite restarts
-  --ails-ii                 Run standalone two-phase AILS-II from a BKS/solution seed
   --dri                     Cluster customers, solve clusters and improve across clusters
   --dri-vicinity N          Neighboring clusters per cluster (default: 3)
   --dri-neighbors N         Similar customers considered for cross-cluster moves (default: 20)
@@ -43,7 +42,6 @@ pub struct ExtensionOptions {
     pub get_bks: bool,
     pub initial_solution: Option<String>,
     pub intensify: bool,
-    pub ails_ii: bool,
     pub dri: bool,
     pub output: Option<String>,
     config: IntensifyOptions,
@@ -63,7 +61,6 @@ impl ExtensionOptions {
         self.get_bks
             || self.initial_solution.is_some()
             || self.intensify
-            || self.ails_ii
             || self.dri
             || self.output.is_some()
             || self.controls
@@ -80,7 +77,6 @@ impl ExtensionOptions {
                 self.initial_solution = Some(args.next().ok_or("missing solution file")?)
             }
             "--intensify" => self.intensify = true,
-            "--ails-ii" => self.ails_ii = true,
             "--dri" => self.dri = true,
             "--std-similarity" => {
                 self.config.std_similarity = true;
@@ -212,9 +208,6 @@ impl ExtensionOptions {
         if self.dri && self.intensify {
             return Err("--dri conflicts with --intensify".into());
         }
-        if self.ails_ii && (self.intensify || self.dri) {
-            return Err("--ails-ii conflicts with --intensify and --dri".into());
-        }
         if self.dri && self.route_controls {
             return Err("route-intensification controls require --intensify".into());
         }
@@ -283,43 +276,6 @@ impl ExtensionOptions {
             }
             Ok(())
         };
-        if self.ails_ii {
-            let start = std::time::Instant::now();
-            let seed = if let Some(routes) = seed {
-                routes
-            } else {
-                let mut initial = options.clone();
-                if options.time_limit > 0.0 {
-                    initial.time_limit = options.time_limit.min(5.0);
-                }
-                let result = run_hgs(instance, &initial)?;
-                result.routes
-            };
-            let initial_cost = validate_plan(instance, &seed)?;
-            checkpoint(&seed, initial_cost)?;
-            let mut hgs = options.clone();
-            hgs.seed = options.seed;
-            let result = run_ails_ii(
-                instance,
-                &seed,
-                &AilsIiOptions {
-                    time_limit: options.time_limit,
-                    hgs,
-                    ..AilsIiOptions::default()
-                },
-            )?;
-            let cost = validate_plan(instance, &result.routes)?;
-            checkpoint(&result.routes, cost)?;
-            eprintln!(
-                "AILS-II: initial={initial_cost:.6} best={cost:.6} generations={} elapsed={:.2}s",
-                result.generations,
-                start.elapsed().as_secs_f64()
-            );
-            return Ok(HgsResult {
-                elapsed_secs: start.elapsed().as_secs_f64(),
-                ..result
-            });
-        }
         if self.dri {
             if let Some(routes) = &seed {
                 checkpoint(routes, validate_plan(instance, routes)?)?;
@@ -406,51 +362,4 @@ impl ExtensionOptions {
             elapsed_secs: start.elapsed().as_secs_f64(),
         })
     }
-}
-
-fn write_checkpoint(path: &Path, text: &str) -> Result<(), String> {
-    let filename = path
-        .file_name()
-        .ok_or("solution output needs a filename")?
-        .to_string_lossy();
-    let temporary = path.with_file_name(format!(".{filename}.{}.tmp", std::process::id()));
-    std::fs::write(&temporary, text).map_err(|e| format!("write checkpoint: {e}"))?;
-    std::fs::rename(&temporary, path).map_err(|e| format!("rename checkpoint: {e}"))
-}
-
-fn download_bks(name: &str) -> Result<String, String> {
-    // Bundle the dependency-free downloader so installed binaries do not depend
-    // on a source checkout. Python performs HTTPS certificate verification.
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
-        .as_nanos();
-    let directory = std::env::temp_dir().join(format!("baldes-bks-{}-{nonce}", std::process::id()));
-    std::fs::create_dir(&directory).map_err(|e| format!("create BKS temporary directory: {e}"))?;
-    let path = directory.join("seed.sol");
-    let result = (|| {
-        let output = std::process::Command::new("python3")
-            .arg("-c")
-            .arg(include_str!("../../../scripts/setup/get_bks.py"))
-            .arg(name)
-            .arg("-o")
-            .arg(&path)
-            .output()
-            .map_err(|e| format!("--get-bks requires Python 3: {e}"))?;
-        if !output.status.success() {
-            return Err(format!(
-                "BKS download failed: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
-            ));
-        }
-        eprint!(
-            "{}",
-            String::from_utf8_lossy(&output.stdout)
-                .replace(&path.to_string_lossy().to_string(), "temporary seed")
-        );
-        std::fs::read_to_string(&path).map_err(|e| e.to_string())
-    })();
-    let _ = std::fs::remove_file(&path);
-    let _ = std::fs::remove_dir(&directory);
-    result
 }

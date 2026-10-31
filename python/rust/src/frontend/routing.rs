@@ -68,7 +68,8 @@ pub(super) fn solve_routing(
     stabilization_max_tree_depth: i64,
 ) -> PyResult<Py<PyDict>> {
     use baldes::inputs::{Customer, Rounding};
-    use baldes::master::routing::{self, RootOptions, RoutingContext};
+    use baldes::master::clp::{ClpOptions, MasterSolver};
+    use baldes::master::{cg, model};
     if problem_type != "vrptw" && problem_type != "cvrp" {
         return Err(PyValueError::new_err(
             "problem_type must be 'vrptw' or 'cvrp'",
@@ -157,31 +158,31 @@ pub(super) fn solve_routing(
         rounding,
         distances,
     };
-    let mut options = RootOptions::default();
     if master_threads > i32::MAX as usize {
         return Err(PyValueError::new_err(
             "master thread count exceeds native integer range",
         ));
     }
-    options.master_threads = master_threads;
-    options.bound_mode =
-        routing::BoundMode::parse(bound_mode).map_err(|e| PyValueError::new_err(e.to_string()))?;
     if log_interval == 0 {
         return Err(PyValueError::new_err("log_interval must be positive"));
     }
+    let mut options = model::Options::default();
+    options.master_threads = master_threads;
+    options.cg.bound_mode =
+        cg::BoundMode::parse(bound_mode).map_err(|e| PyValueError::new_err(e.to_string()))?;
     options.cg.log_interval = verbose.then_some(log_interval);
     options.master_solver = match master_solver {
-        "clp" => routing::MasterSolver::Clp,
-        "ipm" => routing::MasterSolver::Ipm,
-        "highs" => routing::MasterSolver::Highs,
-        "gurobi" => routing::MasterSolver::Gurobi,
+        "clp" => MasterSolver::Clp,
+        "ipm" => MasterSolver::Ipm,
+        "highs" => MasterSolver::Highs,
+        "gurobi" => MasterSolver::Gurobi,
         _ => {
             return Err(PyValueError::new_err(
                 "master_solver must be 'clp', 'highs', 'gurobi', or 'ipm'",
             ))
         }
     };
-    options.clp_options = routing::ClpOptions {
+    options.clp_options = ClpOptions {
         scaling: clp_scaling
             .parse()
             .map_err(|e: baldes::core::error::OrError| PyValueError::new_err(e.to_string()))?,
@@ -207,19 +208,20 @@ pub(super) fn solve_routing(
             })
         })
         .transpose()?;
+    // Master column clean-up of the routing root: threshold 10000, keep 0.66.
+    options.cg.column_cleanup_threshold = 10000.;
+    options.cg.column_cleanup_ratio = 0.66;
     options.cg.stabilize = stabilize;
     options.cg.stabilization_max_tree_depth = stabilization_max_tree_depth;
     options.cg.max_iterations = max_iterations;
     options.cg.time_limit = std::time::Duration::try_from_secs_f64(time_limit)
         .map_err(|e| PyValueError::new_err(e.to_string()))?;
-    options.enumerate = enumerate;
-    options.incumbent = upper_bound;
+    options.enumeration = enumerate.then(Default::default);
     options.pricing_options = pricing_options.into_iter().collect();
-    if rank_one_cuts {
-        options = options.with_rank_one_cuts();
-    }
+    options.separation.rank_one.enabled = rank_one_cuts;
+    options.separation.upper_bound = upper_bound.is_finite().then_some(upper_bound);
     if capacity_cuts || two_path_cuts {
-        options = options.with_capacity_cuts(instance.capacity_cut_config(rounding, two_path_cuts));
+        options.separation.capacity = Some(instance.capacity_cut_config(rounding, two_path_cuts));
     }
     if let Some(limit) = max_cut_rounds {
         options.cg.max_cut_rounds = limit;
@@ -228,23 +230,16 @@ pub(super) fn solve_routing(
     // All inputs and the result own their storage. Python can run other threads
     // while the Rust solver and its private Clp master execute.
     let started = std::time::Instant::now();
-    // Node snapshots retain an Rc<ClpMaster> and must stay on the solver
-    // thread. Python consumes only the owned result data, which is Send.
+    // Node snapshots retain their master and must stay on the solver thread.
+    // Python consumes only the owned result data, which is Send.
     struct PythonRootOutput {
         master: baldes::master::cg::Output,
-        routes: Vec<baldes::Route>,
-        values: Vec<f64>,
+        routes: Vec<(f64, baldes::Route)>,
         duals: Vec<f64>,
         incumbent: f64,
-        pricing_seconds: f64,
         oracle_calls: usize,
-        solver_seconds: f64,
-        simplex_iterations: usize,
-        ipm_iterations: usize,
         cuts: usize,
         lp_before_cuts: f64,
-        fixing_calls: usize,
-        enumerated_routes: usize,
     }
     let output = py
         .detach(move || -> baldes::Result<_> {
@@ -254,27 +249,41 @@ pub(super) fn solve_routing(
                 instance.graph(ng, rounding)?
             };
             let n = instance.customers.len() - 1;
-            options.cg.multiplicity = n as f64;
-            let problem = RoutingContext::set_partitioning(graph, n as f64)?;
+            let mut incumbent = upper_bound;
             if let Some(warm) = warm {
-                instance.seed_hgs(&problem, rounding, &mut options, &warm)?;
+                let seed = instance.seed_hgs(
+                    &graph,
+                    rounding,
+                    &warm,
+                    options.cg.log_interval.is_some(),
+                    &[],
+                )?;
+                if let Some(upper) = seed.incumbent {
+                    incumbent = incumbent.min(upper);
+                    options.separation.upper_bound = Some(incumbent);
+                }
+                options.seed_routes = seed
+                    .routes
+                    .into_iter()
+                    .map(|route| model::NetworkRoute { network: 0, route })
+                    .collect();
             }
-            let output = routing::solve(problem, options)?;
+            let problem = model::Problem::set_partitioning(graph, n as f64)?;
+            let output = model::solve(problem, options)?;
             Ok(PythonRootOutput {
-                simplex_iterations: output.simplex_iterations,
-                ipm_iterations: output.ipm_iterations,
-                master: output.master,
-                routes: output.routes,
-                values: output.values,
+                routes: output
+                    .values
+                    .iter()
+                    .zip(&output.routes)
+                    .filter(|(&value, _)| value > 1e-9)
+                    .map(|(&value, route)| (value, route.route.clone()))
+                    .collect(),
                 duals: output.duals,
-                incumbent: output.incumbent,
-                pricing_seconds: output.pricing_seconds,
-                oracle_calls: output.oracle_calls,
-                solver_seconds: output.solver_seconds,
+                incumbent,
+                oracle_calls: output.oracle_calls.iter().map(|(_, calls)| calls).sum(),
                 cuts: output.cuts,
                 lp_before_cuts: output.lp_before_cuts,
-                fixing_calls: output.fixing_calls,
-                enumerated_routes: output.enumerated_routes,
+                master: output.master,
             })
         })
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
@@ -295,8 +304,6 @@ pub(super) fn solve_routing(
     field!("cuts", output.cuts);
     field!("cut_rounds", output.master.cut_rounds);
     field!("iterations", output.master.iterations);
-    field!("simplex_iterations", output.simplex_iterations);
-    field!("ipm_iterations", output.ipm_iterations);
     field!("pricing_calls", output.master.pricing_calls);
     field!("oracle_calls", output.oracle_calls);
     let mut feasibility = Vec::new();
@@ -317,19 +324,11 @@ pub(super) fn solve_routing(
     // Generated columns inserted over the run.
     field!("columns", output.master.inserted_tags.len());
     field!("master_columns", output.master.columns);
-    field!("fixing_calls", output.fixing_calls);
-    field!("enumerated_routes", output.enumerated_routes);
     field!("pruned_by_bound", output.master.pruned_by_bound);
     field!("duals", output.duals);
     field!("seconds", started.elapsed().as_secs_f64());
-    field!("pricing_seconds", output.pricing_seconds);
-    field!("solver_seconds", output.solver_seconds);
     let mut routes = Vec::new();
-    for (&tag, &value) in output.master.column_tags.iter().zip(&output.values) {
-        if tag < 0 || value <= 1e-9 {
-            continue;
-        }
-        let route = &output.routes[tag as usize];
+    for (value, route) in &output.routes {
         let item = PyDict::new(py);
         item.set_item("value", value)?;
         item.set_item("cost", route.original_cost)?;

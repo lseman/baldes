@@ -100,4 +100,4 @@ mod root;
 #[cfg(feature = "clp")]
 mod hgs;
 #[cfg(feature = "clp")]
-pub use hgs::{HgsColumns, HgsSeedSummary, HgsWarmStart};
+pub use hgs::{HgsColumns, HgsSeed, HgsSeedSummary, HgsWarmStart};

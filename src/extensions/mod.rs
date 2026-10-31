@@ -5,8 +5,11 @@
 //! and `robust` the budgeted-uncertainty VRPTW.
 //! These modules remain in the same
 //! crate; this namespace does not introduce runtime plugins or Cargo features.
+pub mod ails_ii;
 /// Decision-diagram arc-flow relaxation with infeasible-prefix refinement.
 pub mod ce;
+/// Route-level operators shared by standalone primal heuristics.
+pub mod common;
 pub mod evrp;
 pub mod hgs;
 pub mod ipm;
