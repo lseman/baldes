@@ -103,6 +103,18 @@ impl DualPriceSmoothing {
             .map_or_else(|| previous.center.clone(), |(center, _)| center.clone());
         self.center_bound = previous.center_bound;
         self.center_phase = phase;
+        // In the automatic schedule a resumed solve (next cut round or child
+        // node) continues from the previous final alpha, floored at the
+        // initial alpha with the usual relative and absolute tolerance.
+        if self.parameters.alpha_factor >= 1. {
+            let floor = self.parameters.initial_alpha;
+            self.alpha = if greater(floor, previous.alpha, self.parameters.tolerance) {
+                floor
+            } else {
+                previous.alpha
+            };
+            self.effective_alpha = self.alpha;
+        }
     }
     pub(crate) fn exclude_rows(&mut self, rows: Vec<usize>) {
         self.excluded_rows = rows;
@@ -189,7 +201,7 @@ impl DualPriceSmoothing {
             return;
         }
         self.effective_alpha = self.alpha;
-        if !self.gap_accepts(gap) || self.alpha <= self.parameters.tolerance {
+        if !self.gap_accepts(gap) || !greater(self.alpha, 0., self.parameters.tolerance) {
             return;
         }
         self.publish(self.effective_alpha, true);
@@ -261,14 +273,21 @@ impl DualPriceSmoothing {
             && !greater(self.parameters.min_gap, gap, self.parameters.tolerance)
     }
     fn publish(&mut self, alpha: f64, directional: bool) {
-        let directional_point =
-            (directional && self.parameters.beta_factor > 0.).then(|| self.directional_point());
+        // The reference clamps row signs only on the directional branch,
+        // that is, once an out point was computed from a nonzero in-out step.
+        let directional_point = (directional && self.parameters.beta_factor > 0.)
+            .then(|| self.directional_point())
+            .flatten();
+        let clamp = directional_point.is_some();
         let outward = directional_point.as_deref().unwrap_or(&self.raw);
         self.pricing.resize(outward.len(), 0.);
         for (i, (price, out)) in self.pricing.iter_mut().zip(outward).enumerate() {
             *price = (1. - alpha) * out + alpha * self.center.get(i).copied().unwrap_or(0.);
         }
         for (pi, sense) in self.pricing.iter_mut().zip(&self.senses) {
+            if !clamp {
+                break;
+            }
             if (*sense == RowSense::LessEqual && *pi > self.parameters.tolerance)
                 || (*sense == RowSense::GreaterEqual && *pi < -self.parameters.tolerance)
             {
@@ -281,7 +300,7 @@ impl DualPriceSmoothing {
             }
         }
     }
-    fn directional_point(&self) -> Vec<f64> {
+    fn directional_point(&self) -> Option<Vec<f64>> {
         let mut out = self.raw.clone();
         let diff: Vec<_> = self
             .raw
@@ -297,18 +316,20 @@ impl DualPriceSmoothing {
             .collect();
         let length = norm(&diff);
         if length <= self.parameters.tolerance {
-            return out;
+            return None;
         }
         let sub_norm = norm(&self.subgradient);
         let mut beta = self.parameters.beta_factor;
         if beta == 1. {
-            // Restarting the schedule invalidates the automatic direction,
-            // even though the previous normalized vector remains stored.
-            if !self.directional_available || sub_norm <= 1e-12 {
-                return out;
-            }
-            let toward: Vec<_> = diff.iter().map(|value| value / length).collect();
-            beta = dot(&toward, &self.subgradient);
+            // Without a valid incumbent subgradient the reference keeps the
+            // directional branch with a zero incumbent angle: the out point
+            // is the raw dual, rescaled, and row signs are still clamped.
+            beta = if !self.directional_available || sub_norm <= 1e-12 {
+                0.
+            } else {
+                let toward: Vec<_> = diff.iter().map(|value| value / length).collect();
+                dot(&toward, &self.subgradient)
+            };
         }
         beta = beta.clamp(0., 1.);
         for (i, v) in out.iter_mut().enumerate() {
@@ -336,7 +357,7 @@ impl DualPriceSmoothing {
                 *v = (step[i] / step_norm) * length + self.center.get(i).copied().unwrap_or(0.);
             }
         }
-        out
+        Some(out)
     }
     fn consider_center(&mut self, f: &Feedback) {
         if !f.lagrangian.is_finite() {
@@ -352,9 +373,10 @@ impl DualPriceSmoothing {
             self.center_phase = f.phase;
         }
         self.center_bound = f.lagrangian;
-        // Without a best pricing solution the reference keeps its normalized
-        // subgradient and accepts the raw master point as the next center.
-        let mut c = if f.subgradient_available {
+        // The reference centers on the point it priced: the smoothed value of
+        // each participating row while smoothing is active, otherwise the raw
+        // master dual. Whether a subgradient is available does not matter.
+        let mut c = if self.active {
             self.pricing.clone()
         } else {
             self.raw.clone()
@@ -372,9 +394,9 @@ impl DualPriceSmoothing {
         }
         self.next_center = Some((c, g));
         self.next_gradient_available = f.subgradient_available;
-        if f.subgradient_available {
-            self.directional_available = true;
-        }
+        // saveNormalizedSubgradientAtIncumbent clears validity before it
+        // recomputes, so a centre without a subgradient has no direction.
+        self.directional_available = f.subgradient_available;
         self.center_moved = true;
     }
 }

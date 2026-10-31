@@ -85,3 +85,17 @@ fn routing_timeout_clears_batch_proof_and_coverage_at_the_current_duals() {
     assert_eq!(state.pricing.correction, None);
     assert_eq!(state.pricing.gradient, None);
 }
+
+#[test]
+fn nonnegative_best_path_weights_the_subgradient_by_upper_multiplicity() {
+    // The reference subtracts the best path with the largest convexity
+    // right-hand side even when its reduced cost is nonnegative; only the
+    // Lagrangian correction switches to the lower multiplicity.
+    let (problem, mut state) = routing();
+    state.pricing.rhs = problem.model.rows.iter().map(|r| r.rhs).collect();
+    let phase = state.solver.phases.iter().position(|p| p.exact()).unwrap();
+    let answer = state.price(&problem, phase, &[0., 0.], 0).unwrap();
+    assert!(answer.exact);
+    assert!(answer.minimum >= 0.);
+    assert_eq!(state.pricing.gradient, Some(vec![0., 0.]));
+}

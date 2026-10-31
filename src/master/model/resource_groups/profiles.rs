@@ -110,6 +110,13 @@ pub(in crate::master::model) fn refresh<const D: usize>(
         // Integer validation is exact-real; a rounded reconstruction failure
         // cannot silently remove an original-feasible path from the universe.
         match crate::master::routing::exact_route_feasibility(domain, &route.route) {
+            // Like the reference's packing-set resource branch, an existing
+            // column is never capped: its Boolean violation coefficient on the
+            // rhs-zero branch row blocks it, and that row's dual reaches
+            // pricing. A zero cap would hide the column from the row while
+            // pricing can still return it, so pricing could never certify the
+            // LP. Synchronized windows have no such row and keep the cap.
+            Some(false) if oracle.synchronized_windows.is_empty() => continue,
             Some(false) => {
                 node.state.route_upper_bounds.insert(tag, 0.);
                 continue;

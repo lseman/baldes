@@ -34,7 +34,7 @@ fn cold_node(policy: NetworkPricingSchedule) -> NodeSnapshot<2> {
 }
 
 #[test]
-fn partial_exact_oracles_never_supply_a_complete_bound_or_stale_gradient() {
+fn partial_exact_oracles_never_supply_a_bound_and_reuse_last_best_paths() {
     for policy in [
         NetworkPricingSchedule::Cyclic,
         NetworkPricingSchedule::Sorted,
@@ -60,7 +60,19 @@ fn partial_exact_oracles_never_supply_a_complete_bound_or_stale_gradient() {
             assert!(!answer.exact);
             assert!(!node.state.scheduler.complete);
             assert_eq!(node.state.correction, None);
-            assert_eq!(node.state.gradient, None);
+            // Like the reference, an unvisited network contributes its last
+            // best path to the stabilization subgradient. Until every network
+            // has one, the subgradient is unknown.
+            if expected_network < 2 {
+                assert_eq!(node.state.gradient, None);
+            } else {
+                let gradient = node.state.gradient.as_ref().unwrap();
+                for oracle in &node.state.oracles {
+                    for &(row, coefficient) in &oracle.route_entries {
+                        assert_eq!(gradient[row], node.state.rhs[row] - coefficient);
+                    }
+                }
+            }
         }
         // Previous visits do not count as coverage at a new dual point. Even
         // identical prices require a complete traversal for a fresh bound.

@@ -56,6 +56,10 @@ pub(crate) struct Scheduler {
     scores: Vec<Option<f64>>,
     /// Coverage of the last batch at its actual dual point, not cached scores.
     pub complete: bool,
+    /// Last best path of each network and its subgradient weight. Like the
+    /// reference's per-subproblem best solution, it persists until that
+    /// network is priced again and stands in when it is not priced.
+    pub(crate) best_paths: Vec<Option<super::BestPath>>,
 }
 
 impl Scheduler {
@@ -75,6 +79,7 @@ impl Scheduler {
             phase: None,
             scores: vec![None; networks],
             complete: false,
+            best_paths: vec![],
         }
     }
 

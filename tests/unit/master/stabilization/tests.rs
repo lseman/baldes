@@ -308,3 +308,116 @@ fn row_remapping_compacts_pending_center_and_handles_short_maps() {
     assert!(smoothing.pricing.is_empty());
     assert_eq!(smoothing.next_center, Some((vec![], vec![])));
 }
+
+#[test]
+fn resumed_automatic_schedule_continues_from_the_floored_previous_alpha() {
+    // Native recordStabilizationInfo/setupStab: a resumed solve (cut round
+    // or child node) starts at max(previous alpha, 0.5) in automatic mode.
+    for (previous, expected) in [(0.55, 0.55), (0.25, 0.5), (0.5 - 5e-7, 0.5 - 5e-7)] {
+        let mut parent = DualPriceSmoothing::default();
+        parent.alpha = previous;
+        let mut child = DualPriceSmoothing::default();
+        child.inherit_center(&parent, 0);
+        assert_eq!(child.alpha, expected);
+    }
+    // A fixed factor below one ignores the recorded alpha.
+    let mut parent = DualPriceSmoothing::new(Parameters {
+        alpha_factor: 0.3,
+        ..Default::default()
+    });
+    parent.alpha = 0.9;
+    let mut child = DualPriceSmoothing::new(Parameters {
+        alpha_factor: 0.3,
+        ..Default::default()
+    });
+    child.inherit_center(&parent, 0);
+    assert_eq!(child.alpha, 0.3f32 as f64);
+}
+
+#[test]
+fn active_smoothing_centers_on_the_priced_point_without_a_subgradient() {
+    // Native updateOnLagrBoundChange centers participating rows on their
+    // smoothed value whether or not a best pricing solution exists.
+    let mut smoothing = DualPriceSmoothing::default();
+    smoothing.center = vec![0., 0.];
+    smoothing.raw = vec![2., 3.];
+    smoothing.pricing = vec![1., 1.5];
+    smoothing.active = true;
+    smoothing.after_pricing(&Feedback {
+        negative_columns: 0,
+        subgradient_available: false,
+        subgradient: vec![1., 1.],
+        lagrangian: 100.,
+        phase: 0,
+    });
+    smoothing.after_master(&[3., 4.], &[RowSense::Equal; 2], 1., 0, false);
+    assert_eq!(smoothing.center, [1., 1.5]);
+}
+
+#[test]
+fn plain_smoothing_does_not_clamp_row_signs() {
+    // recomputeSmoothedValue clamps only on its directional branch.
+    let mut smoothing = DualPriceSmoothing::default();
+    smoothing.center = vec![1.];
+    smoothing.raw = vec![1.];
+    smoothing.senses = vec![RowSense::LessEqual];
+    smoothing.publish(0.5, false);
+    assert_eq!(smoothing.pricing, [1.]);
+    let mut directional = DualPriceSmoothing::new(Parameters {
+        beta_factor: 0.5,
+        ..Parameters::default()
+    });
+    directional.center = vec![1.];
+    directional.raw = vec![2.];
+    directional.senses = vec![RowSense::LessEqual];
+    directional.publish(0.5, true);
+    assert_eq!(directional.pricing, [0.]);
+}
+
+#[test]
+fn automatic_direction_without_incumbent_subgradient_still_clamps() {
+    // With beta factor one and no valid incumbent subgradient the reference
+    // uses a zero incumbent angle: the raw dual on the directional branch.
+    let mut smoothing = DualPriceSmoothing::new(Parameters {
+        beta_factor: 1.,
+        ..Parameters::default()
+    });
+    smoothing.center = vec![0., 1.];
+    smoothing.raw = vec![1., 3.];
+    smoothing.senses = vec![RowSense::Equal, RowSense::LessEqual];
+    smoothing.publish(0.5, true);
+    assert_eq!(smoothing.pricing[0], 0.5);
+    assert_eq!(smoothing.pricing[1], 0.);
+}
+
+#[test]
+fn centre_without_subgradient_invalidates_the_direction() {
+    let mut smoothing = DualPriceSmoothing::new(Parameters {
+        beta_factor: 1.,
+        ..Parameters::default()
+    });
+    smoothing.center = vec![0.];
+    smoothing.raw = vec![1.];
+    smoothing.pricing = vec![1.];
+    for (available, expected) in [(true, true), (false, false)] {
+        smoothing.center_bound = f64::NEG_INFINITY;
+        smoothing.after_pricing(&Feedback {
+            negative_columns: 1,
+            subgradient_available: available,
+            subgradient: vec![1.],
+            lagrangian: 1.,
+            phase: 0,
+        });
+        assert_eq!(smoothing.directional_available, expected);
+    }
+}
+
+#[test]
+fn smoothing_gate_uses_the_relative_and_absolute_zero_test() {
+    for (alpha, active) in [(1e-6, false), (1e-6 + 1e-12, true)] {
+        let mut smoothing = DualPriceSmoothing::default();
+        smoothing.alpha = alpha;
+        smoothing.after_master(&[1.], &[RowSense::Equal], 0., 0, false);
+        assert_eq!(smoothing.active, active, "{alpha}");
+    }
+}

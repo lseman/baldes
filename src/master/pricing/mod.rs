@@ -56,10 +56,41 @@ pub(crate) struct Request {
     pub upper: f64,
     pub envelopes: Envelopes,
 }
+/// Stabilization subgradient weight of a network's best path. The reference
+/// weights it by the largest convexity right-hand side (the upper
+/// multiplicity) whatever the sign of its reduced cost; the Lagrangian
+/// correction keeps the sign-dependent quantity.
+fn gradient_weight(request: &Request, quantity: f64) -> f64 {
+    if request.upper.is_finite() {
+        request.upper
+    } else {
+        quantity
+    }
+}
 pub(crate) struct Collected {
     pub columns: Vec<cg::Column>,
     pub fresh: usize,
     pub best_entries: Option<Vec<(usize, f64)>>,
+    /// The route behind `best_entries`, as returned by the oracle.
+    pub best_route: Option<Route>,
+}
+pub(crate) enum BestSource {
+    /// Coefficients are recomputed from the route at the current rows.
+    Route(Route),
+    /// A retained-domain column, valid while the row count is unchanged.
+    Entries { entries: Vec<(usize, f64)>, rows: usize },
+}
+pub(crate) struct BestPath {
+    pub source: BestSource,
+    pub weight: f64,
+}
+impl Scheduler {
+    fn remember_best(&mut self, index: usize, best: Option<BestPath>) {
+        if self.best_paths.len() <= index {
+            self.best_paths.resize_with(index + 1, || None);
+        }
+        self.best_paths[index] = best;
+    }
 }
 pub(crate) struct Retained {
     /// Independent lower enclosure of the retained domain, including controls
@@ -154,6 +185,10 @@ pub(crate) fn price<const D: usize>(
         let mut used_estimate = false;
         let mut fresh = false;
         let mut visited = 0;
+        // Networks not priced in this batch, with their subgradient weight
+        // when known. Their last best path stands in for the gradient term.
+        let mut handled = vec![];
+        let mut stale: Vec<(usize, Option<f64>)> = vec![];
         for &index in &order {
             if context.deadline.is_some_and(|end| Instant::now() >= end) {
                 return Err(incomplete("network pricing time limit"));
@@ -163,6 +198,8 @@ pub(crate) fn price<const D: usize>(
             if let Some(bound) = admission(&context, &request.envelopes, bounded) {
                 used_estimate |= !bound.zero_quantity;
                 gradient_available &= bound.zero_quantity;
+                handled.push(index);
+                stale.push((index, Some(gradient_weight(&request, 0.))));
                 correction += bound.correction;
                 exact &= request.exact;
                 minimum = minimum.min(bound.minimum);
@@ -219,6 +256,7 @@ pub(crate) fn price<const D: usize>(
                 if network_minimum == f64::INFINITY {
                     network_minimum = 0.;
                 }
+                handled.push(index);
                 if !retained.independent_caps {
                     let quantity = if network_minimum < 0. {
                         request.upper
@@ -226,13 +264,26 @@ pub(crate) fn price<const D: usize>(
                         request.lower
                     };
                     correction += quantity * network_minimum;
-                    if let Some((_, entries)) = best {
-                        for (row, a) in entries {
+                    let weight = gradient_weight(&request, quantity);
+                    if let Some((_, entries)) = &best {
+                        for &(row, a) in entries {
                             *gradient
                                 .get_mut(row)
-                                .ok_or_else(|| invalid("network gradient row"))? -= quantity * a;
+                                .ok_or_else(|| invalid("network gradient row"))? -= weight * a;
                         }
+                    } else if weight != 0. {
+                        gradient_available = false;
                     }
+                    scheduler.remember_best(
+                        index,
+                        best.map(|(_, entries)| BestPath {
+                            source: BestSource::Entries {
+                                entries,
+                                rows: context.rhs.len(),
+                            },
+                            weight,
+                        }),
+                    );
                     retained
                         .columns
                         .sort_by(|(a, _), (b, _)| a.reduced_cost.total_cmp(&b.reduced_cost));
@@ -286,13 +337,26 @@ pub(crate) fn price<const D: usize>(
             correction += quantity * reduced;
             let collected =
                 networks.collect(index, result.columns, request.offset, context.duals)?;
+            handled.push(index);
+            let weight = gradient_weight(&request, quantity);
             if let Some(entries) = collected.best_entries {
                 for (row, value) in entries {
                     *gradient
                         .get_mut(row)
-                        .ok_or_else(|| invalid("network gradient row"))? -= quantity * value;
+                        .ok_or_else(|| invalid("network gradient row"))? -= weight * value;
                 }
+            } else if weight != 0. {
+                // The reference requires a best solution for every
+                // subproblem with a nonzero upper multiplicity.
+                gradient_available = false;
             }
+            scheduler.remember_best(
+                index,
+                collected.best_route.map(|route| BestPath {
+                    source: BestSource::Route(route),
+                    weight,
+                }),
+            );
             fresh |= collected.fresh > 0;
             columns.extend(collected.columns);
             if scheduler.finish_network(index, collected.fresh) {
@@ -304,11 +368,31 @@ pub(crate) fn price<const D: usize>(
         if minimum == f64::INFINITY {
             minimum = 0.;
         }
+        for index in networks.active() {
+            if !handled.contains(&index) {
+                stale.push((index, None));
+            }
+        }
+        if gradient_available {
+            gradient_available =
+                stale_terms(networks, scheduler, &stale, context.duals, &mut gradient)?;
+        }
         if !scheduler.complete {
+            // No Lagrangian bound, but the stabilization subgradient still
+            // follows the reference: the unpriced networks' last best paths.
+            let gradient = gradient_available
+                .then(|| {
+                    let (_, entries) = networks.static_contribution(context.duals)?;
+                    for (row, value) in entries {
+                        *gradient.get_mut(row)? -= value;
+                    }
+                    gradient.iter().all(|v| v.is_finite()).then_some(gradient)
+                })
+                .flatten();
             return Ok(Batch {
                 answer: answer(context.phase, columns, minimum, false),
                 correction: None,
-                gradient: None,
+                gradient,
             });
         }
         let contribution =
@@ -354,6 +438,47 @@ pub(crate) fn price<const D: usize>(
             gradient: contribution.and_then(|_| gradient_available.then_some(gradient)),
         });
     }
+}
+
+/// Subtract the last best path of each network not priced in this batch.
+/// Returns false when such a network has a nonzero weight but no usable path,
+/// so the reference subgradient is unknown.
+fn stale_terms<const D: usize>(
+    networks: &mut impl Networks<D>,
+    scheduler: &Scheduler,
+    stale: &[(usize, Option<f64>)],
+    duals: &[f64],
+    gradient: &mut [f64],
+) -> Result<bool> {
+    for &(index, weight) in stale {
+        let cached = scheduler.best_paths.get(index).and_then(Option::as_ref);
+        let Some(weight) = weight.or(cached.map(|best| best.weight)) else {
+            return Ok(false);
+        };
+        if weight == 0. {
+            continue;
+        }
+        let entries = match cached.map(|best| &best.source) {
+            Some(BestSource::Route(route)) => {
+                networks
+                    .collect(index, vec![route.clone()], 0., duals)?
+                    .best_entries
+            }
+            Some(BestSource::Entries { entries, rows }) if *rows == gradient.len() => {
+                Some(entries.clone())
+            }
+            _ => None,
+        };
+        let Some(entries) = entries else {
+            return Ok(false);
+        };
+        for (row, value) in entries {
+            *gradient
+                .get_mut(row)
+                .ok_or_else(|| invalid("network gradient row"))? -= weight * value;
+        }
+    }
+    Ok(true)
 }
 
 fn answer(phase: usize, columns: Vec<cg::Column>, minimum: f64, exact: bool) -> cg::Answer {

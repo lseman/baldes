@@ -513,7 +513,7 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
         let oracle = &mut self.state.oracles[index];
         let mut columns = vec![];
         let mut new_improving_columns = 0;
-        let mut best: Option<(f64, Vec<(usize, f64)>)> = None;
+        let mut best: Option<(f64, Vec<(usize, f64)>, Route)> = None;
         for mut route in routes {
             let coefficients = entries(oracle, &route, self.state.shared_offset)?;
             let cost = original_costs::route_cost(oracle, &route)?;
@@ -527,9 +527,9 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
             }
             if best
                 .as_ref()
-                .map_or(true, |(value, _)| reduced_cost < *value)
+                .map_or(true, |(value, _, _)| reduced_cost < *value)
             {
-                best = Some((reduced_cost, coefficients.clone()));
+                best = Some((reduced_cost, coefficients.clone(), route.clone()));
             }
             route.original_cost = cost;
             route.cost += offset;
@@ -561,7 +561,8 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
         Ok(crate::master::pricing::Collected {
             columns,
             fresh: new_improving_columns,
-            best_entries: best.map(|(_, entries)| entries),
+            best_route: best.as_ref().map(|(_, _, route)| route.clone()),
+            best_entries: best.map(|(_, entries, _)| entries),
         })
     }
     fn static_contribution(&self, duals: &[f64]) -> Option<(f64, Vec<(usize, f64)>)> {

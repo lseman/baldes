@@ -508,6 +508,16 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                             && !seen.contains(*identity)
                     })
                     .count();
+                if fresh == 0 && std::env::var_os("BALDES_DEBUG_FRESH").is_some() {
+                    for c in answer.columns.iter() {
+                        let mrc = master_reduced_cost(c, &raw);
+                        if mrc < -options.tolerance {
+                            let sig = c.signature();
+                            let idx = loaded.iter().position(|l| l.as_ref().is_some_and(|l| l.signature() == sig));
+                            eprintln!("DEBUGFRESH rc {} master_rc {mrc} loaded {:?} ub {:?} tag {}", c.reduced_cost, idx, idx.map(|i| master.upper()[i]), c.tag);
+                        }
+                    }
+                }
                 if columns_only && fresh == 0 {
                     if controller.retry_exact_pricing() {
                         continue;

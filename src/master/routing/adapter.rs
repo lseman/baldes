@@ -443,9 +443,9 @@ impl<const D: usize> Networks<D> for RoutingAdapter<'_, D> {
             let column = self.state.column(self.problem, &route, duals, tag)?;
             if best
                 .as_ref()
-                .map_or(true, |(value, _)| column.reduced_cost < *value)
+                .map_or(true, |(value, _, _)| column.reduced_cost < *value)
             {
-                best = Some((column.reduced_cost, column.entries.clone()));
+                best = Some((column.reduced_cost, column.entries.clone(), route.clone()));
             }
             fresh += usize::from(
                 is_new && column.reduced_cost < -self.state.pricing.scheduler.tolerance,
@@ -455,7 +455,8 @@ impl<const D: usize> Networks<D> for RoutingAdapter<'_, D> {
         Ok(Collected {
             columns,
             fresh,
-            best_entries: best.map(|(_, entries)| entries),
+            best_route: best.as_ref().map(|(_, _, route)| route.clone()),
+            best_entries: best.map(|(_, entries, _)| entries),
         })
     }
 }

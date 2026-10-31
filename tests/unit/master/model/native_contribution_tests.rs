@@ -61,11 +61,29 @@ fn finite_network_batches_replay_native_contributions_and_zero_cost_quantities()
             .sum();
         assert_eq!(node.state.correction, Some(expected));
         assert_eq!(root.master.lp, expected);
+        // A network admitted by its variable box has no best path, so the
+        // reference subgradient (upper multiplicity times that path) is
+        // unknown and the batch publishes none.
+        let admitted = pair.iter().any(|case| {
+            case["cost"].as_f64().unwrap() >= 0. && case["lower"].as_f64().unwrap() == 0.
+        });
+        if admitted {
+            assert!(node.state.gradient.is_none());
+            continue;
+        }
         let gradient = node.state.gradient.as_ref().unwrap();
+        // The contribution uses the sign-dependent quantity, but the
+        // stabilization subgradient weights the best path by the upper
+        // multiplicity (largest convexity right-hand side) regardless of sign.
         for (oracle, case) in node.state.oracles.iter().zip(pair) {
-            let quantity = case["native"]["quantity"].as_f64().unwrap();
+            let upper = case["upper"].as_f64().unwrap();
+            let weight = if upper.is_finite() {
+                upper
+            } else {
+                case["native"]["quantity"].as_f64().unwrap()
+            };
             for &(row, coefficient) in &oracle.route_entries {
-                assert_eq!(gradient[row], node.state.rhs[row] - quantity * coefficient);
+                assert_eq!(gradient[row], node.state.rhs[row] - weight * coefficient);
             }
         }
     }
