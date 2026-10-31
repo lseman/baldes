@@ -208,7 +208,14 @@ pub(super) fn recover<const D: usize>(
                 break;
             }
         }
-        let complete_exact = answer.exact && state.scheduler.complete;
+        // Coupled resources change the phase-I pricing program (charges are
+        // suppressed), so exhaustion there is not an original-domain proof.
+        let complete_exact = answer.exact
+            && state.scheduler.complete
+            && !state
+                .oracles
+                .iter()
+                .any(|o| o.network.graph.has_coupled_resources());
         let mut inserted = 0;
         for column in answer.columns {
             if !column.acceptable || column.reduced_cost >= -tolerance || !seen.insert(column.tag) {
