@@ -3,6 +3,7 @@ mod completion;
 mod configuration;
 mod construction;
 mod cuts;
+mod feasibility;
 mod fixing_workflow;
 mod lifecycle;
 mod presence;
@@ -23,6 +24,7 @@ use crate::cuts::CutRegistry;
 use crate::enumeration::{self, Enumeration};
 use crate::labeling::engine::{EngineControls, LabelingEngine};
 use crate::{incomplete, invalid, Controls, Graph, PricingResult, Result};
+pub use feasibility::EnumerationFeasibilityCheck;
 use std::sync::Arc;
 use std::time::Duration;
 #[derive(Debug)]
@@ -82,4 +84,5 @@ pub struct Solver<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
         Vec<FullKPathInput>,
     ),
     cut_input_source: Option<Arc<state::CutInputSource>>,
+    enumeration_feasibility: Option<Arc<dyn EnumerationFeasibilityCheck>>,
 }

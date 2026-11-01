@@ -52,3 +52,25 @@ fn beta_epigraph_matches_two_support_planes_and_allows_negative_beta() {
         assert!((private.objective() - expected).abs() < 1e-7);
     }
 }
+
+#[test]
+fn support_plane_order_matches_captured_native_comparator() {
+    let capture: serde_json::Value =
+        serde_json::from_str(include_str!("native_sort_capture.json")).unwrap();
+    let cases = capture["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 712);
+    let plane = |value: &serde_json::Value| SupportPlane {
+        point: vec![],
+        dual_activity: f64::from_bits(value[0].as_u64().unwrap()),
+        protected_center: value[1].as_bool().unwrap(),
+        zero_age: value[2].as_u64().unwrap() as u32,
+        creation_id: value[3].as_u64().unwrap(),
+    };
+    for (index, case) in cases.iter().enumerate() {
+        assert_eq!(
+            precedes(&plane(&case["b"]), &plane(&case["a"])),
+            case["b_precedes_a"].as_bool().unwrap(),
+            "case {index}"
+        );
+    }
+}

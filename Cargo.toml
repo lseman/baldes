@@ -75,6 +75,11 @@ serde = { version = "=1.0.204", features = ["derive"], optional = true }
 # Preserve the crate MSRV for the optional JSON front end.
 serde_json = { version = "=1.0.122", features = ["float_roundtrip"], optional = true }
 
+[dev-dependencies]
+# Binary-capture regressions are also exercised without native LP backends.
+serde = { version = "=1.0.204", features = ["derive"] }
+serde_json = { version = "=1.0.122", features = ["float_roundtrip"] }
+
 [build-dependencies]
 cc = { version = "1", features = ["parallel"], optional = true }
 pkg-config = { version = "0.3", optional = true }

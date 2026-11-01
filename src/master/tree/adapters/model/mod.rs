@@ -4,12 +4,14 @@ use super::*;
 mod adapter;
 mod branching;
 mod diving;
+mod fixed_solution_cuts;
 mod greedy;
 mod integer_objective;
 mod local_search;
 mod parallel;
 mod primal_callbacks;
 pub use diving::DivingOptions;
+pub use fixed_solution_cuts::{FixedSolutionCut, FixedSolutionInput, FixedSolutionSeparator};
 pub use local_search::LocalSearchOptions;
 pub use primal_callbacks::{
     PrimalHeuristic, PrimalHeuristicInput, PrimalHeuristicSolution, PrimalHeuristicSource,
@@ -145,6 +147,8 @@ pub struct ModelTreeOptions {
     pub greedy: bool,
     /// Application-defined primal candidates, replayed before acceptance.
     pub primal_heuristics: Vec<PrimalHeuristic>,
+    /// User presence cuts separated before a dive child evaluates its fixed solution.
+    pub fixed_solution_separators: Vec<FixedSolutionSeparator>,
     /// Random incumbent partial-column fixing and child diving; disabled by default.
     pub local_search: Option<LocalSearchOptions>,
     /// Restricted-master integer heuristic; disabled by default, as in native.
@@ -251,6 +255,7 @@ impl Default for ModelTreeOptions {
             diving: None,
             greedy: false,
             primal_heuristics: vec![],
+            fixed_solution_separators: vec![],
             local_search: None,
             restricted_master_mip: None,
             absolute_gap: 1e-6,
@@ -783,6 +788,13 @@ fn solve_split<const D: usize>(
                 .map(|o| (o.network.id, o.network.graph.as_ref())),
             &node.state.master_variables,
         )?,
+    }
+    if options
+        .fixed_solution_separators
+        .iter()
+        .any(|s| s.name.trim().is_empty())
+    {
+        return Err(invalid("fixed-solution separator name must be nonempty"));
     }
     let mut class_names = HashSet::new();
     for class in &options.component_classes {

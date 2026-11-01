@@ -940,3 +940,102 @@ fn raw_objective_round_reports_unrepresentable_refinement_without_losing_search(
 }
 
 mod load_completion;
+
+#[test]
+fn enumeration_feasibility_filters_retained_paths_and_survives_node_forks() {
+    #[derive(Debug)]
+    struct RejectVertexOne;
+    impl baldes::pricing::EnumerationFeasibilityCheck for RejectVertexOne {
+        fn is_feasible(&self, route: &baldes::Route) -> baldes::Result<bool> {
+            assert_eq!(route.nodes.len(), route.arcs.len() + 1);
+            assert_eq!(route.resource_profile.len(), route.nodes.len());
+            Ok(!route.nodes.contains(&1))
+        }
+    }
+    let mut solver = baldes::pricing::Solver::<2>::new(4, 1).unwrap();
+    solver.graph = graph(
+        4,
+        1,
+        &[
+            (0, 1, -3., 1.),
+            (1, 3, 0., 1.),
+            (0, 2, -1., 1.),
+            (2, 3, 0., 1.),
+        ],
+    );
+    solver.set_enumeration_feasibility_check(Some(std::sync::Arc::new(RejectVertexOne)));
+    // Ordinary labeling retains its original domain and exact minimum.
+    assert_eq!(
+        solver
+            .price_phase(0, 10, false)
+            .unwrap()
+            .minimum_reduced_cost,
+        -3.
+    );
+    let mut child = solver.fork_for_node();
+    let routes = child.enumerate(0.).unwrap();
+    assert_eq!(routes.len(), 1);
+    assert_eq!(routes[0].nodes, [0, 2, 3]);
+    let retained = child.price_phase(0, 10, false).unwrap();
+    assert!(retained.exact);
+    assert_eq!(retained.minimum_reduced_cost, -1.);
+    assert_eq!(retained.columns.len(), 1);
+    assert_eq!(solver.enumerate(0.).unwrap().len(), 1);
+    child.set_enumeration_feasibility_check(None);
+    assert!(child.enumeration.is_none());
+    assert_eq!(child.enumerate(0.).unwrap().len(), 2);
+    assert_eq!(
+        solver
+            .price_phase(0, 10, false)
+            .unwrap()
+            .minimum_reduced_cost,
+        -1.
+    );
+}
+
+#[test]
+fn failed_enumeration_feasibility_check_does_not_publish_a_partial_universe() {
+    #[derive(Debug)]
+    struct FailingCheck;
+    impl baldes::pricing::EnumerationFeasibilityCheck for FailingCheck {
+        fn is_feasible(&self, _: &baldes::Route) -> baldes::Result<bool> {
+            Err(baldes::core::error::OrError {
+                kind: baldes::core::error::ErrorKind::Runtime,
+                message: "application feasibility failed".into(),
+            })
+        }
+    }
+    let mut solver = baldes::pricing::Solver::<2>::new(2, 0).unwrap();
+    solver.graph.add_arc(0, 1, -1.).unwrap();
+    solver.set_enumeration_feasibility_check(Some(std::sync::Arc::new(FailingCheck)));
+    assert!(solver
+        .enumerate(0.)
+        .unwrap_err()
+        .to_string()
+        .contains("application feasibility failed"));
+    assert!(solver.enumeration.is_none());
+}
+
+#[test]
+fn enumeration_feasibility_distinguishes_parallel_physical_arc_paths() {
+    #[derive(Debug)]
+    struct RejectFirstArc;
+    impl baldes::pricing::EnumerationFeasibilityCheck for RejectFirstArc {
+        fn is_feasible(&self, route: &baldes::Route) -> baldes::Result<bool> {
+            Ok(!route.arcs.contains(&71))
+        }
+    }
+    let mut solver = baldes::pricing::Solver::<2>::new(2, 0).unwrap();
+    solver.graph.add_arc(0, 1, -3.).unwrap();
+    solver.graph.add_arc(0, 1, -1.).unwrap();
+    // Public IDs are sparse and reversed relative to physical vector slots.
+    solver.graph.arcs[0].id = 71;
+    solver.graph.arcs[1].id = 19;
+    solver.set_enumeration_feasibility_check(Some(std::sync::Arc::new(RejectFirstArc)));
+    let routes = solver.enumerate(0.).unwrap();
+    assert_eq!(routes.len(), 1);
+    assert_eq!(routes[0].arcs, [19]);
+    let retained = solver.price_phase(0, 10, false).unwrap();
+    assert!(retained.exact);
+    assert_eq!(retained.minimum_reduced_cost, -1.);
+}

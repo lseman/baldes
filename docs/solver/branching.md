@@ -403,3 +403,12 @@ visits, validates the original integer solution, and accepts only improving
 candidates. Enumerated callbacks run only when a retained pattern domain is
 available; their input identifies any objective cutoff limiting that domain.
 Callbacks must be `Send + Sync` and are runtime Rust registrations.
+
+Rust applications can register `FixedSolutionSeparator` values through
+`ModelTreeOptions::fixed_solution_separators` (empty by default). They run before
+dive child column generation, including local search, and receive separate
+residual and fixed route lists. Fixed identities are excluded entirely from the
+residual list; static variables are omitted. Returned `FixedSolutionCut` rows
+use the presence-row installer, including fixed RHS adjustment and future
+pricing events. The separator author owns cut validity; descriptor coordinates
+and finite priorities are checked. This hook does not run during greedy search.

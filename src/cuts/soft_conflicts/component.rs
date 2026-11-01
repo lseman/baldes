@@ -1,20 +1,23 @@
 //! Whole-column classes over sparse integer additive coordinates.
 use super::*;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "clp", derive(serde::Serialize, serde::Deserialize))]
 pub enum ComponentSense {
     GreaterEqual,
     LessEqual,
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "clp", derive(serde::Serialize, serde::Deserialize))]
 pub struct ComponentBound {
     pub coordinate: usize,
     pub threshold: f64,
     pub sense: ComponentSense,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "clp", derive(serde::Serialize, serde::Deserialize))]
 pub struct ComponentSequence {
     pub bounds: Vec<ComponentBound>,
 }

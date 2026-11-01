@@ -47,6 +47,7 @@ impl<const D: usize> Solver<D> {
             presence_pricing: Default::default(),
             applied_cuts: (vec![], vec![], vec![], vec![]),
             cut_input_source: None,
+            enumeration_feasibility: None,
         })
     }
     /// Independent node state: keep fixing, NG, cuts, options and complete
@@ -142,6 +143,7 @@ impl<const D: usize> Solver<D> {
             presence_pricing: self.presence_pricing.clone(),
             applied_cuts: self.applied_cuts.clone(),
             cut_input_source: self.cut_input_source.clone(),
+            enumeration_feasibility: self.enumeration_feasibility.clone(),
         }
     }
 }

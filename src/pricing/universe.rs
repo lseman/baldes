@@ -69,6 +69,7 @@ impl<const D: usize> Solver<D> {
             max_route_arcs: self.controls.max_route_arcs,
             preserve_arc_paths: self.enumeration_preserve_arc_paths
                 || !self.ryan_foster.is_empty()
+                || self.enumeration_feasibility.is_some()
                 || self.presence_pricing.active(),
             // Dominance needs only one working partition. Path export tracks
             // native hash activation and candidate order independently.
@@ -223,7 +224,7 @@ impl<const D: usize> Solver<D> {
         if enumeration_started.elapsed() > controls.time_limit {
             return Err(incomplete("enumeration time limit exceeded"));
         }
-        let routes = match universe.paths.routes_until(
+        let mut routes = match universe.paths.routes_until(
             &self.graph,
             Some((enumeration_started, controls.time_limit)),
         ) {
@@ -235,6 +236,39 @@ impl<const D: usize> Solver<D> {
                 return Err(error);
             }
         };
+        if let Some(check) = &self.enumeration_feasibility {
+            let positions: std::collections::HashMap<_, _> = self
+                .graph
+                .arcs
+                .iter()
+                .enumerate()
+                .map(|(position, arc)| (arc.id, position))
+                .collect();
+            let mut accepted = std::collections::HashSet::new();
+            let mut checked = Vec::with_capacity(routes.len());
+            for route in routes {
+                if enumeration_started.elapsed() > controls.time_limit {
+                    return Err(incomplete("enumeration time limit exceeded"));
+                }
+                if check.is_feasible(&route)? {
+                    accepted.insert(
+                        route
+                            .arcs
+                            .iter()
+                            .map(|id| {
+                                positions
+                                    .get(id)
+                                    .copied()
+                                    .ok_or_else(|| invalid("unknown enumerated route arc"))
+                            })
+                            .collect::<Result<Vec<_>>>()?,
+                    );
+                    checked.push(route);
+                }
+            }
+            universe.paths.retain(|path| accepted.contains(&path.arcs));
+            routes = checked;
+        }
         if enumeration_started.elapsed() > controls.time_limit {
             return Err(incomplete("enumeration time limit exceeded"));
         }

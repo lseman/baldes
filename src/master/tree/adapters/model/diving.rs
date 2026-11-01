@@ -281,7 +281,7 @@ pub(super) fn run_with_residuals<const D: usize>(
                         if Instant::now() >= end || dive.nodes >= config.node_limit {
                             break;
                         }
-                        match solve_child(&node, options, config, best, end) {
+                        match solve_child(&node, options, config, best, end, &entry.residuals) {
                             Ok(output) => {
                                 dive.count(&output);
                                 output
@@ -368,6 +368,7 @@ fn solve_child<const D: usize>(
     config: &DivingOptions,
     best: f64,
     end: Instant,
+    residuals: &Residuals,
 ) -> Result<Output<D>> {
     let mut configured = options.node.clone();
     configured.fixing_upper_bound = best.is_finite().then_some(best);
@@ -376,7 +377,13 @@ fn solve_child<const D: usize>(
         .cg
         .time_limit
         .min(end.saturating_duration_since(Instant::now()));
-    node.solve(configured)
+    let prepared =
+        fixed_solution_cuts::prepare(node, options, residuals.values().any(|q| *q != 0.))?;
+    configured.cg.time_limit = configured
+        .cg
+        .time_limit
+        .min(end.saturating_duration_since(Instant::now()));
+    prepared.as_ref().unwrap_or(node).solve(configured)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -467,7 +474,7 @@ fn children<const D: usize>(
         let Ok(child) = fix_variable(parent, tag, value, &mut child_residuals) else {
             continue;
         };
-        match solve_child(&child, options, config, best, end) {
+        match solve_child(&child, options, config, best, end, &child_residuals) {
             Ok(solved) => {
                 dive.count(&solved);
                 if solved.master.status == cg::Status::Optimal

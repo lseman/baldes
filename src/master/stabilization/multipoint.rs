@@ -61,7 +61,12 @@ fn precedes(a: &SupportPlane, b: &SupportPlane) -> bool {
         return a.protected_center;
     }
     let scale = a.dual_activity.abs().max(b.dual_activity.abs());
-    if (a.dual_activity - b.dual_activity).abs() > scale * 1e-6 + 1e-6 {
+    // Native equality compares both subtraction orders. At large activities,
+    // abs(a-b) can disagree at an adjacent binary64 boundary.
+    let equality_margin = scale * 1e-6 + 1e-6;
+    if a.dual_activity < b.dual_activity - equality_margin
+        || b.dual_activity < a.dual_activity - equality_margin
+    {
         return b.dual_activity < a.dual_activity - (scale * 1e-10 + 1e-6);
     }
     if a.zero_age != b.zero_age {

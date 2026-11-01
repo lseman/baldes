@@ -121,7 +121,8 @@ pub fn solve<I: TreeInput>(input: I, options: I::Options) -> crate::Result<I::Ou
 }
 
 pub use crate::master::model::tree_adapter::{
-    DivingOptions, LocalSearchOptions, ModelTreeOptions, ModelTreeOutput, NetworkBranchDirection,
+    DivingOptions, FixedSolutionCut, FixedSolutionInput, FixedSolutionSeparator,
+    LocalSearchOptions, ModelTreeOptions, ModelTreeOutput, NetworkBranchDirection,
     NetworkBranchPriorities, NetworkBranchingPolicy, PrimalHeuristic, PrimalHeuristicInput,
     PrimalHeuristicSolution, PrimalHeuristicSource, RestrictedMasterMip,
 };

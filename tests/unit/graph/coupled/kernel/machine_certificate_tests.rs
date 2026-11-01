@@ -169,7 +169,7 @@ fn general_native_raw_certificates_match_independent_nonlattice_machine_programs
             }])
             .unwrap();
         if spec.scale == 0. {
-            graph.suppress_coupled_costs();
+            graph.coupled.as_mut().unwrap().suppress_costs();
         }
         // Fixtures describe the explicitly selected MACHINE feasibility
         // model. Its scope cannot silently replace a default source witness.
@@ -236,7 +236,7 @@ fn machine_feasibility_requires_explicit_model_choice_and_survives_cloning() {
         Some((true, [3., 3.]))
     );
     let mut child = graph.clone();
-    child.suppress_coupled_costs();
+    child.coupled.as_mut().unwrap().suppress_costs();
     assert!(child.front_program_domain());
     assert_eq!(
         child.coupled_kernel().unwrap().certify(&[0]),
@@ -301,6 +301,7 @@ fn machine_component_points_do_not_turn_rounded_aggregate_costs_into_exact_point
 }
 
 #[test]
+#[cfg(feature = "clp")]
 fn source_objective_walk_relaxation_never_overbounds_native_machine_costs() {
     for policy in [
         FrontOperationPolicy::StrictDomain,

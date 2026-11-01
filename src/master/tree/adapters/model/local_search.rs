@@ -242,6 +242,13 @@ fn child_dive<const D: usize>(
         .cg
         .time_limit
         .min(end.saturating_duration_since(Instant::now()));
+    let child =
+        fixed_solution_cuts::prepare(&child, options, residuals.values().any(|q| *q != 0.))?
+            .unwrap_or(child);
+    node_options.cg.time_limit = node_options
+        .cg
+        .time_limit
+        .min(end.saturating_duration_since(Instant::now()));
     let solved = match child.solve(node_options) {
         Ok(output) => output,
         Err(error)

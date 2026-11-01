@@ -103,3 +103,49 @@ fn automatic_initialization_waits_for_mean_and_widens_stored_kappa() {
         assert_eq!(state.inner_radius, five_piece.then_some(4.));
     }
 }
+
+include!("native_capture.rs");
+
+#[test]
+fn curvature_updates_and_bands_match_captured_native_kernel() {
+    for (index, &(five_piece, bits)) in CURVATURE_CAPTURE.iter().enumerate() {
+        let values = bits.map(f64::from_bits);
+        let mut state = CurvatureState {
+            outer_radius: values[0],
+            inner_radius: five_piece.then_some(values[1]),
+            curvature: values[3],
+        };
+        state
+            .update(CurvatureFeedback {
+                mean_dual_distance: Some(values[2]),
+                advance_rate: values[4],
+            })
+            .unwrap();
+        assert_eq!(state.outer_radius.to_bits(), bits[5], "outer case {index}");
+        if five_piece {
+            assert_eq!(
+                state.inner_radius.unwrap().to_bits(),
+                bits[6],
+                "inner case {index}"
+            );
+        }
+        let mut expected = vec![];
+        for (width, cap) in [(values[7], values[8]), (values[9], values[10])] {
+            if cap > 0. {
+                expected.push((width, cap));
+            }
+        }
+        expected.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let parameters = state.bands().unwrap();
+        let actual = parameters.as_ref().map_or(&[][..], |p| p.bands.as_slice());
+        assert_eq!(actual.len(), expected.len(), "band count case {index}");
+        for (band, (width, cap)) in actual.iter().zip(expected) {
+            assert_eq!(
+                band.half_width.to_bits(),
+                width.to_bits(),
+                "width case {index}"
+            );
+            assert_eq!(band.penalty.to_bits(), cap.to_bits(), "cap case {index}");
+        }
+    }
+}
