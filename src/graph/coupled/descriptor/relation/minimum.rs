@@ -71,7 +71,7 @@ impl PairedFrontOperations {
                     bv
                 } else {
                     previous_order = -1;
-                    (bv + ((ax - bx) * slope))
+                    bv + ((ax - bx) * slope)
                 }
             };
             let mut choose_a = av <= b_start;
@@ -579,7 +579,7 @@ impl PairedFrontOperations {
                     j += 1;
                     bv
                 } else {
-                    (bv + ((ax - bx) * slope))
+                    bv + ((ax - bx) * slope)
                 }
             };
             let mut active = b_start < av || near(av, b_start)?;
