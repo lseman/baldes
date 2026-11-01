@@ -71,7 +71,7 @@ impl<const D: usize> Solver<D> {
         }
         if let Some(source) = self.cut_input_source.as_ref().filter(|source| {
             source.matches(&self.cuts, &self.graph, self.exact_cut_duals)
-                && self.engine.as_ref().map_or(true, |engine| {
+                && self.engine.as_ref().is_none_or(|engine| {
                     engine.cut_structure_matches(&self.applied_cuts.0, &self.applied_cuts.1)
                 })
         }) {

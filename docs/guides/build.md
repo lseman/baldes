@@ -4,8 +4,8 @@
 
 ## Direct Cargo builds
 
-Install Rust/Cargo and clone the repository. The core library can be built
-without an external LP backend:
+Install Rust/Cargo 1.89 or newer and clone the repository. The core library can
+be built without an external LP backend:
 
 ```sh
 cargo build --release

@@ -146,7 +146,7 @@ pub fn sort<T: Clone, F: Fn(&T, &T) -> bool>(v: &mut [T], less: F) {
 }
 
 /// libstdc++ `std::stable_sort` with the temporary buffer it normally gets
-/// ((len + 1) / 2 elements): chunked insertion sort, then buffered merges.
+/// (`len.div_ceil(2)` elements): chunked insertion sort, then buffered merges.
 /// Equivalent elements under a tolerant comparator end where this algorithm
 /// leaves them.
 pub fn stable_sort<T: Clone, F: Fn(&T, &T) -> bool>(v: &mut [T], less: F) {
@@ -163,7 +163,7 @@ pub(crate) fn stable_sort_with_buffer<T: Clone, F: Fn(&T, &T) -> bool>(
     if len < 2 {
         return;
     }
-    let half = (len + 1) / 2;
+    let half = len.div_ceil(2);
     let (left, right) = v.split_at_mut(half);
     merge_sort_with_buffer(left, buffer, &less);
     merge_sort_with_buffer(right, buffer, &less);

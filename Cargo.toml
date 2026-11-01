@@ -6,7 +6,7 @@ resolver = "2"
 name = "baldes"
 version = "2.0.3"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.89"
 description = "BALDES 2.0: bucket-graph labeling RCSP solver and branch-cut-and-price root, written in Rust"
 license = "MIT"
 repository = "https://github.com/lseman/baldes"
@@ -65,14 +65,12 @@ highs = ["dep:pkg-config"]
 gurobi = []
 
 [dependencies]
-# Keep the CPU pool compatible with Rust 1.70.
+# Pinned versions keep dependency behavior consistent across builds.
 rayon = "=1.10.0"
 rayon-core = "=1.12.1"
 ndarray = { version = "=0.16.1", optional = true, default-features = false, features = ["std"] }
-# matrixmultiply 0.3.11 requires Rust 1.75; preserve this crate's Rust 1.70 MSRV.
 matrixmultiply = { version = "=0.3.10", optional = true, default-features = false, features = ["std"] }
 serde = { version = "=1.0.204", features = ["derive"], optional = true }
-# Preserve the crate MSRV for the optional JSON front end.
 serde_json = { version = "=1.0.122", features = ["float_roundtrip"], optional = true }
 
 [dev-dependencies]

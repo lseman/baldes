@@ -91,7 +91,7 @@ impl<const D: usize> LabelStorage<D> {
         }
         let retained_fronts = g
             .coupled_kernel()
-            .map_or(false, |k| k.retains_cost_components());
+            .is_some_and(|k| k.retains_cost_components());
         let (cached_words, pending_words) = if retained_fronts || strict_signed {
             // Rounded common future costs can shrink the current mixed-key
             // gap. Do not spend that gap on different future cut behavior or

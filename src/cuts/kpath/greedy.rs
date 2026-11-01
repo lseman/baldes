@@ -8,7 +8,7 @@ impl Separation {
         let tol = self.params.violation_tolerance;
         // C++ vector<bool> has word-aligned capacity (multiples of 64 bits);
         // index n (the "no element" marker) is inside that capacity when n % 64 != 0.
-        let elem_cap = ((n + 63) / 64).max(1) * 64;
+        let elem_cap = n.div_ceil(64).max(1) * 64;
         for seed in 0..n {
             if self.demands[seed] == 0.0 {
                 continue;

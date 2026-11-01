@@ -4,7 +4,7 @@
 
 ## Install from a checkout
 
-The source package requires Python 3.9+, Rust/Cargo 1.85+, Git, and a C++14
+The source package requires Python 3.9+, Rust/Cargo 1.89+, Git, and a C++14
 compiler for the default Clp build. Package construction uses maturin.
 Use a virtual environment so the interpreter used to install is also the one
 that imports the extension:

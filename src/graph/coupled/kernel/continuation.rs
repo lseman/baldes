@@ -12,11 +12,10 @@ struct Step {
 impl Drop for Step {
     fn drop(&mut self) {
         let mut next = self.next.take();
-        while let Some(step) = next {
-            match Arc::try_unwrap(step) {
-                Ok(mut step) => next = step.next.take(),
-                Err(_) => break,
-            }
+        // Consume each reference once. Concurrent owners using into_inner
+        // leave exactly one owner to continue draining the shared tail.
+        while let Some(mut step) = next.and_then(Arc::into_inner) {
+            next = step.next.take();
         }
     }
 }
@@ -118,3 +117,7 @@ impl std::fmt::Debug for Continuation {
         f.debug_list().entries(self.iter()).finish()
     }
 }
+
+#[cfg(test)]
+#[path = "../../../../tests/unit/graph/coupled/kernel/continuation_tests.rs"]
+mod tests;

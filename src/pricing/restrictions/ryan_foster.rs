@@ -107,7 +107,7 @@ impl RyanFosterResources {
         Ok(result)
     }
     pub fn can_visit(&self, state: &BranchState, vertex: usize) -> bool {
-        state.as_ref().map_or(true, |words| {
+        state.as_ref().is_none_or(|words| {
             self.vertices[vertex]
                 .iter()
                 .all(|op| op.toggle || words[op.resource / 32] & (1 << (op.resource % 32)) == 0)
@@ -135,7 +135,7 @@ impl RyanFosterResources {
     pub fn accepts(&self, state: &BranchState) -> bool {
         state
             .as_ref()
-            .map_or(true, |w| (0..16).all(|i| w[i] & self.parity[i] == 0))
+            .is_none_or(|w| (0..16).all(|i| w[i] & self.parity[i] == 0))
     }
     pub fn joins(&self, a: &BranchState, b: &BranchState) -> bool {
         if self.resources == 0 {

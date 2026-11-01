@@ -49,10 +49,7 @@ impl RetainedColumn {
                 Ok(mut columns) => columns[index].take().unwrap(),
                 Err(columns) => columns[index].as_ref().unwrap().clone(),
             },
-            Self::Edited(column) => match Arc::try_unwrap(column) {
-                Ok(column) => column,
-                Err(column) => (*column).clone(),
-            },
+            Self::Edited(column) => Arc::unwrap_or_clone(column),
         }
     }
 }

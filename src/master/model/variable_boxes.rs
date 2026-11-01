@@ -184,7 +184,7 @@ impl WalkProof {
     }
 
     fn within_cap(&self, length: Option<usize>) -> bool {
-        length.is_some_and(|length| self.cap.map_or(true, |cap| length <= cap))
+        length.is_some_and(|length| self.cap.is_none_or(|cap| length <= cap))
     }
 
     fn minimum(&self, position: usize) -> Option<usize> {

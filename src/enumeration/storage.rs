@@ -53,7 +53,7 @@ impl<const D: usize> Storage<D> {
             return false;
         };
         if g.coupled_kernel()
-            .map_or(false, |k| k.retains_cost_components())
+            .is_some_and(|k| k.retains_cost_components())
         {
             if a.cut_cost > b.cut_cost || a.cut_words != b.cut_words {
                 return false;

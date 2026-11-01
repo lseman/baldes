@@ -4,7 +4,7 @@ impl Separation {
     pub(super) fn connected_components(&self, out: &mut CandidateSet) {
         let m = self.columns.len();
         let n = self.n;
-        let col_cap = ((self.num_columns + 63) / 64).max(1) * 64;
+        let col_cap = self.num_columns.div_ceil(64).max(1) * 64;
         let mut column_added = vec![false; col_cap.max(self.num_columns + 1)];
         let mut comp_cols: Vec<RouteColumn> = Vec::new();
         let mut column_visited = vec![false; col_cap.max(self.num_columns + 1)];
