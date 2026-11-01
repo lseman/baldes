@@ -44,6 +44,27 @@ def triangle():
     return NetworkProblem.from_file(FIXTURE)
 
 
+@pytest.mark.parametrize("standard_count", [0, 2])
+def test_implicit_paired_bucket_width_reaches_fresh_and_resumed_solves(standard_count):
+    fixture = FIXTURE.parent / "paired_piecewise_linear.json"
+    data = json.loads(fixture.read_text())
+    network = data["networks"][0]
+    network["resources"] = [
+        {"kind": "disposable", "bounds": [[0.0, 10.0]] * 4}
+        for _ in range(standard_count)
+    ]
+    for arc in network["arcs"]:
+        arc["consumption"] = [0.0] * standard_count
+    network["paired_front_programs"][0]["vertex_bounds"] = [[0.0, 8.0]] * 4
+    model = NetworkProblem.from_json(json.dumps(data))
+    options = dict(bucket_steps=(1.0,), stabilize=False, artificial_cost=100.0,
+                   pricing_options={"BALDESlabelDominanceStrategy": 1.0})
+    root = model.solve(**options)
+    for result in (root, root.snapshot.solve(**options)):
+        assert result.status == "Optimal"
+        assert result.lp == pytest.approx(8.0)
+
+
 def test_local_search_partial_incumbent_dives_reach_the_public_network_tree():
     disabled = triangle().solve(tree=True, stabilize=False, node_limit=1, local_search={})
     assert disabled.diving_nodes == 0
@@ -169,6 +190,8 @@ def test_assignment_tree_and_limits(bound_mode):
     assert result.bound == pytest.approx(2)
     assert result.nodes == 6 and result.open_nodes == 0
     assert result.tree_processed_nodes == 7
+    assert result.parallel_batches == 0
+    assert json.loads(result.to_json())["parallel_batches"] == 0
     assert result.strong_branching_trials == 0
     assert result.pricing_calls > 0
     assert {n for n, calls in result.oracle_calls if calls} == {7, 42}

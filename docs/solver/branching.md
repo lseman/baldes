@@ -404,6 +404,26 @@ candidates. Enumerated callbacks run only when a retained pattern domain is
 available; their input identifies any objective cutoff limiting that domain.
 Callbacks must be `Send + Sync` and are runtime Rust registrations.
 
+`ModelTreeOptions.master_heuristic` registers an optional
+`MasterHeuristic::new(name, callback)` before each ordinary or local-search
+dive child evaluates. Its `MasterHeuristicInput.routes` contains the retained
+LP's generated route columns, excluding static values and fixed contributions.
+`fixed_routes` exposes the child's fixed generated columns separately.
+`master_variables` exposes each static coordinate's original ID and objective
+coefficient, declared integrality, residual bounds, retained LP value and offset.
+For each coordinate, `original = offset + residual`; the retained value may be
+outside the new child's bounds until reoptimization.
+Return an optional `ResidualMasterSolution`: quantities of residual routes and
+static variables, with omitted static values treated as zero. The solver restores
+fixed contributions, rebuilds original costs, and replays feasibility. Fractional
+route or static quantities may replace the point seen by fixed-solution
+separators; only an integer solution can supply an incumbent and improving
+cutoff. Duplicate route identities are coalesced. Declining the callback leaves
+an empty residual point for those separators. This registration is disabled by
+default and does not run during greedy or ordinary tree-node evaluation.
+The input does not export arbitrary branch/cut row descriptors or a mutable
+formulation handle.
+
 Rust applications can register `FixedSolutionSeparator` values through
 `ModelTreeOptions::fixed_solution_separators` (empty by default). They run before
 dive child column generation, including local search, and receive separate
@@ -412,3 +432,27 @@ residual list; static variables are omitted. Returned `FixedSolutionCut` rows
 use the presence-row installer, including fixed RHS adjustment and future
 pricing events. The separator author owns cut validity; descriptor coordinates
 and finite priorities are checked. This hook does not run during greedy search.
+
+`ModelTreeOptions.component_generators` registers automatic whole-column class
+families with `ComponentClassGenerator`. Each coordinate supplies sparse integer
+arc contributions, its binary/integer kind, split priority, original upper bound
+and current upper bound. Generation packs fractional column quantities into unit
+bins and explores conjunctions and their siblings through the inherited class
+tree. Family names identify that history; fixed-route replay, snapshot forks and
+routing-class restrictions on imported snapshots preserve it. `Some(0)` remains
+distinct from an absent coordinate.
+
+The first strong-branching phase supplies the candidate quota; without strong
+branching, one candidate is retained. The default class violation threshold is
+`0.02`, while the separate fractional-column flag tolerance defaults to `1e-8`.
+When the branching family is only part of the original integer-coordinate
+registry, provide the complete `ordering_coordinates` registry to reproduce
+sparse solution ordering. Continuous schedule coordinates are outside this API.
+`ImportedSnapshot::with_component_bounds` retains both routing-class rows and
+their generator descriptors when a later import batch rebuilds the model.
+
+Network tree results expose `parallel_batches`: the number of dispatches with
+at least two concurrently evaluated fresh nodes. Serial trees, singleton
+dispatches, reused strong-branching results, and heuristic solves do not
+increment it. This scheduling counter is independent of node counts and
+imported-column acquisition batches.

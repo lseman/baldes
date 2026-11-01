@@ -885,6 +885,13 @@ fn registered_signed_owner_fixing_and_enumeration_match_native() {
             .unwrap();
         let edge = solver.graph.arc_mut(id).unwrap();
         edge.consumption[0] = base[index].pairs()[0].0;
+        edge.bounds[0] = Some(
+            Window::new(
+                arc["bounds"][0].as_f64().unwrap(),
+                arc["bounds"][1].as_f64().unwrap(),
+            )
+            .unwrap(),
+        );
         edge.reduced_cost = captured["physical_arc_reduced_costs"][index]
             .as_f64()
             .unwrap();
@@ -902,7 +909,13 @@ fn registered_signed_owner_fixing_and_enumeration_match_native() {
         .map(|(physical_arc, arc)| MachineArcFunctionInput {
             physical_arc,
             tail_bounds: windows[arc["tail"].as_u64().unwrap() as usize],
-            waiting_bounds: windows[arc["head"].as_u64().unwrap() as usize],
+            // Prepared arc windows include arrival tightening beyond the
+            // vertex hull; use the captured bounds for exact bucket admission.
+            waiting_bounds: Window::new(
+                arc["bounds"][0].as_f64().unwrap(),
+                arc["bounds"][1].as_f64().unwrap(),
+            )
+            .unwrap(),
             waiting_rate: 0,
             base: &base[physical_arc],
             dependent: affine(-0.25),

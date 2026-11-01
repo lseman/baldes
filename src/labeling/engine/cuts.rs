@@ -216,6 +216,15 @@ impl<const D: usize> LabelingEngine<D> {
     /// a substitute: an unreachable forward cell can still inherit a valid
     /// completion bound from its dominance predecessors.
     pub fn prepare_full_labels(&mut self, g: &Graph<D>, controls: &Controls) -> Result<()> {
+        self.prepare_full_labels_with_completion(g, controls, None)
+    }
+
+    pub(super) fn prepare_full_labels_with_completion(
+        &mut self,
+        g: &Graph<D>,
+        controls: &Controls,
+        completion: Option<(f64, i32)>,
+    ) -> Result<()> {
         if let Some(kernel) = g.coupled_kernel() {
             kernel.validate_for(g)?;
         }
@@ -230,7 +239,7 @@ impl<const D: usize> LabelingEngine<D> {
                 return Ok(());
             }
             if self.half_ready {
-                return self.continue_after_halfway(g, controls);
+                return self.continue_after_halfway_with_completion(g, controls, completion);
             }
         }
         if !self.consumption_joins {
@@ -285,10 +294,19 @@ impl<const D: usize> LabelingEngine<D> {
             let started = Instant::now();
             let mut pool = SolutionPool::new(g.vertices.len(), 1, 0);
             self.run_direction(g, true, controls, started, &mut pool)?;
-            if !self.consumption_joins {
-                self.run_direction(g, false, controls, started, &mut pool)?;
-            }
+            // The backward completion gate reads predecessor-inherited forward
+            // bounds, so publish those before starting the opposite sweep.
             self.update_unreachable(true);
+            if !self.consumption_joins {
+                self.run_direction_with_completion(
+                    g,
+                    false,
+                    controls,
+                    started,
+                    &mut pool,
+                    completion.map(|(threshold, mode)| (threshold, mode == 2, true)),
+                )?;
+            }
             if !self.consumption_joins {
                 self.update_unreachable(false);
             }

@@ -115,7 +115,7 @@ pub(super) fn route_cost<const D: usize>(oracle: &Oracle<D>, route: &Route) -> R
     let resource = if associated.is_empty() {
         route.coupled_cost(&oracle.network.graph, &positions)?
     } else {
-        let [(resource, coefficient)] = associated else {
+        let [(resource, _coefficient)] = associated else {
             return Err(crate::incomplete(
                 "multiple paired owner associations require multiple paired programs",
             ));
@@ -124,13 +124,7 @@ pub(super) fn route_cost<const D: usize>(oracle: &Oracle<D>, route: &Route) -> R
         oracle
             .network
             .graph
-            .coupled_kernel()
-            .unwrap()
-            .joined_machine_path_matching_with_paired_coefficient(
-                &positions,
-                Some(selected),
-                *coefficient,
-            )?
+            .recorded_paired_path_matching(&positions, Some(selected))?
             .map(|(cost, _)| cost)
     }
     .ok_or_else(|| invalid("network path violates coupled resources"))?;

@@ -40,6 +40,7 @@ pub(super) struct PreparedSlopePaired {
     machine_root_history: Option<Arc<MachinePathHistory>>,
     machine_backward_root: Option<Arc<MachinePathHistory>>,
     machine_topology: Option<MachineTopology>,
+    machine_vertex_bounds: Option<Arc<[Option<(u64, u64)>]>>,
     base_windows: Option<BaseWindows>,
     mode: PairedResourceMode,
 }
@@ -78,6 +79,7 @@ impl PartialEq for PreparedSlopePaired {
                 (None, None) => true,
                 _ => false,
             }
+            && self.machine_vertex_bounds == b.machine_vertex_bounds
             && self.machine_topology == b.machine_topology
             && self.base_windows == b.base_windows
             && self.mode == b.mode
@@ -147,6 +149,9 @@ impl PreparedSlopePaired {
     pub(super) fn machine_input_handle(&self) -> Option<Arc<[PreparedMachineArc]>> {
         self.machine_inputs.clone()
     }
+    pub(super) fn machine_arc_input(&self, arc: usize) -> Option<&PreparedMachineArc> {
+        self.machine_inputs.as_deref()?.get(arc)
+    }
     pub(super) fn machine_waiting_rates(&self) -> Option<&[f64]> {
         self.machine_waiting_rates.as_deref()
     }
@@ -174,6 +179,30 @@ impl PreparedSlopePaired {
         self.machine_waiting_rates = Some(Arc::from(rates));
         Ok(true)
     }
+    pub(super) fn machine_vertex_bounds(&self) -> Option<Vec<Option<Window>>> {
+        self.machine_vertex_bounds.as_ref().map(|bounds| {
+            bounds
+                .iter()
+                .map(|bound| {
+                    bound.map(|(lower, upper)| Window {
+                        lower: f64::from_bits(lower),
+                        upper: f64::from_bits(upper),
+                    })
+                })
+                .collect()
+        })
+    }
+    pub(super) fn set_machine_vertex_bounds(&mut self, bounds: &[Option<Window>]) -> bool {
+        let bounds: Arc<[_]> = bounds
+            .iter()
+            .map(|bound| bound.map(|w| (w.lower.to_bits(), w.upper.to_bits())))
+            .collect();
+        if self.machine_vertex_bounds.as_ref() == Some(&bounds) {
+            return false;
+        }
+        self.machine_vertex_bounds = Some(bounds);
+        true
+    }
     pub(super) fn machine_topology(&self) -> Option<&MachineTopology> {
         self.machine_topology.as_ref()
     }
@@ -194,6 +223,7 @@ impl PreparedSlopePaired {
     ) -> FrontierOutcome<()> {
         match MachinePathHistory::from_root(&root, usize::MAX, budget) {
             FrontierOutcome::Complete(history) => {
+                self.machine_vertex_bounds = None;
                 self.machine_backward_root = Some(Arc::new(history));
                 FrontierOutcome::Complete(())
             }
@@ -395,6 +425,7 @@ impl PreparedSlopePaired {
         self.machine_inputs = inputs.map(|inputs| Arc::from(inputs.to_vec()));
         self.machine_waiting_rates = None;
         self.machine_topology = topology;
+        self.machine_vertex_bounds = None;
         self.machine_root_history = root_history;
         self.machine_backward_root = None;
         Ok(true)
@@ -442,6 +473,7 @@ impl PreparedSlopePaired {
             }
             None => None,
         };
+        self.machine_vertex_bounds = None;
         self.machine_root_input = root.cloned();
         self.machine_root_history = history;
         Ok(true)
@@ -579,6 +611,7 @@ impl PreparedSlopePaired {
             machine_root_history: None,
             machine_backward_root: None,
             machine_topology: None,
+            machine_vertex_bounds: None,
             base_windows: None,
             mode,
         })

@@ -378,6 +378,7 @@ class NetworkResult:
     enumerated_mip_calls: int
     enumerated_mip_nodes: int
     enumerated_mip_failures: int
+    parallel_batches: int = 0
     tree_processed_nodes: int = 0
     strong_branching_trials: int = 0
     mapped_history_ranked: int = 0
@@ -403,6 +404,7 @@ class NetworkResult:
 def _result(text: str, native: Any) -> NetworkResult:
     data = json.loads(text)
     data.setdefault("tree_processed_nodes", 0)
+    data.setdefault("parallel_batches", 0)
     data["original_variables"] = tuple(data.get("original_variables", ()))
     data["routes"] = tuple(NetworkRoute(**r) for r in data["routes"])
     data["fixed_routes"] = tuple(NetworkRoute(**r) for r in data["fixed_routes"])

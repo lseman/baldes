@@ -23,9 +23,25 @@ impl BucketGraph {
                     physical.tail
                 }];
                 let corner = d.corners[id.vertex][id.bucket];
-                let Some(mut high) = self.propagate(g, forward, a.physical, corner) else {
+                let paired = self.paired_vertices.is_some();
+                let Some(mut high) = self.project(g, forward, a.physical, corner)? else {
                     continue;
                 };
+                if paired && self.dimensions == 1 {
+                    // Paired states cover an interval, rather than one scalar
+                    // cell image. The auxiliary graph retains every destination
+                    // cell from the mapped corner to the vertex domain end.
+                    let Some(start) = self
+                        .bucket_id_checked(forward, target, high)
+                        .map_err(|()| crate::incomplete("bucket graph index overflow"))?
+                    else {
+                        continue;
+                    };
+                    for k in start..d.corners[target].len() {
+                        edges[source].push(offsets[target] + k);
+                    }
+                    continue;
+                }
                 if g.has_time_windows() {
                     // Waiting across a gap is monotone but discontinuous.
                     // Bound its image by propagating both cell endpoints.

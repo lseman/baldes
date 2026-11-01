@@ -568,3 +568,68 @@ fn native_multipoint_defaults_retain_both_artificial_pairs_and_only_relax_last_c
     assert_eq!(state.explicit_bands[0].penalty, 0.9_f32 as f64);
     assert_eq!(state.explicit_bands[1].penalty, (0.9_f32 as f64) / 10.);
 }
+
+#[cfg(feature = "clp")]
+#[test]
+fn artificial_geometry_matches_signed_rhs_and_class_native_capture() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("artificial_geometry_capture.json")).unwrap();
+    let cases = fixture["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 396);
+    for case in cases {
+        let kind = case["kind"].as_u64().unwrap();
+        if kind < 2 || case["active"] == 0 {
+            // Class0/1 are not proximal columns; inactive rows are excluded
+            // before the private master creates artificial columns.
+            continue;
+        }
+        let inner = kind >= 4;
+        let band = ProximalBand {
+            half_width: if inner { 3. } else { 8. },
+            penalty: if inner { 5. } else { 6. },
+        };
+        let sign = if kind % 2 == 0 { 1. } else { -1. };
+        // Native constraint incumbent values use the opposite dual sign.
+        let (cost, coefficient, cap) = artificial_geometry(
+            case["rhs"].as_f64().unwrap(),
+            -2.5,
+            &band,
+            sign,
+            true,
+            inner && case["mode"] == 2,
+        );
+        assert_eq!(cost, case["cost"].as_f64().unwrap(), "{case}");
+        assert_eq!(coefficient, case["coefficient"].as_f64().unwrap(), "{case}");
+        assert_eq!(cap, case["upper"].as_f64().unwrap(), "{case}");
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn negative_rhs_artificials_keep_signed_geometry_on_private_master() {
+    use crate::master::{clp::ClpMaster, RowSense};
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::Equal, -2., &[]).unwrap();
+    master.add_column(10., &[(0, -1.)]).unwrap();
+    assert!(master.solve());
+    let mut parameters = ProximalParameters::three_piece(1., 1.5);
+    parameters.rhs_row_scaling = true;
+    let mut state = ProximalState::default();
+    state
+        .begin_iteration(&[-10.], &[0], 0, &parameters)
+        .unwrap();
+    let point = state
+        .pricing_point(
+            &master,
+            &[-10.],
+            0,
+            &parameters,
+            &[],
+            Duration::from_secs(1),
+        )
+        .unwrap();
+    assert!((point[0] + 1.).abs() < 1e-7, "{point:?}");
+    assert_eq!(master.costs(), &[10.]);
+    assert_eq!(master.rhs(), &[-2.]);
+    assert!((master.objective() - 20.).abs() < 1e-7);
+}

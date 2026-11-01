@@ -460,6 +460,19 @@ impl PathStorage {
         let key = contribution
             .as_ref()
             .map(|_| Arc::<[usize]>::from(path.arcs.as_slice()));
+        // Distinct physical paths must survive arc-flow preservation, but a
+        // second paired join of the same path can have a cheaper selected
+        // value. Keep that representative and its matching join snapshots.
+        if self.preserve_arc_paths
+            && contribution
+                .as_ref()
+                .is_some_and(|(_, _, resource, _, _)| resource.is_some())
+            && self.partitions.iter().flatten().any(|previous| {
+                previous.arcs == path.arcs && path.original_cost + EPSILON < previous.original_cost
+            })
+        {
+            self.retain(|previous| previous.arcs != path.arcs);
+        }
         if !self.insert(path) {
             return false;
         }

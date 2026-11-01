@@ -16,8 +16,8 @@ mod pricing;
 mod snapshot;
 mod source;
 pub use pricing::{
-    ImportCertificate, ImportCosts, ImportOracleReply, ImportPricing, ImportPricingKind,
-    ImportPricingMinimum,
+    ImportCertificate, ImportCosts, ImportOracle, ImportOracleNode, ImportOracleReply,
+    ImportOracleSetup, ImportOracleState, ImportPricing, ImportPricingKind, ImportPricingMinimum,
 };
 pub use snapshot::ImportedSnapshot;
 pub use source::{ColumnBatch, ColumnImport, ImportOptions, ImportProgress, ImportStatus};

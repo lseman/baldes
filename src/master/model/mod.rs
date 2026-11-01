@@ -34,7 +34,9 @@ mod nonlinear;
 mod presence_rows;
 mod retirement;
 pub use component::{
-    ComponentBound, ComponentClassBranching, ComponentCoordinate, ComponentSense, ComponentSequence,
+    ComponentBound, ComponentClassBranching, ComponentClassGenerator, ComponentCoordinate,
+    ComponentGeneratorCoordinate, ComponentPriorityRule, ComponentSense, ComponentSequence,
+    ComponentVariableKind,
 };
 mod resource_groups;
 mod ryan_foster;
@@ -43,7 +45,6 @@ mod synchronization;
 pub use synchronization::{SynchronizedService, SynchronizedServiceMember};
 mod activity_rows;
 mod resource_rows;
-pub(crate) use activity_rows::value_on_graph as accumulated_activity_column_value;
 pub use activity_rows::{AccumulatedActivityCoefficients, AccumulatedActivityEntry};
 pub use presence_rows::PresenceCoefficients;
 pub use resource_groups::{ResourceGroupCandidate, ResourceGroupMember};
@@ -193,8 +194,10 @@ pub struct Options {
     /// Clp-only scaling and reoptimization storage policy.
     pub clp_options: crate::master::clp::ClpOptions,
     /// Initial bucket widths in resource order for every network (each must
-    /// have exactly this many resources); empty or zero entries keep automatic
-    /// sizing.
+    /// have exactly this many resources). An implicit paired base also accepts
+    /// a single width for its own bucket axis. Empty or zero entries keep
+    /// automatic standard-resource sizing; paired splitting requires a positive
+    /// configured base width.
     pub bucket_steps: Vec<f64>,
     /// Cut families separated between column-generation rounds.
     pub separation: SeparationOptions,
@@ -314,6 +317,9 @@ impl<const D: usize> Oracle<D> {
 type IntegerWitness = (f64, Vec<FixedRoute>, Vec<(i32, f64)>);
 
 struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    /// Ordered logical component branches, retained independently of physical
+    /// row retirement so later class generation preserves its inherited tree.
+    component_branches: Vec<ComponentClassBranching>,
     /// Original-model primal retained during this solve, separate from LP state.
     pricing_witness: Option<IntegerWitness>,
     /// Global feasible objective used only for objective-dependent fixing.
@@ -468,7 +474,7 @@ mod multiplicity_tests;
 #[path = "../../../tests/unit/master/model/sharing_tests.rs"]
 mod sharing_tests;
 
-use solve::{run, solve_with_fixed_routes, solve_with_seed_routes, validate_options};
+use solve::{run, validate_options};
 pub use solve::{solve, solve_master, solve_with_master_variables};
 
 #[cfg(test)]

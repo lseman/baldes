@@ -1,4 +1,5 @@
 //! Shared master construction, column generation, pricing, preprocessing and tree search.
+mod ordering;
 pub use lp_master::{LpMaster, LpSolveOutcome};
 pub mod solvers;
 #[cfg(feature = "clp")]

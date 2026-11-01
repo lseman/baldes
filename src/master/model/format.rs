@@ -173,6 +173,10 @@ pub struct PairedFrontProgram {
     pub resource: usize,
     pub source_bounds: [f64; 2],
     pub terminal_bounds: [f64; 2],
+    /// Complete paired-base vertex windows, including vertices without outgoing
+    /// arcs, in original vertex order. Supplied preparation windows must agree.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vertex_bounds: Option<Vec<[f64; 2]>>,
     pub root: FrontProgramFunction,
     pub arcs: Vec<FrontProgramArc>,
 }
@@ -453,6 +457,14 @@ impl Model {
                         )))
                     }
                 }
+                if let Some(bounds) = &program.vertex_bounds {
+                    let bounds = bounds
+                        .iter()
+                        .copied()
+                        .map(windows)
+                        .collect::<Result<Vec<_>>>()?;
+                    graph.set_paired_bucket_vertex_bounds(program.resource, &bounds)?;
+                }
             }
             for (index, (resource, rates)) in input.paired_machine_waiting_rates.iter().enumerate()
             {
@@ -582,6 +594,8 @@ pub struct SolveOptions {
     pub bound_mode: String,
     pub artificial_cost: f64,
     pub log_interval: Option<usize>,
+    /// Initial bucket widths; an implicit paired base accepts one width.
+    pub bucket_steps: Vec<f64>,
     pub pricing_options: BTreeMap<String, f64>,
 }
 impl Default for SolveOptions {
@@ -637,6 +651,7 @@ impl Default for SolveOptions {
             bound_mode: "numerical".into(),
             artificial_cost: 2.76,
             log_interval: None,
+            bucket_steps: vec![],
             pricing_options: BTreeMap::new(),
         }
     }
@@ -759,6 +774,7 @@ impl SolveOptions {
         options.cg.bound_mode = cg::BoundMode::parse(&self.bound_mode)?;
         options.cg.artificial_cost = self.artificial_cost;
         options.cg.log_interval = self.log_interval;
+        options.bucket_steps = self.bucket_steps.clone();
         if self.max_iterations == 0 || self.log_interval == Some(0) {
             return Err(invalid("iteration and log limits must be positive"));
         }
@@ -985,6 +1001,7 @@ pub struct SolveResult {
     pub oracle_calls: Vec<(i32, usize)>,
     pub nodes: usize,
     pub tree_processed_nodes: usize,
+    pub parallel_batches: usize,
     pub open_nodes: usize,
     pub seconds: f64,
     pub enumeration_reports: Vec<EnumerationReport>,
@@ -1070,6 +1087,7 @@ impl SolveResult {
             oracle_calls: output.oracle_calls.clone(),
             nodes: 0,
             tree_processed_nodes: 0,
+            parallel_batches: 0,
             open_nodes: 0,
             enumeration_reports: vec![output.snapshot.enumeration_report().clone()],
             enumerated_mip_calls: 0,
@@ -1120,6 +1138,7 @@ impl SolveResult {
             oracle_calls: output.oracle_calls.clone(),
             nodes: output.nodes,
             tree_processed_nodes: output.processed_nodes,
+            parallel_batches: output.parallel_batches,
             open_nodes: output.open_nodes,
             enumeration_reports: output.enumeration_reports.clone(),
             enumerated_mip_calls: output.enumerated_mip_calls,
@@ -1170,6 +1189,7 @@ impl SolveResult {
             oracle_calls: vec![],
             nodes: output.mip.nodes,
             tree_processed_nodes: 0,
+            parallel_batches: 0,
             open_nodes: usize::from(!proof),
             cuts: 0,
             cut_rounds: 0,

@@ -1,6 +1,33 @@
 use super::*;
 
 impl<const D: usize> LabelingEngine<D> {
+    /// A directional deletion is not physical path loss: a suffix in the
+    /// opposite direction can still participate in a complete join. Jump arcs
+    /// are rebuilt from surviving normal occurrences after publication.
+    pub(super) fn physical_arc_survives_fixing(
+        &self,
+        physical: usize,
+        removals: &[(bool, std::collections::BTreeSet<usize>)],
+    ) -> bool {
+        [true, false].into_iter().any(|forward| {
+            let removed = removals
+                .iter()
+                .find(|(direction, _)| *direction == forward)
+                .map(|(_, removed)| removed);
+            self.grid
+                .direction(forward)
+                .buckets
+                .iter()
+                .flatten()
+                .flat_map(|bucket| &bucket.arcs)
+                .any(|arc| {
+                    arc.jump.is_none()
+                        && arc.physical == physical
+                        && !removed.is_some_and(|removed| removed.contains(&arc.id))
+                })
+        })
+    }
+
     /// Fix after exact completion at the same reduced costs. Symmetric search
     /// pairs forward prefixes; ordinary search uses both directions. Cached
     /// associations are local to this fixing pass.
@@ -17,11 +44,57 @@ impl<const D: usize> LabelingEngine<D> {
         self.fix_bucket_arcs_with_full_cut_state(g, threshold, has_full_cuts)
     }
 
+    pub(crate) fn prepare_and_fix_bucket_arcs(
+        &mut self,
+        g: &Graph<D>,
+        controls: &Controls,
+        threshold: f64,
+        has_full_cuts: bool,
+        completion_mode: i32,
+    ) -> Result<crate::pricing::fixing::FixingReport> {
+        if !threshold.is_finite() {
+            return Err(invalid("finite fixing threshold required"));
+        }
+        let started = Instant::now();
+        if controls.time_limit.is_zero() {
+            return Err(incomplete("fixing time limit exceeded"));
+        }
+        let feasibility_only = g.has_coupled_resources() && (self.has_cuts() || has_full_cuts);
+        let completion =
+            (completion_mode != 0 && !feasibility_only).then_some((threshold, completion_mode));
+        let outcome = (|| {
+            self.prepare_full_labels_with_completion(g, controls, completion)?;
+            self.fix_bucket_arcs_with_completion(
+                g,
+                threshold,
+                has_full_cuts,
+                completion_mode,
+                Some((started, controls.time_limit)),
+            )
+        })();
+        if self.statistics.completion_pruned != 0 || outcome.is_err() {
+            self.full_ready = false;
+            self.half_ready = false;
+        }
+        outcome
+    }
+
     pub(crate) fn fix_bucket_arcs_with_full_cut_state(
         &mut self,
         g: &Graph<D>,
         threshold: f64,
         has_full_cuts: bool,
+    ) -> Result<crate::pricing::fixing::FixingReport> {
+        self.fix_bucket_arcs_with_completion(g, threshold, has_full_cuts, 2, None)
+    }
+
+    pub(crate) fn fix_bucket_arcs_with_completion(
+        &mut self,
+        g: &Graph<D>,
+        threshold: f64,
+        has_full_cuts: bool,
+        completion_mode: i32,
+        timer: Option<(Instant, std::time::Duration)>,
     ) -> Result<crate::pricing::fixing::FixingReport> {
         use crate::pricing::fixing::{contains, update, FixingReport, PairingCache};
         if !self.full_ready {
@@ -68,6 +141,7 @@ impl<const D: usize> LabelingEngine<D> {
         let mut report = FixingReport::default();
         let mut concatenation_tests = 0;
         let mut removals = Vec::new();
+        let mut terminal_witnesses = std::collections::BTreeSet::new();
         for forward in [true, false] {
             if self.consumption_joins && !forward {
                 continue;
@@ -87,6 +161,11 @@ impl<const D: usize> LabelingEngine<D> {
                         let physical = &g.arcs[arc.physical];
                         if physical.reduced_cost >= NO_ROUTE_COST {
                             continue;
+                        }
+                        if report.checked & 63 == 0
+                            && timer.is_some_and(|(start, limit)| start.elapsed() >= limit)
+                        {
+                            return Err(incomplete("fixing time limit exceeded"));
                         }
                         report.checked += 1;
                         let target = self.grid.internal[if forward {
@@ -122,9 +201,8 @@ impl<const D: usize> LabelingEngine<D> {
                         }
                         let point = self.grid.direction(forward).corners[source.vertex]
                             [arc.jump.unwrap_or(source.bucket)];
-                        let arrival = self
-                            .grid
-                            .propagate(g, forward, arc.physical, point)
+                        let projected = self.grid.project(g, forward, arc.physical, point)?;
+                        let arrival = projected
                             .map(|mut q| {
                                 if self.consumption_joins {
                                     for r in 0..self.grid.dimensions {
@@ -154,6 +232,53 @@ impl<const D: usize> LabelingEngine<D> {
                             if let Some(l) =
                                 self.extend(g, forward, arc, self.storage(forward).labels.view(id))
                             {
+                                // An actual complete extension is independent
+                                // of the literal opposite-root key screen. Keep
+                                // this witness even when a completion gate rejects
+                                // the label, so fixing cannot publish a contradiction.
+                                if paired_keys
+                                    && !feasibility_only
+                                    && !self.consumption_joins
+                                    && forward
+                                    && physical.head == g.sink
+                                    && {
+                                        let mut terminal_branch = l.branch_state.clone();
+                                        self.branching.visit(&mut terminal_branch, g.sink)
+                                            && self.branching.accepts(&terminal_branch)
+                                    }
+                                    && self.backward.root.is_some_and(|root| {
+                                        self.ctx()
+                                            .join_cost(
+                                                g,
+                                                g.sink,
+                                                (&l).into(),
+                                                self.backward.labels.view(root),
+                                            )
+                                            .is_some_and(|cost| cost < threshold)
+                                    })
+                                {
+                                    terminal_witnesses.insert(arc.physical);
+                                }
+                                // Query before the target vertex's NG/cut step,
+                                // as in the native fixing extension. Only complete
+                                // opposite labels may justify rejection here.
+                                if completion_mode != 0
+                                    && !feasibility_only
+                                    && !self.ctx().completion_exists_in(
+                                        self.storage(self.consumption_joins || !forward),
+                                        g,
+                                        forward,
+                                        &l,
+                                        l.bucket,
+                                        threshold,
+                                        completion_mode == 2,
+                                        self.full_ready,
+                                        false,
+                                        timer,
+                                    )
+                                {
+                                    continue;
+                                }
                                 let key = crate::core::rounding::add_down(l.key(), knapsack_lower)
                                     .unwrap_or(f64::NEG_INFINITY);
                                 minimum = if scan_all {
@@ -247,6 +372,15 @@ impl<const D: usize> LabelingEngine<D> {
                                             if bound >= threshold {
                                                 break;
                                             }
+                                            if concatenation_tests & 255 == 0
+                                                && timer.is_some_and(|(start, limit)| {
+                                                    start.elapsed() >= limit
+                                                })
+                                            {
+                                                return Err(incomplete(
+                                                    "fixing time limit exceeded",
+                                                ));
+                                            }
                                             concatenation_tests += 1;
                                             let cost = if forward {
                                                 self.ctx().join_cost(g, meeting, l.into(), other)
@@ -291,6 +425,21 @@ impl<const D: usize> LabelingEngine<D> {
                 report.eliminated_backward = removed.len();
             }
             removals.push((forward, removed));
+        }
+        if timer.is_some_and(|(start, limit)| start.elapsed() >= limit) {
+            return Err(incomplete("fixing time limit exceeded"));
+        }
+        if self.resource_error.load(Ordering::Relaxed) {
+            return Err(incomplete(
+                "resource or bucket completion arithmetic failure during fixing",
+            ));
+        }
+        for physical in terminal_witnesses {
+            if !self.physical_arc_survives_fixing(physical, &removals) {
+                return Err(incomplete(
+                    "paired fixing screen contradicts an improving terminal witness",
+                ));
+            }
         }
         for (forward, removed) in removals {
             let direction = if forward {

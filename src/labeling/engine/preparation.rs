@@ -52,11 +52,40 @@ impl<const D: usize> LabelingEngine<D> {
         }
     }
 
-    pub fn prepare(g: &Graph<D>, controls: EngineControls<D>, phase: Phase) -> Result<Self> {
+    pub fn prepare(g: &Graph<D>, mut controls: EngineControls<D>, phase: Phase) -> Result<Self> {
         phase.validate()?;
+        if controls.partial_dominance {
+            controls.paired_split_strategy = 2;
+        }
         // The symmetry test reads only grid bounds, so build the backward grid
         // afterwards and only when the symmetric forward-only path is not taken.
         let mut grid = BucketGraph::prepare(g, &controls.steps, controls.target_buckets, false)?;
+        if controls.partial_dominance || matches!(controls.paired_split_strategy, 1 | 2) {
+            if let Some(kernel) = g
+                .coupled_kernel()
+                .filter(|k| k.machine_paired_join_complete())
+            {
+                let base = kernel.paired_split_base_resource(g)?;
+                if base.is_some() && grid.resource_slots.first().copied() != base {
+                    return Err(invalid(
+                        "paired splitting requires its base resource as the first bucket axis",
+                    ));
+                }
+                let width = controls.steps.get(base.unwrap_or(0)).copied().unwrap_or(0.);
+                if !width.is_finite() || width <= 0. {
+                    return Err(invalid(
+                        "paired splitting requires a positive configured paired-axis bucket width",
+                    ));
+                }
+            } else if controls.partial_dominance {
+                return Err(invalid(
+                    "partial dominance requires a prepared paired resource",
+                ));
+            } else {
+                // Non-paired native State types have no split dispatcher.
+                controls.paired_split_strategy = 0;
+            }
+        }
         let reverse = crate::graph::symmetry::reverse_arcs(g).unwrap_or_default();
         let consumption_joins = controls.bidirectional
             && g.max_route_arcs().is_none()
@@ -167,9 +196,20 @@ impl<const D: usize> LabelingEngine<D> {
                     .ok_or_else(|| invalid("backward root outside effective windows"))?;
             }
         }
+        let coupled_state = g.coupled_kernel().map(|k| {
+            if self.consumption_joins {
+                k.reversal_root(forward)
+            } else {
+                k.root(forward)
+            }
+        });
+        let coordinate = self
+            .grid
+            .coordinates_with_paired(g, forward, resources.as_ref(), coupled_state.as_deref())
+            .ok_or_else(|| incomplete("root bucket coordinate is unavailable"))?;
         let bucket = self
             .grid
-            .bucket_id_checked(forward, internal, self.grid.coordinate(&resources))
+            .bucket_id_checked(forward, internal, coordinate)
             .map_err(|()| incomplete("root bucket index overflow"))?
             .ok_or_else(|| invalid("root outside bucket grid"))?;
         let label = StoredLabel {
@@ -186,13 +226,7 @@ impl<const D: usize> LabelingEngine<D> {
             ng: self.ng.vertex_bits[vertex],
             branch_state: None,
             presence_state: self.cuts.presence.empty_state(),
-            coupled_state: g.coupled_kernel().map(|k| {
-                if self.consumption_joins {
-                    k.reversal_root(forward)
-                } else {
-                    k.root(forward)
-                }
-            }),
+            coupled_state,
             parent: None,
             arc: None,
             hops: 0,
@@ -207,7 +241,22 @@ impl<const D: usize> LabelingEngine<D> {
                 .map_or(0.0, |&p| 0.5 * p),
         };
         let mut label = label;
+        if self.grid.paired_vertices.is_some() {
+            let coordinate = self
+                .ctx()
+                .label_coordinates(g, forward, &label)
+                .ok_or_else(|| incomplete("paired root coordinate is unavailable"))?;
+            if let Some(&slot) = self.grid.resource_slots.first() {
+                label.resources[slot] = coordinate[0];
+            }
+            label.bucket.bucket = self
+                .grid
+                .bucket_id_checked(forward, internal, coordinate)
+                .map_err(|()| incomplete("paired root bucket index overflow"))?
+                .ok_or_else(|| invalid("paired root outside bucket grid"))?;
+        }
         (label.cut_words, label.additional_cost) = self.root_cut_state(vertex);
+        let bucket = label.bucket.bucket;
         let storage = self.storage_mut(forward);
         let hot = HotLabel::of(&label);
         let id = storage.retain(label);

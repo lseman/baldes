@@ -418,6 +418,7 @@ impl PairedFrontOperations {
             front.provenance().as_ref(),
             FrontierProvenance::MachineRoot { .. }
                 | FrontierProvenance::PairedMachineWaiting { .. }
+                | FrontierProvenance::MachineSplit { forward: true, .. }
         ) {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
                 "machine transition requires a machine root or forward state",

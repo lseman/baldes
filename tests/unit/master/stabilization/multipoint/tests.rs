@@ -74,3 +74,36 @@ fn support_plane_order_matches_captured_native_comparator() {
         );
     }
 }
+
+#[test]
+fn full_support_plane_order_matches_native_buffered_sort() {
+    let capture: serde_json::Value =
+        serde_json::from_str(include_str!("order_capture.json")).unwrap();
+    let cases = capture["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 169);
+    assert_eq!(capture["insertion_mismatches"], 85);
+    for case in cases {
+        let mut planes: Vec<_> = case["planes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| SupportPlane {
+                point: vec![],
+                dual_activity: f64::from_bits(row[0].as_u64().unwrap()),
+                protected_center: row[1].as_bool().unwrap(),
+                zero_age: row[2].as_u64().unwrap() as u32,
+                creation_id: row[3].as_u64().unwrap(),
+            })
+            .collect();
+        let capacity = planes.len();
+        retain_planes(&mut planes, capacity).unwrap();
+        let actual: Vec<_> = planes.iter().map(|p| p.creation_id - 1).collect();
+        let expected: Vec<_> = case["order"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap())
+            .collect();
+        assert_eq!(actual, expected, "{case}");
+    }
+}

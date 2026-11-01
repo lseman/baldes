@@ -141,14 +141,22 @@ fn patterns<const D: usize>(output: &Output<D>) -> Result<Option<Vec<NetworkRout
     Ok(Some(paths.into_iter().map(|(_, route)| route).collect()))
 }
 
-fn validate<const D: usize>(
+pub(super) fn validate<const D: usize>(
+    node: &NodeSnapshot<D>,
+    solution: PrimalHeuristicSolution,
+) -> Result<Option<IntegerWitness>> {
+    validate_point(node, solution, true)
+}
+
+pub(super) fn validate_point<const D: usize>(
     node: &NodeSnapshot<D>,
     mut solution: PrimalHeuristicSolution,
+    integer_routes: bool,
 ) -> Result<Option<IntegerWitness>> {
     for fixed in &mut solution.routes {
         if !fixed.quantity.is_finite()
             || fixed.quantity <= 0.
-            || fixed.quantity.fract() != 0.
+            || integer_routes && fixed.quantity.fract() != 0.
             || fixed.quantity > 9_007_199_254_740_992.
         {
             return Ok(None);

@@ -74,10 +74,19 @@ pub struct AggregateVariableBranching {
 }
 
 /// Captured intrinsic program and its original physical arc identities.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 struct ActivitySource {
     kernel: Arc<crate::graph::coupled::CoupledKernel>,
     arcs: HashMap<i32, usize>,
+    recorded_match: Arc<dyn Fn(&[usize], f64) -> Result<bool> + Send + Sync>,
+}
+impl std::fmt::Debug for ActivitySource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ActivitySource")
+            .field("kernel", &self.kernel)
+            .field("arcs", &self.arcs)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Retained original identities and expressions, independent of column tags.
@@ -339,6 +348,14 @@ pub fn compile_pricing_variables<const D: usize>(
                 network.id,
                 ActivitySource {
                     kernel: Arc::new(network.graph.coupled_kernel().unwrap().clone()),
+                    recorded_match: {
+                        let graph = network.graph.clone();
+                        Arc::new(move |arcs, value| {
+                            Ok(graph
+                                .recorded_paired_path_matching(arcs, Some(value))?
+                                .is_some())
+                        })
+                    },
                     arcs: network
                         .graph
                         .arcs
@@ -662,10 +679,7 @@ impl PricingVariableRegistry {
                                 if source.kernel.retained_paired_machine_resource()
                                     == Some(*index) =>
                             {
-                                source
-                                    .kernel
-                                    .joined_machine_path_matching(&path, Some(*value))?
-                                    .is_some()
+                                (source.recorded_match)(&path, *value)?
                             }
                             _ => false,
                         }

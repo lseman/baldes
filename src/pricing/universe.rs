@@ -50,12 +50,20 @@ impl<const D: usize> Solver<D> {
         cutoff: f64,
         concatenation_limit: Option<Duration>,
     ) -> Result<Vec<crate::Route>> {
+        let enumeration_started = std::time::Instant::now();
+        let total_time_limit = self.controls.time_limit;
         self.check_presence_universe()?;
+        self.enumeration = None;
+        self.enumeration_snapshot = None;
         if self.engine.is_none() {
             self.price_phase(0, 1, false)?;
         }
-        self.complete_labels(true)?;
-        let controls = enumeration::Controls {
+        let remaining = total_time_limit.saturating_sub(enumeration_started.elapsed());
+        if remaining.is_zero() {
+            return Err(incomplete("enumeration time limit exceeded"));
+        }
+        self.complete_labels_with_limit(remaining)?;
+        let mut controls = enumeration::Controls {
             cutoff,
             label_limit: self
                 .options
@@ -144,7 +152,10 @@ impl<const D: usize> Solver<D> {
                         .active()
                         .then_some(&engine.cuts.presence),
                 });
-        let enumeration_started = std::time::Instant::now();
+        controls.time_limit = total_time_limit.saturating_sub(enumeration_started.elapsed());
+        if controls.time_limit.is_zero() {
+            return Err(incomplete("enumeration time limit exceeded"));
+        }
         let result = Enumeration::run_with_concatenation_limit(
             &self.graph,
             &engine.grid,
@@ -163,7 +174,7 @@ impl<const D: usize> Solver<D> {
                     label,
                     cutoff,
                     scan,
-                    Some((enumeration_started, controls.time_limit)),
+                    Some((enumeration_started, total_time_limit)),
                 )
             },
             concatenation_limit,
@@ -186,13 +197,13 @@ impl<const D: usize> Solver<D> {
                 return Err(error);
             }
         };
-        if enumeration_started.elapsed() > controls.time_limit {
+        if enumeration_started.elapsed() > total_time_limit {
             return Err(incomplete("enumeration time limit exceeded"));
         }
         let g = &self.graph;
         let mut interrupted = false;
         universe.paths.retain(|p| {
-            if interrupted || enumeration_started.elapsed() > controls.time_limit {
+            if interrupted || enumeration_started.elapsed() > total_time_limit {
                 interrupted = true;
                 return true;
             }
@@ -202,7 +213,7 @@ impl<const D: usize> Solver<D> {
                 )
             })
         });
-        if interrupted || enumeration_started.elapsed() > controls.time_limit {
+        if interrupted || enumeration_started.elapsed() > total_time_limit {
             return Err(incomplete("enumeration time limit exceeded"));
         }
         if self.presence_pricing.active() {
@@ -213,7 +224,7 @@ impl<const D: usize> Solver<D> {
                 &enumerated_kpath,
                 &self.knapsack_pricing,
                 &self.presence_pricing,
-                Some((enumeration_started, controls.time_limit)),
+                Some((enumeration_started, total_time_limit)),
             ) {
                 if !is_enumeration_interruption(&error.message) {
                     self.restore_arcs();
@@ -221,13 +232,13 @@ impl<const D: usize> Solver<D> {
                 return Err(error);
             }
         }
-        if enumeration_started.elapsed() > controls.time_limit {
+        if enumeration_started.elapsed() > total_time_limit {
             return Err(incomplete("enumeration time limit exceeded"));
         }
-        let mut routes = match universe.paths.routes_until(
-            &self.graph,
-            Some((enumeration_started, controls.time_limit)),
-        ) {
+        let mut routes = match universe
+            .paths
+            .routes_until(&self.graph, Some((enumeration_started, total_time_limit)))
+        {
             Ok(routes) => routes,
             Err(error) => {
                 if !is_enumeration_interruption(&error.message) {
@@ -247,7 +258,7 @@ impl<const D: usize> Solver<D> {
             let mut accepted = std::collections::HashSet::new();
             let mut checked = Vec::with_capacity(routes.len());
             for route in routes {
-                if enumeration_started.elapsed() > controls.time_limit {
+                if enumeration_started.elapsed() > total_time_limit {
                     return Err(incomplete("enumeration time limit exceeded"));
                 }
                 if check.is_feasible(&route)? {
@@ -269,11 +280,11 @@ impl<const D: usize> Solver<D> {
             universe.paths.retain(|path| accepted.contains(&path.arcs));
             routes = checked;
         }
-        if enumeration_started.elapsed() > controls.time_limit {
+        if enumeration_started.elapsed() > total_time_limit {
             return Err(incomplete("enumeration time limit exceeded"));
         }
         let snapshot = self.topology();
-        if enumeration_started.elapsed() > controls.time_limit {
+        if enumeration_started.elapsed() > total_time_limit {
             return Err(incomplete("enumeration time limit exceeded"));
         }
         self.enumeration_snapshot = Some(snapshot);
@@ -633,11 +644,19 @@ impl<const D: usize> Solver<D> {
             .record_custom_machine_resource_path(&self.graph, &indices, resource)
     }
     pub fn fix(&mut self, threshold: f64) -> Result<fixing::FixingReport> {
-        self.complete_labels(true)?;
+        self.prepare_completion_engine()?;
         let has_full_cuts = !self.applied_cuts.2.is_empty() || !self.applied_cuts.3.is_empty();
-        self.engine
-            .as_mut()
-            .ok_or_else(|| invalid("pricing must precede fixing"))?
-            .fix_bucket_arcs_with_full_cut_state(&self.graph, threshold, has_full_cuts)
+        let mode = self.options.get("BALDESuseComplBoundsInRedCostFixing")? as i32;
+        let outcome = self.engine.as_mut().unwrap().prepare_and_fix_bucket_arcs(
+            &self.graph,
+            &self.controls,
+            threshold,
+            has_full_cuts,
+            mode,
+        );
+        if outcome.is_err() {
+            self.restore_arcs();
+        }
+        outcome
     }
 }

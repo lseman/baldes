@@ -1,0 +1,138 @@
+{
+  "binary_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "scope": "native Std2 completionExists, synthetic zero-scalar/one-bucket storage",
+  "cases": [
+    {
+      "lower": 0.0,
+      "own_cost": -2.0,
+      "other_cost": 0.0,
+      "own_ng": 1,
+      "other_ng": 1,
+      "threshold": 0.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "lower": 0.0,
+      "own_cost": -2.0,
+      "other_cost": 0.0,
+      "own_ng": 1,
+      "other_ng": 1,
+      "threshold": 0.0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "lower": 0.0,
+      "own_cost": -2.0,
+      "other_cost": 0.0,
+      "own_ng": 1,
+      "other_ng": 2,
+      "threshold": 0.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "lower": 0.0,
+      "own_cost": -2.0,
+      "other_cost": 0.0,
+      "own_ng": 1,
+      "other_ng": 2,
+      "threshold": 0.0,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "lower": 0.0,
+      "own_cost": -2.0,
+      "other_cost": 20.0,
+      "own_ng": 1,
+      "other_ng": 2,
+      "threshold": 0.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "lower": 0.0,
+      "own_cost": -2.0,
+      "other_cost": 20.0,
+      "own_ng": 1,
+      "other_ng": 2,
+      "threshold": 0.0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "lower": 2.0,
+      "own_cost": -2.0,
+      "other_cost": 0.0,
+      "own_ng": 1,
+      "other_ng": 2,
+      "threshold": 0.0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "lower": 2.0,
+      "own_cost": -2.0,
+      "other_cost": 0.0,
+      "own_ng": 1,
+      "other_ng": 2,
+      "threshold": 0.0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "lower": -1.0,
+      "own_cost": -2.0,
+      "other_cost": 0.0,
+      "own_ng": 1,
+      "other_ng": 2,
+      "threshold": -2.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "lower": -1.0,
+      "own_cost": -2.0,
+      "other_cost": 0.0,
+      "own_ng": 1,
+      "other_ng": 2,
+      "threshold": -2.0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "lower": 0.0,
+      "own_cost": -2.0,
+      "other_cost": 0.0,
+      "own_ng": 1,
+      "other_ng": 2,
+      "threshold": -2.0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "lower": 0.0,
+      "own_cost": -2.0,
+      "other_cost": 0.0,
+      "own_ng": 1,
+      "other_ng": 2,
+      "threshold": -2.0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    }
+  ]
+}

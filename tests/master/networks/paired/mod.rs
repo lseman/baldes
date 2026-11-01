@@ -58,7 +58,12 @@ fn check_registered_cases(source: &str) -> usize {
                     options.cg.bound_mode = mode;
                     options.pricing_options =
                         vec![("BALDESuseBidirectionalSearch".into(), direction)];
-                    let output = model::solve(problem, options).unwrap();
+                    let output = model::solve(problem, options).unwrap_or_else(|error| {
+                        panic!(
+                            "{} mode={mode:?} direction={direction} singular={singular}: {error:?}",
+                            case["name"]
+                        )
+                    });
                     assert_eq!(
                         output.master.status,
                         Status::Optimal,

@@ -111,9 +111,16 @@ impl<const D: usize> MultiImport<D> {
         self.certificate_view()?.infeasibility_certificate(options)
     }
     pub fn solve(&self, options: Options) -> Result<ImportedOutput<D>> {
+        self.solve_at_depth(options, 0)
+    }
+    pub(in crate::master::model::imported) fn solve_at_depth(
+        &self,
+        options: Options,
+        depth: usize,
+    ) -> Result<ImportedOutput<D>> {
         if !self.is_complete() {
             return Err(invalid("import domains are not complete"));
         }
-        lifecycle::rebuild(self.definition.clone(), Some(&self.context), options)
+        lifecycle::rebuild_at_depth(self.definition.clone(), Some(&self.context), options, depth)
     }
 }

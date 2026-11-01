@@ -18,6 +18,84 @@ pub(super) struct Context<'a, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSI
     pub(super) load_completion: Option<&'a super::load_completion::LoadCompletion>,
 }
 impl<'a, const D: usize> Context<'a, D> {
+    /// A paired piece's first/last endpoint determines its indexing axis.
+    pub(in crate::labeling::engine) fn label_coordinates<L: LabelData>(
+        &self,
+        g: &Graph<D>,
+        forward: bool,
+        label: &L,
+    ) -> Option<[f64; 2]> {
+        self.coordinates_with_coupled(g, forward, label.resources(), label.coupled_state())
+    }
+
+    fn coordinates_with_coupled(
+        &self,
+        g: &Graph<D>,
+        forward: bool,
+        resources: &[f64],
+        state: Option<&crate::graph::coupled::CoupledLabelState>,
+    ) -> Option<[f64; 2]> {
+        self.grid
+            .coordinates_with_paired(g, forward, resources, state)
+    }
+    pub(super) fn split_paired_label(
+        &self,
+        g: &Graph<D>,
+        forward: bool,
+        mut label: StoredLabel<D>,
+    ) -> Result<Vec<StoredLabel<D>>> {
+        if !matches!(self.controls.paired_split_strategy, 1 | 2) {
+            return Ok(vec![label]);
+        }
+        let kernel = g
+            .coupled_kernel()
+            .ok_or_else(|| invalid("missing paired split kernel"))?;
+        let base = self.grid.resource_slots.first().copied();
+        let vertex = self.grid.internal[label.vertex];
+        let mut ends: Vec<_> = self.grid.direction(forward).corners[vertex]
+            .iter()
+            .map(|point| point[0])
+            .collect();
+        ends.push(self.grid.upper[vertex][0]);
+        ends.sort_by(f64::total_cmp);
+        ends.dedup_by(|a, b| *a == *b);
+        let state = label
+            .coupled_state
+            .take()
+            .ok_or_else(|| invalid("missing paired split state"))?;
+        let pieces = kernel.split_paired_label(
+            state,
+            self.controls.paired_split_strategy,
+            self.grid.middle,
+            &ends,
+            [
+                self.grid.lower[vertex][0],
+                self.grid.upper[vertex][0],
+                self.grid.step[0],
+            ],
+        )?;
+        let mut output = Vec::with_capacity(pieces.len());
+        for piece in pieces {
+            let mut next = label.clone();
+            next.coupled_state = Some(piece.state);
+            next.cost = piece.cost;
+            next.original_cost = piece.original_cost;
+            if let Some(base) = base {
+                next.resources[base] = piece.coordinate;
+            }
+            let q = self
+                .label_coordinates(g, forward, &next)
+                .ok_or_else(|| incomplete("paired split coordinate is unavailable"))?;
+            let bucket = self
+                .grid
+                .bucket_id_checked(forward, vertex, q)
+                .map_err(|_| incomplete("paired split bucket coordinate is unrepresentable"))?
+                .ok_or_else(|| incomplete("paired split bucket coordinate is outside the grid"))?;
+            next.bucket = BucketId { vertex, bucket };
+            output.push(next);
+        }
+        Ok(output)
+    }
     pub(super) fn has_cuts(&self) -> bool {
         !self.cuts.inputs.is_empty() || !self.cuts.kpath.is_empty()
     }
@@ -453,7 +531,7 @@ impl<'a, const D: usize> Context<'a, D> {
                 }
             }
         }
-        let resources: crate::graph::ResourceValues<D> =
+        let mut resources: crate::graph::ResourceValues<D> =
             crate::labeling::ScalarResourceKernel::<D>::extend_active(g, physical, q.0, forward)?
                 .into();
         let (mut coupled_state, coupled_cost) = if let Some(kernel) = g.coupled_kernel() {
@@ -476,6 +554,18 @@ impl<'a, const D: usize> Context<'a, D> {
         } else {
             (None, 0.)
         };
+        if self.grid.paired_vertices.is_some() {
+            let coordinate = self
+                .coordinates_with_coupled(g, forward, resources.as_ref(), coupled_state.as_deref())
+                .map(|q| q[0]);
+            let Some(coordinate) = coordinate else {
+                self.resource_error.store(true, Ordering::Relaxed);
+                return None;
+            };
+            if let Some(&base) = self.grid.resource_slots.first() {
+                resources[base] = coordinate;
+            }
+        }
         let transition = if forward {
             &self.ng.forward[arc.physical]
         } else {
@@ -483,17 +573,22 @@ impl<'a, const D: usize> Context<'a, D> {
         };
         let ng = transition.extend(from.ng(), 0)?;
         let internal = self.grid.internal[vertex];
-        let bucket =
-            match self
-                .grid
-                .bucket_id_checked(forward, internal, self.grid.coordinate(&resources))
-            {
-                Ok(bucket) => bucket?,
-                Err(()) => {
-                    self.resource_error.store(true, Ordering::Relaxed);
-                    return None;
-                }
-            };
+        let bucket = match self.grid.bucket_id_checked(
+            forward,
+            internal,
+            self.coordinates_with_coupled(
+                g,
+                forward,
+                resources.as_ref(),
+                coupled_state.as_deref(),
+            )?,
+        ) {
+            Ok(bucket) => bucket?,
+            Err(()) => {
+                self.resource_error.store(true, Ordering::Relaxed);
+                return None;
+            }
+        };
         let mut additional_cost = from.additional_cost();
         let cut_words = if CUTS {
             let table = if forward {

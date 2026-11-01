@@ -105,7 +105,7 @@ impl<const D: usize> Enumeration<D> {
                 g, grid, controls, cuts, branching, completion,
             );
         }
-        if grid.resource_slots.is_empty() {
+        if grid.resource_slots.is_empty() && grid.paired_vertices.is_none() {
             if union_reversal {
                 return Self::run_forward_with_completion(
                     g,
@@ -243,7 +243,19 @@ impl<const D: usize> Enumeration<D> {
                 }
                 let v = grid.internal[from.vertex];
                 let Some(bucket) = grid
-                    .bucket_id_checked(direction, v, grid.coordinate(&from.resources))
+                    .bucket_id_checked(
+                        direction,
+                        v,
+                        grid.coordinates_with_paired(
+                            g,
+                            direction,
+                            &from.resources,
+                            from.coupled_state.as_deref(),
+                        )
+                        .ok_or_else(|| {
+                            incomplete("paired enumeration coordinate is unavailable")
+                        })?,
+                    )
                     .map_err(|()| incomplete("enumeration bucket index overflow"))?
                 else {
                     continue;
@@ -342,7 +354,17 @@ impl<const D: usize> Enumeration<D> {
                         if !next.can_add_elements(&g.vertices[next.vertex].elements) {
                             continue;
                         }
-                        let before = grid.coordinate(&q)[0] <= grid.middle + EPSILON;
+                        let before = grid
+                            .coordinates_with_paired(
+                                g,
+                                direction,
+                                &next.resources,
+                                next.coupled_state.as_deref(),
+                            )
+                            .ok_or_else(|| {
+                                incomplete("paired enumeration coordinate is unavailable")
+                            })?[0]
+                            <= grid.middle + EPSILON;
                         if !direction && before {
                             continue;
                         }
@@ -527,7 +549,19 @@ impl<const D: usize> Enumeration<D> {
                 let label = &opposite.arena[id];
                 let vertex = grid.internal[label.vertex];
                 if let Some(k) = grid
-                    .bucket_id_checked(consumption, vertex, grid.coordinate(&label.resources))
+                    .bucket_id_checked(
+                        consumption,
+                        vertex,
+                        grid.coordinates_with_paired(
+                            g,
+                            consumption,
+                            &label.resources,
+                            label.coupled_state.as_deref(),
+                        )
+                        .ok_or_else(|| {
+                            incomplete("paired enumeration coordinate is unavailable")
+                        })?,
+                    )
                     .map_err(|()| incomplete("enumeration bucket index overflow"))?
                 {
                     buckets[vertex][k].push(id);
@@ -688,7 +722,9 @@ impl<const D: usize> Enumeration<D> {
                         &coupled_completion,
                     )
                 });
-                let mut q = grid.coordinate(&f.resources);
+                let mut q = grid
+                    .coordinates_with_paired(g, true, &f.resources, f.coupled_state.as_deref())
+                    .ok_or_else(|| incomplete("paired enumeration coordinate is unavailable"))?;
                 if consumption {
                     for r in 0..grid.dimensions {
                         q[r] = grid.upper[vertex][r] + grid.lower[vertex][r] - q[r];

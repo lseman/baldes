@@ -120,6 +120,7 @@ pub(in crate::master::model::imported) fn objective_request_at_output<const D: u
     registry: Rc<Registry>,
 ) -> ImportPricing<D> {
     ImportPricing {
+        node_depth: output.snapshot.state.node_depth,
         epoch: Rc::new(()),
         context: session.context.clone(),
         definition: session.definition.clone(),

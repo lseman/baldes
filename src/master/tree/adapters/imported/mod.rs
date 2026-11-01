@@ -13,10 +13,16 @@ pub struct ImportTreeSolution {
     /// Original IDs and qualified column IDs at the incumbent's own lineage.
     pub values: Values,
 }
+
+#[cfg(test)]
+#[path = "../../../../../tests/unit/master/tree/imported_oracle_tests.rs"]
+mod oracle_tests;
 #[derive(Clone, Debug)]
 struct Pending<const D: usize> {
     session: MultiImport<D>,
     bound: f64,
+    depth: usize,
+    oracle_states: Rc<BTreeMap<i32, ImportOracleState>>,
 }
 /// Immutable, resumable branch-and-price frontier. Open-domain bounds use
 /// directed envelopes or explicit numerical oracle replies under their chosen
@@ -51,6 +57,8 @@ impl<const D: usize> MultiImport<D> {
             pending: vec![Pending {
                 session: self.clone(),
                 bound: f64::NEG_INFINITY,
+                depth: 0,
+                oracle_states: Rc::new(BTreeMap::new()),
             }],
             solution: None,
             bound_mode: None,
@@ -89,9 +97,15 @@ impl<const D: usize> ImportTree<D> {
         F: FnMut(&ImportPricing<D>, Duration) -> Result<ColumnBatch>,
     {
         let mut source = source;
-        driver::run(self, options, imports, false, |point, remaining| {
-            source(point, remaining).map(ImportOracleReply::columns)
-        })
+        driver::run(
+            self,
+            options,
+            imports,
+            false,
+            &mut |point: &ImportPricing<D>, remaining| {
+                source(point, remaining).map(ImportOracleReply::columns)
+            },
+        )
     }
     /// Query every unfinished group at one common point before branching.
     /// Numerical mode can consume trusted global numerical minima. Certified
@@ -101,11 +115,23 @@ impl<const D: usize> ImportTree<D> {
         &self,
         options: &ModelTreeOptions,
         imports: &ImportOptions,
-        source: F,
+        mut source: F,
     ) -> Result<ImportTreeProgress<D>>
     where
         F: FnMut(&ImportPricing<D>, Duration) -> Result<ImportOracleReply>,
     {
-        driver::run(self, options, imports, true, source)
+        driver::run(self, options, imports, true, &mut source)
+    }
+
+    /// Stateful pricing with group-qualified setup and immutable node snapshots.
+    /// Setup rejection is a numerical conclusion; certified mode suspends that
+    /// node without trusting it as a proof. Callback errors preserve this tree.
+    pub fn run_with_oracle<O: ImportOracle<D>>(
+        &self,
+        options: &ModelTreeOptions,
+        imports: &ImportOptions,
+        oracle: &mut O,
+    ) -> Result<ImportTreeProgress<D>> {
+        driver::run(self, options, imports, true, oracle)
     }
 }

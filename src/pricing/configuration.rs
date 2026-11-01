@@ -27,12 +27,16 @@ impl<const D: usize> Solver<D> {
             "BALDESheurLabelingStrategy" => {
                 next_phases = Some(phases::initialize(value as i32, &[])?)
             }
-            // Strategy 1 selects partial dominance, which is not implemented.
-            // Every other value keeps ordinary dominance.
             "BALDESlabelDominanceStrategy" if value == 1. => {
-                return Err(invalid(
-                    "label dominance strategy 1 (partial dominance) is not implemented",
-                ));
+                if !self
+                    .graph
+                    .coupled_kernel()
+                    .is_some_and(|k| k.machine_paired_join_complete())
+                {
+                    return Err(invalid(
+                        "partial dominance requires a prepared paired resource",
+                    ));
+                }
             }
             "BALDESuseBidirectionalSearch" if !(0. ..=2.).contains(&value) => {
                 return Err(invalid("unsupported bidirectional mode"));
@@ -66,6 +70,21 @@ impl<const D: usize> Solver<D> {
                 ));
             }
             _ => {}
+        }
+        if next.get("BALDESlabelDominanceStrategy")? == 1.
+            || matches!(next.get("BALDESlabelSplitStrategy")? as i32, 1 | 2)
+        {
+            if let Some(kernel) = self
+                .graph
+                .coupled_kernel()
+                .filter(|kernel| kernel.machine_paired_join_complete())
+            {
+                let slot = kernel.paired_split_base_resource(&self.graph)?.unwrap_or(0);
+                let width = self.bucket_steps.get(slot).copied().unwrap_or(0.);
+                if !width.is_finite() || width <= 0. {
+                    return Err(invalid("paired splitting requires a positive configured paired-axis bucket width (Solver.bucket_steps[0] for an implicit axis)"));
+                }
+            }
         }
         let changed = self.options.get(name)? != value;
         self.options = next;
@@ -131,6 +150,21 @@ impl<const D: usize> Solver<D> {
                 .unwrap_or(0.)
                 .clamp(0., 6.) as usize,
             dominance_mode: self.dominance_mode,
+            partial_dominance: self
+                .options
+                .get("BALDESlabelDominanceStrategy")
+                .unwrap_or(0.)
+                == 1.,
+            paired_split_strategy: if self
+                .options
+                .get("BALDESlabelDominanceStrategy")
+                .unwrap_or(0.)
+                == 1.
+            {
+                2
+            } else {
+                self.options.get("BALDESlabelSplitStrategy").unwrap_or(0.) as i32
+            },
             steps: self.bucket_steps,
             target_buckets: self
                 .options

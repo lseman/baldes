@@ -3,6 +3,7 @@ use super::*;
 pub(super) const NETWORK_HELP: &str = "Usage: baldes solve MODEL.json [OPTIONS]
 
 Solve shared master rows with multiple pricing networks (Clp).
+  --steps X[,Y,...]       Initial bucket widths (one for an implicit paired base)
   --tree                 Run the assignment branch-and-price tree
   --network-pricing-schedule MODE  full-sweep (default), cyclic, sorted,
                             promising-first or unvisited-first
@@ -87,6 +88,16 @@ fn parse_options(args: Vec<String>) -> Result<Option<NetworkOptions>, String> {
             "--proximal-finite-box-step" => {
                 options.proximal =
                     Some(baldes::master::stabilization::ProximalParameters::finite_box_step());
+            }
+            "--steps" => {
+                let widths = value()?
+                    .split(',')
+                    .map(|width| width.parse::<f64>().map_err(|_| "invalid bucket steps"))
+                    .collect::<Result<Vec<_>, _>>()?;
+                if widths.iter().any(|width| !width.is_finite() || *width < 0.) {
+                    return Err("bucket steps must be finite and nonnegative".into());
+                }
+                options.bucket_steps = widths;
             }
             "--greedy" => options.greedy = true,
             "--local-search" => {

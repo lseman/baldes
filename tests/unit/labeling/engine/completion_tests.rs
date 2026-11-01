@@ -406,3 +406,159 @@ fn sweeps_reuse_id_scratch_and_do_not_replay_previous_terminals() {
         );
     }
 }
+
+#[test]
+fn fixing_completion_modes_match_native_bound_and_ng_scan_cases() {
+    let capture: serde_json::Value =
+        serde_json::from_str(include_str!("fixing_completion_capture.json")).unwrap();
+    assert_eq!(capture["cases"].as_array().unwrap().len(), 12);
+    for case in capture["cases"].as_array().unwrap() {
+        let mut graph = Graph::<2>::new(3, 0).unwrap();
+        graph.add_arc(0, 1, -2.).unwrap();
+        graph.add_arc(1, 2, 0.).unwrap();
+        let mut prepared = engine(&graph);
+        prepared
+            .prepare_full_labels(&graph, &Controls::default())
+            .unwrap();
+        let vertex = prepared.grid.internal[1];
+        let id = prepared.forward.buckets[vertex]
+            .iter()
+            .flat_map(|b| &b.active)
+            .copied()
+            .next()
+            .unwrap();
+        let mut own = prepared.forward.labels.view(id).to_owned();
+        own.cost = case["own_cost"].as_f64().unwrap();
+        own.ng = case["own_ng"].as_u64().unwrap() as NgMask;
+        let id = prepared.backward.buckets[vertex]
+            .iter()
+            .flat_map(|b| &b.active)
+            .copied()
+            .next()
+            .unwrap();
+        let mut other = prepared.backward.labels.view(id).to_owned();
+        other.cost = case["other_cost"].as_f64().unwrap();
+        other.ng = case["other_ng"].as_u64().unwrap() as NgMask;
+        let hot = HotLabel::of(&other);
+        let id = prepared.backward.retain(other);
+        for row in &mut prepared.backward.buckets[vertex] {
+            row.active.clear();
+            row.hot = Default::default();
+            row.lower_cost = NO_ROUTE_COST;
+        }
+        let row = &mut prepared.backward.buckets[vertex][0];
+        row.active.push(id);
+        row.hot.push(hot);
+        row.lower_cost = case["lower"].as_f64().unwrap();
+        assert_eq!(
+            prepared.completion_exists(
+                &graph,
+                true,
+                &own,
+                case["threshold"].as_f64().unwrap(),
+                case["scan"].as_bool().unwrap()
+            ),
+            case["exists"].as_bool().unwrap(),
+            "{case}"
+        );
+    }
+}
+
+fn fixing_graph() -> Graph<2> {
+    let mut graph = Graph::<2>::new(5, 1).unwrap();
+    graph.elementary = true;
+    for v in 0..5 {
+        graph.set_bounds(v, 0, 0., 4.).unwrap();
+    }
+    for (tail, head, cost, use_) in [
+        (0, 1, -5., 1.5),
+        (1, 2, 0., 1.5),
+        (0, 3, 50., 1.),
+        (3, 2, 0., 1.5),
+        (2, 4, 0., 0.5),
+    ] {
+        let arc = graph.add_arc(tail, head, cost).unwrap();
+        graph.arc_mut(arc).unwrap().consumption[0] = use_;
+    }
+    graph
+}
+
+#[test]
+fn fixing_cutoff_labels_never_escape_as_complete_opposite_coverage() {
+    let graph = fixing_graph();
+    for mode in [0, 1, 2] {
+        let mut prepared = engine(&graph);
+        prepared.controls.direction_flags = 1;
+        let priced = prepared.solve(&graph, &Controls::default()).unwrap();
+        assert_eq!(priced.minimum_reduced_cost, -5.);
+        assert!(prepared.half_ready);
+        let report = prepared
+            .prepare_and_fix_bucket_arcs(&graph, &Controls::default(), 0., false, mode)
+            .unwrap();
+        assert!(report.eliminated_forward + report.eliminated_backward > 0);
+        if mode != 0 {
+            assert!(prepared.statistics.completion_pruned > 0, "mode {mode}");
+            assert!(!prepared.full_ready && !prepared.half_ready);
+        } else {
+            assert_eq!(prepared.statistics.completion_pruned, 0);
+            // Removing bucket arcs invalidates full coverage even without a completion gate.
+            assert!(!prepared.full_ready && !prepared.half_ready);
+        }
+        prepared
+            .prepare_full_labels(&graph, &Controls::default())
+            .unwrap();
+        assert!(prepared.full_ready);
+        assert_eq!(
+            prepared
+                .solve(&graph, &Controls::default())
+                .unwrap()
+                .minimum_reduced_cost,
+            -5.
+        );
+    }
+}
+
+#[test]
+fn fixing_mode_options_and_expired_budget_preserve_retry_domain() {
+    let mut solver = crate::pricing::Solver::<2>::new(5, 1).unwrap();
+    solver.graph = fixing_graph();
+    let baseline = solver.enumerate(1000.).unwrap();
+    assert_eq!(baseline.len(), 2, "unfixed fixture route domain");
+    assert_eq!(baseline.iter().filter(|route| route.cost < 1.).count(), 1);
+    solver.restore_arcs();
+    assert_eq!(
+        solver
+            .options
+            .get("RCSPuseComplBoundsInRedCostFixing")
+            .unwrap(),
+        2.
+    );
+    for mode in [0., 1., 2., -1., 3.] {
+        solver.restore_arcs();
+        solver
+            .set_option("RCSPuseComplBoundsInRedCostFixing", mode)
+            .unwrap();
+        let report = solver.fix(0.).unwrap();
+        assert!(report.checked > 0, "mode {mode}");
+        let routes = solver.enumerate(1.).unwrap();
+        assert_eq!(
+            routes.len(),
+            1,
+            "mode {mode}, fixing retained no cheap route"
+        );
+        assert_eq!(routes[0].arcs, [0, 1, 4]);
+        solver.restore_arcs();
+        assert_eq!(solver.enumerate(1000.).unwrap().len(), 2);
+    }
+    solver.controls.time_limit = std::time::Duration::ZERO;
+    assert!(solver
+        .enumerate(1000.)
+        .unwrap_err()
+        .message
+        .contains("time limit"));
+    assert!(solver.inspect_enumeration(1000.).unwrap().is_none());
+    assert!(solver.fix(0.).unwrap_err().message.contains("time limit"));
+    assert!(solver.inspect_enumeration(1000.).unwrap().is_none());
+    solver.controls.time_limit = std::time::Duration::from_secs(10);
+    assert_eq!(solver.enumerate(1000.).unwrap().len(), 2);
+}

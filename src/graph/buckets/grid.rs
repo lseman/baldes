@@ -52,9 +52,47 @@ impl BucketGraph {
             }
         }
         resource_slots.truncate(2);
+        let paired_domains = g
+            .coupled_kernel()
+            .map(|kernel| kernel.paired_bucket_domains(g))
+            .transpose()?
+            .flatten();
+        let paired_base = g
+            .coupled_kernel()
+            .and_then(|kernel| kernel.bound_paired_base_resource(g));
+        // The paired manager owns its base axis even with extra standard
+        // label resources. An implicit axis has no scalar-resource index.
+        if paired_domains.is_some() {
+            resource_slots.clear();
+            if let Some(base) = paired_base {
+                resource_slots.push(base);
+            }
+        }
         let mut grid_steps = [0.; 2];
         for (axis, &r) in resource_slots.iter().enumerate() {
             grid_steps[axis] = steps.get(r).copied().unwrap_or(0.);
+        }
+        if paired_domains.is_some() && paired_base.is_none() {
+            grid_steps[0] = steps.first().copied().unwrap_or(0.);
+            if !grid_steps[0].is_finite() {
+                return Err(invalid("finite paired bucket width required"));
+            }
+            if grid_steps[0] <= 0. {
+                // Compatibility default: one exact interval bucket. A split
+                // strategy requires explicit positive registration instead.
+                let width = paired_domains
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .flatten()
+                    .map(|w| w.upper - w.lower)
+                    .fold(0., f64::max)
+                    + 1e-6;
+                if !width.is_finite() {
+                    return Err(invalid("paired bucket interval width overflow"));
+                }
+                grid_steps[0] = f64::from_bits(width.to_bits() + 1);
+            }
         }
         let dimensions = resource_slots.len().max(1);
         let n = order.len();
@@ -69,6 +107,14 @@ impl BucketGraph {
                 upper[v][r] = g
                     .project_resource(id, slot, bounds, bounds.upper, false)
                     .unwrap_or(bounds.upper);
+            }
+        }
+        if let Some(bounds) = &paired_domains {
+            for (v, &id) in order.iter().enumerate() {
+                if let Some(bounds) = bounds[id] {
+                    lower[v][0] = bounds.lower;
+                    upper[v][0] = bounds.upper;
+                }
             }
         }
         for (r, &slot) in resource_slots.iter().enumerate() {
@@ -89,15 +135,32 @@ impl BucketGraph {
                     upper[h][r].min(a.bounds[slot].map_or(f64::INFINITY, |w| w.upper));
             }
         }
-        let paired_base = g
-            .coupled_kernel()
-            .and_then(|kernel| kernel.bound_paired_base_resource(g));
+        if paired_domains.is_some() {
+            let kernel = g.coupled_kernel().expect("paired bucket domains");
+            for (i, arc) in g.arcs.iter().enumerate() {
+                let bounds = kernel
+                    .paired_bucket_arc_bounds(i)
+                    .ok_or_else(|| invalid("paired bucket arc bounds are unavailable"))?;
+                let head = internal[arc.head];
+                let known = paired_domains.as_ref().unwrap()[arc.head].is_some();
+                arc_lower[i][0] = if known {
+                    bounds.lower.max(lower[head][0])
+                } else {
+                    bounds.lower
+                };
+                arc_upper[i][0] = if known {
+                    bounds.upper.min(upper[head][0])
+                } else {
+                    bounds.upper
+                };
+            }
+        }
         // Prepared paired vertex domains are independent of their arc windows:
         // in particular, native reduction leaves the sink lower bound intact.
         // Other axes use the incoming window hull before source widening.
         for v in 0..n {
             for r in 0..resource_slots.len() {
-                if paired_base == Some(resource_slots[r]) {
+                if paired_domains.is_some() && r == 0 {
                     continue;
                 }
                 let mut incoming_lower = f64::INFINITY;
@@ -147,7 +210,7 @@ impl BucketGraph {
         for (r, &slot) in resource_slots.iter().enumerate() {
             // A paired base has its own explicit preprocessed source domain;
             // copying the terminal upper would discard that supplied geometry.
-            if paired_base != Some(slot) {
+            if paired_domains.is_none() || paired_base != Some(slot) {
                 upper[0][r] = upper[n - 1][r];
             }
         }
@@ -160,15 +223,26 @@ impl BucketGraph {
             )
         });
         let mut centers = 0.;
+        let mut centered = 0;
         for v in 0..n {
+            if paired_domains
+                .as_ref()
+                .is_some_and(|bounds| bounds[order[v]].is_none())
+            {
+                continue;
+            }
             centers = centers + upper[v][0] + lower[v][0];
+            centered += 1;
         }
-        let middle = (centers / (2 * n) as f64 * 10. + 0.5).floor() / 10.;
+        let middle = (centers / (2 * centered) as f64 * 10. + 0.5).floor() / 10.;
         let mut grid = Self {
             forward: Direction::default(),
             backward: Direction::default(),
             bidirectional,
             dimensions,
+            paired_vertices: paired_domains
+                .as_ref()
+                .map(|bounds| order.iter().map(|&id| bounds[id].is_some()).collect()),
             lower,
             upper,
             stride: vec![[0; 2]; n],
@@ -201,6 +275,9 @@ impl BucketGraph {
 
     pub fn set_steps(&mut self, steps: [f64; 2]) -> Result<()> {
         self.step = steps;
+        if self.paired_vertices.is_some() && steps[0].is_finite() && steps[0] > 0. {
+            return Ok(());
+        }
         if steps[..self.dimensions]
             .iter()
             .all(|s| s.is_finite() && *s >= 1e-6)
@@ -212,6 +289,9 @@ impl BucketGraph {
         // conversion back to f64. Large resource windows need not fit i32.
         const MAX_EXACT_INTEGER: f64 = 9_007_199_254_740_992.;
         for v in 0..self.order.len() {
+            if self.paired_vertices.as_ref().is_some_and(|known| !known[v]) {
+                continue;
+            }
             for r in 0..self.dimensions {
                 for x in [self.lower[v][r], self.upper[v][r]] {
                     let scaled = (10000. * x).ceil();
@@ -280,6 +360,24 @@ impl BucketGraph {
             slots.first().map_or(0., |&r| pick(r)),
             slots.get(1).map_or(0., |&r| pick(r)),
         ]
+    }
+
+    /// Coordinates shared by pricing, enumeration and completion. A paired
+    /// axis is read from its actual directional state, not a dummy scalar slot.
+    pub(crate) fn coordinates_with_paired<const D: usize>(
+        &self,
+        g: &Graph<D>,
+        forward: bool,
+        resources: &[f64],
+        state: Option<&crate::graph::coupled::CoupledLabelState>,
+    ) -> Option<[f64; 2]> {
+        let mut q = self.coordinate(resources);
+        if self.paired_vertices.is_some() {
+            q[0] = g
+                .coupled_kernel()?
+                .paired_state_coordinate(state?, forward)?;
+        }
+        Some(q)
     }
 
     #[inline(always)]

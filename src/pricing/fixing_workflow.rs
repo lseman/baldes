@@ -59,7 +59,6 @@ impl<const D: usize> Solver<D> {
                 .map_err(|_| invalid("fixing time threshold"))?;
             }
             let fixing_deadline = std::time::Instant::now().checked_add(self.controls.time_limit);
-            self.complete_labels(true)?;
             let fixed = self.fix(cutoff)?;
             report.eliminated = fixed.eliminated_forward + fixed.eliminated_backward;
             report.state = 4;

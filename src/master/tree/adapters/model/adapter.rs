@@ -73,6 +73,7 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                 .time_limit
                 .min(self.deadline.saturating_duration_since(Instant::now()));
             let nodes: Vec<_> = entries.iter().map(|entry| &entry.node).collect();
+            self.result.parallel_batches += 1;
             return parallel::evaluate(workers, &nodes, &options);
         }
         entries
@@ -423,7 +424,8 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
         }
         // One priority dispatcher for every policy; the policy only presets
         // family priorities (`proposals::collect`) and child direction.
-        let proposals = proposals::collect(&output, options, windows)?;
+        let proposals =
+            proposals::collect_with_deadline(&output, options, windows, Some(deadline))?;
         if options.mapped_strong_branching.is_some()
             && *selected_nodes >= options.node_limit
             && (!proposals.is_empty() || options.branching == NetworkBranchingPolicy::Phased)

@@ -2,6 +2,123 @@
 use super::*;
 
 impl MachinePathHistory {
+    /// Split only the latest pricing snapshot, preserving its physical arc,
+    /// predecessor history and root identity. No physical transition is added.
+    pub(crate) fn split_last(
+        &self,
+        strategy: i32,
+        halfway: f64,
+        mode: i32,
+        bucket_ends: &[f64],
+        bucket_grid: [f64; 3],
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<Vec<Self>> {
+        if !matches!(strategy, 1 | 2) {
+            return FrontierOutcome::Complete(vec![self.clone()]);
+        }
+        let (forward, bits, predecessor, key, ceiling) = match self.last() {
+            MachinePathSnapshot::Root(_) => return FrontierOutcome::Complete(vec![self.clone()]),
+            MachinePathSnapshot::Forward { state, .. } => (
+                true,
+                state.waiting_bits,
+                state.predecessor.unwrap_or(1e12),
+                state.key,
+                0.,
+            ),
+            MachinePathSnapshot::Backward {
+                front,
+                waiting_bits,
+                key,
+                ceiling,
+                ..
+            } => {
+                let predecessor = match front.provenance.as_ref() {
+                    FrontierProvenance::MachineSplit { predecessor, .. } => *predecessor,
+                    _ => 1e12,
+                };
+                (false, *waiting_bits, predecessor, *key, *ceiling)
+            }
+        };
+        let front = self.last().front();
+        let [function] = front.components.as_ref() else {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired split requires one fixed-array front",
+            ));
+        };
+        let input = super::split::SplitState {
+            pairs: function.pairs().to_vec(),
+            waiting_bits: bits,
+            predecessor,
+            key,
+        };
+        let pieces = match super::split::split_state(
+            &input,
+            forward,
+            strategy,
+            halfway,
+            mode,
+            ceiling,
+            bucket_ends,
+            bucket_grid,
+            budget,
+        ) {
+            Ok(pieces) => pieces,
+            Err(reason) => return FrontierOutcome::Unknown(reason),
+        };
+        if pieces.len() <= 1 {
+            return FrontierOutcome::Complete(vec![self.clone()]);
+        }
+        let mut output = Vec::with_capacity(pieces.len());
+        for piece in pieces {
+            let function = match PreparedSlopeFunction::from_machine_pairs(piece.pairs) {
+                Ok(function) => function,
+                Err(error) => return FrontierOutcome::Unknown(FrontierUnknown::Arithmetic(error)),
+            };
+            let split_front = SlopeFront {
+                components: vec![function].into(),
+                provenance: Arc::new(FrontierProvenance::MachineSplit {
+                    input: front.provenance.clone(),
+                    forward,
+                    strategy,
+                    halfway,
+                    waiting_bits: piece.waiting_bits,
+                    predecessor: piece.predecessor,
+                }),
+                tolerant_alignment: true,
+            };
+            let snapshot = match self.last() {
+                MachinePathSnapshot::Forward { arc, .. } => MachinePathSnapshot::Forward {
+                    arc: *arc,
+                    state: MachineForwardState {
+                        front: split_front,
+                        waiting_bits: piece.waiting_bits,
+                        predecessor: Some(piece.predecessor),
+                        key: piece.key,
+                    },
+                },
+                MachinePathSnapshot::Backward { arc, ceiling, .. } => {
+                    MachinePathSnapshot::Backward {
+                        arc: *arc,
+                        front: split_front,
+                        waiting_bits: piece.waiting_bits,
+                        key: piece.key,
+                        ceiling: *ceiling,
+                    }
+                }
+                MachinePathSnapshot::Root(_) => unreachable!(),
+            };
+            output.push(Self {
+                head: Arc::new(MachinePathNode {
+                    previous: self.head.previous.clone(),
+                    snapshot,
+                }),
+                root: self.root.clone(),
+                len: self.len,
+                max_states: self.max_states,
+            });
+        }
+        FrontierOutcome::Complete(output)
+    }
     /// Apply the full backward paired-resource machine dominance wrapper.
     pub fn backward_dominance(
         &self,

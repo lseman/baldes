@@ -46,6 +46,7 @@ impl<const D: usize> std::fmt::Debug for NodeSnapshot<D> {
 impl<const D: usize> State<D> {
     pub(super) fn fork_state(&self) -> Self {
         State {
+            component_branches: self.component_branches.clone(),
             pricing_witness: self.pricing_witness.clone(),
             tree_incumbent: self.tree_incumbent,
             integer_primal_termination: self.integer_primal_termination,

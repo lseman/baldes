@@ -334,6 +334,24 @@ same resource. `paired_waiting_base_resources` derives head waiting windows
 from scalar vertex/arc bounds; use it only when that scalar coordinate represents
 the paired base state. Disconnected scalar time windows are unsupported here.
 
+A network JSON front program can also supply `vertex_bounds`, one `[lower,
+upper]` pair per physical vertex in original order. These complete paired-base
+windows include isolated vertices and must agree with the source, terminal and
+arc-tail windows used to prepare the program. The Rust equivalent is
+`Graph::set_paired_bucket_vertex_bounds`. Inconsistent or incomplete supplied
+metadata is rejected.
+
+`BALDESlabelDominanceStrategy=1` selects paired insertion without within-bucket
+label rejection and forces `BALDESlabelSplitStrategy=2` (bucket splitting).
+Split strategy 1 uses linear splitting. A paired base without a scalar binding
+has its own single bucket axis, including when ordinary scalar constraints are
+also present. Supply its positive width with network solve option
+`"bucket_steps": [width]`, or CLI `--steps width`; ordinary scalar coordinates
+remain label constraints.
+Splitting also requires complete vertex windows, supplied with `vertex_bounds`
+when program inputs leave isolated vertices unspecified. A scalar-bound base
+uses that scalar coordinate's configured width.
+
 Paired fronts automatically select the front-program domain during preparation.
 They have no alternate source-control or normalization API. Raw interval fronts
 retain their separate `front_program_domain` switch and policies.

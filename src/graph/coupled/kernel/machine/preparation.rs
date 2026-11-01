@@ -133,6 +133,28 @@ impl<const D: usize> Graph<D> {
             a.lower.to_bits() == b.lower.to_bits() && a.upper.to_bits() == b.upper.to_bits()
         };
         let mut vertex_bounds = vec![None; self.vertices.len()];
+        // Preserve explicitly supplied domains for vertices absent from arc
+        // inputs across a reinstallation on the identical physical topology.
+        if let Some(old) = self.coupled.as_ref().and_then(|kernel| {
+            let index = kernel
+                .definitions
+                .iter()
+                .take(resource)
+                .filter(|r| matches!(r, CoupledResource::PairedFront { .. }))
+                .count();
+            kernel
+                .slope_paired
+                .get(index)
+                .filter(|paired| paired.machine_topology_matches(self))
+                .and_then(|paired| paired.machine_vertex_bounds())
+        }) {
+            for (v, bounds) in old.into_iter().enumerate() {
+                if v != self.source && v != self.sink && !self.arcs.iter().any(|arc| arc.tail == v)
+                {
+                    vertex_bounds[v] = bounds;
+                }
+            }
+        }
         for (vertex, bounds) in [(self.source, source_bounds), (self.sink, terminal_bounds)] {
             let Some(slot) = vertex_bounds.get_mut(vertex) else {
                 return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
@@ -387,7 +409,17 @@ impl<const D: usize> Graph<D> {
         } else {
             result
         };
-        if !matches!(result, FrontierOutcome::Complete(())) {
+        if matches!(result, FrontierOutcome::Complete(())) {
+            let kernel = self.coupled.as_mut().expect("prepared coupled kernel");
+            let index = kernel.definitions[..resource]
+                .iter()
+                .filter(|r| matches!(r, CoupledResource::PairedFront { .. }))
+                .count();
+            if kernel.slope_paired[index].set_machine_vertex_bounds(&vertex_bounds) {
+                kernel.identity = std::sync::Arc::new(());
+                kernel.machine_identity = std::sync::Arc::new(());
+            }
+        } else {
             self.coupled = Some(original);
         }
         result

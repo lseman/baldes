@@ -153,8 +153,18 @@ pub(super) fn prepare_with_seed_routes<const D: usize>(
         solver.graph = network.graph.clone();
         solver.graph.graph_id = network.id;
         if !options.bucket_steps.is_empty() {
-            if options.bucket_steps.len() != network.graph.resources.len() {
-                return Err(invalid("bucket steps must list every network resource"));
+            let implicit_paired = match network.graph.coupled_kernel() {
+                Some(kernel) => {
+                    kernel.bound_paired_base_resource(&network.graph).is_none()
+                        && kernel.paired_bucket_domains(&network.graph)?.is_some()
+                }
+                None => false,
+            };
+            let paired_width = implicit_paired && options.bucket_steps.len() == 1;
+            if !paired_width && options.bucket_steps.len() != network.graph.resources.len() {
+                return Err(invalid(
+                    "bucket steps must list every network resource or the implicit paired base",
+                ));
             }
             for (slot, &step) in options.bucket_steps.iter().enumerate() {
                 solver.bucket_steps[slot] = step;
@@ -194,6 +204,7 @@ pub(super) fn prepare_with_seed_routes<const D: usize>(
     }
     let master_only = oracles.is_empty();
     let mut state = State {
+        component_branches: vec![],
         pricing_witness: None,
         tree_incumbent: options.fixing_upper_bound.unwrap_or(f64::INFINITY),
         integer_primal_termination: options.integer_primal_termination,

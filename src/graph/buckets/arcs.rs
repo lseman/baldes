@@ -9,6 +9,9 @@ impl BucketGraph {
             return Err(invalid("positive finite bucket step required"));
         }
         for v in 0..self.order.len() {
+            if self.paired_vertices.as_ref().is_some_and(|known| !known[v]) {
+                continue;
+            }
             let mut total = 1usize;
             for (r, &step) in steps.iter().enumerate().take(self.dimensions) {
                 if self.lower[v][r] > self.upper[v][r] + 1e-6 {
@@ -34,11 +37,62 @@ impl BucketGraph {
         g: &Graph<D>,
         forward: bool,
         physical: usize,
+        q: [f64; 2],
+    ) -> Option<[f64; 2]> {
+        self.propagate_with_axis(g, forward, physical, q, None)
+    }
+
+    /// Project the bound paired axis with its prepared function, leaving any
+    /// independent scalar axes to ordinary resource propagation.
+    pub(crate) fn project<const D: usize>(
+        &self,
+        g: &Graph<D>,
+        forward: bool,
+        physical: usize,
+        q: [f64; 2],
+    ) -> Result<Option<[f64; 2]>> {
+        let Some(kernel) = g.coupled_kernel().filter(|kernel| {
+            self.paired_vertices.is_some() && kernel.machine_paired_join_complete()
+        }) else {
+            return Ok(self.propagate(g, forward, physical, q));
+        };
+        let tail = self.internal[g.arcs[physical].tail];
+        let Some(value) = kernel.paired_bucket_arrival(
+            physical,
+            forward,
+            q[0],
+            [self.lower[tail][0], self.upper[tail][0]],
+            [self.arc_lower[physical][0], self.arc_upper[physical][0]],
+        )?
+        else {
+            return Ok(None);
+        };
+        Ok(self.propagate_with_axis(g, forward, physical, q, Some((0, value))))
+    }
+
+    /// Propagate scalar axes while an owning coupled resource supplies one
+    /// already-propagated coordinate. The replaced axis is not tested against
+    /// an unrelated scalar increment before that replacement.
+    pub(crate) fn propagate_with_axis<const D: usize>(
+        &self,
+        g: &Graph<D>,
+        forward: bool,
+        physical: usize,
         mut q: [f64; 2],
+        replacement: Option<(usize, f64)>,
     ) -> Option<[f64; 2]> {
         let a = &g.arcs[physical];
         let tail = self.internal[a.tail];
         for r in 0..self.dimensions {
+            if let Some((axis, value)) = replacement {
+                if axis == r {
+                    if !value.is_finite() {
+                        return None;
+                    }
+                    q[r] = value;
+                    continue;
+                }
+            }
             if self
                 .resource_slots
                 .get(r)
@@ -77,6 +131,19 @@ impl BucketGraph {
 
     pub fn flags<const D: usize>(&self, g: &Graph<D>, forward: bool, a: &BucketArc) -> u8 {
         let d = self.direction(forward);
+        let physical = &g.arcs[a.physical];
+        let target = self.internal[if forward {
+            physical.head
+        } else {
+            physical.tail
+        }];
+        if self
+            .paired_vertices
+            .as_ref()
+            .is_some_and(|known| !known[target])
+        {
+            return 0;
+        }
         let mut q = d.corners[a.from.vertex][a.from.bucket];
         if let Some(jump) = a.jump {
             for r in 0..self.dimensions {
@@ -88,13 +155,13 @@ impl BucketGraph {
                 }
             }
         }
-        let Some(q) = self.propagate(g, forward, a.physical, q) else {
+        let Ok(Some(q)) = self.project(g, forward, a.physical, q) else {
             return 0;
         };
         // A backward projection can cross an arbitrarily large window gap
         // inside one input cell. `q - step` is not a lower image bound;
         // retain both phase flags and let actual label resources choose.
-        if !forward && g.has_time_windows() {
+        if !forward && g.has_time_windows() && self.paired_vertices.is_none() {
             return 3;
         }
         let border = self.middle + 1e-6;
@@ -152,6 +219,11 @@ impl BucketGraph {
         let mut rows = vec![];
         let mut corners = vec![];
         for v in 0..self.order.len() {
+            if self.paired_vertices.as_ref().is_some_and(|known| !known[v]) {
+                rows.push(vec![]);
+                corners.push(vec![]);
+                continue;
+            }
             let lo = self.lower[v];
             let up = self.upper[v];
             let mut total = 1usize;

@@ -34,6 +34,10 @@ pub struct EngineControls<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS 
     pub bidirectional: bool,
     pub bidirectional_mode: i32,
     pub dominance_mode: i32,
+    /// Paired experimental insertion: comparisons cannot reject or evict.
+    pub partial_dominance: bool,
+    /// 0 keeps a whole paired front, 1 splits segments, 2 splits buckets.
+    pub paired_split_strategy: i32,
     pub steps: crate::graph::ResourceValues<D>,
     pub target_buckets: i32,
     pub group_limit: i32,
@@ -56,6 +60,8 @@ impl<const D: usize> Default for EngineControls<D> {
             bidirectional: true,
             bidirectional_mode: 2,
             dominance_mode: 0,
+            partial_dominance: false,
+            paired_split_strategy: 0,
             steps: [0.; D].into(),
             target_buckets: 100,
             group_limit: 0,
@@ -149,3 +155,7 @@ use context::Context;
 mod directions;
 
 mod load_completion;
+
+#[cfg(test)]
+#[path = "../../../tests/unit/labeling/engine/paired_split_tests.rs"]
+mod paired_split_tests;

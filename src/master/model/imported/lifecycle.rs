@@ -20,6 +20,7 @@ impl<const D: usize> std::fmt::Debug for Definition<D> {
 }
 #[derive(Clone, Debug)]
 pub(super) enum Restriction {
+    ComponentDescriptor(ComponentClassBranching),
     NonlinearRow {
         row: Row,
         kernels: nonlinear::RowKernels,
@@ -66,7 +67,7 @@ impl<const D: usize> Context<D> {
                 _ => upper,
             })
     }
-    fn ordered(&self) -> Vec<&Restriction> {
+    pub(super) fn ordered(&self) -> Vec<&Restriction> {
         let mut result = vec![];
         let mut next = self.restrictions.as_deref();
         while let Some(step) = next {
@@ -86,6 +87,16 @@ pub(super) fn rebuild<const D: usize>(
     previous: Option<&Context<D>>,
     options: Options,
 ) -> Result<ImportedOutput<D>> {
+    let depth = options.cg.node_depth;
+    rebuild_at_depth(definition, previous, options, depth)
+}
+
+pub(super) fn rebuild_at_depth<const D: usize>(
+    definition: Rc<Definition<D>>,
+    previous: Option<&Context<D>>,
+    mut options: Options,
+    depth: usize,
+) -> Result<ImportedOutput<D>> {
     let Compiled {
         problem,
         variables,
@@ -98,10 +109,35 @@ pub(super) fn rebuild<const D: usize>(
         definition,
         restrictions: previous.and_then(|p| p.restrictions.clone()),
     });
-    ImportedOutput::new(
-        solve_with_fixed_routes(problem, variables, options, &fixed, &nonlinear)?,
-        context,
-    )
+    options.cg.node_depth = depth;
+    let mut output = solve_with_node_depth(problem, variables, options, &fixed, &nonlinear, &[])?;
+    if let Some(previous) = previous {
+        output.snapshot.state.component_branches = previous
+            .ordered()
+            .into_iter()
+            .filter_map(|r| match r {
+                Restriction::ComponentDescriptor(class) => Some(class.clone()),
+                _ => None,
+            })
+            .collect();
+    }
+    ImportedOutput::new(output, context)
+}
+
+pub(super) fn solve_with_node_depth<const D: usize>(
+    problem: Problem<D>,
+    variables: Vec<MasterVariable>,
+    options: Options,
+    fixed: &[FixedRoute],
+    nonlinear: &[(usize, nonlinear::RowKernels)],
+    seeds: &[NetworkRoute],
+) -> Result<Output<D>> {
+    let depth = options.cg.node_depth;
+    let (master, mut state, options) = super::super::solve::prepare_with_seed_routes(
+        problem, variables, options, fixed, nonlinear, seeds,
+    )?;
+    state.node_depth = depth;
+    super::super::solve::run(master, state, options)
 }
 
 pub(super) struct Compiled<const D: usize> {
@@ -131,6 +167,9 @@ pub(super) fn compile_definition<const D: usize>(
     let mut nonlinear = vec![];
     if let Some(previous) = previous {
         for restriction in previous.ordered() {
+            if matches!(restriction, Restriction::ComponentDescriptor(_)) {
+                continue;
+            }
             if let Restriction::NonlinearRow {
                 row,
                 kernels,
@@ -202,6 +241,7 @@ pub(super) fn compile_definition<const D: usize>(
             }
             let (ids, bounds) = match *restriction {
                 Restriction::RoutingMultiplicity(..)
+                | Restriction::ComponentDescriptor(_)
                 | Restriction::FixedRoute(..)
                 | Restriction::SharedRow { .. }
                 | Restriction::NonlinearRow { .. } => {

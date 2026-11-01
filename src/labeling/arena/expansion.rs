@@ -84,82 +84,85 @@ impl<const D: usize> LabelArena<D> {
         count
     }
 
-    pub(crate) fn unexpand_where(&mut self, mut predicate: impl FnMut(&[f64]) -> bool) {
+    pub(crate) fn unexpand_where(
+        &mut self,
+        mut predicate: impl FnMut(&[f64], Option<&crate::graph::coupled::CoupledLabelState>) -> bool,
+    ) {
         self.inspected.take();
         match &mut self.records {
             Records::Ordinary(v) => {
                 for label in v {
-                    if predicate(&label.resources) {
+                    if predicate(&label.resources, label.coupled_state()) {
                         label.expanded = false;
                     }
                 }
             }
             Records::Extended(v) => {
                 for label in v {
-                    if predicate(&label.base.resources) {
+                    if predicate(&label.base.resources, label.coupled_state()) {
                         label.base.expanded = false;
                     }
                 }
             }
             Records::Branched(v) => {
                 for label in v {
-                    if predicate(&label.base.resources) {
+                    if predicate(&label.base.resources, label.coupled_state()) {
                         label.base.expanded = false;
                     }
                 }
             }
             Records::Compact2(v) => {
                 for label in v {
-                    if predicate(&label.base.resources) {
+                    if predicate(&label.base.resources, label.coupled_state()) {
                         label.base.expanded = false;
                     }
                 }
             }
             Records::Compact4(v) => {
                 for label in v {
-                    if predicate(&label.base.resources) {
+                    if predicate(&label.base.resources, label.coupled_state()) {
                         label.base.expanded = false;
                     }
                 }
             }
             Records::Compact8(v) => {
                 for label in v {
-                    if predicate(&label.base.resources) {
+                    if predicate(&label.base.resources, label.coupled_state()) {
                         label.base.expanded = false;
                     }
                 }
             }
             Records::Auxiliary2(v) => {
                 for label in v {
-                    if predicate(&label.base.resources) {
+                    if predicate(&label.base.resources, label.coupled_state()) {
                         label.base.expanded = false;
                     }
                 }
             }
             Records::Auxiliary4(v) => {
                 for label in v {
-                    if predicate(&label.base.resources) {
+                    if predicate(&label.base.resources, label.coupled_state()) {
                         label.base.expanded = false;
                     }
                 }
             }
             Records::Auxiliary8(v) => {
                 for label in v {
-                    if predicate(&label.base.resources) {
+                    if predicate(&label.base.resources, label.coupled_state()) {
                         label.base.expanded = false;
                     }
                 }
             }
             Records::AuxiliaryFull(v) => {
                 for label in v {
-                    if predicate(&label.base.resources) {
+                    if predicate(&label.base.resources, label.coupled_state()) {
                         label.base.expanded = false;
                     }
                 }
             }
             Records::Full(v) => {
                 for label in v {
-                    if predicate(&label.resources) {
+                    if predicate(&label.resources, label.coupled_state()) {
                         label.expanded = false;
                     }
                 }

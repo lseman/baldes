@@ -8,11 +8,15 @@ mod fixed_solution_cuts;
 mod greedy;
 mod integer_objective;
 mod local_search;
+mod master_heuristic;
 mod parallel;
 mod primal_callbacks;
 pub use diving::DivingOptions;
 pub use fixed_solution_cuts::{FixedSolutionCut, FixedSolutionInput, FixedSolutionSeparator};
 pub use local_search::LocalSearchOptions;
+pub use master_heuristic::{
+    MasterHeuristic, MasterHeuristicInput, ResidualMasterCoordinate, ResidualMasterSolution,
+};
 pub use primal_callbacks::{
     PrimalHeuristic, PrimalHeuristicInput, PrimalHeuristicSolution, PrimalHeuristicSource,
 };
@@ -136,6 +140,8 @@ pub struct ModelTreeOptions {
     pub mapped_variables: Vec<MappedBranchVariable>,
     /// Explicit whole-column classes; automatic native class-tree generation is separate.
     pub component_classes: Vec<ComponentClassBranching>,
+    /// Registered integer-coordinate families with automatic class generation.
+    pub component_generators: Vec<ComponentClassGenerator>,
     pub packing: Option<PackingBranching>,
     /// Cluster boundary and pair generators, each on one network's arcs.
     pub clusters: Vec<NetworkClusterBranching>,
@@ -147,6 +153,8 @@ pub struct ModelTreeOptions {
     pub greedy: bool,
     /// Application-defined primal candidates, replayed before acceptance.
     pub primal_heuristics: Vec<PrimalHeuristic>,
+    /// Residual master candidate before dive child cuts and column generation.
+    pub master_heuristic: Option<MasterHeuristic>,
     /// User presence cuts separated before a dive child evaluates its fixed solution.
     pub fixed_solution_separators: Vec<FixedSolutionSeparator>,
     /// Random incumbent partial-column fixing and child diving; disabled by default.
@@ -249,12 +257,14 @@ impl Default for ModelTreeOptions {
             branch_directions: BTreeMap::new(),
             mapped_variables: vec![],
             component_classes: vec![],
+            component_generators: vec![],
             packing: None,
             clusters: vec![],
             ryan_foster: None,
             diving: None,
             greedy: false,
             primal_heuristics: vec![],
+            master_heuristic: None,
             fixed_solution_separators: vec![],
             local_search: None,
             restricted_master_mip: None,
@@ -285,6 +295,9 @@ pub struct ModelTreeOutput {
     pub routes: Vec<FixedRoute>,
     pub master_values: Vec<(i32, f64)>,
     pub nodes: usize,
+    /// Dispatches containing two or more concurrently evaluated fresh nodes.
+    /// Prepared results, singleton dispatches and heuristic solves are excluded.
+    pub parallel_batches: usize,
     /// Fresh node work, including exact-pricing trials and bound-pruned fresh nodes.
     /// Reusing a completed exact trial does not count it a second time.
     pub processed_nodes: usize,
@@ -588,6 +601,21 @@ fn solve<const D: usize>(start: Start<D>, options: ModelTreeOptions) -> Result<M
                 }
             }
         }
+        for generator in &mut options.component_generators {
+            if let Some(w) = windows.iter().find(|w| w.network == generator.network) {
+                let positions = &component_positions[&generator.network];
+                let copies: Vec<_> = w
+                    .split
+                    .arcs
+                    .iter()
+                    .filter(|a| a.arc != a.original)
+                    .map(|a| (positions.len(), positions[&a.original]))
+                    .enumerate()
+                    .map(|(i, (base, original))| (base + i, original))
+                    .collect();
+                generator.remap_arcs(&copies)?;
+            }
+        }
         for variable in &mut options.mapped_variables {
             for contribution in &mut variable.networks {
                 if let Some(w) = windows.iter().find(|w| w.network == contribution.network) {
@@ -641,6 +669,13 @@ fn solve_split<const D: usize>(
     validate_options(&options.node)?;
     options.node.integer_primal_termination = true;
     options.branch_priorities.validate()?;
+    if options
+        .master_heuristic
+        .as_ref()
+        .is_some_and(|h| h.name.trim().is_empty())
+    {
+        return Err(invalid("master heuristic name must be nonempty"));
+    }
     if options
         .primal_heuristics
         .iter()
@@ -817,6 +852,27 @@ fn solve_split<const D: usize>(
         .ok_or_else(|| invalid("component class network"))?;
         class.for_graph(graph)?;
     }
+    let mut generator_names = HashSet::new();
+    for generator in &options.component_generators {
+        if !generator_names.insert(&generator.name) {
+            return Err(invalid("duplicate component generator name"));
+        }
+        let graph = match &start {
+            Start::Fresh(problem, _) => problem
+                .networks
+                .iter()
+                .find(|n| n.id == generator.network)
+                .map(|n| &n.graph),
+            Start::Snapshot(node) => node
+                .state
+                .oracles
+                .iter()
+                .find(|o| o.network.id == generator.network)
+                .map(|o| o.network.graph.as_ref()),
+        }
+        .ok_or_else(|| invalid("component generator network"))?;
+        generator.validate(graph)?;
+    }
     let networks: Vec<_> = match &start {
         Start::Fresh(problem, variables) => {
             problem.validate()?;
@@ -858,6 +914,7 @@ fn solve_split<const D: usize>(
         routes: vec![],
         master_values: vec![],
         nodes: 0,
+        parallel_batches: 0,
         processed_nodes: 0,
         strong_branching_trials: 0,
         mapped_history_ranked: 0,

@@ -281,12 +281,30 @@ pub(super) fn run_with_residuals<const D: usize>(
                         if Instant::now() >= end || dive.nodes >= config.node_limit {
                             break;
                         }
-                        match solve_child(&node, options, config, best, end, &entry.residuals) {
+                        let mut early = None;
+                        let evaluated = solve_child(
+                            &node,
+                            options,
+                            config,
+                            best,
+                            end,
+                            &entry.residuals,
+                            &mut early,
+                        );
+                        if let Some(witness) = early.filter(|w| w.0 < best) {
+                            best = witness.0;
+                            guidance = Some(witness.clone());
+                            dive.incumbent = Some(witness);
+                        }
+                        match evaluated {
                             Ok(output) => {
                                 dive.count(&output);
                                 output
                             }
                             Err(error) if budget_error(&error) => {
+                                if config.stop_after_first_solution && dive.incumbent.is_some() {
+                                    return Ok(dive);
+                                }
                                 current = pop_deepest(&mut heap);
                                 continue;
                             }
@@ -314,6 +332,9 @@ pub(super) fn run_with_residuals<const D: usize>(
                 }
             }
         }
+        if config.stop_after_first_solution && dive.incumbent.is_some() {
+            break;
+        }
         let children = children(
             output,
             options,
@@ -327,6 +348,13 @@ pub(super) fn run_with_residuals<const D: usize>(
             end,
             &mut dive,
         )?;
+        if let Some(witness) = dive.incumbent.as_ref().filter(|w| w.0 < best) {
+            best = witness.0;
+            guidance = Some(witness.clone());
+        }
+        if config.stop_after_first_solution && dive.incumbent.is_some() {
+            break;
+        }
         for (pending, discrepancy, tabu, residuals) in children {
             heap.push(Entry {
                 pending,
@@ -362,6 +390,7 @@ fn budget_error(error: &crate::core::error::OrError) -> bool {
     error.message.contains("time limit") || error.message.contains("label limit")
 }
 
+#[allow(clippy::too_many_arguments)]
 fn solve_child<const D: usize>(
     node: &NodeSnapshot<D>,
     options: &ModelTreeOptions,
@@ -369,6 +398,7 @@ fn solve_child<const D: usize>(
     best: f64,
     end: Instant,
     residuals: &Residuals,
+    early: &mut Option<IntegerWitness>,
 ) -> Result<Output<D>> {
     let mut configured = options.node.clone();
     configured.fixing_upper_bound = best.is_finite().then_some(best);
@@ -377,13 +407,28 @@ fn solve_child<const D: usize>(
         .cg
         .time_limit
         .min(end.saturating_duration_since(Instant::now()));
-    let prepared =
-        fixed_solution_cuts::prepare(node, options, residuals.values().any(|q| *q != 0.))?;
+    let heuristic = master_heuristic::prepare(node, options, residuals)?;
+    let node = heuristic.node.as_ref().unwrap_or(node);
+    let prepared = fixed_solution_cuts::prepare_with_routes(
+        node,
+        options,
+        residuals.values().any(|q| *q != 0.),
+        heuristic.routes.as_deref(),
+    )?;
+    let node = prepared.as_ref().unwrap_or(node);
+    *early = if options.master_heuristic.is_some() {
+        master_heuristic::retained_witness(node)?.filter(|w| w.0 < best)
+    } else {
+        None
+    };
+    if let Some(witness) = early.as_ref() {
+        configured.fixing_upper_bound = Some(best.min(witness.0));
+    }
     configured.cg.time_limit = configured
         .cg
         .time_limit
         .min(end.saturating_duration_since(Instant::now()));
-    prepared.as_ref().unwrap_or(node).solve(configured)
+    node.solve(configured)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -474,7 +519,21 @@ fn children<const D: usize>(
         let Ok(child) = fix_variable(parent, tag, value, &mut child_residuals) else {
             continue;
         };
-        match solve_child(&child, options, config, best, end, &child_residuals) {
+        let best = dive.incumbent.as_ref().map_or(best, |w| best.min(w.0));
+        let mut early = None;
+        let evaluation = solve_child(
+            &child,
+            options,
+            config,
+            best,
+            end,
+            &child_residuals,
+            &mut early,
+        );
+        if let Some(witness) = early.filter(|w| w.0 < best) {
+            dive.incumbent = Some(witness);
+        }
+        match evaluation {
             Ok(solved) => {
                 dive.count(&solved);
                 if solved.master.status == cg::Status::Optimal
@@ -485,6 +544,9 @@ fn children<const D: usize>(
             }
             Err(error) if budget_error(&error) => {}
             Err(error) => return Err(error),
+        }
+        if config.stop_after_first_solution && dive.incumbent.is_some() {
+            break;
         }
     }
     evaluated.sort_by(|a, b| a.1.master.lp.total_cmp(&b.1.master.lp));
@@ -553,3 +615,7 @@ fn fix_variable<const D: usize>(
 #[cfg(test)]
 #[path = "../../../../../tests/unit/master/tree/diving_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../../../../tests/unit/master/tree/master_heuristic_tests.rs"]
+mod master_heuristic_tests;

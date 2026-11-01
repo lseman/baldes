@@ -48,6 +48,9 @@ pub struct BucketGraph {
     pub backward: Direction,
     pub bidirectional: bool,
     pub dimensions: usize,
+    /// Paired indexing owns one base axis; absent entries have no supplied
+    /// domain and cannot lie on a complete path. No scalar slot is fabricated.
+    pub(crate) paired_vertices: Option<Vec<bool>>,
     pub lower: Vec<[f64; 2]>,
     pub upper: Vec<[f64; 2]>,
     pub stride: Vec<[usize; 2]>,

@@ -117,6 +117,27 @@ impl ProximalWarmStart {
         } else {
             return Ok(None);
         }
+        if node_depth > self.node_depth {
+            if let (Some(curvature), Some(configuration)) =
+                (&mut snapshot.curvature, &parameters.curvature)
+            {
+                // Setup reuses the inherited outer radius as its measured mean.
+                curvature.update(crate::master::stabilization::curvature::CurvatureFeedback {
+                    mean_dual_distance: Some(curvature.outer_radius),
+                    advance_rate: configuration.advance_rate,
+                })?;
+            } else {
+                // Node records store configured caps, rather than the temporary
+                // caps reduced by artificial-activity retries in the parent.
+                let configured = parameters.explicit.as_ref().map_or_else(
+                    || parameters.bands.clone(),
+                    |explicit| explicit.initial_bands(),
+                );
+                for (band, configured) in snapshot.explicit_bands.iter_mut().zip(configured) {
+                    band.penalty = configured.penalty;
+                }
+            }
+        }
         if node_depth > self.node_depth && parameters.curvature.is_none() && !parameters.multi_point
         {
             if let Some(baseline) = snapshot.explicit_baseline {

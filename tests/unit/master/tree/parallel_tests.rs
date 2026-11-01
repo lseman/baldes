@@ -25,6 +25,11 @@ fn parallel_batches_prove_the_sequential_optimum() {
     assert_eq!(sequential.status, crate::master::tree::TreeStatus::Optimal);
     assert_eq!(parallel.status, crate::master::tree::TreeStatus::Optimal);
     assert!(parallel.nodes > 1);
+    assert_eq!(sequential.parallel_batches, 0);
+    assert!(parallel.parallel_batches > 0);
+    assert!(parallel.parallel_batches * 2 <= parallel.nodes);
+    let report = crate::master::model::format::SolveResult::tree(&parallel, 0.);
+    assert_eq!(report.parallel_batches, parallel.parallel_batches);
     assert!(
         (sequential.incumbent - parallel.incumbent).abs() < 1e-6,
         "{} {}",

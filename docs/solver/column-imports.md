@@ -216,6 +216,16 @@ and evaluates its numerical reduced cost with the same reconstructed row maps.
 Original-coordinate objective costs enter through these duals; do not add them
 a second time. These are numerical search signals, not certified lower bounds.
 
+Callbacks can inspect the explicit restrictions of their request with
+`point.original_bounds(id)`, `point.column_bounds(column_id)` and
+`point.multiplicity_bounds()`. Repeated child restrictions intersect the
+original declaration. Column IDs are local to the request's group; retargeting
+with `for_subproblem` changes that qualification. These accessors include no
+deductions from the finite restricted master. Original bounds constrain
+aggregate coordinates across groups, and multiplicity bounds constrain total
+group quantity. They do not bound each future pattern's vector.
+`point.envelope()` returns the optional declared per-pattern domain instead.
+
 `point.reduced_cost_bounds(column)` returns an enclosure of that candidate's
 exact-real reduced cost at the stored binary64 dual point. Exact expansions
 preserve cancellation; directed intervals handle fractional underflow. `None`
@@ -390,6 +400,19 @@ without additions or completion returns `Incomplete` with a reusable frontier.
 Callback errors or invalid batches preserve the input tree; external callback
 side effects remain caller-owned. Both budgets share one deadline, and
 synchronous callbacks must cooperate with the remaining-time argument.
+
+For an optimizer with resumable node state, implement `ImportOracle` and call
+`tree.run_with_oracle(&tree_options, &limits, &mut oracle)`. `setup_node` runs
+after the child's explicit restrictions have been replayed and before pricing;
+`price` returns the usual `ImportOracleReply`. `record_node` saves state for a
+retained node. Its optional `ImportOracleState` is an immutable, type-erased
+`Rc` snapshot shared by siblings, then supplied to each child's setup separately;
+keep mutable working state in the oracle rather than mutating a shared snapshot.
+Setup receives the group's current bounds and node depth. All three hooks
+receive the remaining shared time budget and must cooperate with it. Returning
+`ImportOracleSetup::Infeasible` closes the node only in numerical mode; certified
+mode keeps it `Incomplete` because this callback result supplies no certificate.
+Existing closure callbacks remain supported without state hooks.
 
 Open sessions also provide `with_variable_bounds`, `with_column_bounds`,
 `with_multiplicity`, `with_routing_multiplicity`, `with_row`,

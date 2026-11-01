@@ -50,7 +50,15 @@ impl FixedSolutionSeparator {
     }
 }
 
+#[cfg(test)]
 fn input<const D: usize>(node: &NodeSnapshot<D>) -> FixedSolutionInput {
+    input_with_routes(node, None)
+}
+
+fn input_with_routes<const D: usize>(
+    node: &NodeSnapshot<D>,
+    routes: Option<&[FixedRoute]>,
+) -> FixedSolutionInput {
     let mut fixed_routes: Vec<FixedRoute> = Vec::new();
     let mut identities: HashMap<(i32, String), usize> = HashMap::new();
     for fixed in &node.state.fixed_routes {
@@ -66,24 +74,35 @@ fn input<const D: usize>(node: &NodeSnapshot<D>) -> FixedSolutionInput {
     // discarding the parent primal map. Native separation observes that map
     // before the new child's first column-generation evaluation.
     let values = node.master.values();
-    let residual_routes = node
-        .warm
-        .columns
-        .iter()
-        .enumerate()
-        .filter_map(|(column, metadata)| {
-            let tag = usize::try_from(metadata.as_ref()?.tag).ok()?;
-            let route = node.state.routes.get(tag)?;
-            let quantity = *values.get(column)?;
-            if quantity == 0. || identities.contains_key(&(route.network, route.route.identity())) {
-                return None;
-            }
-            Some(FixedRoute {
-                route: route.as_ref().clone(),
-                quantity,
+    let residual_routes = if let Some(routes) = routes {
+        routes
+            .iter()
+            .filter(|route| {
+                !identities.contains_key(&(route.route.network, route.route.route.identity()))
             })
-        })
-        .collect();
+            .cloned()
+            .collect()
+    } else {
+        node.warm
+            .columns
+            .iter()
+            .enumerate()
+            .filter_map(|(column, metadata)| {
+                let tag = usize::try_from(metadata.as_ref()?.tag).ok()?;
+                let route = node.state.routes.get(tag)?;
+                let quantity = *values.get(column)?;
+                if quantity == 0.
+                    || identities.contains_key(&(route.network, route.route.identity()))
+                {
+                    return None;
+                }
+                Some(FixedRoute {
+                    route: route.as_ref().clone(),
+                    quantity,
+                })
+            })
+            .collect()
+    };
     FixedSolutionInput {
         residual_routes,
         fixed_routes,
@@ -93,17 +112,27 @@ fn input<const D: usize>(node: &NodeSnapshot<D>) -> FixedSolutionInput {
 /// Returned rows live on a private node; no-op separation needs no copy.
 /// A static-only fixed solution triggers the
 /// lifecycle too, while the callback's route lists deliberately omit statics.
+#[cfg(test)]
 pub(super) fn prepare<const D: usize>(
     node: &NodeSnapshot<D>,
     options: &ModelTreeOptions,
     fixed_static: bool,
+) -> Result<Option<NodeSnapshot<D>>> {
+    prepare_with_routes(node, options, fixed_static, None)
+}
+
+pub(super) fn prepare_with_routes<const D: usize>(
+    node: &NodeSnapshot<D>,
+    options: &ModelTreeOptions,
+    fixed_static: bool,
+    routes: Option<&[FixedRoute]>,
 ) -> Result<Option<NodeSnapshot<D>>> {
     if options.fixed_solution_separators.is_empty()
         || (node.state.fixed_routes.is_empty() && !fixed_static)
     {
         return Ok(None);
     }
-    let input = input(node);
+    let input = input_with_routes(node, routes);
     let mut cuts = Vec::new();
     for separator in &options.fixed_solution_separators {
         cuts.extend((separator.callback)(&input)?);

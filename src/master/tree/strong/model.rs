@@ -120,6 +120,10 @@ impl History {
 /// native priority/quota admission, never for the entire physical-arc registry.
 pub(super) enum Restriction {
     Component(ComponentClassBranching),
+    GeneratedComponent {
+        class: ComponentClassBranching,
+        ordinal: usize,
+    },
     Mapped(MappedBranchVariable),
     Resource(ResourceGroupCandidate),
     Assignment {
@@ -165,7 +169,7 @@ impl Proposal {
             },
         ];
         match &self.restriction {
-            Restriction::Component(class) => bounds
+            Restriction::Component(class) | Restriction::GeneratedComponent { class, .. } => bounds
                 .into_iter()
                 .map(|b| node.with_component_bounds(class, b))
                 .collect(),
@@ -391,6 +395,7 @@ pub(super) fn validate(options: &crate::master::tree::StrongBranchingOptions) ->
 pub(super) fn registered_proposals<const D: usize>(
     output: &Output<D>,
     options: &ModelTreeOptions,
+    deadline: Option<Instant>,
 ) -> Result<Vec<Proposal>> {
     let mut proposals = mapped_proposals(output, &options.mapped_variables, options.tolerance)?;
     for class in &options.component_classes {
@@ -398,6 +403,18 @@ pub(super) fn registered_proposals<const D: usize>(
             proposals.push(proposal);
         }
     }
+    let quota = options
+        .mapped_strong_branching
+        .as_ref()
+        .and_then(|strong| strong.phases.first())
+        .map_or(1, |phase| phase.candidates);
+    proposals.extend(component::generated_proposals(
+        output,
+        &options.component_generators,
+        quota,
+        options.tolerance,
+        deadline,
+    )?);
     for clusters in &options.clusters {
         proposals.extend(clusters.proposals(output, options.tolerance)?);
     }
@@ -463,6 +480,19 @@ pub(super) fn choose_proposals<const D: usize>(
     // non-strong path. Reorder only their own slots: packing and other
     // families retain their separately defined tie rules and priorities.
     rank_mapped_slots(&proposals, &options.mapped_variables, &mut order);
+    let component_slots: Vec<_> = proposals
+        .iter()
+        .enumerate()
+        .filter_map(|(index, p)| match p.restriction {
+            Restriction::GeneratedComponent { ordinal, .. } => Some((index, ordinal)),
+            _ => None,
+        })
+        .collect();
+    let mut ranked_components = component_slots.clone();
+    ranked_components.sort_by_key(|&(_, ordinal)| ordinal);
+    for (&(slot, _), (index, _)) in component_slots.iter().zip(ranked_components) {
+        order[slot] = index;
+    }
     let mut groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     for (index, proposal) in proposals.iter().enumerate() {
         if matches!(proposal.restriction, Restriction::Multiplicity { .. }) {
@@ -546,6 +576,7 @@ pub(super) fn choose_proposals<const D: usize>(
     }
     priorities.extend(options.clusters.iter().map(|c| c.priority));
     priorities.extend(options.component_classes.iter().map(|c| c.priority));
+    priorities.extend(options.component_generators.iter().map(|g| g.priority));
     priorities.extend(options.ryan_foster.iter().map(|r| r.priority));
     if options.branching != NetworkBranchingPolicy::Phased {
         // Preset policies rank inferred families relative to the registered

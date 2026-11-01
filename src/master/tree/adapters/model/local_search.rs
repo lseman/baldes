@@ -242,9 +242,23 @@ fn child_dive<const D: usize>(
         .cg
         .time_limit
         .min(end.saturating_duration_since(Instant::now()));
-    let child =
-        fixed_solution_cuts::prepare(&child, options, residuals.values().any(|q| *q != 0.))?
-            .unwrap_or(child);
+    let heuristic = master_heuristic::prepare(&child, options, residuals)?;
+    let child = heuristic.node.unwrap_or(child);
+    let child = fixed_solution_cuts::prepare_with_routes(
+        &child,
+        options,
+        residuals.values().any(|q| *q != 0.),
+        heuristic.routes.as_deref(),
+    )?
+    .unwrap_or(child);
+    let early = if options.master_heuristic.is_some() {
+        master_heuristic::retained_witness(&child)?.filter(|w| w.0 < incumbent)
+    } else {
+        None
+    };
+    if let Some(witness) = early.as_ref() {
+        node_options.fixing_upper_bound = Some(incumbent.min(witness.0));
+    }
     node_options.cg.time_limit = node_options
         .cg
         .time_limit
@@ -254,15 +268,23 @@ fn child_dive<const D: usize>(
         Err(error)
             if error.message.contains("time limit") || error.message.contains("label limit") =>
         {
-            return Ok(diving::Dive::default());
+            return Ok(diving::Dive {
+                incumbent: early,
+                ..Default::default()
+            });
         }
         Err(error) => return Err(error),
     };
+    let solved_witness = solved
+        .snapshot
+        .integer_witness(options.tolerance)?
+        .filter(|candidate| candidate.0 < incumbent);
+    let witness = match (early, solved_witness) {
+        (Some(a), Some(b)) => Some(if a.0 <= b.0 { a } else { b }),
+        (a, b) => a.or(b),
+    };
     let mut total = diving::Dive {
-        incumbent: solved
-            .snapshot
-            .integer_witness(options.tolerance)?
-            .filter(|candidate| candidate.0 < incumbent),
+        incumbent: witness,
         nodes: 1,
         iterations: solved.master.iterations,
         pricing_calls: solved.master.pricing_calls,

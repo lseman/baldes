@@ -111,8 +111,8 @@ impl Route {
             .filter(|kernel| kernel.machine_paired_join_complete())
         {
             if self.coupled_values.is_empty() {
-                return Ok(kernel
-                    .joined_machine_path_matching(positions, None)?
+                return Ok(graph
+                    .recorded_paired_path_matching(positions, None)?
                     .is_some_and(|(_, value)| value.is_none()));
             }
             let [(resource, value)] = self.coupled_values.as_slice() else {
@@ -121,8 +121,8 @@ impl Route {
             if kernel.retained_paired_machine_resource() != Some(*resource) {
                 return Ok(false);
             }
-            return Ok(kernel
-                .joined_machine_path_matching(positions, Some(*value))?
+            return Ok(graph
+                .recorded_paired_path_matching(positions, Some(*value))?
                 .is_some());
         }
         Ok(graph.coupled_paired_values(positions)? == self.coupled_values)
@@ -146,8 +146,8 @@ impl Route {
                 }
                 _ => return Ok(None),
             };
-            return Ok(kernel
-                .joined_associated_machine_path_matching(positions, selected)?
+            return Ok(graph
+                .recorded_paired_path_matching(positions, selected)?
                 .and_then(|(cost, value)| {
                     (selected.is_some() || value.is_none()).then_some(cost)
                 }));

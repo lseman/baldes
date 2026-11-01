@@ -2,11 +2,15 @@
 use super::*;
 pub use certificate::ImportCertificate;
 pub(super) mod certificate;
+mod context;
+pub use context::ImportOracleNode;
 mod enclosure;
 mod envelope;
 mod feasibility;
 mod objective;
 mod oracle;
+mod oracle_lifecycle;
+pub use oracle_lifecycle::{ImportOracle, ImportOracleSetup, ImportOracleState};
 pub(super) mod session;
 pub use oracle::{ImportOracleReply, ImportPricingMinimum};
 
@@ -31,6 +35,7 @@ pub struct ImportCosts {
 /// infeasibility conclusion or completion flag is carried by this object.
 #[derive(Clone, Debug)]
 pub struct ImportPricing<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    node_depth: usize,
     epoch: Rc<()>,
     context: Rc<Context<D>>,
     definition: Rc<Definition<D>>,
@@ -47,6 +52,10 @@ pub struct ImportPricing<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }
     open_groups: Rc<BTreeSet<i32>>,
 }
 impl<const D: usize> ImportPricing<D> {
+    /// Actual imported-tree depth of the restricted solve that produced this point.
+    pub fn node_depth(&self) -> usize {
+        self.node_depth
+    }
     pub(in crate::master::model::imported) fn open_group_ids(&self) -> &BTreeSet<i32> {
         &self.open_groups
     }
@@ -201,3 +210,7 @@ pub(super) fn next_point<const D: usize>(
 #[cfg(test)]
 #[path = "../../../../../tests/unit/master/model/imported/pricing/candidate_tests.rs"]
 mod candidate_tests;
+
+#[cfg(test)]
+#[path = "../../../../../tests/unit/master/model/imported/pricing/context_tests.rs"]
+mod context_tests;

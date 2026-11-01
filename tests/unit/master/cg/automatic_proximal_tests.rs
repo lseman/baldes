@@ -336,3 +336,147 @@ fn all_inactive_native_candidates_do_not_manufacture_zero_mean_feedback() {
     assert_eq!(state.curvature, 1e12);
     assert_eq!(state.outer_radius, 1e12);
 }
+
+#[test]
+fn child_setup_matches_recorded_geometry_and_restores_configured_caps() {
+    use crate::master::stabilization::curvature::CurvatureState;
+    use crate::master::stabilization::proximal::ExplicitParameters;
+    use crate::master::stabilization::ProximalBand;
+    let capture: serde_json::Value =
+        serde_json::from_str(include_str!("record_setup_capture.json")).unwrap();
+    assert_eq!(capture["cases"].as_array().unwrap().len(), 9);
+    for case in capture["cases"].as_array().unwrap() {
+        let mode = case["mode"].as_u64().unwrap();
+        let factor = case["factor"].as_f64().unwrap();
+        let (master, state, _) = checkpoint();
+        let mut parameters = match mode {
+            0 => {
+                let mut p = ProximalParameters::automatic_five_piece();
+                p.curvature.as_mut().unwrap().advance_rate = 0.5;
+                p
+            }
+            1 => ProximalParameters::explicit(ExplicitParameters {
+                five_piece: true,
+                kappa: -1.,
+                outer_half_width: 27.,
+                inner_half_width: 14.,
+                outer_penalty: 6.,
+                inner_penalty: 5.,
+                ..Default::default()
+            }),
+            2 => {
+                let mut p = ProximalParameters::five_piece(
+                    ProximalBand {
+                        half_width: 14.,
+                        penalty: 6.,
+                    },
+                    ProximalBand {
+                        half_width: 27.,
+                        penalty: 5.,
+                    },
+                );
+                p.multi_point = true;
+                p
+            }
+            _ => unreachable!(),
+        };
+        parameters.child_half_interval_factor = factor;
+        let mut snapshot = state.snapshot().unwrap();
+        snapshot.configuration = parameters.curvature.clone();
+        snapshot.curvature = (mode == 0).then_some(CurvatureState {
+            outer_radius: 8.,
+            inner_radius: Some(4.),
+            curvature: 3.,
+        });
+        snapshot.explicit_bands = if mode == 0 {
+            vec![]
+        } else {
+            vec![
+                ProximalBand {
+                    half_width: 14.,
+                    penalty: 0.6,
+                },
+                ProximalBand {
+                    half_width: 27.,
+                    penalty: 0.5,
+                },
+            ]
+        };
+        snapshot.explicit_baseline = Some(7.);
+        let mut retained = ProximalState::default();
+        retained.inherit(&snapshot).unwrap();
+        let mut warm =
+            ProximalWarmStart::capture(&retained, &master, &NoController, &parameters, &[], &[], 0)
+                .unwrap()
+                .unwrap();
+        warm.child = true;
+        let same_node = warm
+            .restore(&master, &NoController, &parameters, 0)
+            .unwrap()
+            .unwrap();
+        assert_eq!(same_node.curvature, snapshot.curvature);
+        assert_eq!(
+            same_node.explicit_bands.len(),
+            snapshot.explicit_bands.len()
+        );
+        for (actual, expected) in same_node
+            .explicit_bands
+            .iter()
+            .zip(&snapshot.explicit_bands)
+        {
+            assert_eq!(actual.half_width, expected.half_width);
+            assert_eq!(actual.penalty, expected.penalty);
+        }
+        let child = warm
+            .restore(&master, &NoController, &parameters, 1)
+            .unwrap()
+            .unwrap();
+        let expected = |offset: &str| case["setup"][offset].as_f64().unwrap();
+        if mode == 0 {
+            let curvature = child.curvature.unwrap();
+            assert_eq!(curvature.curvature, expected("0x40"));
+            assert_eq!(curvature.outer_radius, expected("0x80"));
+            assert_eq!(curvature.inner_radius, Some(expected("0x78")));
+        } else {
+            assert_eq!(child.explicit_bands[0].half_width, expected("0x88"));
+            assert_eq!(child.explicit_bands[1].half_width, expected("0x90"));
+            assert_eq!(child.explicit_bands[0].penalty, expected("0xd0"));
+            assert_eq!(child.explicit_bands[1].penalty, expected("0xc8"));
+        }
+        let mut previous = child;
+        for descendant in case["descendants"].as_array().unwrap() {
+            let depth = descendant["depth"].as_u64().unwrap() as usize;
+            let mut retained = ProximalState::default();
+            retained.inherit(&previous).unwrap();
+            let mut warm = ProximalWarmStart::capture(
+                &retained,
+                &master,
+                &NoController,
+                &parameters,
+                &[],
+                &[],
+                depth - 1,
+            )
+            .unwrap()
+            .unwrap();
+            warm.child = true;
+            let next = warm
+                .restore(&master, &NoController, &parameters, depth)
+                .unwrap()
+                .unwrap();
+            let expected = |offset: &str| descendant["setup"][offset].as_f64().unwrap();
+            if mode == 0 {
+                let curvature = next.curvature.unwrap();
+                assert_eq!(curvature.curvature, expected("0x40"));
+                assert_eq!(curvature.outer_radius, expected("0x80"));
+                assert_eq!(curvature.inner_radius, Some(expected("0x78")));
+            } else {
+                assert_eq!(next.explicit_bands[0].half_width, expected("0x88"));
+                assert_eq!(next.explicit_bands[1].half_width, expected("0x90"));
+                assert_eq!(next.explicit_bands[0].penalty, expected("0xd0"));
+                assert_eq!(next.explicit_bands[1].penalty, expected("0xc8"));
+            }
+            previous = next;
+        }
+    }
+}

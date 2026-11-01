@@ -91,15 +91,25 @@ fn preset_priorities(proposals: &mut [Proposal], options: &ModelTreeOptions) {
     }
 }
 
+#[cfg(test)]
 pub(super) fn collect<const D: usize>(
     output: &Output<D>,
     options: &ModelTreeOptions,
     windows: &[time_windows::NetworkWindows],
 ) -> Result<Vec<Proposal>> {
+    collect_with_deadline(output, options, windows, None)
+}
+
+pub(super) fn collect_with_deadline<const D: usize>(
+    output: &Output<D>,
+    options: &ModelTreeOptions,
+    windows: &[time_windows::NetworkWindows],
+    deadline: Option<Instant>,
+) -> Result<Vec<Proposal>> {
     let node = &output.snapshot;
     let tolerance = options.tolerance;
     let priorities = &options.branch_priorities;
-    let mut proposals = model_strong::registered_proposals(output, options)?;
+    let mut proposals = model_strong::registered_proposals(output, options, deadline)?;
     for candidate in node.resource_group_candidates(tolerance)? {
         proposals.push(resource_proposal(candidate, priorities.resource));
     }

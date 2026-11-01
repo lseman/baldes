@@ -1,11 +1,11 @@
 use super::*;
 use std::time::Duration;
 
-fn bounds(lower: f64, upper: f64) -> Bounds {
+pub(super) fn bounds(lower: f64, upper: f64) -> Bounds {
     Bounds { lower, upper }
 }
 
-fn column(id: i32, cost: f64, entries: Vec<(i32, f64)>) -> Column {
+pub(super) fn column(id: i32, cost: f64, entries: Vec<(i32, f64)>) -> Column {
     Column {
         id,
         cost,
@@ -15,7 +15,7 @@ fn column(id: i32, cost: f64, entries: Vec<(i32, f64)>) -> Column {
     }
 }
 
-fn session() -> MultiImport<2> {
+pub(super) fn session() -> MultiImport<2> {
     let definition = Definition {
         problem: Problem {
             rows: vec![],

@@ -163,6 +163,7 @@ fn registered_tree_pairs_network_identities_sides_ranks_and_feasible_node_bounds
             master_values: vec![],
             nodes: 0,
             processed_nodes: 0,
+            parallel_batches: 0,
             strong_branching_trials: 0,
             mapped_history_ranked: 0,
             mapped_branch_evaluations: vec![],

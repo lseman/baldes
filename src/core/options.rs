@@ -60,6 +60,12 @@ pub const OPTION_TABLE: &[OptionInfo] = &[
         support: OptionSupport::Implemented("src/pricing/mod.rs"),
     },
     OptionInfo {
+        name: "BALDESuseComplBoundsInRedCostFixing",
+        kind: OptionKind::Int,
+        default: 2.0,
+        support: OptionSupport::Implemented("src/pricing/completion.rs; src/labeling/engine/completion.rs; src/labeling/engine/fixing.rs; 0 disables, 2 scans compatible labels, other integers check bucket bounds"),
+    },
+    OptionInfo {
         name: "BALDESapplyReducedCostFixing",
         kind: OptionKind::Int,
         default: 1.0,
@@ -176,10 +182,16 @@ pub const OPTION_TABLE: &[OptionInfo] = &[
         support: OptionSupport::Implemented("src/pricing/mod.rs"),
     },
     OptionInfo {
+        name: "BALDESlabelSplitStrategy",
+        kind: OptionKind::Int,
+        default: 0.0,
+        support: OptionSupport::Implemented("src/pricing/configuration.rs; src/labeling/engine; paired front linear/bucket split strategies"),
+    },
+    OptionInfo {
         name: "BALDESlabelDominanceStrategy",
         kind: OptionKind::Int,
         default: 0.0,
-        support: OptionSupport::Implemented("src/pricing/configuration.rs; 1 (partial dominance) is rejected, other integers use ordinary dominance"),
+        support: OptionSupport::Implemented("src/pricing/configuration.rs; src/labeling/engine; 1 selects prepared paired insertion with forced bucket split, standard resources reject it"),
     },
     OptionInfo {
         name: "BALDESdynBuckStepAdjustRatioThreshold",

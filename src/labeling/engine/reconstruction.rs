@@ -122,19 +122,60 @@ impl<const D: usize> LabelingEngine<D> {
                         )))
                     }
                 };
-                let (_, coupled) = kernel
-                    .join_objective_costs(forward, backward)?
-                    .ok_or_else(|| incomplete(RESOURCE_REPLAY_MISMATCH))?;
+                let recorded = if selection.dependent.is_some() {
+                    match g.reconstruct_paired_machine_join_for_path(
+                        resource,
+                        forward,
+                        backward,
+                        &arcs,
+                        0,
+                        FrontierBudget::default(),
+                    ) {
+                        FrontierOutcome::Complete(value) => Some(value),
+                        FrontierOutcome::Empty => return Err(incomplete(RESOURCE_REPLAY_MISMATCH)),
+                        FrontierOutcome::Unknown(reason) => {
+                            return Err(incomplete(format!(
+                                "paired retained recorder unavailable: {reason:?}"
+                            )))
+                        }
+                    }
+                } else {
+                    None
+                };
+                let dependent = recorded
+                    .as_ref()
+                    .map(|recorded| {
+                        recorded.path.dependent.last().copied().ok_or_else(|| {
+                            incomplete("paired retained recorder has no terminal value")
+                        })
+                    })
+                    .transpose()?;
+                let coupled = dependent
+                    .map(|value| kernel.recorded_paired_original_objective(value))
+                    .transpose()?
+                    .unwrap_or(0.);
                 let left = forward
                     .scalar_original_cost()
                     .ok_or_else(|| incomplete(RESOURCE_REPLAY_MISMATCH))?;
                 let right = backward
                     .scalar_original_cost()
                     .ok_or_else(|| incomplete(RESOURCE_REPLAY_MISMATCH))?;
+                if let (Some(slot), Some(recorded)) =
+                    (kernel.bound_paired_base_resource(g), recorded.as_ref())
+                {
+                    if recorded.path.base.len() != resource_profile.len() {
+                        return Err(incomplete(
+                            "paired retained recorder profile length mismatch",
+                        ));
+                    }
+                    for (profile, &base) in resource_profile.iter_mut().zip(&recorded.path.base) {
+                        profile[slot] = base;
+                    }
+                    q[slot] = *recorded.path.base.last().unwrap();
+                }
                 Some((
                     (left + right) + coupled,
-                    selection
-                        .dependent
+                    dependent
                         .map(|value| vec![(resource, value)])
                         .unwrap_or_default(),
                 ))

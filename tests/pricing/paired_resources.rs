@@ -366,6 +366,30 @@ fn paired_json_round_trip_keeps_modes_and_front_programs() {
             Some(control_oracle(&path, PairedResourceMode::CostBounded))
         );
     }
+    // Complete windows survive JSON and reach physical preparation. Invalid
+    // supplied metadata must fail rather than replacing known program windows.
+    let vertex_bounds: Vec<_> = WINDOWS.iter().map(|&(lo, hi)| [lo, hi]).collect();
+    model["networks"][0]["paired_front_programs"][0]["vertex_bounds"] =
+        serde_json::json!(vertex_bounds);
+    let complete = Model::from_json(&model.to_string()).unwrap();
+    let round_trip = serde_json::to_value(&complete).unwrap();
+    assert_eq!(
+        round_trip["networks"][0]["paired_front_programs"][0]["vertex_bounds"],
+        serde_json::json!(vertex_bounds)
+    );
+    complete.problem::<2>().unwrap();
+    for invalid in [serde_json::json!([[0., 1.]]), {
+        let mut inconsistent = serde_json::json!(vertex_bounds);
+        inconsistent[0] = serde_json::json!([0., 2.]);
+        inconsistent
+    }] {
+        let mut malformed = model.clone();
+        malformed["networks"][0]["paired_front_programs"][0]["vertex_bounds"] = invalid;
+        assert!(Model::from_json(&malformed.to_string())
+            .unwrap()
+            .problem::<2>()
+            .is_err());
+    }
     let mut duplicated = model.clone();
     duplicated["networks"][0]["paired_front_programs"] =
         serde_json::json!([program_json(0), program_json(0)]);
@@ -601,4 +625,58 @@ fn paired_factory_limits_reject_other_coupled_compositions_without_replacing_the
         graph.coupled_kernel().unwrap().replay(&[0, 1]).unwrap(),
         Some(control_oracle(&[0, 1], mode))
     );
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn paired_implicit_bucket_width_reaches_master_through_json_options() {
+    use baldes::master::{
+        cg::Status,
+        model::{
+            self,
+            format::{Model, SolveOptions},
+        },
+    };
+    for standard_count in [0, 2] {
+        let mut input: serde_json::Value = serde_json::from_str(include_str!(
+            "../../examples/networks/paired_piecewise_linear.json"
+        ))
+        .unwrap();
+        let network = &mut input["networks"][0];
+        network["resources"] = serde_json::Value::Array(
+            (0..standard_count)
+                .map(|_| {
+                    serde_json::json!({
+                        "kind": "disposable", "bounds": vec![[0.,10.]; 4]
+                    })
+                })
+                .collect(),
+        );
+        for arc in network["arcs"].as_array_mut().unwrap() {
+            arc["consumption"] = serde_json::json!(vec![0.; standard_count]);
+        }
+        network["paired_front_programs"][0]["vertex_bounds"] = serde_json::json!(vec![[0., 8.]; 4]);
+        let options = SolveOptions::from_json(
+            r#"{
+            "bucket_steps": [1.0],
+            "stabilize": false,
+            "artificial_cost": 100.0,
+            "pricing_options": {"BALDESlabelDominanceStrategy": 1.0}
+        }"#,
+        )
+        .unwrap();
+        let options = options.node_options().unwrap();
+        assert_eq!(options.bucket_steps, [1.]);
+        let problem = Model::from_json(&input.to_string())
+            .unwrap()
+            .problem::<2>()
+            .unwrap();
+        let result = model::solve(problem, options).unwrap();
+        assert_eq!(result.master.status, Status::Optimal, "{standard_count}");
+        assert!(
+            (result.master.lp - 8.).abs() < 1e-8,
+            "{standard_count}: {}",
+            result.master.lp
+        );
+    }
 }

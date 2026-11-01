@@ -32,12 +32,13 @@ impl<const D: usize> ColumnImport<D> {
         for fixed in &mut compiled.fixed {
             fixed.route.route.original_cost = 0.;
         }
-        let output = solve_with_fixed_routes(
+        let output = lifecycle::solve_with_node_depth(
             compiled.problem,
             compiled.variables,
             options,
             &compiled.fixed,
             &compiled.nonlinear,
+            &[],
         )?;
         let master = &output.snapshot.master;
         if !master.solved
@@ -71,6 +72,7 @@ impl<const D: usize> ColumnImport<D> {
             None
         };
         Ok(ImportPricing {
+            node_depth: output.snapshot.state.node_depth,
             epoch: Rc::new(()),
             context: self.context.clone(),
             definition: self.definition.clone(),

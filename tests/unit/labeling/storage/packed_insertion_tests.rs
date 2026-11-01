@@ -103,3 +103,45 @@ fn high_word_signed_extraction_retains_its_dominance_direction() {
     assert_eq!(inserted_pair(&[descriptor], signed, [0; LIMITED_WORDS]), 1);
     assert_eq!(inserted_pair(&[descriptor], [0; LIMITED_WORDS], signed), 2);
 }
+
+#[test]
+fn paired_partial_insertion_keeps_comparable_labels_but_preserves_order_and_capacity() {
+    for forward in [true, false] {
+        let graph = Graph::<2>::new(2, 0).unwrap();
+        let mut storage = LabelStorage::new([1]);
+        let mut stats = Statistics::default();
+        for cost in [2., 3., 1.] {
+            assert!(storage.insert(
+                &graph,
+                label(cost, [0; LIMITED_WORDS]),
+                forward,
+                InsertionTest::NoDominance,
+                3,
+                false,
+                &[],
+                &mut stats
+            ));
+        }
+        assert_eq!(storage.buckets[0][0].active.len(), 3);
+        assert_eq!(stats.dominated, 0);
+        // The candidate is retained even when the capacity eviction means no
+        // new component expansion is requested, as in ordinary insertion.
+        assert!(!storage.insert(
+            &graph,
+            label(0., [0; LIMITED_WORDS]),
+            forward,
+            InsertionTest::NoDominance,
+            3,
+            false,
+            &[],
+            &mut stats
+        ));
+        let bucket = &storage.buckets[0][0];
+        let costs: Vec<_> = (0..bucket.active.len())
+            .map(|i| bucket.hot.get(i).cost)
+            .collect();
+        assert_eq!(costs, [0., 1., 2.]);
+        assert_eq!(stats.dominated, 0);
+        assert_eq!(stats.capped, 1);
+    }
+}

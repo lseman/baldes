@@ -2,6 +2,21 @@
 use super::*;
 use crate::cuts::soft_conflicts::PresenceRow;
 pub use crate::cuts::soft_conflicts::{ComponentBound, ComponentSense, ComponentSequence};
+mod generator;
+pub use generator::{
+    ComponentClassGenerator, ComponentGeneratorCoordinate, ComponentPriorityRule,
+    ComponentVariableKind,
+};
+
+pub(super) fn generated_proposals<const D: usize>(
+    output: &Output<D>,
+    generators: &[ComponentClassGenerator],
+    quota: usize,
+    tolerance: f64,
+    deadline: Option<Instant>,
+) -> Result<Vec<model_strong::Proposal>> {
+    generator::collect(output, generators, quota, tolerance, deadline)
+}
 
 /// Sparse integer coordinate on original physical arcs. `None` omits the
 /// coordinate; `Some(0)` records a present coordinate with value zero.
@@ -30,7 +45,10 @@ fn default_minimum_fractionality() -> f64 {
 }
 
 impl ComponentClassBranching {
-    fn coefficients<const D: usize>(&self, node: &NodeSnapshot<D>) -> Result<PresenceCoefficients> {
+    pub(super) fn coefficients<const D: usize>(
+        &self,
+        node: &NodeSnapshot<D>,
+    ) -> Result<PresenceCoefficients> {
         let oracle = node
             .state
             .oracles
@@ -201,6 +219,9 @@ impl<const D: usize> NodeSnapshot<D> {
         }
         for oracle in &mut node.state.oracles {
             oracle.solver.enumeration_preserve_arc_paths = true;
+        }
+        if bounds.lower.is_finite() || bounds.upper.is_finite() {
+            node.state.component_branches.push(class.clone());
         }
         Ok(node)
     }

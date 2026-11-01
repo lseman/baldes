@@ -63,6 +63,7 @@ impl<const D: usize> ColumnImport<D> {
             None
         };
         Ok(ImportPricing {
+            node_depth: output.snapshot.state.node_depth,
             epoch: Rc::new(()),
             context: self.context.clone(),
             definition: self.definition.clone(),
@@ -101,7 +102,7 @@ impl<const D: usize> ColumnImport<D> {
         let mut registry = Rc::new(compiled.registry);
         let mut initial_options = options.clone();
         initial_options.cg.time_limit = deadline.saturating_duration_since(Instant::now());
-        let mut output = solve_with_seed_routes(
+        let mut output = lifecycle::solve_with_node_depth(
             compiled.problem,
             compiled.variables,
             initial_options,
@@ -133,7 +134,7 @@ impl<const D: usize> ColumnImport<D> {
             let compiled = lifecycle::compile_definition(&self.definition, Some(&self.context))?;
             registry = Rc::new(compiled.registry);
             options.cg.time_limit = deadline.saturating_duration_since(Instant::now());
-            output = solve_with_seed_routes(
+            output = lifecycle::solve_with_node_depth(
                 compiled.problem,
                 compiled.variables,
                 options,

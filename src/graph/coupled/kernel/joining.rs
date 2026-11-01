@@ -263,6 +263,12 @@ impl CoupledKernel {
             .unwrap_or(1.)
     }
 
+    /// Apply the registered original-variable charge to a recorder-selected
+    /// paired value, independently of the raw pricing concatenation bound.
+    pub(crate) fn recorded_paired_original_objective(&self, value: f64) -> Result<f64> {
+        finite(self.cost_scale * finite(self.paired_associated_coefficient() * value)?)
+    }
+
     pub(crate) fn joined_associated_machine_path_matching(
         &self,
         arcs: &[usize],
@@ -400,7 +406,7 @@ impl CoupledKernel {
         arcs: &[usize],
         selected: Option<f64>,
     ) -> Result<Option<(f64, Option<f64>)>> {
-        self.joined_machine_path_matching_using(arcs, selected, None)
+        self.joined_machine_path_matching_using(arcs, selected, None, None)
     }
 
     /// Recompose the original resource charge with an owner-associated paired
@@ -414,7 +420,7 @@ impl CoupledKernel {
         if !coefficient.is_finite() {
             return Err(invalid("nonfinite paired associated objective coefficient"));
         }
-        self.joined_machine_path_matching_using(arcs, selected, Some(coefficient))
+        self.joined_machine_path_matching_using(arcs, selected, Some(coefficient), None)
     }
 
     fn joined_machine_path_matching_using(
@@ -422,6 +428,9 @@ impl CoupledKernel {
         arcs: &[usize],
         selected: Option<f64>,
         coefficient: Option<f64>,
+        mut recorder: Option<
+            &mut dyn FnMut(&CoupledLabelState, &CoupledLabelState) -> Result<Option<f64>>,
+        >,
     ) -> Result<Option<(f64, Option<f64>)>> {
         if !self.machine_paired_join_complete() {
             return Err(invalid("paired machine path unavailable"));
@@ -465,8 +474,34 @@ impl CoupledKernel {
                         descriptor::FrontierBudget::default(),
                     ) {
                         descriptor::FrontierOutcome::Complete(selection) => {
+                            // Enumeration publishes raw join values; ordinary pricing
+                            // publishes recorder values. Preserve the raw interpretation
+                            // when it matches, then validate the recorded interpretation.
                             if selected.is_none_or(|value| selection.dependent == Some(value)) {
                                 return Ok(Some((cost, selection.dependent)));
+                            }
+                            if selection.dependent.is_some() {
+                                if let Some(record) = recorder.as_mut() {
+                                    match record(&prefix, suffix) {
+                                        Ok(Some(value)) if selected == Some(value) => {
+                                            let cost = finite(
+                                                self.cost_scale
+                                                    * finite(
+                                                        coefficient.unwrap_or(
+                                                            self.paired_associated_coefficient(),
+                                                        ) * value,
+                                                    )?,
+                                            )?;
+                                            return Ok(Some((cost, Some(value))));
+                                        }
+                                        Ok(_) => {}
+                                        Err(error) => {
+                                            if unresolved.is_none() {
+                                                unresolved = Some(error);
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                         descriptor::FrontierOutcome::Empty => {}
@@ -917,5 +952,48 @@ impl CoupledKernel {
             current = Some(next);
         }
         Ok(Some(current.as_deref().unwrap_or(f).resource_objective))
+    }
+}
+
+impl<const D: usize> Graph<D> {
+    /// Replay exported recorder coordinates against every retained physical split.
+    pub(crate) fn recorded_paired_path_matching(
+        &self,
+        arcs: &[usize],
+        selected: Option<f64>,
+    ) -> Result<Option<(f64, Option<f64>)>> {
+        let kernel = self
+            .coupled_kernel()
+            .ok_or_else(|| invalid("paired kernel unavailable"))?;
+        let resource = kernel
+            .retained_paired_machine_resource()
+            .ok_or_else(|| invalid("paired recorder resource unavailable"))?;
+        let mut record = |forward: &CoupledLabelState, backward: &CoupledLabelState| match self
+            .reconstruct_paired_machine_join_for_path(
+                resource,
+                forward,
+                backward,
+                arcs,
+                0,
+                descriptor::FrontierBudget::default(),
+            ) {
+            descriptor::FrontierOutcome::Complete(value) => value
+                .path
+                .dependent
+                .last()
+                .copied()
+                .map(Some)
+                .ok_or_else(|| incomplete("paired recorder terminal unavailable")),
+            descriptor::FrontierOutcome::Empty => Ok(None),
+            descriptor::FrontierOutcome::Unknown(reason) => Err(incomplete(format!(
+                "paired recorder replay unavailable: {reason:?}"
+            ))),
+        };
+        kernel.joined_machine_path_matching_using(
+            arcs,
+            selected,
+            Some(kernel.paired_associated_coefficient()),
+            Some(&mut record),
+        )
     }
 }

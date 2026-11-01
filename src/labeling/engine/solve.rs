@@ -161,7 +161,12 @@ impl<const D: usize> LabelingEngine<D> {
                     let mut cutoff = pool.cutoff(v);
                     for &f in &self.forward.crossing[v] {
                         let label = self.forward.labels.view(f);
-                        let mut coordinate = self.grid.coordinate(label.resources());
+                        let mut coordinate = self
+                            .ctx()
+                            .label_coordinates(g, true, &label)
+                            .ok_or_else(|| {
+                                incomplete("paired crossing coordinate is unavailable")
+                            })?;
                         if self.consumption_joins {
                             for r in 0..self.grid.dimensions {
                                 coordinate[r] = (self.grid.upper[internal][r]
@@ -364,6 +369,15 @@ impl<const D: usize> LabelingEngine<D> {
     }
 
     pub fn continue_after_halfway(&mut self, g: &Graph<D>, controls: &Controls) -> Result<()> {
+        self.continue_after_halfway_with_completion(g, controls, None)
+    }
+
+    pub(super) fn continue_after_halfway_with_completion(
+        &mut self,
+        g: &Graph<D>,
+        controls: &Controls,
+        completion: Option<(f64, i32)>,
+    ) -> Result<()> {
         if g.coupled_kernel()
             .is_some_and(|kernel| kernel.has_negative_paired_objectives())
         {
@@ -386,26 +400,71 @@ impl<const D: usize> LabelingEngine<D> {
         self.controls.sink_concatenation = false;
         self.phase.labels_per_bucket = i64::MAX;
         let result = (|| {
+            // Native minimum-under-cost preparation is a single ordered pass.
+            self.update_unreachable(true);
+            self.update_unreachable(false);
+            let started = Instant::now();
             for v in 0..self.forward.crossing.len() {
                 // Insertion changes the label arena and buckets, not these
                 // crossing IDs. End each ID borrow before mutating the engine.
                 for position in 0..self.forward.crossing[v].len() {
                     let id = self.forward.crossing[v][position];
                     let mut label = self.forward.labels.view(id).to_owned();
+                    if completion.is_some_and(|(threshold, mode)| {
+                        !self.ctx().completion_exists_in(
+                            &self.backward,
+                            g,
+                            true,
+                            &label,
+                            label.bucket,
+                            threshold,
+                            mode == 2,
+                            false,
+                            false,
+                            Some((started, controls.time_limit)),
+                        )
+                    }) {
+                        self.statistics.completion_pruned += 1;
+                        continue;
+                    }
                     self.vertex_step(&mut label);
                     let hot = HotLabel::of(&label);
                     self.insert(g, true, &label, hot, controls);
                 }
             }
             let grid = &self.grid;
-            self.forward
-                .labels
-                .unexpand_where(|resources| grid.coordinate(&resources)[0] > grid.middle + EPSILON);
-            let started = Instant::now();
+            let mut missing_coordinate = false;
+            self.forward.labels.unexpand_where(|resources, state| {
+                match grid.coordinates_with_paired(g, true, resources, state) {
+                    Some(q) => q[0] > grid.middle + EPSILON,
+                    None => {
+                        missing_coordinate = true;
+                        false
+                    }
+                }
+            });
+            if missing_coordinate {
+                return Err(incomplete("paired continuation coordinate is unavailable"));
+            }
             let mut pool = SolutionPool::new(g.vertices.len(), 1, 0);
-            self.run_direction(g, true, controls, started, &mut pool)?;
-            self.backward.labels.unexpand_where(|_| true);
-            self.run_direction(g, false, controls, started, &mut pool)?;
+            self.run_direction_with_completion(
+                g,
+                true,
+                controls,
+                started,
+                &mut pool,
+                completion.map(|(threshold, mode)| (threshold, mode == 2, false)),
+            )?;
+            self.update_unreachable(true);
+            self.backward.labels.unexpand_where(|_, _| true);
+            self.run_direction_with_completion(
+                g,
+                false,
+                controls,
+                started,
+                &mut pool,
+                completion.map(|(threshold, mode)| (threshold, mode == 2, true)),
+            )?;
             self.update_unreachable(true);
             self.update_unreachable(false);
             if self.resource_error.load(Ordering::Relaxed) {

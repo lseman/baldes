@@ -63,6 +63,9 @@ impl<const D: usize> LabelStorage<D> {
         b_state: Option<&crate::graph::coupled::CoupledLabelState>,
         words: impl FnOnce() -> (&'w [u32], &'w [u32]),
     ) -> bool {
+        if test == InsertionTest::NoDominance {
+            return false;
+        }
         let Some(penalty) = g.coupled_dominance_penalty(a_state, b_state, forward, vertex) else {
             return false;
         };
@@ -176,6 +179,9 @@ impl<const D: usize> LabelStorage<D> {
         cuts: &[DominanceDescriptor],
         words: impl FnOnce() -> (&'w [u32], &'w [u32]),
     ) -> bool {
+        if test == InsertionTest::NoDominance {
+            return false;
+        }
         if hop_limit && a.hops > b.hops {
             return false;
         }

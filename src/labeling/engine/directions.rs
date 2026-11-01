@@ -56,6 +56,16 @@ impl<const D: usize> LabelingEngine<D> {
         terminals: &'a mut Vec<(usize, f64, usize)>,
         counts: &'a (AtomicUsize, AtomicUsize),
     ) -> Sweep<'a, D> {
+        self.sweep_with_completion(forward, terminals, counts, None)
+    }
+
+    fn sweep_with_completion<'a>(
+        &'a mut self,
+        forward: bool,
+        terminals: &'a mut Vec<(usize, f64, usize)>,
+        counts: &'a (AtomicUsize, AtomicUsize),
+        completion: Option<(f64, bool, bool)>,
+    ) -> Sweep<'a, D> {
         let ctx = Context {
             grid: &self.grid,
             ng: &self.ng,
@@ -85,6 +95,14 @@ impl<const D: usize> LabelingEngine<D> {
         Sweep {
             ctx,
             storage,
+            fixing_completion: completion.map(|(threshold, scan, complete)| {
+                sweep::FixingCompletion {
+                    opposite: other,
+                    threshold,
+                    scan,
+                    complete,
+                }
+            }),
             statistics: &mut self.statistics,
             extension_checks: &mut self.extension_checks,
             filter_checks: &mut self.filter_checks,
@@ -119,6 +137,18 @@ impl<const D: usize> LabelingEngine<D> {
         started: Instant,
         pool: &mut SolutionPool<(Option<usize>, Option<usize>)>,
     ) -> Result<()> {
+        self.run_direction_with_completion(g, forward, controls, started, pool, None)
+    }
+
+    pub(super) fn run_direction_with_completion(
+        &mut self,
+        g: &Graph<D>,
+        forward: bool,
+        controls: &Controls,
+        started: Instant,
+        pool: &mut SolutionPool<(Option<usize>, Option<usize>)>,
+        completion: Option<(f64, bool, bool)>,
+    ) -> Result<()> {
         let scratch = if forward {
             &mut self.forward_scratch
         } else {
@@ -128,7 +158,7 @@ impl<const D: usize> LabelingEngine<D> {
         terminals.clear();
         let counts = Default::default();
         let result = self
-            .sweep(forward, &mut terminals, &counts)
+            .sweep_with_completion(forward, &mut terminals, &counts, completion)
             .run_direction(g, forward, controls, started);
         insert_terminals(pool, forward, &terminals);
         terminals.clear();
@@ -187,6 +217,7 @@ impl<const D: usize> LabelingEngine<D> {
         let mut forward = Sweep {
             ctx,
             storage: &mut self.forward,
+            fixing_completion: None,
             statistics: &mut self.statistics,
             extension_checks: &mut self.extension_checks,
             filter_checks: &mut self.filter_checks,
@@ -200,6 +231,7 @@ impl<const D: usize> LabelingEngine<D> {
         let mut backward = Sweep {
             ctx,
             storage: &mut self.backward,
+            fixing_completion: None,
             statistics: &mut statistics,
             extension_checks: &mut self.backward_checks.0,
             filter_checks: &mut self.backward_checks.1,

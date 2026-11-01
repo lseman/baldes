@@ -76,7 +76,7 @@ impl ExplicitParameters {
         }
         Ok(())
     }
-    fn initial_bands(&self) -> Vec<ProximalBand> {
+    pub(crate) fn initial_bands(&self) -> Vec<ProximalBand> {
         let initial = |width: f64| {
             if (self.kappa as f32) > 0. {
                 1e12
@@ -374,6 +374,34 @@ pub(crate) struct ProximalState {
     artificial_values: Option<Vec<f64>>,
     explicit_bands: Vec<ProximalBand>,
     explicit_baseline: Option<f64>,
+}
+
+/// Geometry of one private-master artificial column. The native constraint
+/// center has the opposite sign to the LP dual center used here.
+fn artificial_geometry(
+    rhs: f64,
+    center: f64,
+    band: &ProximalBand,
+    sign: f64,
+    rhs_scaling: bool,
+    multipoint: bool,
+) -> (f64, f64, f64) {
+    let coefficient_scale = if rhs_scaling && rhs.abs() > 1e-6 {
+        rhs
+    } else {
+        1.
+    };
+    let cost_scale = if rhs_scaling && rhs.abs() > rhs.abs() * 1e-6 + 1e-6 {
+        rhs
+    } else {
+        1.
+    };
+    let cost = if multipoint {
+        0.
+    } else {
+        cost_scale * (sign * center + band.half_width)
+    };
+    (cost, sign * coefficient_scale, band.penalty)
 }
 
 impl ProximalState {
@@ -758,35 +786,22 @@ impl ProximalState {
                 .get(row)
                 .ok_or_else(|| invalid("proximal row RHS missing"))?;
             let rhs_scaling = parameters.rhs_row_scaling || parameters.explicit.is_some();
-            let coefficient_scale = if rhs_scaling && rhs.abs() > 1e-6 {
-                rhs
-            } else {
-                1.
-            };
-            let cost_scale = if rhs_scaling && rhs.abs() > rhs.abs() * 1e-6 + 1e-6 {
-                rhs
-            } else {
-                1.
-            };
             for (band_index, band) in parameters.bands.iter().enumerate() {
                 let outer = parameters.multi_point && band_index + 1 == parameters.bands.len();
                 let mut pair = [0; 2];
                 // +e constrains pi <= center+width; -e constrains the
                 // opposite side. Finite upper bounds soften these constraints.
                 for (i, sign) in [-1., 1.].into_iter().enumerate() {
-                    let cost = if outer {
-                        0.
-                    } else {
-                        cost_scale * (sign * center + band.half_width)
-                    };
+                    let (cost, coefficient, penalty) =
+                        artificial_geometry(rhs, center, band, sign, rhs_scaling, outer);
                     if !cost.is_finite() {
                         return Ok(raw.to_vec());
                     }
-                    let column = private.add_column(cost, &[(row, sign * coefficient_scale)])?;
+                    let column = private.add_column(cost, &[(row, coefficient)])?;
                     band_columns[band_index].push(column);
                     pair[i] = column;
-                    if band.penalty.is_finite() {
-                        private.set_upper(column, band.penalty)?;
+                    if penalty.is_finite() {
+                        private.set_upper(column, penalty)?;
                     }
                 }
                 if outer {

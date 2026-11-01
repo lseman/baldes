@@ -109,7 +109,17 @@ impl<const D: usize> Enumeration<D> {
             }
             let v = grid.internal[from.vertex];
             let Some(bucket) = grid
-                .bucket_id_checked(true, v, grid.coordinate(&from.resources))
+                .bucket_id_checked(
+                    true,
+                    v,
+                    grid.coordinates_with_paired(
+                        g,
+                        true,
+                        &from.resources,
+                        from.coupled_state.as_deref(),
+                    )
+                    .ok_or_else(|| incomplete("paired enumeration coordinate is unavailable"))?,
+                )
                 .map_err(|()| incomplete("enumeration bucket index overflow"))?
             else {
                 continue;

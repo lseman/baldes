@@ -155,6 +155,7 @@ def _networks(
     proximal: Optional[Mapping[str, Any]] = None,
     bound_mode: str = "numerical",
     artificial_cost: float = 2.76,
+    bucket_steps: Tuple[float, ...] = (),
     log_interval: Optional[int] = None,
     pricing_options: Optional[Mapping[str, float]] = None,
     synchronized_services: Tuple[SynchronizedService, ...] = (),
@@ -175,6 +176,6 @@ def _networks(
                    local_search=None if local_search is None else dict(local_search), greedy=greedy,
                    time_limit=time_limit, max_iterations=max_iterations,
                    node_limit=node_limit, stabilize=stabilize, bound_mode=bound_mode,
-                   artificial_cost=artificial_cost, log_interval=log_interval,
+                   artificial_cost=artificial_cost, bucket_steps=bucket_steps, log_interval=log_interval,
                    pricing_options={} if pricing_options is None else dict(pricing_options))
     return _result(*_core._solve({"kind": "networks", "data": json.loads(problem.to_json(indent=None))}, json.loads(_options(options))))

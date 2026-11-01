@@ -40,6 +40,9 @@ use crate::graph::ng::NgMask;
 use crate::graph::{Graph, ResourceKind};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InsertionTest {
+    /// Experimental paired insertion retains key ordering and finite capacity,
+    /// but no comparison can reject the candidate or evict an existing label.
+    NoDominance,
     Full,
     ResourcesAndCost,
     ResourcesAndNg,

@@ -1,0 +1,5327 @@
+{
+  "binary_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "scope": "native updateOnLagrBoundChange with empty row list; maximizing bound and equal phase",
+  "old_addition_mismatches": 45,
+  "cases": [
+    {
+      "old_bits": 0,
+      "new_bits": 4517329193108106634,
+      "accepted": false
+    },
+    {
+      "old_bits": 0,
+      "new_bits": 4517329193108106635,
+      "accepted": false
+    },
+    {
+      "old_bits": 0,
+      "new_bits": 4517329193108106636,
+      "accepted": false
+    },
+    {
+      "old_bits": 0,
+      "new_bits": 4517329193108106637,
+      "accepted": false
+    },
+    {
+      "old_bits": 0,
+      "new_bits": 4517329193108106638,
+      "accepted": false
+    },
+    {
+      "old_bits": 0,
+      "new_bits": 4517329193108106639,
+      "accepted": false
+    },
+    {
+      "old_bits": 0,
+      "new_bits": 4517329193108106640,
+      "accepted": false
+    },
+    {
+      "old_bits": 4607182418800017408,
+      "new_bits": 4607182423304067392,
+      "accepted": false
+    },
+    {
+      "old_bits": 4607182418800017408,
+      "new_bits": 4607182423304067393,
+      "accepted": false
+    },
+    {
+      "old_bits": 4607182418800017408,
+      "new_bits": 4607182423304067394,
+      "accepted": false
+    },
+    {
+      "old_bits": 4607182418800017408,
+      "new_bits": 4607182423304067395,
+      "accepted": false
+    },
+    {
+      "old_bits": 4607182418800017408,
+      "new_bits": 4607182423304067396,
+      "accepted": false
+    },
+    {
+      "old_bits": 4607182418800017408,
+      "new_bits": 4607182423304067397,
+      "accepted": true
+    },
+    {
+      "old_bits": 4607182418800017408,
+      "new_bits": 4607182423304067398,
+      "accepted": true
+    },
+    {
+      "old_bits": 13830554455654793216,
+      "new_bits": 13830554446646693244,
+      "accepted": false
+    },
+    {
+      "old_bits": 13830554455654793216,
+      "new_bits": 13830554446646693243,
+      "accepted": false
+    },
+    {
+      "old_bits": 13830554455654793216,
+      "new_bits": 13830554446646693242,
+      "accepted": false
+    },
+    {
+      "old_bits": 13830554455654793216,
+      "new_bits": 13830554446646693241,
+      "accepted": false
+    },
+    {
+      "old_bits": 13830554455654793216,
+      "new_bits": 13830554446646693240,
+      "accepted": true
+    },
+    {
+      "old_bits": 13830554455654793216,
+      "new_bits": 13830554446646693239,
+      "accepted": true
+    },
+    {
+      "old_bits": 13830554455654793216,
+      "new_bits": 13830554446646693238,
+      "accepted": true
+    },
+    {
+      "old_bits": 4696837146684686336,
+      "new_bits": 4696837146685553916,
+      "accepted": false
+    },
+    {
+      "old_bits": 4696837146684686336,
+      "new_bits": 4696837146685553917,
+      "accepted": false
+    },
+    {
+      "old_bits": 4696837146684686336,
+      "new_bits": 4696837146685553918,
+      "accepted": false
+    },
+    {
+      "old_bits": 4696837146684686336,
+      "new_bits": 4696837146685553919,
+      "accepted": false
+    },
+    {
+      "old_bits": 4696837146684686336,
+      "new_bits": 4696837146685553920,
+      "accepted": true
+    },
+    {
+      "old_bits": 4696837146684686336,
+      "new_bits": 4696837146685553921,
+      "accepted": true
+    },
+    {
+      "old_bits": 4696837146684686336,
+      "new_bits": 4696837146685553922,
+      "accepted": true
+    },
+    {
+      "old_bits": 13920209183539462144,
+      "new_bits": 13920209183538594564,
+      "accepted": false
+    },
+    {
+      "old_bits": 13920209183539462144,
+      "new_bits": 13920209183538594563,
+      "accepted": false
+    },
+    {
+      "old_bits": 13920209183539462144,
+      "new_bits": 13920209183538594562,
+      "accepted": false
+    },
+    {
+      "old_bits": 13920209183539462144,
+      "new_bits": 13920209183538594561,
+      "accepted": false
+    },
+    {
+      "old_bits": 13920209183539462144,
+      "new_bits": 13920209183538594560,
+      "accepted": true
+    },
+    {
+      "old_bits": 13920209183539462144,
+      "new_bits": 13920209183538594559,
+      "accepted": true
+    },
+    {
+      "old_bits": 13920209183539462144,
+      "new_bits": 13920209183538594558,
+      "accepted": true
+    },
+    {
+      "old_bits": 4786511204640096256,
+      "new_bits": 4786511204640915453,
+      "accepted": false
+    },
+    {
+      "old_bits": 4786511204640096256,
+      "new_bits": 4786511204640915454,
+      "accepted": false
+    },
+    {
+      "old_bits": 4786511204640096256,
+      "new_bits": 4786511204640915455,
+      "accepted": false
+    },
+    {
+      "old_bits": 4786511204640096256,
+      "new_bits": 4786511204640915456,
+      "accepted": false
+    },
+    {
+      "old_bits": 4786511204640096256,
+      "new_bits": 4786511204640915457,
+      "accepted": true
+    },
+    {
+      "old_bits": 4786511204640096256,
+      "new_bits": 4786511204640915458,
+      "accepted": true
+    },
+    {
+      "old_bits": 4786511204640096256,
+      "new_bits": 4786511204640915459,
+      "accepted": true
+    },
+    {
+      "old_bits": 14009883241494872064,
+      "new_bits": 14009883241494052867,
+      "accepted": false
+    },
+    {
+      "old_bits": 14009883241494872064,
+      "new_bits": 14009883241494052866,
+      "accepted": false
+    },
+    {
+      "old_bits": 14009883241494872064,
+      "new_bits": 14009883241494052865,
+      "accepted": false
+    },
+    {
+      "old_bits": 14009883241494872064,
+      "new_bits": 14009883241494052864,
+      "accepted": false
+    },
+    {
+      "old_bits": 14009883241494872064,
+      "new_bits": 14009883241494052863,
+      "accepted": true
+    },
+    {
+      "old_bits": 14009883241494872064,
+      "new_bits": 14009883241494052862,
+      "accepted": true
+    },
+    {
+      "old_bits": 14009883241494872064,
+      "new_bits": 14009883241494052861,
+      "accepted": true
+    },
+    {
+      "old_bits": 4846369599423283200,
+      "new_bits": 4846369599423783197,
+      "accepted": false
+    },
+    {
+      "old_bits": 4846369599423283200,
+      "new_bits": 4846369599423783198,
+      "accepted": false
+    },
+    {
+      "old_bits": 4846369599423283200,
+      "new_bits": 4846369599423783199,
+      "accepted": false
+    },
+    {
+      "old_bits": 4846369599423283200,
+      "new_bits": 4846369599423783200,
+      "accepted": false
+    },
+    {
+      "old_bits": 4846369599423283200,
+      "new_bits": 4846369599423783201,
+      "accepted": true
+    },
+    {
+      "old_bits": 4846369599423283200,
+      "new_bits": 4846369599423783202,
+      "accepted": true
+    },
+    {
+      "old_bits": 4846369599423283200,
+      "new_bits": 4846369599423783203,
+      "accepted": true
+    },
+    {
+      "old_bits": 14069741636278059008,
+      "new_bits": 14069741636277559011,
+      "accepted": false
+    },
+    {
+      "old_bits": 14069741636278059008,
+      "new_bits": 14069741636277559010,
+      "accepted": false
+    },
+    {
+      "old_bits": 14069741636278059008,
+      "new_bits": 14069741636277559009,
+      "accepted": false
+    },
+    {
+      "old_bits": 14069741636278059008,
+      "new_bits": 14069741636277559008,
+      "accepted": false
+    },
+    {
+      "old_bits": 14069741636278059008,
+      "new_bits": 14069741636277559007,
+      "accepted": true
+    },
+    {
+      "old_bits": 14069741636278059008,
+      "new_bits": 14069741636277559006,
+      "accepted": true
+    },
+    {
+      "old_bits": 14069741636278059008,
+      "new_bits": 14069741636277559005,
+      "accepted": true
+    },
+    {
+      "old_bits": 4637520179070147302,
+      "new_bits": 4637520179141298019,
+      "accepted": false
+    },
+    {
+      "old_bits": 4637520179070147302,
+      "new_bits": 4637520179141298020,
+      "accepted": false
+    },
+    {
+      "old_bits": 4637520179070147302,
+      "new_bits": 4637520179141298021,
+      "accepted": false
+    },
+    {
+      "old_bits": 4637520179070147302,
+      "new_bits": 4637520179141298022,
+      "accepted": false
+    },
+    {
+      "old_bits": 4637520179070147302,
+      "new_bits": 4637520179141298023,
+      "accepted": true
+    },
+    {
+      "old_bits": 4637520179070147302,
+      "new_bits": 4637520179141298024,
+      "accepted": true
+    },
+    {
+      "old_bits": 4637520179070147302,
+      "new_bits": 4637520179141298025,
+      "accepted": true
+    },
+    {
+      "old_bits": 13835327067461512117,
+      "new_bits": 13835327065209235045,
+      "accepted": false
+    },
+    {
+      "old_bits": 13835327067461512117,
+      "new_bits": 13835327065209235044,
+      "accepted": false
+    },
+    {
+      "old_bits": 13835327067461512117,
+      "new_bits": 13835327065209235043,
+      "accepted": false
+    },
+    {
+      "old_bits": 13835327067461512117,
+      "new_bits": 13835327065209235042,
+      "accepted": false
+    },
+    {
+      "old_bits": 13835327067461512117,
+      "new_bits": 13835327065209235041,
+      "accepted": true
+    },
+    {
+      "old_bits": 13835327067461512117,
+      "new_bits": 13835327065209235040,
+      "accepted": true
+    },
+    {
+      "old_bits": 13835327067461512117,
+      "new_bits": 13835327065209235039,
+      "accepted": true
+    },
+    {
+      "old_bits": 4682172997324257438,
+      "new_bits": 4682172997325069813,
+      "accepted": false
+    },
+    {
+      "old_bits": 4682172997324257438,
+      "new_bits": 4682172997325069814,
+      "accepted": false
+    },
+    {
+      "old_bits": 4682172997324257438,
+      "new_bits": 4682172997325069815,
+      "accepted": false
+    },
+    {
+      "old_bits": 4682172997324257438,
+      "new_bits": 4682172997325069816,
+      "accepted": false
+    },
+    {
+      "old_bits": 4682172997324257438,
+      "new_bits": 4682172997325069817,
+      "accepted": true
+    },
+    {
+      "old_bits": 4682172997324257438,
+      "new_bits": 4682172997325069818,
+      "accepted": true
+    },
+    {
+      "old_bits": 4682172997324257438,
+      "new_bits": 4682172997325069819,
+      "accepted": true
+    },
+    {
+      "old_bits": 4729343804975922500,
+      "new_bits": 4729343804976429310,
+      "accepted": false
+    },
+    {
+      "old_bits": 4729343804975922500,
+      "new_bits": 4729343804976429311,
+      "accepted": false
+    },
+    {
+      "old_bits": 4729343804975922500,
+      "new_bits": 4729343804976429312,
+      "accepted": false
+    },
+    {
+      "old_bits": 4729343804975922500,
+      "new_bits": 4729343804976429313,
+      "accepted": false
+    },
+    {
+      "old_bits": 4729343804975922500,
+      "new_bits": 4729343804976429314,
+      "accepted": true
+    },
+    {
+      "old_bits": 4729343804975922500,
+      "new_bits": 4729343804976429315,
+      "accepted": true
+    },
+    {
+      "old_bits": 4729343804975922500,
+      "new_bits": 4729343804976429316,
+      "accepted": true
+    },
+    {
+      "old_bits": 14002100965407574473,
+      "new_bits": 14002100965407083144,
+      "accepted": false
+    },
+    {
+      "old_bits": 14002100965407574473,
+      "new_bits": 14002100965407083143,
+      "accepted": false
+    },
+    {
+      "old_bits": 14002100965407574473,
+      "new_bits": 14002100965407083142,
+      "accepted": false
+    },
+    {
+      "old_bits": 14002100965407574473,
+      "new_bits": 14002100965407083141,
+      "accepted": false
+    },
+    {
+      "old_bits": 14002100965407574473,
+      "new_bits": 14002100965407083140,
+      "accepted": true
+    },
+    {
+      "old_bits": 14002100965407574473,
+      "new_bits": 14002100965407083139,
+      "accepted": true
+    },
+    {
+      "old_bits": 14002100965407574473,
+      "new_bits": 14002100965407083138,
+      "accepted": true
+    },
+    {
+      "old_bits": 4743882719703695152,
+      "new_bits": 4743882719704304744,
+      "accepted": false
+    },
+    {
+      "old_bits": 4743882719703695152,
+      "new_bits": 4743882719704304745,
+      "accepted": false
+    },
+    {
+      "old_bits": 4743882719703695152,
+      "new_bits": 4743882719704304746,
+      "accepted": false
+    },
+    {
+      "old_bits": 4743882719703695152,
+      "new_bits": 4743882719704304747,
+      "accepted": false
+    },
+    {
+      "old_bits": 4743882719703695152,
+      "new_bits": 4743882719704304748,
+      "accepted": true
+    },
+    {
+      "old_bits": 4743882719703695152,
+      "new_bits": 4743882719704304749,
+      "accepted": true
+    },
+    {
+      "old_bits": 4743882719703695152,
+      "new_bits": 4743882719704304750,
+      "accepted": true
+    },
+    {
+      "old_bits": 13826516041569529969,
+      "new_bits": 13826516032561833839,
+      "accepted": false
+    },
+    {
+      "old_bits": 13826516041569529969,
+      "new_bits": 13826516032561833838,
+      "accepted": false
+    },
+    {
+      "old_bits": 13826516041569529969,
+      "new_bits": 13826516032561833837,
+      "accepted": false
+    },
+    {
+      "old_bits": 13826516041569529969,
+      "new_bits": 13826516032561833836,
+      "accepted": false
+    },
+    {
+      "old_bits": 13826516041569529969,
+      "new_bits": 13826516032561833835,
+      "accepted": true
+    },
+    {
+      "old_bits": 13826516041569529969,
+      "new_bits": 13826516032561833834,
+      "accepted": true
+    },
+    {
+      "old_bits": 13826516041569529969,
+      "new_bits": 13826516032561833833,
+      "accepted": true
+    },
+    {
+      "old_bits": 14081332523603925924,
+      "new_bits": 14081332523603167558,
+      "accepted": false
+    },
+    {
+      "old_bits": 14081332523603925924,
+      "new_bits": 14081332523603167557,
+      "accepted": false
+    },
+    {
+      "old_bits": 14081332523603925924,
+      "new_bits": 14081332523603167556,
+      "accepted": false
+    },
+    {
+      "old_bits": 14081332523603925924,
+      "new_bits": 14081332523603167555,
+      "accepted": false
+    },
+    {
+      "old_bits": 14081332523603925924,
+      "new_bits": 14081332523603167554,
+      "accepted": true
+    },
+    {
+      "old_bits": 14081332523603925924,
+      "new_bits": 14081332523603167553,
+      "accepted": true
+    },
+    {
+      "old_bits": 14081332523603925924,
+      "new_bits": 14081332523603167552,
+      "accepted": true
+    },
+    {
+      "old_bits": 14072079362998990501,
+      "new_bits": 14072079362998256731,
+      "accepted": false
+    },
+    {
+      "old_bits": 14072079362998990501,
+      "new_bits": 14072079362998256730,
+      "accepted": false
+    },
+    {
+      "old_bits": 14072079362998990501,
+      "new_bits": 14072079362998256729,
+      "accepted": false
+    },
+    {
+      "old_bits": 14072079362998990501,
+      "new_bits": 14072079362998256728,
+      "accepted": false
+    },
+    {
+      "old_bits": 14072079362998990501,
+      "new_bits": 14072079362998256727,
+      "accepted": true
+    },
+    {
+      "old_bits": 14072079362998990501,
+      "new_bits": 14072079362998256726,
+      "accepted": true
+    },
+    {
+      "old_bits": 14072079362998990501,
+      "new_bits": 14072079362998256725,
+      "accepted": true
+    },
+    {
+      "old_bits": 13916947094819396730,
+      "new_bits": 13916947094818855358,
+      "accepted": false
+    },
+    {
+      "old_bits": 13916947094819396730,
+      "new_bits": 13916947094818855357,
+      "accepted": false
+    },
+    {
+      "old_bits": 13916947094819396730,
+      "new_bits": 13916947094818855356,
+      "accepted": false
+    },
+    {
+      "old_bits": 13916947094819396730,
+      "new_bits": 13916947094818855355,
+      "accepted": false
+    },
+    {
+      "old_bits": 13916947094819396730,
+      "new_bits": 13916947094818855354,
+      "accepted": true
+    },
+    {
+      "old_bits": 13916947094819396730,
+      "new_bits": 13916947094818855353,
+      "accepted": true
+    },
+    {
+      "old_bits": 13916947094819396730,
+      "new_bits": 13916947094818855352,
+      "accepted": true
+    },
+    {
+      "old_bits": 4670937473558734182,
+      "new_bits": 4670937473559529883,
+      "accepted": false
+    },
+    {
+      "old_bits": 4670937473558734182,
+      "new_bits": 4670937473559529884,
+      "accepted": false
+    },
+    {
+      "old_bits": 4670937473558734182,
+      "new_bits": 4670937473559529885,
+      "accepted": false
+    },
+    {
+      "old_bits": 4670937473558734182,
+      "new_bits": 4670937473559529886,
+      "accepted": false
+    },
+    {
+      "old_bits": 4670937473558734182,
+      "new_bits": 4670937473559529887,
+      "accepted": true
+    },
+    {
+      "old_bits": 4670937473558734182,
+      "new_bits": 4670937473559529888,
+      "accepted": true
+    },
+    {
+      "old_bits": 4670937473558734182,
+      "new_bits": 4670937473559529889,
+      "accepted": true
+    },
+    {
+      "old_bits": 4671573294731660574,
+      "new_bits": 4671573294732519857,
+      "accepted": false
+    },
+    {
+      "old_bits": 4671573294731660574,
+      "new_bits": 4671573294732519858,
+      "accepted": false
+    },
+    {
+      "old_bits": 4671573294731660574,
+      "new_bits": 4671573294732519859,
+      "accepted": false
+    },
+    {
+      "old_bits": 4671573294731660574,
+      "new_bits": 4671573294732519860,
+      "accepted": false
+    },
+    {
+      "old_bits": 4671573294731660574,
+      "new_bits": 4671573294732519861,
+      "accepted": true
+    },
+    {
+      "old_bits": 4671573294731660574,
+      "new_bits": 4671573294732519862,
+      "accepted": true
+    },
+    {
+      "old_bits": 4671573294731660574,
+      "new_bits": 4671573294732519863,
+      "accepted": true
+    },
+    {
+      "old_bits": 13947438216978822059,
+      "new_bits": 13947438216977942191,
+      "accepted": false
+    },
+    {
+      "old_bits": 13947438216978822059,
+      "new_bits": 13947438216977942190,
+      "accepted": false
+    },
+    {
+      "old_bits": 13947438216978822059,
+      "new_bits": 13947438216977942189,
+      "accepted": false
+    },
+    {
+      "old_bits": 13947438216978822059,
+      "new_bits": 13947438216977942188,
+      "accepted": false
+    },
+    {
+      "old_bits": 13947438216978822059,
+      "new_bits": 13947438216977942187,
+      "accepted": true
+    },
+    {
+      "old_bits": 13947438216978822059,
+      "new_bits": 13947438216977942186,
+      "accepted": true
+    },
+    {
+      "old_bits": 13947438216978822059,
+      "new_bits": 13947438216977942185,
+      "accepted": true
+    },
+    {
+      "old_bits": 4731486436583239610,
+      "new_bits": 4731486436583960683,
+      "accepted": false
+    },
+    {
+      "old_bits": 4731486436583239610,
+      "new_bits": 4731486436583960684,
+      "accepted": false
+    },
+    {
+      "old_bits": 4731486436583239610,
+      "new_bits": 4731486436583960685,
+      "accepted": false
+    },
+    {
+      "old_bits": 4731486436583239610,
+      "new_bits": 4731486436583960686,
+      "accepted": false
+    },
+    {
+      "old_bits": 4731486436583239610,
+      "new_bits": 4731486436583960687,
+      "accepted": true
+    },
+    {
+      "old_bits": 4731486436583239610,
+      "new_bits": 4731486436583960688,
+      "accepted": true
+    },
+    {
+      "old_bits": 4731486436583239610,
+      "new_bits": 4731486436583960689,
+      "accepted": true
+    },
+    {
+      "old_bits": 4788045982223506174,
+      "new_bits": 4788045982224028489,
+      "accepted": false
+    },
+    {
+      "old_bits": 4788045982223506174,
+      "new_bits": 4788045982224028490,
+      "accepted": false
+    },
+    {
+      "old_bits": 4788045982223506174,
+      "new_bits": 4788045982224028491,
+      "accepted": false
+    },
+    {
+      "old_bits": 4788045982223506174,
+      "new_bits": 4788045982224028492,
+      "accepted": false
+    },
+    {
+      "old_bits": 4788045982223506174,
+      "new_bits": 4788045982224028493,
+      "accepted": true
+    },
+    {
+      "old_bits": 4788045982223506174,
+      "new_bits": 4788045982224028494,
+      "accepted": true
+    },
+    {
+      "old_bits": 4788045982223506174,
+      "new_bits": 4788045982224028495,
+      "accepted": true
+    },
+    {
+      "old_bits": 4745889542909618510,
+      "new_bits": 4745889542910428785,
+      "accepted": false
+    },
+    {
+      "old_bits": 4745889542909618510,
+      "new_bits": 4745889542910428786,
+      "accepted": false
+    },
+    {
+      "old_bits": 4745889542909618510,
+      "new_bits": 4745889542910428787,
+      "accepted": false
+    },
+    {
+      "old_bits": 4745889542909618510,
+      "new_bits": 4745889542910428788,
+      "accepted": false
+    },
+    {
+      "old_bits": 4745889542909618510,
+      "new_bits": 4745889542910428789,
+      "accepted": true
+    },
+    {
+      "old_bits": 4745889542909618510,
+      "new_bits": 4745889542910428790,
+      "accepted": true
+    },
+    {
+      "old_bits": 4745889542909618510,
+      "new_bits": 4745889542910428791,
+      "accepted": true
+    },
+    {
+      "old_bits": 14069731123655650784,
+      "new_bits": 14069731123655151838,
+      "accepted": false
+    },
+    {
+      "old_bits": 14069731123655650784,
+      "new_bits": 14069731123655151837,
+      "accepted": false
+    },
+    {
+      "old_bits": 14069731123655650784,
+      "new_bits": 14069731123655151836,
+      "accepted": false
+    },
+    {
+      "old_bits": 14069731123655650784,
+      "new_bits": 14069731123655151835,
+      "accepted": false
+    },
+    {
+      "old_bits": 14069731123655650784,
+      "new_bits": 14069731123655151834,
+      "accepted": true
+    },
+    {
+      "old_bits": 14069731123655650784,
+      "new_bits": 14069731123655151833,
+      "accepted": true
+    },
+    {
+      "old_bits": 14069731123655650784,
+      "new_bits": 14069731123655151832,
+      "accepted": true
+    },
+    {
+      "old_bits": 4839881000015830906,
+      "new_bits": 4839881000016582763,
+      "accepted": false
+    },
+    {
+      "old_bits": 4839881000015830906,
+      "new_bits": 4839881000016582764,
+      "accepted": false
+    },
+    {
+      "old_bits": 4839881000015830906,
+      "new_bits": 4839881000016582765,
+      "accepted": false
+    },
+    {
+      "old_bits": 4839881000015830906,
+      "new_bits": 4839881000016582766,
+      "accepted": false
+    },
+    {
+      "old_bits": 4839881000015830906,
+      "new_bits": 4839881000016582767,
+      "accepted": true
+    },
+    {
+      "old_bits": 4839881000015830906,
+      "new_bits": 4839881000016582768,
+      "accepted": true
+    },
+    {
+      "old_bits": 4839881000015830906,
+      "new_bits": 4839881000016582769,
+      "accepted": true
+    },
+    {
+      "old_bits": 14008410398410917956,
+      "new_bits": 14008410398410246043,
+      "accepted": false
+    },
+    {
+      "old_bits": 14008410398410917956,
+      "new_bits": 14008410398410246042,
+      "accepted": false
+    },
+    {
+      "old_bits": 14008410398410917956,
+      "new_bits": 14008410398410246041,
+      "accepted": false
+    },
+    {
+      "old_bits": 14008410398410917956,
+      "new_bits": 14008410398410246040,
+      "accepted": false
+    },
+    {
+      "old_bits": 14008410398410917956,
+      "new_bits": 14008410398410246039,
+      "accepted": true
+    },
+    {
+      "old_bits": 14008410398410917956,
+      "new_bits": 14008410398410246038,
+      "accepted": true
+    },
+    {
+      "old_bits": 14008410398410917956,
+      "new_bits": 14008410398410246037,
+      "accepted": true
+    },
+    {
+      "old_bits": 14022814500982004952,
+      "new_bits": 14022814500981243709,
+      "accepted": false
+    },
+    {
+      "old_bits": 14022814500982004952,
+      "new_bits": 14022814500981243708,
+      "accepted": false
+    },
+    {
+      "old_bits": 14022814500982004952,
+      "new_bits": 14022814500981243707,
+      "accepted": false
+    },
+    {
+      "old_bits": 14022814500982004952,
+      "new_bits": 14022814500981243706,
+      "accepted": false
+    },
+    {
+      "old_bits": 14022814500982004952,
+      "new_bits": 14022814500981243705,
+      "accepted": true
+    },
+    {
+      "old_bits": 14022814500982004952,
+      "new_bits": 14022814500981243704,
+      "accepted": true
+    },
+    {
+      "old_bits": 14022814500982004952,
+      "new_bits": 14022814500981243703,
+      "accepted": true
+    },
+    {
+      "old_bits": 13982876977225372476,
+      "new_bits": 13982876977224551745,
+      "accepted": false
+    },
+    {
+      "old_bits": 13982876977225372476,
+      "new_bits": 13982876977224551744,
+      "accepted": false
+    },
+    {
+      "old_bits": 13982876977225372476,
+      "new_bits": 13982876977224551743,
+      "accepted": false
+    },
+    {
+      "old_bits": 13982876977225372476,
+      "new_bits": 13982876977224551742,
+      "accepted": false
+    },
+    {
+      "old_bits": 13982876977225372476,
+      "new_bits": 13982876977224551741,
+      "accepted": true
+    },
+    {
+      "old_bits": 13982876977225372476,
+      "new_bits": 13982876977224551740,
+      "accepted": true
+    },
+    {
+      "old_bits": 13982876977225372476,
+      "new_bits": 13982876977224551739,
+      "accepted": true
+    },
+    {
+      "old_bits": 4773192569740409890,
+      "new_bits": 4773192569741248303,
+      "accepted": false
+    },
+    {
+      "old_bits": 4773192569740409890,
+      "new_bits": 4773192569741248304,
+      "accepted": false
+    },
+    {
+      "old_bits": 4773192569740409890,
+      "new_bits": 4773192569741248305,
+      "accepted": false
+    },
+    {
+      "old_bits": 4773192569740409890,
+      "new_bits": 4773192569741248306,
+      "accepted": false
+    },
+    {
+      "old_bits": 4773192569740409890,
+      "new_bits": 4773192569741248307,
+      "accepted": true
+    },
+    {
+      "old_bits": 4773192569740409890,
+      "new_bits": 4773192569741248308,
+      "accepted": true
+    },
+    {
+      "old_bits": 4773192569740409890,
+      "new_bits": 4773192569741248309,
+      "accepted": true
+    },
+    {
+      "old_bits": 13957599864909440789,
+      "new_bits": 13957599864908895953,
+      "accepted": false
+    },
+    {
+      "old_bits": 13957599864909440789,
+      "new_bits": 13957599864908895952,
+      "accepted": false
+    },
+    {
+      "old_bits": 13957599864909440789,
+      "new_bits": 13957599864908895951,
+      "accepted": false
+    },
+    {
+      "old_bits": 13957599864909440789,
+      "new_bits": 13957599864908895950,
+      "accepted": false
+    },
+    {
+      "old_bits": 13957599864909440789,
+      "new_bits": 13957599864908895949,
+      "accepted": true
+    },
+    {
+      "old_bits": 13957599864909440789,
+      "new_bits": 13957599864908895948,
+      "accepted": true
+    },
+    {
+      "old_bits": 13957599864909440789,
+      "new_bits": 13957599864908895947,
+      "accepted": true
+    },
+    {
+      "old_bits": 14055631931394888110,
+      "new_bits": 14055631931393997644,
+      "accepted": false
+    },
+    {
+      "old_bits": 14055631931394888110,
+      "new_bits": 14055631931393997643,
+      "accepted": false
+    },
+    {
+      "old_bits": 14055631931394888110,
+      "new_bits": 14055631931393997642,
+      "accepted": false
+    },
+    {
+      "old_bits": 14055631931394888110,
+      "new_bits": 14055631931393997641,
+      "accepted": false
+    },
+    {
+      "old_bits": 14055631931394888110,
+      "new_bits": 14055631931393997640,
+      "accepted": true
+    },
+    {
+      "old_bits": 14055631931394888110,
+      "new_bits": 14055631931393997639,
+      "accepted": true
+    },
+    {
+      "old_bits": 14055631931394888110,
+      "new_bits": 14055631931393997638,
+      "accepted": true
+    },
+    {
+      "old_bits": 4851127729238352654,
+      "new_bits": 4851127729238878104,
+      "accepted": false
+    },
+    {
+      "old_bits": 4851127729238352654,
+      "new_bits": 4851127729238878105,
+      "accepted": false
+    },
+    {
+      "old_bits": 4851127729238352654,
+      "new_bits": 4851127729238878106,
+      "accepted": false
+    },
+    {
+      "old_bits": 4851127729238352654,
+      "new_bits": 4851127729238878107,
+      "accepted": false
+    },
+    {
+      "old_bits": 4851127729238352654,
+      "new_bits": 4851127729238878108,
+      "accepted": true
+    },
+    {
+      "old_bits": 4851127729238352654,
+      "new_bits": 4851127729238878109,
+      "accepted": true
+    },
+    {
+      "old_bits": 4851127729238352654,
+      "new_bits": 4851127729238878110,
+      "accepted": true
+    },
+    {
+      "old_bits": 4753070601150911333,
+      "new_bits": 4753070601151538990,
+      "accepted": false
+    },
+    {
+      "old_bits": 4753070601150911333,
+      "new_bits": 4753070601151538991,
+      "accepted": false
+    },
+    {
+      "old_bits": 4753070601150911333,
+      "new_bits": 4753070601151538992,
+      "accepted": false
+    },
+    {
+      "old_bits": 4753070601150911333,
+      "new_bits": 4753070601151538993,
+      "accepted": false
+    },
+    {
+      "old_bits": 4753070601150911333,
+      "new_bits": 4753070601151538994,
+      "accepted": true
+    },
+    {
+      "old_bits": 4753070601150911333,
+      "new_bits": 4753070601151538995,
+      "accepted": true
+    },
+    {
+      "old_bits": 4753070601150911333,
+      "new_bits": 4753070601151538996,
+      "accepted": true
+    },
+    {
+      "old_bits": 4790464271929415136,
+      "new_bits": 4790464271930179280,
+      "accepted": false
+    },
+    {
+      "old_bits": 4790464271929415136,
+      "new_bits": 4790464271930179281,
+      "accepted": false
+    },
+    {
+      "old_bits": 4790464271929415136,
+      "new_bits": 4790464271930179282,
+      "accepted": false
+    },
+    {
+      "old_bits": 4790464271929415136,
+      "new_bits": 4790464271930179283,
+      "accepted": false
+    },
+    {
+      "old_bits": 4790464271929415136,
+      "new_bits": 4790464271930179284,
+      "accepted": true
+    },
+    {
+      "old_bits": 4790464271929415136,
+      "new_bits": 4790464271930179285,
+      "accepted": true
+    },
+    {
+      "old_bits": 4790464271929415136,
+      "new_bits": 4790464271930179286,
+      "accepted": true
+    },
+    {
+      "old_bits": 4652483367550232535,
+      "new_bits": 4652483367555107434,
+      "accepted": false
+    },
+    {
+      "old_bits": 4652483367550232535,
+      "new_bits": 4652483367555107435,
+      "accepted": false
+    },
+    {
+      "old_bits": 4652483367550232535,
+      "new_bits": 4652483367555107436,
+      "accepted": false
+    },
+    {
+      "old_bits": 4652483367550232535,
+      "new_bits": 4652483367555107437,
+      "accepted": false
+    },
+    {
+      "old_bits": 4652483367550232535,
+      "new_bits": 4652483367555107438,
+      "accepted": true
+    },
+    {
+      "old_bits": 4652483367550232535,
+      "new_bits": 4652483367555107439,
+      "accepted": true
+    },
+    {
+      "old_bits": 4652483367550232535,
+      "new_bits": 4652483367555107440,
+      "accepted": true
+    },
+    {
+      "old_bits": 4802203475088223526,
+      "new_bits": 4802203475088810510,
+      "accepted": false
+    },
+    {
+      "old_bits": 4802203475088223526,
+      "new_bits": 4802203475088810511,
+      "accepted": false
+    },
+    {
+      "old_bits": 4802203475088223526,
+      "new_bits": 4802203475088810512,
+      "accepted": false
+    },
+    {
+      "old_bits": 4802203475088223526,
+      "new_bits": 4802203475088810513,
+      "accepted": false
+    },
+    {
+      "old_bits": 4802203475088223526,
+      "new_bits": 4802203475088810514,
+      "accepted": true
+    },
+    {
+      "old_bits": 4802203475088223526,
+      "new_bits": 4802203475088810515,
+      "accepted": true
+    },
+    {
+      "old_bits": 4802203475088223526,
+      "new_bits": 4802203475088810516,
+      "accepted": true
+    },
+    {
+      "old_bits": 4688312232681986208,
+      "new_bits": 4688312232682460247,
+      "accepted": false
+    },
+    {
+      "old_bits": 4688312232681986208,
+      "new_bits": 4688312232682460248,
+      "accepted": false
+    },
+    {
+      "old_bits": 4688312232681986208,
+      "new_bits": 4688312232682460249,
+      "accepted": false
+    },
+    {
+      "old_bits": 4688312232681986208,
+      "new_bits": 4688312232682460250,
+      "accepted": false
+    },
+    {
+      "old_bits": 4688312232681986208,
+      "new_bits": 4688312232682460251,
+      "accepted": true
+    },
+    {
+      "old_bits": 4688312232681986208,
+      "new_bits": 4688312232682460252,
+      "accepted": true
+    },
+    {
+      "old_bits": 4688312232681986208,
+      "new_bits": 4688312232682460253,
+      "accepted": true
+    },
+    {
+      "old_bits": 4741311368025668894,
+      "new_bits": 4741311368026471715,
+      "accepted": false
+    },
+    {
+      "old_bits": 4741311368025668894,
+      "new_bits": 4741311368026471716,
+      "accepted": false
+    },
+    {
+      "old_bits": 4741311368025668894,
+      "new_bits": 4741311368026471717,
+      "accepted": false
+    },
+    {
+      "old_bits": 4741311368025668894,
+      "new_bits": 4741311368026471718,
+      "accepted": false
+    },
+    {
+      "old_bits": 4741311368025668894,
+      "new_bits": 4741311368026471719,
+      "accepted": true
+    },
+    {
+      "old_bits": 4741311368025668894,
+      "new_bits": 4741311368026471720,
+      "accepted": true
+    },
+    {
+      "old_bits": 4741311368025668894,
+      "new_bits": 4741311368026471721,
+      "accepted": true
+    },
+    {
+      "old_bits": 4612444011598583781,
+      "new_bits": 4612444013850909751,
+      "accepted": false
+    },
+    {
+      "old_bits": 4612444011598583781,
+      "new_bits": 4612444013850909752,
+      "accepted": false
+    },
+    {
+      "old_bits": 4612444011598583781,
+      "new_bits": 4612444013850909753,
+      "accepted": false
+    },
+    {
+      "old_bits": 4612444011598583781,
+      "new_bits": 4612444013850909754,
+      "accepted": false
+    },
+    {
+      "old_bits": 4612444011598583781,
+      "new_bits": 4612444013850909755,
+      "accepted": true
+    },
+    {
+      "old_bits": 4612444011598583781,
+      "new_bits": 4612444013850909756,
+      "accepted": true
+    },
+    {
+      "old_bits": 4612444011598583781,
+      "new_bits": 4612444013850909757,
+      "accepted": true
+    },
+    {
+      "old_bits": 4659791286960097845,
+      "new_bits": 4659791286963054152,
+      "accepted": false
+    },
+    {
+      "old_bits": 4659791286960097845,
+      "new_bits": 4659791286963054153,
+      "accepted": false
+    },
+    {
+      "old_bits": 4659791286960097845,
+      "new_bits": 4659791286963054154,
+      "accepted": false
+    },
+    {
+      "old_bits": 4659791286960097845,
+      "new_bits": 4659791286963054155,
+      "accepted": false
+    },
+    {
+      "old_bits": 4659791286960097845,
+      "new_bits": 4659791286963054156,
+      "accepted": true
+    },
+    {
+      "old_bits": 4659791286960097845,
+      "new_bits": 4659791286963054157,
+      "accepted": true
+    },
+    {
+      "old_bits": 4659791286960097845,
+      "new_bits": 4659791286963054158,
+      "accepted": true
+    },
+    {
+      "old_bits": 14011263027402422031,
+      "new_bits": 14011263027401915215,
+      "accepted": false
+    },
+    {
+      "old_bits": 14011263027402422031,
+      "new_bits": 14011263027401915214,
+      "accepted": false
+    },
+    {
+      "old_bits": 14011263027402422031,
+      "new_bits": 14011263027401915213,
+      "accepted": false
+    },
+    {
+      "old_bits": 14011263027402422031,
+      "new_bits": 14011263027401915212,
+      "accepted": false
+    },
+    {
+      "old_bits": 14011263027402422031,
+      "new_bits": 14011263027401915211,
+      "accepted": true
+    },
+    {
+      "old_bits": 14011263027402422031,
+      "new_bits": 14011263027401915210,
+      "accepted": true
+    },
+    {
+      "old_bits": 14011263027402422031,
+      "new_bits": 14011263027401915209,
+      "accepted": true
+    },
+    {
+      "old_bits": 14067020179561855234,
+      "new_bits": 14067020179561177023,
+      "accepted": false
+    },
+    {
+      "old_bits": 14067020179561855234,
+      "new_bits": 14067020179561177022,
+      "accepted": false
+    },
+    {
+      "old_bits": 14067020179561855234,
+      "new_bits": 14067020179561177021,
+      "accepted": false
+    },
+    {
+      "old_bits": 14067020179561855234,
+      "new_bits": 14067020179561177020,
+      "accepted": false
+    },
+    {
+      "old_bits": 14067020179561855234,
+      "new_bits": 14067020179561177019,
+      "accepted": true
+    },
+    {
+      "old_bits": 14067020179561855234,
+      "new_bits": 14067020179561177018,
+      "accepted": true
+    },
+    {
+      "old_bits": 14067020179561855234,
+      "new_bits": 14067020179561177017,
+      "accepted": true
+    },
+    {
+      "old_bits": 14060943290263116965,
+      "new_bits": 14060943290262596083,
+      "accepted": false
+    },
+    {
+      "old_bits": 14060943290263116965,
+      "new_bits": 14060943290262596082,
+      "accepted": false
+    },
+    {
+      "old_bits": 14060943290263116965,
+      "new_bits": 14060943290262596081,
+      "accepted": false
+    },
+    {
+      "old_bits": 14060943290263116965,
+      "new_bits": 14060943290262596080,
+      "accepted": false
+    },
+    {
+      "old_bits": 14060943290263116965,
+      "new_bits": 14060943290262596079,
+      "accepted": true
+    },
+    {
+      "old_bits": 14060943290263116965,
+      "new_bits": 14060943290262596078,
+      "accepted": true
+    },
+    {
+      "old_bits": 14060943290263116965,
+      "new_bits": 14060943290262596077,
+      "accepted": true
+    },
+    {
+      "old_bits": 4513040450826834432,
+      "new_bits": 4519797805022837463,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513040450826834432,
+      "new_bits": 4519797805022837464,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513040450826834432,
+      "new_bits": 4519797805022837465,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513040450826834432,
+      "new_bits": 4519797805022837466,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513040450826834432,
+      "new_bits": 4519797805022837467,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513040450826834432,
+      "new_bits": 4519797805022837468,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513040450826834432,
+      "new_bits": 4519797805022837469,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520358866961396676,
+      "new_bits": 4523347629662509751,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520358866961396676,
+      "new_bits": 4523347629662509752,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520358866961396676,
+      "new_bits": 4523347629662509753,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520358866961396676,
+      "new_bits": 4523347629662509754,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520358866961396676,
+      "new_bits": 4523347629662509755,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520358866961396676,
+      "new_bits": 4523347629662509756,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520358866961396676,
+      "new_bits": 4523347629662509757,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515613324891007952,
+      "new_bits": 4521084242055052867,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515613324891007952,
+      "new_bits": 4521084242055052868,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515613324891007952,
+      "new_bits": 4521084242055052869,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515613324891007952,
+      "new_bits": 4521084242055052870,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515613324891007952,
+      "new_bits": 4521084242055052871,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515613324891007952,
+      "new_bits": 4521084242055052872,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515613324891007952,
+      "new_bits": 4521084242055052873,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742286063329611507,
+      "new_bits": 13733310997689665179,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742286063329611507,
+      "new_bits": 13733310997689665178,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742286063329611507,
+      "new_bits": 13733310997689665177,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742286063329611507,
+      "new_bits": 13733310997689665176,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742286063329611507,
+      "new_bits": 13733310997689665175,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742286063329611507,
+      "new_bits": 13733310997689665174,
+      "accepted": true
+    },
+    {
+      "old_bits": 13742286063329611507,
+      "new_bits": 13733310997689665173,
+      "accepted": true
+    },
+    {
+      "old_bits": 13744124138928354426,
+      "new_bits": 13738321081781957213,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744124138928354426,
+      "new_bits": 13738321081781957212,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744124138928354426,
+      "new_bits": 13738321081781957211,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744124138928354426,
+      "new_bits": 13738321081781957210,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744124138928354426,
+      "new_bits": 13738321081781957209,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744124138928354426,
+      "new_bits": 13738321081781957208,
+      "accepted": true
+    },
+    {
+      "old_bits": 13744124138928354426,
+      "new_bits": 13738321081781957207,
+      "accepted": true
+    },
+    {
+      "old_bits": 4511947198063281824,
+      "new_bits": 4519416085781511779,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511947198063281824,
+      "new_bits": 4519416085781511780,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511947198063281824,
+      "new_bits": 4519416085781511781,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511947198063281824,
+      "new_bits": 4519416085781511782,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511947198063281824,
+      "new_bits": 4519416085781511783,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511947198063281824,
+      "new_bits": 4519416085781511784,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511947198063281824,
+      "new_bits": 4519416085781511785,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520695414458114804,
+      "new_bits": 4523515903410885643,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520695414458114804,
+      "new_bits": 4523515903410885644,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520695414458114804,
+      "new_bits": 4523515903410885645,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520695414458114804,
+      "new_bits": 4523515903410885646,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520695414458114804,
+      "new_bits": 4523515903410885647,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520695414458114804,
+      "new_bits": 4523515903410885648,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520695414458114804,
+      "new_bits": 4523515903410885649,
+      "accepted": false
+    },
+    {
+      "old_bits": 13737646315015187340,
+      "new_bits": 4510146990978118717,
+      "accepted": false
+    },
+    {
+      "old_bits": 13737646315015187340,
+      "new_bits": 4510146990978118718,
+      "accepted": false
+    },
+    {
+      "old_bits": 13737646315015187340,
+      "new_bits": 4510146990978118719,
+      "accepted": false
+    },
+    {
+      "old_bits": 13737646315015187340,
+      "new_bits": 4510146990978118720,
+      "accepted": false
+    },
+    {
+      "old_bits": 13737646315015187340,
+      "new_bits": 4510146990978118721,
+      "accepted": false
+    },
+    {
+      "old_bits": 13737646315015187340,
+      "new_bits": 4510146990978118722,
+      "accepted": true
+    },
+    {
+      "old_bits": 13737646315015187340,
+      "new_bits": 4510146990978118723,
+      "accepted": true
+    },
+    {
+      "old_bits": 13726715091979164000,
+      "new_bits": 4516454131587636017,
+      "accepted": false
+    },
+    {
+      "old_bits": 13726715091979164000,
+      "new_bits": 4516454131587636018,
+      "accepted": false
+    },
+    {
+      "old_bits": 13726715091979164000,
+      "new_bits": 4516454131587636019,
+      "accepted": false
+    },
+    {
+      "old_bits": 13726715091979164000,
+      "new_bits": 4516454131587636020,
+      "accepted": false
+    },
+    {
+      "old_bits": 13726715091979164000,
+      "new_bits": 4516454131587636021,
+      "accepted": false
+    },
+    {
+      "old_bits": 13726715091979164000,
+      "new_bits": 4516454131587636022,
+      "accepted": false
+    },
+    {
+      "old_bits": 13726715091979164000,
+      "new_bits": 4516454131587636023,
+      "accepted": false
+    },
+    {
+      "old_bits": 4508752864890615536,
+      "new_bits": 4518617502488265349,
+      "accepted": false
+    },
+    {
+      "old_bits": 4508752864890615536,
+      "new_bits": 4518617502488265350,
+      "accepted": false
+    },
+    {
+      "old_bits": 4508752864890615536,
+      "new_bits": 4518617502488265351,
+      "accepted": false
+    },
+    {
+      "old_bits": 4508752864890615536,
+      "new_bits": 4518617502488265352,
+      "accepted": false
+    },
+    {
+      "old_bits": 4508752864890615536,
+      "new_bits": 4518617502488265353,
+      "accepted": false
+    },
+    {
+      "old_bits": 4508752864890615536,
+      "new_bits": 4518617502488265354,
+      "accepted": false
+    },
+    {
+      "old_bits": 4508752864890615536,
+      "new_bits": 4518617502488265355,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742002214399843024,
+      "new_bits": 13732175601970704787,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742002214399843024,
+      "new_bits": 13732175601970704786,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742002214399843024,
+      "new_bits": 13732175601970704785,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742002214399843024,
+      "new_bits": 13732175601970704784,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742002214399843024,
+      "new_bits": 13732175601970704783,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742002214399843024,
+      "new_bits": 13732175601970704782,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742002214399843024,
+      "new_bits": 13732175601970704781,
+      "accepted": true
+    },
+    {
+      "old_bits": 13741950537420788124,
+      "new_bits": 13731968894054505859,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741950537420788124,
+      "new_bits": 13731968894054505858,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741950537420788124,
+      "new_bits": 13731968894054505857,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741950537420788124,
+      "new_bits": 13731968894054505856,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741950537420788124,
+      "new_bits": 13731968894054505855,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741950537420788124,
+      "new_bits": 13731968894054505854,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741950537420788124,
+      "new_bits": 13731968894054505853,
+      "accepted": true
+    },
+    {
+      "old_bits": 4521613786908243770,
+      "new_bits": 4523975089635996045,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521613786908243770,
+      "new_bits": 4523975089635996046,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521613786908243770,
+      "new_bits": 4523975089635996047,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521613786908243770,
+      "new_bits": 4523975089635996048,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521613786908243770,
+      "new_bits": 4523975089635996049,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521613786908243770,
+      "new_bits": 4523975089635996050,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521613786908243770,
+      "new_bits": 4523975089635996051,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520734115649072116,
+      "new_bits": 4523535254006366234,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520734115649072116,
+      "new_bits": 4523535254006366235,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520734115649072116,
+      "new_bits": 4523535254006366236,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520734115649072116,
+      "new_bits": 4523535254006366237,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520734115649072116,
+      "new_bits": 4523535254006366238,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520734115649072116,
+      "new_bits": 4523535254006366239,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520734115649072116,
+      "new_bits": 4523535254006366240,
+      "accepted": false
+    },
+    {
+      "old_bits": 13734566926835829696,
+      "new_bits": 4513750328658706603,
+      "accepted": false
+    },
+    {
+      "old_bits": 13734566926835829696,
+      "new_bits": 4513750328658706604,
+      "accepted": false
+    },
+    {
+      "old_bits": 13734566926835829696,
+      "new_bits": 4513750328658706605,
+      "accepted": false
+    },
+    {
+      "old_bits": 13734566926835829696,
+      "new_bits": 4513750328658706606,
+      "accepted": false
+    },
+    {
+      "old_bits": 13734566926835829696,
+      "new_bits": 4513750328658706607,
+      "accepted": false
+    },
+    {
+      "old_bits": 13734566926835829696,
+      "new_bits": 4513750328658706608,
+      "accepted": false
+    },
+    {
+      "old_bits": 13734566926835829696,
+      "new_bits": 4513750328658706609,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742304583199770154,
+      "new_bits": 13733385077170292359,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742304583199770154,
+      "new_bits": 13733385077170292358,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742304583199770154,
+      "new_bits": 13733385077170292357,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742304583199770154,
+      "new_bits": 13733385077170292356,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742304583199770154,
+      "new_bits": 13733385077170292355,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742304583199770154,
+      "new_bits": 13733385077170292354,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742304583199770154,
+      "new_bits": 13733385077170292353,
+      "accepted": true
+    },
+    {
+      "old_bits": 4510029651034145344,
+      "new_bits": 4518936699024179721,
+      "accepted": false
+    },
+    {
+      "old_bits": 4510029651034145344,
+      "new_bits": 4518936699024179722,
+      "accepted": false
+    },
+    {
+      "old_bits": 4510029651034145344,
+      "new_bits": 4518936699024179723,
+      "accepted": false
+    },
+    {
+      "old_bits": 4510029651034145344,
+      "new_bits": 4518936699024179724,
+      "accepted": false
+    },
+    {
+      "old_bits": 4510029651034145344,
+      "new_bits": 4518936699024179725,
+      "accepted": false
+    },
+    {
+      "old_bits": 4510029651034145344,
+      "new_bits": 4518936699024179726,
+      "accepted": false
+    },
+    {
+      "old_bits": 4510029651034145344,
+      "new_bits": 4518936699024179727,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521056672748346370,
+      "new_bits": 4523696532556019489,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521056672748346370,
+      "new_bits": 4523696532556019490,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521056672748346370,
+      "new_bits": 4523696532556019491,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521056672748346370,
+      "new_bits": 4523696532556019492,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521056672748346370,
+      "new_bits": 4523696532556019493,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521056672748346370,
+      "new_bits": 4523696532556019494,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521056672748346370,
+      "new_bits": 4523696532556019495,
+      "accepted": false
+    },
+    {
+      "old_bits": 4516391512859855556,
+      "new_bits": 4521473336039515578,
+      "accepted": false
+    },
+    {
+      "old_bits": 4516391512859855556,
+      "new_bits": 4521473336039515579,
+      "accepted": false
+    },
+    {
+      "old_bits": 4516391512859855556,
+      "new_bits": 4521473336039515580,
+      "accepted": false
+    },
+    {
+      "old_bits": 4516391512859855556,
+      "new_bits": 4521473336039515581,
+      "accepted": false
+    },
+    {
+      "old_bits": 4516391512859855556,
+      "new_bits": 4521473336039515582,
+      "accepted": false
+    },
+    {
+      "old_bits": 4516391512859855556,
+      "new_bits": 4521473336039515583,
+      "accepted": false
+    },
+    {
+      "old_bits": 4516391512859855556,
+      "new_bits": 4521473336039515584,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521428811235618366,
+      "new_bits": 4523882601799674093,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521428811235618366,
+      "new_bits": 4523882601799674094,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521428811235618366,
+      "new_bits": 4523882601799674095,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521428811235618366,
+      "new_bits": 4523882601799674096,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521428811235618366,
+      "new_bits": 4523882601799674097,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521428811235618366,
+      "new_bits": 4523882601799674098,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521428811235618366,
+      "new_bits": 4523882601799674099,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521512399545122106,
+      "new_bits": 4523924395954430143,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521512399545122106,
+      "new_bits": 4523924395954430144,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521512399545122106,
+      "new_bits": 4523924395954430145,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521512399545122106,
+      "new_bits": 4523924395954430146,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521512399545122106,
+      "new_bits": 4523924395954430147,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521512399545122106,
+      "new_bits": 4523924395954430148,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521512399545122106,
+      "new_bits": 4523924395954430149,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511566061350859296,
+      "new_bits": 4519320801603396619,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511566061350859296,
+      "new_bits": 4519320801603396620,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511566061350859296,
+      "new_bits": 4519320801603396621,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511566061350859296,
+      "new_bits": 4519320801603396622,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511566061350859296,
+      "new_bits": 4519320801603396623,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511566061350859296,
+      "new_bits": 4519320801603396624,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511566061350859296,
+      "new_bits": 4519320801603396625,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515594874979271612,
+      "new_bits": 4521075017099183774,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515594874979271612,
+      "new_bits": 4521075017099183775,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515594874979271612,
+      "new_bits": 4521075017099183776,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515594874979271612,
+      "new_bits": 4521075017099183777,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515594874979271612,
+      "new_bits": 4521075017099183778,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515594874979271612,
+      "new_bits": 4521075017099183779,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515594874979271612,
+      "new_bits": 4521075017099183780,
+      "accepted": false
+    },
+    {
+      "old_bits": 13732751855970799084,
+      "new_bits": 4514657864091131155,
+      "accepted": false
+    },
+    {
+      "old_bits": 13732751855970799084,
+      "new_bits": 4514657864091131156,
+      "accepted": false
+    },
+    {
+      "old_bits": 13732751855970799084,
+      "new_bits": 4514657864091131157,
+      "accepted": false
+    },
+    {
+      "old_bits": 13732751855970799084,
+      "new_bits": 4514657864091131158,
+      "accepted": false
+    },
+    {
+      "old_bits": 13732751855970799084,
+      "new_bits": 4514657864091131159,
+      "accepted": false
+    },
+    {
+      "old_bits": 13732751855970799084,
+      "new_bits": 4514657864091131160,
+      "accepted": false
+    },
+    {
+      "old_bits": 13732751855970799084,
+      "new_bits": 4514657864091131161,
+      "accepted": false
+    },
+    {
+      "old_bits": 13727357789954482368,
+      "new_bits": 4516325528624582763,
+      "accepted": false
+    },
+    {
+      "old_bits": 13727357789954482368,
+      "new_bits": 4516325528624582764,
+      "accepted": false
+    },
+    {
+      "old_bits": 13727357789954482368,
+      "new_bits": 4516325528624582765,
+      "accepted": false
+    },
+    {
+      "old_bits": 13727357789954482368,
+      "new_bits": 4516325528624582766,
+      "accepted": false
+    },
+    {
+      "old_bits": 13727357789954482368,
+      "new_bits": 4516325528624582767,
+      "accepted": false
+    },
+    {
+      "old_bits": 13727357789954482368,
+      "new_bits": 4516325528624582768,
+      "accepted": false
+    },
+    {
+      "old_bits": 13727357789954482368,
+      "new_bits": 4516325528624582769,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521016388004499262,
+      "new_bits": 4523676390184093921,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521016388004499262,
+      "new_bits": 4523676390184093922,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521016388004499262,
+      "new_bits": 4523676390184093923,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521016388004499262,
+      "new_bits": 4523676390184093924,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521016388004499262,
+      "new_bits": 4523676390184093925,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521016388004499262,
+      "new_bits": 4523676390184093926,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521016388004499262,
+      "new_bits": 4523676390184093927,
+      "accepted": false
+    },
+    {
+      "old_bits": 4499166741361712096,
+      "new_bits": 4517615087686007541,
+      "accepted": false
+    },
+    {
+      "old_bits": 4499166741361712096,
+      "new_bits": 4517615087686007542,
+      "accepted": false
+    },
+    {
+      "old_bits": 4499166741361712096,
+      "new_bits": 4517615087686007543,
+      "accepted": false
+    },
+    {
+      "old_bits": 4499166741361712096,
+      "new_bits": 4517615087686007544,
+      "accepted": false
+    },
+    {
+      "old_bits": 4499166741361712096,
+      "new_bits": 4517615087686007545,
+      "accepted": false
+    },
+    {
+      "old_bits": 4499166741361712096,
+      "new_bits": 4517615087686007546,
+      "accepted": false
+    },
+    {
+      "old_bits": 4499166741361712096,
+      "new_bits": 4517615087686007547,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742734621369921242,
+      "new_bits": 13735105229850724695,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742734621369921242,
+      "new_bits": 13735105229850724694,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742734621369921242,
+      "new_bits": 13735105229850724693,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742734621369921242,
+      "new_bits": 13735105229850724692,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742734621369921242,
+      "new_bits": 13735105229850724691,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742734621369921242,
+      "new_bits": 13735105229850724690,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742734621369921242,
+      "new_bits": 13735105229850724689,
+      "accepted": true
+    },
+    {
+      "old_bits": 4513658660624954312,
+      "new_bits": 4520106909921928314,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513658660624954312,
+      "new_bits": 4520106909921928315,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513658660624954312,
+      "new_bits": 4520106909921928316,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513658660624954312,
+      "new_bits": 4520106909921928317,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513658660624954312,
+      "new_bits": 4520106909921928318,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513658660624954312,
+      "new_bits": 4520106909921928319,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513658660624954312,
+      "new_bits": 4520106909921928320,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744871537622300812,
+      "new_bits": 13739815879169700507,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744871537622300812,
+      "new_bits": 13739815879169700506,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744871537622300812,
+      "new_bits": 13739815879169700505,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744871537622300812,
+      "new_bits": 13739815879169700504,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744871537622300812,
+      "new_bits": 13739815879169700503,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744871537622300812,
+      "new_bits": 13739815879169700502,
+      "accepted": true
+    },
+    {
+      "old_bits": 13744871537622300812,
+      "new_bits": 13739815879169700501,
+      "accepted": true
+    },
+    {
+      "old_bits": 13736065623862913792,
+      "new_bits": 4512957599953793331,
+      "accepted": false
+    },
+    {
+      "old_bits": 13736065623862913792,
+      "new_bits": 4512957599953793332,
+      "accepted": false
+    },
+    {
+      "old_bits": 13736065623862913792,
+      "new_bits": 4512957599953793333,
+      "accepted": false
+    },
+    {
+      "old_bits": 13736065623862913792,
+      "new_bits": 4512957599953793334,
+      "accepted": false
+    },
+    {
+      "old_bits": 13736065623862913792,
+      "new_bits": 4512957599953793335,
+      "accepted": false
+    },
+    {
+      "old_bits": 13736065623862913792,
+      "new_bits": 4512957599953793336,
+      "accepted": false
+    },
+    {
+      "old_bits": 13736065623862913792,
+      "new_bits": 4512957599953793337,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520556966313362342,
+      "new_bits": 4523446679338502489,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520556966313362342,
+      "new_bits": 4523446679338502490,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520556966313362342,
+      "new_bits": 4523446679338502491,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520556966313362342,
+      "new_bits": 4523446679338502492,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520556966313362342,
+      "new_bits": 4523446679338502493,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520556966313362342,
+      "new_bits": 4523446679338502494,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520556966313362342,
+      "new_bits": 4523446679338502495,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735143561135723664,
+      "new_bits": 4513462011508788449,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735143561135723664,
+      "new_bits": 4513462011508788450,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735143561135723664,
+      "new_bits": 4513462011508788451,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735143561135723664,
+      "new_bits": 4513462011508788452,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735143561135723664,
+      "new_bits": 4513462011508788453,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735143561135723664,
+      "new_bits": 4513462011508788454,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735143561135723664,
+      "new_bits": 4513462011508788455,
+      "accepted": false
+    },
+    {
+      "old_bits": 13745156418038616428,
+      "new_bits": 13740604406858674631,
+      "accepted": false
+    },
+    {
+      "old_bits": 13745156418038616428,
+      "new_bits": 13740604406858674630,
+      "accepted": false
+    },
+    {
+      "old_bits": 13745156418038616428,
+      "new_bits": 13740604406858674629,
+      "accepted": false
+    },
+    {
+      "old_bits": 13745156418038616428,
+      "new_bits": 13740604406858674628,
+      "accepted": false
+    },
+    {
+      "old_bits": 13745156418038616428,
+      "new_bits": 13740604406858674627,
+      "accepted": false
+    },
+    {
+      "old_bits": 13745156418038616428,
+      "new_bits": 13740604406858674626,
+      "accepted": true
+    },
+    {
+      "old_bits": 13745156418038616428,
+      "new_bits": 13740604406858674625,
+      "accepted": true
+    },
+    {
+      "old_bits": 4515263870129560360,
+      "new_bits": 4520909514674311598,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515263870129560360,
+      "new_bits": 4520909514674311599,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515263870129560360,
+      "new_bits": 4520909514674311600,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515263870129560360,
+      "new_bits": 4520909514674311601,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515263870129560360,
+      "new_bits": 4520909514674311602,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515263870129560360,
+      "new_bits": 4520909514674311603,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515263870129560360,
+      "new_bits": 4520909514674311604,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517180270111783952,
+      "new_bits": 4521758331237544459,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517180270111783952,
+      "new_bits": 4521758331237544460,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517180270111783952,
+      "new_bits": 4521758331237544461,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517180270111783952,
+      "new_bits": 4521758331237544462,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517180270111783952,
+      "new_bits": 4521758331237544463,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517180270111783952,
+      "new_bits": 4521758331237544464,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517180270111783952,
+      "new_bits": 4521758331237544465,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744035594056763888,
+      "new_bits": 13738143992038793847,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744035594056763888,
+      "new_bits": 13738143992038793846,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744035594056763888,
+      "new_bits": 13738143992038793845,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744035594056763888,
+      "new_bits": 13738143992038793844,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744035594056763888,
+      "new_bits": 13738143992038793843,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744035594056763888,
+      "new_bits": 13738143992038793842,
+      "accepted": true
+    },
+    {
+      "old_bits": 13744035594056763888,
+      "new_bits": 13738143992038793841,
+      "accepted": true
+    },
+    {
+      "old_bits": 4513772673972476272,
+      "new_bits": 4520163916595694994,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513772673972476272,
+      "new_bits": 4520163916595694995,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513772673972476272,
+      "new_bits": 4520163916595694996,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513772673972476272,
+      "new_bits": 4520163916595694997,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513772673972476272,
+      "new_bits": 4520163916595694998,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513772673972476272,
+      "new_bits": 4520163916595694999,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513772673972476272,
+      "new_bits": 4520163916595695000,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725111169725036560,
+      "new_bits": 4516654621869381899,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725111169725036560,
+      "new_bits": 4516654621869381900,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725111169725036560,
+      "new_bits": 4516654621869381901,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725111169725036560,
+      "new_bits": 4516654621869381902,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725111169725036560,
+      "new_bits": 4516654621869381903,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725111169725036560,
+      "new_bits": 4516654621869381904,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725111169725036560,
+      "new_bits": 4516654621869381905,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519046187278899320,
+      "new_bits": 4522691289821195439,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519046187278899320,
+      "new_bits": 4522691289821195440,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519046187278899320,
+      "new_bits": 4522691289821195441,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519046187278899320,
+      "new_bits": 4522691289821195442,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519046187278899320,
+      "new_bits": 4522691289821195443,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519046187278899320,
+      "new_bits": 4522691289821195444,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519046187278899320,
+      "new_bits": 4522691289821195445,
+      "accepted": false
+    },
+    {
+      "old_bits": 4512973879251365388,
+      "new_bits": 4519764519235099613,
+      "accepted": false
+    },
+    {
+      "old_bits": 4512973879251365388,
+      "new_bits": 4519764519235099614,
+      "accepted": false
+    },
+    {
+      "old_bits": 4512973879251365388,
+      "new_bits": 4519764519235099615,
+      "accepted": false
+    },
+    {
+      "old_bits": 4512973879251365388,
+      "new_bits": 4519764519235099616,
+      "accepted": false
+    },
+    {
+      "old_bits": 4512973879251365388,
+      "new_bits": 4519764519235099617,
+      "accepted": false
+    },
+    {
+      "old_bits": 4512973879251365388,
+      "new_bits": 4519764519235099618,
+      "accepted": false
+    },
+    {
+      "old_bits": 4512973879251365388,
+      "new_bits": 4519764519235099619,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513757972735993088,
+      "new_bits": 4520156565977452667,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513757972735993088,
+      "new_bits": 4520156565977452668,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513757972735993088,
+      "new_bits": 4520156565977452669,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513757972735993088,
+      "new_bits": 4520156565977452670,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513757972735993088,
+      "new_bits": 4520156565977452671,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513757972735993088,
+      "new_bits": 4520156565977452672,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513757972735993088,
+      "new_bits": 4520156565977452673,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513892501240378408,
+      "new_bits": 4520223830229652054,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513892501240378408,
+      "new_bits": 4520223830229652055,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513892501240378408,
+      "new_bits": 4520223830229652056,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513892501240378408,
+      "new_bits": 4520223830229652057,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513892501240378408,
+      "new_bits": 4520223830229652058,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513892501240378408,
+      "new_bits": 4520223830229652059,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513892501240378408,
+      "new_bits": 4520223830229652060,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515834948553685856,
+      "new_bits": 4521195053886402900,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515834948553685856,
+      "new_bits": 4521195053886402901,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515834948553685856,
+      "new_bits": 4521195053886402902,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515834948553685856,
+      "new_bits": 4521195053886402903,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515834948553685856,
+      "new_bits": 4521195053886402904,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515834948553685856,
+      "new_bits": 4521195053886402905,
+      "accepted": false
+    },
+    {
+      "old_bits": 4515834948553685856,
+      "new_bits": 4521195053886402906,
+      "accepted": false
+    },
+    {
+      "old_bits": 13739814341964676200,
+      "new_bits": 4503437666952069421,
+      "accepted": false
+    },
+    {
+      "old_bits": 13739814341964676200,
+      "new_bits": 4503437666952069422,
+      "accepted": false
+    },
+    {
+      "old_bits": 13739814341964676200,
+      "new_bits": 4503437666952069423,
+      "accepted": false
+    },
+    {
+      "old_bits": 13739814341964676200,
+      "new_bits": 4503437666952069424,
+      "accepted": false
+    },
+    {
+      "old_bits": 13739814341964676200,
+      "new_bits": 4503437666952069425,
+      "accepted": false
+    },
+    {
+      "old_bits": 13739814341964676200,
+      "new_bits": 4503437666952069426,
+      "accepted": false
+    },
+    {
+      "old_bits": 13739814341964676200,
+      "new_bits": 4503437666952069427,
+      "accepted": false
+    },
+    {
+      "old_bits": 4505162166023381472,
+      "new_bits": 4518087460393214457,
+      "accepted": false
+    },
+    {
+      "old_bits": 4505162166023381472,
+      "new_bits": 4518087460393214458,
+      "accepted": false
+    },
+    {
+      "old_bits": 4505162166023381472,
+      "new_bits": 4518087460393214459,
+      "accepted": false
+    },
+    {
+      "old_bits": 4505162166023381472,
+      "new_bits": 4518087460393214460,
+      "accepted": false
+    },
+    {
+      "old_bits": 4505162166023381472,
+      "new_bits": 4518087460393214461,
+      "accepted": false
+    },
+    {
+      "old_bits": 4505162166023381472,
+      "new_bits": 4518087460393214462,
+      "accepted": false
+    },
+    {
+      "old_bits": 4505162166023381472,
+      "new_bits": 4518087460393214463,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521171656111777340,
+      "new_bits": 4523754024237740723,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521171656111777340,
+      "new_bits": 4523754024237740724,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521171656111777340,
+      "new_bits": 4523754024237740725,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521171656111777340,
+      "new_bits": 4523754024237740726,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521171656111777340,
+      "new_bits": 4523754024237740727,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521171656111777340,
+      "new_bits": 4523754024237740728,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521171656111777340,
+      "new_bits": 4523754024237740729,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735826317425565848,
+      "new_bits": 4513120633363901495,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735826317425565848,
+      "new_bits": 4513120633363901496,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735826317425565848,
+      "new_bits": 4513120633363901497,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735826317425565848,
+      "new_bits": 4513120633363901498,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735826317425565848,
+      "new_bits": 4513120633363901499,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735826317425565848,
+      "new_bits": 4513120633363901500,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735826317425565848,
+      "new_bits": 4513120633363901501,
+      "accepted": false
+    },
+    {
+      "old_bits": 13743993235079293556,
+      "new_bits": 13738059274083861655,
+      "accepted": false
+    },
+    {
+      "old_bits": 13743993235079293556,
+      "new_bits": 13738059274083861654,
+      "accepted": false
+    },
+    {
+      "old_bits": 13743993235079293556,
+      "new_bits": 13738059274083861653,
+      "accepted": false
+    },
+    {
+      "old_bits": 13743993235079293556,
+      "new_bits": 13738059274083861652,
+      "accepted": false
+    },
+    {
+      "old_bits": 13743993235079293556,
+      "new_bits": 13738059274083861651,
+      "accepted": false
+    },
+    {
+      "old_bits": 13743993235079293556,
+      "new_bits": 13738059274083861650,
+      "accepted": true
+    },
+    {
+      "old_bits": 13743993235079293556,
+      "new_bits": 13738059274083861649,
+      "accepted": true
+    },
+    {
+      "old_bits": 13741082662289582042,
+      "new_bits": 13724067382189558291,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741082662289582042,
+      "new_bits": 13724067382189558290,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741082662289582042,
+      "new_bits": 13724067382189558289,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741082662289582042,
+      "new_bits": 13724067382189558288,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741082662289582042,
+      "new_bits": 13724067382189558287,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741082662289582042,
+      "new_bits": 13724067382189558286,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741082662289582042,
+      "new_bits": 13724067382189558285,
+      "accepted": false
+    },
+    {
+      "old_bits": 4518648491037370338,
+      "new_bits": 4522492441700411063,
+      "accepted": false
+    },
+    {
+      "old_bits": 4518648491037370338,
+      "new_bits": 4522492441700411064,
+      "accepted": false
+    },
+    {
+      "old_bits": 4518648491037370338,
+      "new_bits": 4522492441700411065,
+      "accepted": false
+    },
+    {
+      "old_bits": 4518648491037370338,
+      "new_bits": 4522492441700411066,
+      "accepted": false
+    },
+    {
+      "old_bits": 4518648491037370338,
+      "new_bits": 4522492441700411067,
+      "accepted": false
+    },
+    {
+      "old_bits": 4518648491037370338,
+      "new_bits": 4522492441700411068,
+      "accepted": false
+    },
+    {
+      "old_bits": 4518648491037370338,
+      "new_bits": 4522492441700411069,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722146338082060672,
+      "new_bits": 4517005117917478795,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722146338082060672,
+      "new_bits": 4517005117917478796,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722146338082060672,
+      "new_bits": 4517005117917478797,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722146338082060672,
+      "new_bits": 4517005117917478798,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722146338082060672,
+      "new_bits": 4517005117917478799,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722146338082060672,
+      "new_bits": 4517005117917478800,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722146338082060672,
+      "new_bits": 4517005117917478801,
+      "accepted": false
+    },
+    {
+      "old_bits": 13745114929425407133,
+      "new_bits": 13740521429632264339,
+      "accepted": false
+    },
+    {
+      "old_bits": 13745114929425407133,
+      "new_bits": 13740521429632264338,
+      "accepted": false
+    },
+    {
+      "old_bits": 13745114929425407133,
+      "new_bits": 13740521429632264337,
+      "accepted": false
+    },
+    {
+      "old_bits": 13745114929425407133,
+      "new_bits": 13740521429632264336,
+      "accepted": false
+    },
+    {
+      "old_bits": 13745114929425407133,
+      "new_bits": 13740521429632264335,
+      "accepted": true
+    },
+    {
+      "old_bits": 13745114929425407133,
+      "new_bits": 13740521429632264334,
+      "accepted": true
+    },
+    {
+      "old_bits": 13745114929425407133,
+      "new_bits": 13740521429632264333,
+      "accepted": true
+    },
+    {
+      "old_bits": 13741390964966373011,
+      "new_bits": 13727985944621496163,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741390964966373011,
+      "new_bits": 13727985944621496162,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741390964966373011,
+      "new_bits": 13727985944621496161,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741390964966373011,
+      "new_bits": 13727985944621496160,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741390964966373011,
+      "new_bits": 13727985944621496159,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741390964966373011,
+      "new_bits": 13727985944621496158,
+      "accepted": false
+    },
+    {
+      "old_bits": 13741390964966373011,
+      "new_bits": 13727985944621496157,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742648675424342302,
+      "new_bits": 13734761446068443315,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742648675424342302,
+      "new_bits": 13734761446068443314,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742648675424342302,
+      "new_bits": 13734761446068443313,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742648675424342302,
+      "new_bits": 13734761446068443312,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742648675424342302,
+      "new_bits": 13734761446068443311,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742648675424342302,
+      "new_bits": 13734761446068443310,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742648675424342302,
+      "new_bits": 13734761446068443309,
+      "accepted": true
+    },
+    {
+      "old_bits": 13744441344832067252,
+      "new_bits": 13738955493589319425,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744441344832067252,
+      "new_bits": 13738955493589319424,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744441344832067252,
+      "new_bits": 13738955493589319423,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744441344832067252,
+      "new_bits": 13738955493589319422,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744441344832067252,
+      "new_bits": 13738955493589319421,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744441344832067252,
+      "new_bits": 13738955493589319420,
+      "accepted": true
+    },
+    {
+      "old_bits": 13744441344832067252,
+      "new_bits": 13738955493589319419,
+      "accepted": true
+    },
+    {
+      "old_bits": 4519421684113245092,
+      "new_bits": 4522879038238387101,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519421684113245092,
+      "new_bits": 4522879038238387102,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519421684113245092,
+      "new_bits": 4522879038238387103,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519421684113245092,
+      "new_bits": 4522879038238387104,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519421684113245092,
+      "new_bits": 4522879038238387105,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519421684113245092,
+      "new_bits": 4522879038238387106,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519421684113245092,
+      "new_bits": 4522879038238387107,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735570031568504232,
+      "new_bits": 4513248776292419489,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735570031568504232,
+      "new_bits": 4513248776292419490,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735570031568504232,
+      "new_bits": 4513248776292419491,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735570031568504232,
+      "new_bits": 4513248776292419492,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735570031568504232,
+      "new_bits": 4513248776292419493,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735570031568504232,
+      "new_bits": 4513248776292419494,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735570031568504232,
+      "new_bits": 4513248776292419495,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742134561900480455,
+      "new_bits": 13732704991973201571,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742134561900480455,
+      "new_bits": 13732704991973201570,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742134561900480455,
+      "new_bits": 13732704991973201569,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742134561900480455,
+      "new_bits": 13732704991973201568,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742134561900480455,
+      "new_bits": 13732704991973201567,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742134561900480455,
+      "new_bits": 13732704991973201566,
+      "accepted": true
+    },
+    {
+      "old_bits": 13742134561900480455,
+      "new_bits": 13732704991973201565,
+      "accepted": true
+    },
+    {
+      "old_bits": 13725952670136058976,
+      "new_bits": 4516549434318014615,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725952670136058976,
+      "new_bits": 4516549434318014616,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725952670136058976,
+      "new_bits": 4516549434318014617,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725952670136058976,
+      "new_bits": 4516549434318014618,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725952670136058976,
+      "new_bits": 4516549434318014619,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725952670136058976,
+      "new_bits": 4516549434318014620,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725952670136058976,
+      "new_bits": 4516549434318014621,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520739554038233092,
+      "new_bits": 4523537973200946994,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520739554038233092,
+      "new_bits": 4523537973200946995,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520739554038233092,
+      "new_bits": 4523537973200946996,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520739554038233092,
+      "new_bits": 4523537973200946997,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520739554038233092,
+      "new_bits": 4523537973200946998,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520739554038233092,
+      "new_bits": 4523537973200946999,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520739554038233092,
+      "new_bits": 4523537973200947000,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735020704764674792,
+      "new_bits": 4513523439694306743,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735020704764674792,
+      "new_bits": 4513523439694306744,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735020704764674792,
+      "new_bits": 4513523439694306745,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735020704764674792,
+      "new_bits": 4513523439694306746,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735020704764674792,
+      "new_bits": 4513523439694306747,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735020704764674792,
+      "new_bits": 4513523439694306748,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735020704764674792,
+      "new_bits": 4513523439694306749,
+      "accepted": false
+    },
+    {
+      "old_bits": 13733874322353995092,
+      "new_bits": 4514096630899589273,
+      "accepted": false
+    },
+    {
+      "old_bits": 13733874322353995092,
+      "new_bits": 4514096630899589274,
+      "accepted": false
+    },
+    {
+      "old_bits": 13733874322353995092,
+      "new_bits": 4514096630899589275,
+      "accepted": false
+    },
+    {
+      "old_bits": 13733874322353995092,
+      "new_bits": 4514096630899589276,
+      "accepted": false
+    },
+    {
+      "old_bits": 13733874322353995092,
+      "new_bits": 4514096630899589277,
+      "accepted": false
+    },
+    {
+      "old_bits": 13733874322353995092,
+      "new_bits": 4514096630899589278,
+      "accepted": false
+    },
+    {
+      "old_bits": 13733874322353995092,
+      "new_bits": 4514096630899589279,
+      "accepted": false
+    },
+    {
+      "old_bits": 13739756113325556418,
+      "new_bits": 4503751561717738541,
+      "accepted": false
+    },
+    {
+      "old_bits": 13739756113325556418,
+      "new_bits": 4503751561717738542,
+      "accepted": false
+    },
+    {
+      "old_bits": 13739756113325556418,
+      "new_bits": 4503751561717738543,
+      "accepted": false
+    },
+    {
+      "old_bits": 13739756113325556418,
+      "new_bits": 4503751561717738544,
+      "accepted": false
+    },
+    {
+      "old_bits": 13739756113325556418,
+      "new_bits": 4503751561717738545,
+      "accepted": false
+    },
+    {
+      "old_bits": 13739756113325556418,
+      "new_bits": 4503751561717738546,
+      "accepted": false
+    },
+    {
+      "old_bits": 13739756113325556418,
+      "new_bits": 4503751561717738547,
+      "accepted": true
+    },
+    {
+      "old_bits": 4494097410772927616,
+      "new_bits": 4517462195950493584,
+      "accepted": false
+    },
+    {
+      "old_bits": 4494097410772927616,
+      "new_bits": 4517462195950493585,
+      "accepted": false
+    },
+    {
+      "old_bits": 4494097410772927616,
+      "new_bits": 4517462195950493586,
+      "accepted": false
+    },
+    {
+      "old_bits": 4494097410772927616,
+      "new_bits": 4517462195950493587,
+      "accepted": false
+    },
+    {
+      "old_bits": 4494097410772927616,
+      "new_bits": 4517462195950493588,
+      "accepted": false
+    },
+    {
+      "old_bits": 4494097410772927616,
+      "new_bits": 4517462195950493589,
+      "accepted": false
+    },
+    {
+      "old_bits": 4494097410772927616,
+      "new_bits": 4517462195950493590,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521669953938816545,
+      "new_bits": 4524031137180707317,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521669953938816545,
+      "new_bits": 4524031137180707318,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521669953938816545,
+      "new_bits": 4524031137180707319,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521669953938816545,
+      "new_bits": 4524031137180707320,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521669953938816545,
+      "new_bits": 4524031137180707321,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521669953938816545,
+      "new_bits": 4524031137180707322,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521669953938816545,
+      "new_bits": 4524031137180707323,
+      "accepted": false
+    },
+    {
+      "old_bits": 13738358480149891162,
+      "new_bits": 4508722660708853505,
+      "accepted": false
+    },
+    {
+      "old_bits": 13738358480149891162,
+      "new_bits": 4508722660708853506,
+      "accepted": false
+    },
+    {
+      "old_bits": 13738358480149891162,
+      "new_bits": 4508722660708853507,
+      "accepted": false
+    },
+    {
+      "old_bits": 13738358480149891162,
+      "new_bits": 4508722660708853508,
+      "accepted": false
+    },
+    {
+      "old_bits": 13738358480149891162,
+      "new_bits": 4508722660708853509,
+      "accepted": false
+    },
+    {
+      "old_bits": 13738358480149891162,
+      "new_bits": 4508722660708853510,
+      "accepted": true
+    },
+    {
+      "old_bits": 13738358480149891162,
+      "new_bits": 4508722660708853511,
+      "accepted": true
+    },
+    {
+      "old_bits": 4513142548090251028,
+      "new_bits": 4519848853654550866,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513142548090251028,
+      "new_bits": 4519848853654550867,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513142548090251028,
+      "new_bits": 4519848853654550868,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513142548090251028,
+      "new_bits": 4519848853654550869,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513142548090251028,
+      "new_bits": 4519848853654550870,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513142548090251028,
+      "new_bits": 4519848853654550871,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513142548090251028,
+      "new_bits": 4519848853654550872,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517250163946923346,
+      "new_bits": 4521793278155117651,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517250163946923346,
+      "new_bits": 4521793278155117652,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517250163946923346,
+      "new_bits": 4521793278155117653,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517250163946923346,
+      "new_bits": 4521793278155117654,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517250163946923346,
+      "new_bits": 4521793278155117655,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517250163946923346,
+      "new_bits": 4521793278155117656,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517250163946923346,
+      "new_bits": 4521793278155117657,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742249337666659139,
+      "new_bits": 13733164095037870399,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742249337666659139,
+      "new_bits": 13733164095037870398,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742249337666659139,
+      "new_bits": 13733164095037870397,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742249337666659139,
+      "new_bits": 13733164095037870396,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742249337666659139,
+      "new_bits": 13733164095037870395,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742249337666659139,
+      "new_bits": 13733164095037870394,
+      "accepted": true
+    },
+    {
+      "old_bits": 13742249337666659139,
+      "new_bits": 13733164095037870393,
+      "accepted": true
+    },
+    {
+      "old_bits": 4516426785843010468,
+      "new_bits": 4521490972531094798,
+      "accepted": false
+    },
+    {
+      "old_bits": 4516426785843010468,
+      "new_bits": 4521490972531094799,
+      "accepted": false
+    },
+    {
+      "old_bits": 4516426785843010468,
+      "new_bits": 4521490972531094800,
+      "accepted": false
+    },
+    {
+      "old_bits": 4516426785843010468,
+      "new_bits": 4521490972531094801,
+      "accepted": false
+    },
+    {
+      "old_bits": 4516426785843010468,
+      "new_bits": 4521490972531094802,
+      "accepted": false
+    },
+    {
+      "old_bits": 4516426785843010468,
+      "new_bits": 4521490972531094803,
+      "accepted": false
+    },
+    {
+      "old_bits": 4516426785843010468,
+      "new_bits": 4521490972531094804,
+      "accepted": false
+    },
+    {
+      "old_bits": 4509097866434751160,
+      "new_bits": 4518703752874307880,
+      "accepted": false
+    },
+    {
+      "old_bits": 4509097866434751160,
+      "new_bits": 4518703752874307881,
+      "accepted": false
+    },
+    {
+      "old_bits": 4509097866434751160,
+      "new_bits": 4518703752874307882,
+      "accepted": false
+    },
+    {
+      "old_bits": 4509097866434751160,
+      "new_bits": 4518703752874307883,
+      "accepted": false
+    },
+    {
+      "old_bits": 4509097866434751160,
+      "new_bits": 4518703752874307884,
+      "accepted": false
+    },
+    {
+      "old_bits": 4509097866434751160,
+      "new_bits": 4518703752874307885,
+      "accepted": false
+    },
+    {
+      "old_bits": 4509097866434751160,
+      "new_bits": 4518703752874307886,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513748810004157444,
+      "new_bits": 4520151984611534387,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513748810004157444,
+      "new_bits": 4520151984611534388,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513748810004157444,
+      "new_bits": 4520151984611534389,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513748810004157444,
+      "new_bits": 4520151984611534390,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513748810004157444,
+      "new_bits": 4520151984611534391,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513748810004157444,
+      "new_bits": 4520151984611534392,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513748810004157444,
+      "new_bits": 4520151984611534393,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520050830182200390,
+      "new_bits": 4523193611272896207,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520050830182200390,
+      "new_bits": 4523193611272896208,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520050830182200390,
+      "new_bits": 4523193611272896209,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520050830182200390,
+      "new_bits": 4523193611272896210,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520050830182200390,
+      "new_bits": 4523193611272896211,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520050830182200390,
+      "new_bits": 4523193611272896212,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520050830182200390,
+      "new_bits": 4523193611272896213,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511050999077521208,
+      "new_bits": 4519192036035049220,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511050999077521208,
+      "new_bits": 4519192036035049221,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511050999077521208,
+      "new_bits": 4519192036035049222,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511050999077521208,
+      "new_bits": 4519192036035049223,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511050999077521208,
+      "new_bits": 4519192036035049224,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511050999077521208,
+      "new_bits": 4519192036035049225,
+      "accepted": false
+    },
+    {
+      "old_bits": 4511050999077521208,
+      "new_bits": 4519192036035049226,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519585423262777230,
+      "new_bits": 4522960907813161357,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519585423262777230,
+      "new_bits": 4522960907813161358,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519585423262777230,
+      "new_bits": 4522960907813161359,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519585423262777230,
+      "new_bits": 4522960907813161360,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519585423262777230,
+      "new_bits": 4522960907813161361,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519585423262777230,
+      "new_bits": 4522960907813161362,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519585423262777230,
+      "new_bits": 4522960907813161363,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722071367095617536,
+      "new_bits": 4517009803604131023,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722071367095617536,
+      "new_bits": 4517009803604131024,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722071367095617536,
+      "new_bits": 4517009803604131025,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722071367095617536,
+      "new_bits": 4517009803604131026,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722071367095617536,
+      "new_bits": 4517009803604131027,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722071367095617536,
+      "new_bits": 4517009803604131028,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722071367095617536,
+      "new_bits": 4517009803604131029,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744920119255917226,
+      "new_bits": 13739913042436923617,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744920119255917226,
+      "new_bits": 13739913042436923616,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744920119255917226,
+      "new_bits": 13739913042436923615,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744920119255917226,
+      "new_bits": 13739913042436923614,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744920119255917226,
+      "new_bits": 13739913042436923613,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744920119255917226,
+      "new_bits": 13739913042436923612,
+      "accepted": true
+    },
+    {
+      "old_bits": 13744920119255917226,
+      "new_bits": 13739913042436923611,
+      "accepted": true
+    },
+    {
+      "old_bits": 13744346984221794749,
+      "new_bits": 13738766772368793291,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744346984221794749,
+      "new_bits": 13738766772368793290,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744346984221794749,
+      "new_bits": 13738766772368793289,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744346984221794749,
+      "new_bits": 13738766772368793288,
+      "accepted": false
+    },
+    {
+      "old_bits": 13744346984221794749,
+      "new_bits": 13738766772368793287,
+      "accepted": true
+    },
+    {
+      "old_bits": 13744346984221794749,
+      "new_bits": 13738766772368793286,
+      "accepted": true
+    },
+    {
+      "old_bits": 13744346984221794749,
+      "new_bits": 13738766772368793285,
+      "accepted": true
+    },
+    {
+      "old_bits": 13742411685067304359,
+      "new_bits": 13733813484640386339,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742411685067304359,
+      "new_bits": 13733813484640386338,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742411685067304359,
+      "new_bits": 13733813484640386337,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742411685067304359,
+      "new_bits": 13733813484640386336,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742411685067304359,
+      "new_bits": 13733813484640386335,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742411685067304359,
+      "new_bits": 13733813484640386334,
+      "accepted": true
+    },
+    {
+      "old_bits": 13742411685067304359,
+      "new_bits": 13733813484640386333,
+      "accepted": true
+    },
+    {
+      "old_bits": 4518239749889423646,
+      "new_bits": 4522288071126417281,
+      "accepted": false
+    },
+    {
+      "old_bits": 4518239749889423646,
+      "new_bits": 4522288071126417282,
+      "accepted": false
+    },
+    {
+      "old_bits": 4518239749889423646,
+      "new_bits": 4522288071126417283,
+      "accepted": false
+    },
+    {
+      "old_bits": 4518239749889423646,
+      "new_bits": 4522288071126417284,
+      "accepted": false
+    },
+    {
+      "old_bits": 4518239749889423646,
+      "new_bits": 4522288071126417285,
+      "accepted": false
+    },
+    {
+      "old_bits": 4518239749889423646,
+      "new_bits": 4522288071126417286,
+      "accepted": false
+    },
+    {
+      "old_bits": 4518239749889423646,
+      "new_bits": 4522288071126417287,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513507573252304336,
+      "new_bits": 4520031366235595771,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513507573252304336,
+      "new_bits": 4520031366235595772,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513507573252304336,
+      "new_bits": 4520031366235595773,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513507573252304336,
+      "new_bits": 4520031366235595774,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513507573252304336,
+      "new_bits": 4520031366235595775,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513507573252304336,
+      "new_bits": 4520031366235595776,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513507573252304336,
+      "new_bits": 4520031366235595777,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519424059122424130,
+      "new_bits": 4522880225742976738,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519424059122424130,
+      "new_bits": 4522880225742976739,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519424059122424130,
+      "new_bits": 4522880225742976740,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519424059122424130,
+      "new_bits": 4522880225742976741,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519424059122424130,
+      "new_bits": 4522880225742976742,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519424059122424130,
+      "new_bits": 4522880225742976743,
+      "accepted": false
+    },
+    {
+      "old_bits": 4519424059122424130,
+      "new_bits": 4522880225742976744,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742602996790181874,
+      "new_bits": 13734578731531819875,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742602996790181874,
+      "new_bits": 13734578731531819874,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742602996790181874,
+      "new_bits": 13734578731531819873,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742602996790181874,
+      "new_bits": 13734578731531819872,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742602996790181874,
+      "new_bits": 13734578731531819871,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742602996790181874,
+      "new_bits": 13734578731531819870,
+      "accepted": false
+    },
+    {
+      "old_bits": 13742602996790181874,
+      "new_bits": 13734578731531819869,
+      "accepted": true
+    },
+    {
+      "old_bits": 13722900884248021216,
+      "new_bits": 4516930907553981189,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722900884248021216,
+      "new_bits": 4516930907553981190,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722900884248021216,
+      "new_bits": 4516930907553981191,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722900884248021216,
+      "new_bits": 4516930907553981192,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722900884248021216,
+      "new_bits": 4516930907553981193,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722900884248021216,
+      "new_bits": 4516930907553981194,
+      "accepted": false
+    },
+    {
+      "old_bits": 13722900884248021216,
+      "new_bits": 4516930907553981195,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513583598960852712,
+      "new_bits": 4520069379089873761,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513583598960852712,
+      "new_bits": 4520069379089873762,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513583598960852712,
+      "new_bits": 4520069379089873763,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513583598960852712,
+      "new_bits": 4520069379089873764,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513583598960852712,
+      "new_bits": 4520069379089873765,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513583598960852712,
+      "new_bits": 4520069379089873766,
+      "accepted": false
+    },
+    {
+      "old_bits": 4513583598960852712,
+      "new_bits": 4520069379089873767,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517885873401517550,
+      "new_bits": 4522111132882446539,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517885873401517550,
+      "new_bits": 4522111132882446540,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517885873401517550,
+      "new_bits": 4522111132882446541,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517885873401517550,
+      "new_bits": 4522111132882446542,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517885873401517550,
+      "new_bits": 4522111132882446543,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517885873401517550,
+      "new_bits": 4522111132882446544,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517885873401517550,
+      "new_bits": 4522111132882446545,
+      "accepted": false
+    },
+    {
+      "old_bits": 4514766100702604980,
+      "new_bits": 4520660629960809020,
+      "accepted": false
+    },
+    {
+      "old_bits": 4514766100702604980,
+      "new_bits": 4520660629960809021,
+      "accepted": false
+    },
+    {
+      "old_bits": 4514766100702604980,
+      "new_bits": 4520660629960809022,
+      "accepted": false
+    },
+    {
+      "old_bits": 4514766100702604980,
+      "new_bits": 4520660629960809023,
+      "accepted": false
+    },
+    {
+      "old_bits": 4514766100702604980,
+      "new_bits": 4520660629960809024,
+      "accepted": false
+    },
+    {
+      "old_bits": 4514766100702604980,
+      "new_bits": 4520660629960809025,
+      "accepted": false
+    },
+    {
+      "old_bits": 4514766100702604980,
+      "new_bits": 4520660629960809026,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740554622232643531,
+      "new_bits": 4494780275870672189,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740554622232643531,
+      "new_bits": 4494780275870672190,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740554622232643531,
+      "new_bits": 4494780275870672191,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740554622232643531,
+      "new_bits": 4494780275870672192,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740554622232643531,
+      "new_bits": 4494780275870672193,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740554622232643531,
+      "new_bits": 4494780275870672194,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740554622232643531,
+      "new_bits": 4494780275870672195,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740094497809336190,
+      "new_bits": 4501196420195013629,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740094497809336190,
+      "new_bits": 4501196420195013630,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740094497809336190,
+      "new_bits": 4501196420195013631,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740094497809336190,
+      "new_bits": 4501196420195013632,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740094497809336190,
+      "new_bits": 4501196420195013633,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740094497809336190,
+      "new_bits": 4501196420195013634,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740094497809336190,
+      "new_bits": 4501196420195013635,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521706805831709395,
+      "new_bits": 4524067989073603853,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521706805831709395,
+      "new_bits": 4524067989073603854,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521706805831709395,
+      "new_bits": 4524067989073603855,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521706805831709395,
+      "new_bits": 4524067989073603856,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521706805831709395,
+      "new_bits": 4524067989073603857,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521706805831709395,
+      "new_bits": 4524067989073603858,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521706805831709395,
+      "new_bits": 4524067989073603859,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521829259718063055,
+      "new_bits": 4524190442959969758,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521829259718063055,
+      "new_bits": 4524190442959969759,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521829259718063055,
+      "new_bits": 4524190442959969760,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521829259718063055,
+      "new_bits": 4524190442959969761,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521829259718063055,
+      "new_bits": 4524190442959969762,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521829259718063055,
+      "new_bits": 4524190442959969763,
+      "accepted": false
+    },
+    {
+      "old_bits": 4521829259718063055,
+      "new_bits": 4524190442959969764,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735612957997807104,
+      "new_bits": 4513227313077770199,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735612957997807104,
+      "new_bits": 4513227313077770200,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735612957997807104,
+      "new_bits": 4513227313077770201,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735612957997807104,
+      "new_bits": 4513227313077770202,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735612957997807104,
+      "new_bits": 4513227313077770203,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735612957997807104,
+      "new_bits": 4513227313077770204,
+      "accepted": false
+    },
+    {
+      "old_bits": 13735612957997807104,
+      "new_bits": 4513227313077770205,
+      "accepted": false
+    },
+    {
+      "old_bits": 13731116891695188240,
+      "new_bits": 4515385753189500271,
+      "accepted": false
+    },
+    {
+      "old_bits": 13731116891695188240,
+      "new_bits": 4515385753189500272,
+      "accepted": false
+    },
+    {
+      "old_bits": 13731116891695188240,
+      "new_bits": 4515385753189500273,
+      "accepted": false
+    },
+    {
+      "old_bits": 13731116891695188240,
+      "new_bits": 4515385753189500274,
+      "accepted": false
+    },
+    {
+      "old_bits": 13731116891695188240,
+      "new_bits": 4515385753189500275,
+      "accepted": false
+    },
+    {
+      "old_bits": 13731116891695188240,
+      "new_bits": 4515385753189500276,
+      "accepted": false
+    },
+    {
+      "old_bits": 13731116891695188240,
+      "new_bits": 4515385753189500277,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517711928135394774,
+      "new_bits": 4522024160249376453,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517711928135394774,
+      "new_bits": 4522024160249376454,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517711928135394774,
+      "new_bits": 4522024160249376455,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517711928135394774,
+      "new_bits": 4522024160249376456,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517711928135394774,
+      "new_bits": 4522024160249376457,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517711928135394774,
+      "new_bits": 4522024160249376458,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517711928135394774,
+      "new_bits": 4522024160249376459,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520947790344360674,
+      "new_bits": 4523642091354021197,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520947790344360674,
+      "new_bits": 4523642091354021198,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520947790344360674,
+      "new_bits": 4523642091354021199,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520947790344360674,
+      "new_bits": 4523642091354021200,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520947790344360674,
+      "new_bits": 4523642091354021201,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520947790344360674,
+      "new_bits": 4523642091354021202,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520947790344360674,
+      "new_bits": 4523642091354021203,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520482834917528654,
+      "new_bits": 4523409613640581939,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520482834917528654,
+      "new_bits": 4523409613640581940,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520482834917528654,
+      "new_bits": 4523409613640581941,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520482834917528654,
+      "new_bits": 4523409613640581942,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520482834917528654,
+      "new_bits": 4523409613640581943,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520482834917528654,
+      "new_bits": 4523409613640581944,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520482834917528654,
+      "new_bits": 4523409613640581945,
+      "accepted": false
+    },
+    {
+      "old_bits": 4474692118775156736,
+      "new_bits": 4517336147491333525,
+      "accepted": false
+    },
+    {
+      "old_bits": 4474692118775156736,
+      "new_bits": 4517336147491333526,
+      "accepted": false
+    },
+    {
+      "old_bits": 4474692118775156736,
+      "new_bits": 4517336147491333527,
+      "accepted": false
+    },
+    {
+      "old_bits": 4474692118775156736,
+      "new_bits": 4517336147491333528,
+      "accepted": false
+    },
+    {
+      "old_bits": 4474692118775156736,
+      "new_bits": 4517336147491333529,
+      "accepted": false
+    },
+    {
+      "old_bits": 4474692118775156736,
+      "new_bits": 4517336147491333530,
+      "accepted": false
+    },
+    {
+      "old_bits": 4474692118775156736,
+      "new_bits": 4517336147491333531,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517019308698728576,
+      "new_bits": 4521700629919480729,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517019308698728576,
+      "new_bits": 4521700629919480730,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517019308698728576,
+      "new_bits": 4521700629919480731,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517019308698728576,
+      "new_bits": 4521700629919480732,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517019308698728576,
+      "new_bits": 4521700629919480733,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517019308698728576,
+      "new_bits": 4521700629919480734,
+      "accepted": false
+    },
+    {
+      "old_bits": 4517019308698728576,
+      "new_bits": 4521700629919480735,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520157716448753296,
+      "new_bits": 4523247054406178004,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520157716448753296,
+      "new_bits": 4523247054406178005,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520157716448753296,
+      "new_bits": 4523247054406178006,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520157716448753296,
+      "new_bits": 4523247054406178007,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520157716448753296,
+      "new_bits": 4523247054406178008,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520157716448753296,
+      "new_bits": 4523247054406178009,
+      "accepted": false
+    },
+    {
+      "old_bits": 4520157716448753296,
+      "new_bits": 4523247054406178010,
+      "accepted": false
+    },
+    {
+      "old_bits": 4367597403136100796,
+      "new_bits": 4517329193108578871,
+      "accepted": false
+    },
+    {
+      "old_bits": 4367597403136100796,
+      "new_bits": 4517329193108578872,
+      "accepted": false
+    },
+    {
+      "old_bits": 4367597403136100796,
+      "new_bits": 4517329193108578873,
+      "accepted": false
+    },
+    {
+      "old_bits": 4367597403136100796,
+      "new_bits": 4517329193108578874,
+      "accepted": false
+    },
+    {
+      "old_bits": 4367597403136100796,
+      "new_bits": 4517329193108578875,
+      "accepted": false
+    },
+    {
+      "old_bits": 4367597403136100796,
+      "new_bits": 4517329193108578876,
+      "accepted": false
+    },
+    {
+      "old_bits": 4367597403136100796,
+      "new_bits": 4517329193108578877,
+      "accepted": false
+    },
+    {
+      "old_bits": 13590969439990876604,
+      "new_bits": 4517329193107634397,
+      "accepted": false
+    },
+    {
+      "old_bits": 13590969439990876604,
+      "new_bits": 4517329193107634398,
+      "accepted": false
+    },
+    {
+      "old_bits": 13590969439990876604,
+      "new_bits": 4517329193107634399,
+      "accepted": false
+    },
+    {
+      "old_bits": 13590969439990876604,
+      "new_bits": 4517329193107634400,
+      "accepted": false
+    },
+    {
+      "old_bits": 13590969439990876604,
+      "new_bits": 4517329193107634401,
+      "accepted": false
+    },
+    {
+      "old_bits": 13590969439990876604,
+      "new_bits": 4517329193107634402,
+      "accepted": false
+    },
+    {
+      "old_bits": 13590969439990876604,
+      "new_bits": 4517329193107634403,
+      "accepted": false
+    },
+    {
+      "old_bits": 4427486594234968593,
+      "new_bits": 4517329197830473117,
+      "accepted": false
+    },
+    {
+      "old_bits": 4427486594234968593,
+      "new_bits": 4517329197830473118,
+      "accepted": false
+    },
+    {
+      "old_bits": 4427486594234968593,
+      "new_bits": 4517329197830473119,
+      "accepted": false
+    },
+    {
+      "old_bits": 4427486594234968593,
+      "new_bits": 4517329197830473120,
+      "accepted": false
+    },
+    {
+      "old_bits": 4427486594234968593,
+      "new_bits": 4517329197830473121,
+      "accepted": false
+    },
+    {
+      "old_bits": 4427486594234968593,
+      "new_bits": 4517329197830473122,
+      "accepted": false
+    },
+    {
+      "old_bits": 4427486594234968593,
+      "new_bits": 4517329197830473123,
+      "accepted": false
+    },
+    {
+      "old_bits": 13650858631089744401,
+      "new_bits": 4517329188385740151,
+      "accepted": false
+    },
+    {
+      "old_bits": 13650858631089744401,
+      "new_bits": 4517329188385740152,
+      "accepted": false
+    },
+    {
+      "old_bits": 13650858631089744401,
+      "new_bits": 4517329188385740153,
+      "accepted": false
+    },
+    {
+      "old_bits": 13650858631089744401,
+      "new_bits": 4517329188385740154,
+      "accepted": false
+    },
+    {
+      "old_bits": 13650858631089744401,
+      "new_bits": 4517329188385740155,
+      "accepted": false
+    },
+    {
+      "old_bits": 13650858631089744401,
+      "new_bits": 4517329188385740156,
+      "accepted": false
+    },
+    {
+      "old_bits": 13650858631089744401,
+      "new_bits": 4517329188385740157,
+      "accepted": false
+    },
+    {
+      "old_bits": 4502148214488346440,
+      "new_bits": 4517801429756440823,
+      "accepted": false
+    },
+    {
+      "old_bits": 4502148214488346440,
+      "new_bits": 4517801429756440824,
+      "accepted": false
+    },
+    {
+      "old_bits": 4502148214488346440,
+      "new_bits": 4517801429756440825,
+      "accepted": false
+    },
+    {
+      "old_bits": 4502148214488346440,
+      "new_bits": 4517801429756440826,
+      "accepted": false
+    },
+    {
+      "old_bits": 4502148214488346440,
+      "new_bits": 4517801429756440827,
+      "accepted": false
+    },
+    {
+      "old_bits": 4502148214488346440,
+      "new_bits": 4517801429756440828,
+      "accepted": false
+    },
+    {
+      "old_bits": 4502148214488346440,
+      "new_bits": 4517801429756440829,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725520251343122248,
+      "new_bits": 4516603486667126302,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725520251343122248,
+      "new_bits": 4516603486667126303,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725520251343122248,
+      "new_bits": 4516603486667126304,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725520251343122248,
+      "new_bits": 4516603486667126305,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725520251343122248,
+      "new_bits": 4516603486667126306,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725520251343122248,
+      "new_bits": 4516603486667126307,
+      "accepted": false
+    },
+    {
+      "old_bits": 13725520251343122248,
+      "new_bits": 4516603486667126308,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740701229962882445,
+      "new_bits": 4367597409178484733,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740701229962882445,
+      "new_bits": 4367597409178484734,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740701229962882445,
+      "new_bits": 4367597409178484735,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740701229962882445,
+      "new_bits": 4367597409178484736,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740701229962882445,
+      "new_bits": 4367597409178484737,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740701229962882445,
+      "new_bits": 4367597409178484738,
+      "accepted": false
+    },
+    {
+      "old_bits": 13740701229962882445,
+      "new_bits": 4367597409178484739,
+      "accepted": false
+    }
+  ]
+}

@@ -421,3 +421,33 @@ fn smoothing_gate_uses_the_relative_and_absolute_zero_test() {
         assert_eq!(smoothing.active, active, "{alpha}");
     }
 }
+
+#[test]
+fn smoothing_center_acceptance_matches_native_binary64_boundaries() {
+    let capture: serde_json::Value =
+        serde_json::from_str(include_str!("center_comparison_capture.json")).unwrap();
+    let cases = capture["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 1064);
+    assert_eq!(capture["old_addition_mismatches"], 45);
+    for case in cases {
+        let old = f64::from_bits(case["old_bits"].as_u64().unwrap());
+        let new = f64::from_bits(case["new_bits"].as_u64().unwrap());
+        let accepted = case["accepted"].as_bool().unwrap();
+        let mut smoothing = DualPriceSmoothing::default();
+        smoothing.after_master(&[0.], &[RowSense::Equal], 0., 0, false);
+        smoothing.center_bound = old;
+        smoothing.center_phase = 0;
+        smoothing.after_pricing(&Feedback {
+            negative_columns: 1,
+            subgradient_available: false,
+            subgradient: vec![],
+            lagrangian: new,
+            phase: 0,
+        });
+        assert_eq!(
+            smoothing.center_bound.to_bits(),
+            if accepted { new } else { old }.to_bits(),
+            "{case}"
+        );
+    }
+}

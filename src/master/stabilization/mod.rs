@@ -364,9 +364,11 @@ impl DualPriceSmoothing {
             return;
         }
         if self.center_phase <= f.phase {
-            if self.center_bound.is_finite()
-                && !greater(f.lagrangian, self.center_bound, self.parameters.tolerance)
-            {
+            let improved = f.lagrangian
+                - (f.lagrangian.abs().max(self.center_bound.abs()) * 1e-10
+                    + self.parameters.tolerance)
+                > self.center_bound;
+            if self.center_bound.is_finite() && !improved {
                 return;
             }
         } else {

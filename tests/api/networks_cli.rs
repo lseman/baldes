@@ -24,6 +24,48 @@ fn solve(flags: &[&str]) -> Value {
 }
 
 #[test]
+fn paired_split_bucket_width_reaches_root_and_tree_through_cli() {
+    let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("examples/networks/paired_piecewise_linear.json");
+    for tree in [false, true] {
+        let mut request = command();
+        request.arg("solve").arg(&model).args([
+            "--steps",
+            "1",
+            "--option",
+            "BALDESlabelDominanceStrategy=1",
+            "--no-stabilization",
+            "--artificial-cost",
+            "100",
+            "--json",
+            "-",
+        ]);
+        if tree {
+            request.arg("--tree");
+        }
+        let output = request.output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(result["status"], "Optimal");
+        assert_eq!(result[if tree { "incumbent" } else { "lp" }], 8.);
+    }
+    for invalid in ["NaN", "-1", "1,,2"] {
+        let output = command()
+            .arg("solve")
+            .arg(&model)
+            .args(["--steps", invalid])
+            .output()
+            .unwrap();
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("bucket steps"));
+    }
+}
+
+#[test]
 fn signed_secondary_disposable_resource_is_supported_through_json_cli() {
     let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/multi_network_native_signed_secondary_resource.json");

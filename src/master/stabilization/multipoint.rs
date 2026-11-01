@@ -34,19 +34,25 @@ pub fn observe_activity(planes: &mut [SupportPlane], activity: Option<&[f64]>) -
 }
 
 /// Protected centers first, then descending dual activity, increasing zero
-/// age, and decreasing creation ID. Insertion sorting preserves native
-/// tolerance comparisons without requiring a transitive floating comparator.
+/// age, and decreasing creation ID. Buffered stable sorting preserves the
+/// collection ordering even when tolerant comparisons are not transitive.
 pub fn retain_planes(planes: &mut Vec<SupportPlane>, capacity: usize) -> Result<()> {
     if capacity == 0 || planes.iter().any(|p| !p.dual_activity.is_finite()) {
         return Err(invalid("invalid multipoint retention state"));
     }
-    for i in 1..planes.len() {
-        let mut j = i;
-        while j > 0 && precedes(&planes[j], &planes[j - 1]) {
-            planes.swap(j, j - 1);
-            j -= 1;
-        }
-    }
+    let mut order: Vec<_> = (0..planes.len()).collect();
+    crate::master::ordering::stable(
+        &mut order,
+        &|a, b| precedes(&planes[a], &planes[b]),
+        &mut crate::master::ordering::Work::new(None),
+    )
+    .ok_or_else(|| invalid("multipoint support-plane ordering interrupted"))?;
+    let mut previous: Vec<_> = std::mem::take(planes).into_iter().map(Some).collect();
+    planes.extend(
+        order
+            .into_iter()
+            .map(|index| previous[index].take().unwrap()),
+    );
     let keep = planes
         .iter()
         .take(capacity)

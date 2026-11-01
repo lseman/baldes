@@ -223,13 +223,18 @@ fn backward_paired_joins_match_native_at_every_recorded_split() {
     assert_eq!(controls, 582);
 }
 
-/// Native joins are split-dependent, so a search need not return the
-/// cheapest split or the source oracle. Contract: every search direction
-/// prices and enumerates the same single path value, and that value is one
-/// of the native join values recorded for the path.
+/// Native pricing bounds, emitted values and enumeration can differ. The
+/// whole registered signed-path capture records that distinction explicitly;
+/// the remaining corpus retains its existing split-value contracts.
 #[test]
-fn paired_pricing_and_enumeration_agree_across_search_directions_on_reference_paths() {
+fn paired_pricing_and_enumeration_match_reference_direction_and_export_contracts() {
+    let whole: serde_json::Value = serde_json::from_str(include_str!(
+        "../../fixtures/coupled/metasolver-whole-paired-directions.json"
+    ))
+    .unwrap();
+    assert_eq!(whole["reference_sha256"], corpus().reference_sha256);
     let mut searches = 0;
+    let mut failures = Vec::new();
     for case in corpus().cases {
         let graph = case.graph(-64.);
         let native: Vec<_> = case
@@ -237,49 +242,108 @@ fn paired_pricing_and_enumeration_agree_across_search_directions_on_reference_pa
             .iter()
             .map(|r| r.joined.then_some(r.cost))
             .collect();
+        let whole_case = whole["cases"].as_array().unwrap().iter().find(|record| {
+            record["case"].as_str() == Some(case.name.as_str()) && record["outcome"] == "captured"
+        });
         let mut observed = None;
         for direction in [0., 1., 2.] {
-            let mut solver = baldes::pricing::Solver::<2>::new(case.arcs.len() + 1, 0).unwrap();
-            solver.graph = graph.clone();
-            solver.enumeration_preserve_arc_paths = true;
-            solver
-                .set_option("BALDESuseBidirectionalSearch", direction)
-                .unwrap();
-            let priced = solver.price_phase(0, 64, false).unwrap();
-            assert!(priced.exact, "{} direction={direction}", case.name);
-            let value = (!priced.columns.is_empty()).then(|| priced.minimum_reduced_cost + 64.);
-            assert!(
-                native.contains(&value),
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let mut solver = baldes::pricing::Solver::<2>::new(case.arcs.len() + 1, 0).unwrap();
+                solver.graph = graph.clone();
+                if whole_case.is_some() {
+                    solver.bucket_steps[0] = whole["base_width"].as_f64().unwrap();
+                }
+                solver.enumeration_preserve_arc_paths = true;
+                solver
+                    .set_option("BALDESuseBidirectionalSearch", direction)
+                    .unwrap();
+                let priced = solver.price_phase(0, 64, false).unwrap();
+                assert!(priced.exact, "{} direction={direction}", case.name);
+                let value = (!priced.columns.is_empty()).then(|| priced.minimum_reduced_cost + 64.);
+                assert!(
+                whole_case.is_some() || native.contains(&value),
                 "{} direction={direction}: priced {value:?} is not a native split value {native:?}",
                 case.name
             );
-            let routes = solver.enumerate(0.).unwrap();
-            assert_eq!(
-                routes.len(),
-                usize::from(value.is_some()),
-                "{} direction={direction}",
-                case.name
-            );
-            for route in &routes {
-                assert_eq!(route.arcs.len(), case.arcs.len());
+                let whole_direction =
+                    whole_case.map(|record| &record["directions"][direction as usize]);
+                if let Some(expected) = whole_direction {
+                    assert_eq!(value, expected["pricing_minimum"].as_f64());
+                    let mut selected: Vec<_> = priced
+                        .columns
+                        .iter()
+                        .map(|route| route.original_cost)
+                        .collect();
+                    let mut expected_selected: Vec<_> = expected["selected_values"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|value| {
+                            whole["scalar_shift"].as_f64().unwrap() + value.as_f64().unwrap()
+                        })
+                        .collect();
+                    selected.sort_by(f64::total_cmp);
+                    expected_selected.sort_by(f64::total_cmp);
+                    assert_eq!(
+                        selected, expected_selected,
+                        "{} direction={direction}",
+                        case.name
+                    );
+                }
+                let routes = solver.enumerate(0.).unwrap();
                 assert_eq!(
-                    Some(route.cost + 64.),
-                    value,
+                    routes.len(),
+                    usize::from(value.is_some()),
                     "{} direction={direction}",
                     case.name
                 );
-                assert_eq!(route.cost, route.original_cost);
+                for route in &routes {
+                    assert_eq!(route.arcs.len(), case.arcs.len());
+                    if let Some(expected) = whole_direction {
+                        assert_eq!(
+                            route.cost,
+                            whole["scalar_shift"].as_f64().unwrap()
+                                + expected["enumerated_values"][0].as_f64().unwrap(),
+                            "{} direction={direction}",
+                            case.name
+                        );
+                    } else {
+                        assert_eq!(
+                            Some(route.cost + 64.),
+                            value,
+                            "{} direction={direction}",
+                            case.name
+                        );
+                    }
+                    assert_eq!(route.cost, route.original_cost);
+                }
+                if whole_direction.is_none() {
+                    assert_eq!(
+                        *observed.get_or_insert(value),
+                        value,
+                        "{} direction={direction}",
+                        case.name
+                    );
+                }
+            }));
+            if let Err(error) = result {
+                let message = error
+                    .downcast_ref::<String>()
+                    .map(String::as_str)
+                    .or_else(|| error.downcast_ref::<&str>().copied())
+                    .unwrap_or("unknown panic");
+                failures.push(format!("{} direction={direction}: {message}", case.name));
             }
-            assert_eq!(
-                *observed.get_or_insert(value),
-                value,
-                "{} direction={direction}",
-                case.name
-            );
             searches += 1;
         }
     }
     assert_eq!(searches, 510);
+    assert!(
+        failures.is_empty(),
+        "{} direction checks failed:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
 }
 
 #[derive(Deserialize)]

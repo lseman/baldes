@@ -8,7 +8,7 @@ fn choose_registered<const D: usize>(
     incumbent: f64,
     deadline: Instant,
 ) -> Result<Option<Selection<D>>> {
-    let proposals = registered_proposals(output, options)?;
+    let proposals = registered_proposals(output, options, None)?;
     choose_proposals(output, options, history, incumbent, deadline, proposals)
 }
 use crate::master::{

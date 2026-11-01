@@ -645,7 +645,14 @@ fn composed_arrivals_variable_increments_and_signed_waiting_match_native_splits(
     // (cases composed-waiting-*). With initial coordinate t, first head x and
     // second head y the continuous optimum is 9 (k=1) or 1 (k=-1); the
     // native joins do not attain it and depend on the split.
-    for (waiting, native) in [(-1, [3.6666666666666714, 3.5, 3.5]), (1, [9., 9.5, 9.5])] {
+    // Whole-engine captures in internal/audits/paired-partial-split-continuation-20261031/
+    // whole-pricing/composed use the same root, windows, arc functions and width1.
+    // Completed-label enumeration has its own contract: for waiting=1 its
+    // value9 differs from ordinary pricing/recording9.5 in every search mode.
+    for (waiting, native, ordinary_value, enumerated_value) in [
+        (-1, [3.6666666666666714, 3.5, 3.5], 3.5, 3.5),
+        (1, [9., 9.5, 9.5], 9.5, 9.),
+    ] {
         let mut graph = physical_graph(3, &[(0, 1, -10.), (1, 2, -10.)]);
         // Arrival 2t is consumption t on each tail window.
         let arc = |tail: Window, head: Window| ProgramArc {
@@ -691,22 +698,32 @@ fn composed_arrivals_variable_increments_and_signed_waiting_match_native_splits(
         for search in [0., 1., 2.] {
             let mut solver = crate::pricing::Solver::<2>::new(3, 1).unwrap();
             solver.graph = graph.clone();
+            solver.bucket_steps[0] = 1.;
             solver.enumeration_preserve_arc_paths = true;
             solver
                 .set_option("BALDESuseBidirectionalSearch", search)
                 .unwrap();
-            let priced = solver
-                .price_phase(0, 20, false)
-                .unwrap()
-                .minimum_reduced_cost;
-            assert!(
-                native.contains(&(priced + 20.)),
-                "waiting={waiting} search={search}: {priced}"
+            let priced = solver.price_phase(0, 20, false).unwrap();
+            assert!(priced.exact);
+            assert!(native.contains(&(priced.minimum_reduced_cost + 20.)));
+            assert_eq!(
+                priced.minimum_reduced_cost,
+                ordinary_value - 20.,
+                "waiting={waiting} search={search}"
             );
+            assert!(!priced.columns.is_empty());
+            for route in priced.columns {
+                assert_eq!(route.cost, ordinary_value - 20.);
+                assert_eq!(route.original_cost, ordinary_value - 20.);
+                assert_eq!(route.coupled_values, [(0, ordinary_value)]);
+            }
             let routes = solver.enumerate(0.).unwrap();
             assert_eq!(routes.len(), 1);
-            assert_eq!(routes[0].cost, priced);
-            assert_eq!(routes[0].original_cost, priced);
+            assert_eq!(routes[0].arcs, [0, 1]);
+            assert_eq!(routes[0].cost, enumerated_value - 20.);
+            assert_eq!(routes[0].original_cost, enumerated_value - 20.);
+            assert_eq!(routes[0].coupled_values, [(0, enumerated_value)]);
+            assert_eq!(routes[0].resources, [2.]);
         }
     }
 }

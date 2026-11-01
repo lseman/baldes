@@ -6,6 +6,45 @@ pub struct ImportedSnapshot<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSION
     pub(super) context: Rc<Context<D>>,
 }
 impl<const D: usize> ImportedSnapshot<D> {
+    /// Restrict the cardinality of a class on an original routing network.
+    /// Both the pricing row and class-tree descriptor survive import expansion.
+    pub fn with_component_bounds(
+        &self,
+        class: &ComponentClassBranching,
+        bounds: Bounds,
+    ) -> Result<Self> {
+        if !self
+            .context
+            .definition
+            .problem
+            .networks
+            .iter()
+            .any(|n| n.id == class.network)
+        {
+            return Err(invalid(
+                "component class requires an original routing network",
+            ));
+        }
+        let coefficients = class.coefficients(&self.node)?;
+        let node = self.node.with_component_bounds(class, bounds)?;
+        let mut context = self.context.clone();
+        for (sense, rhs) in [
+            (RowSense::GreaterEqual, bounds.lower),
+            (RowSense::LessEqual, bounds.upper),
+        ] {
+            if rhs.is_finite() {
+                context = context.restricted(Restriction::NonlinearRow {
+                    row: Row { sense, rhs },
+                    kernels: nonlinear::RowKernels::Presence(vec![coefficients.clone()]),
+                    original: vec![],
+                });
+            }
+        }
+        if bounds.lower.is_finite() || bounds.upper.is_finite() {
+            context = context.restricted(Restriction::ComponentDescriptor(class.clone()));
+        }
+        Ok(Self { node, context })
+    }
     /// Ordinary snapshot operations, including preprocessing, tree and MIP.
     pub fn node(&self) -> &NodeSnapshot<D> {
         &self.node

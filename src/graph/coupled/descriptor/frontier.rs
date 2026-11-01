@@ -63,6 +63,16 @@ pub enum FrontierProvenance {
         predecessor: Option<f64>,
         waiting_bits: u64,
     },
+    /// A split pricing state. Its coordinate adjustments and copied anchor
+    /// costs are machine behavior, not exact source-function restriction.
+    MachineSplit {
+        input: Arc<Self>,
+        forward: bool,
+        strategy: i32,
+        halfway: f64,
+        waiting_bits: u64,
+        predecessor: f64,
+    },
     /// Machine-only reduction before continuation. The input
     /// array and provenance remain available for later reconstruction; this
     /// operation is not a source-control equivalence certificate.
@@ -217,6 +227,7 @@ pub struct MachinePathHistory {
 }
 
 mod history;
+mod split;
 
 mod forward;
 
