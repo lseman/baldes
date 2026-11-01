@@ -47,23 +47,26 @@ impl Pool {
         if self.routes.is_empty() || Instant::now() >= deadline {
             return Ok(0);
         }
-        let mut registry = node.state.routes.clone();
+        // Keep a stable owner for borrowed path keys while the staged registry grows.
+        let original_registry = node.state.routes.clone();
+        let mut registry = original_registry.clone();
         let mut tags = node.state.tags.clone();
-        let mut pooled = node.warm.generated_pool.clone();
+        // Existing columns stay in place; publish only validated additions.
+        let mut pooled = Vec::new();
         let mut present: HashSet<_> = node
             .warm
             .columns
             .iter()
             .flatten()
-            .chain(&pooled)
+            .chain(&node.warm.generated_pool)
             .filter_map(|c| usize::try_from(c.tag).ok())
             .collect();
         let mut identities = HashMap::new();
         let mut path_caps = HashMap::new();
-        for (tag, route) in registry.iter().enumerate() {
+        for (tag, route) in original_registry.iter().enumerate() {
             let identity = (route.network, route.route.identity());
             identities.entry(identity).or_insert(tag);
-            let path = (route.network, route.route.arcs.clone());
+            let path = (route.network, route.route.arcs.as_slice());
             let cap = enumeration::route_upper(&node.state, tag).unwrap_or(f64::INFINITY);
             path_caps
                 .entry(path)
@@ -93,7 +96,7 @@ impl Pool {
             {
                 continue;
             }
-            let path = (seed.network, seed.route.arcs.clone());
+            let path = (seed.network, seed.route.arcs.as_slice());
             let identity_key = (seed.network, seed.route.identity());
             let existing = identities.get(&identity_key).copied();
             let path_cap = path_caps.get(&path).copied().unwrap_or(f64::INFINITY);
@@ -194,7 +197,7 @@ impl Pool {
         }
         node.state.routes = registry;
         node.state.tags = tags;
-        node.warm.generated_pool = pooled;
+        node.warm.generated_pool.extend(pooled);
         Ok(added)
     }
 }

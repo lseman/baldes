@@ -429,6 +429,17 @@ fn shared_pool_overflow_does_not_publish_a_partial_registry() {
             }],
         )
         .unwrap();
+    let retained = node
+        .warm
+        .columns
+        .iter()
+        .flatten()
+        .find(|c| c.tag >= 0)
+        .unwrap()
+        .clone();
+    node.warm.generated_pool.push(retained.clone());
+    let pool_storage = node.warm.generated_pool.as_ptr();
+    let entries_storage = node.warm.generated_pool[0].entries.as_ptr();
     let tags = node.state.tags.clone();
     let columns = node.master.costs.len();
     let bound = node.warm.bound;
@@ -437,7 +448,14 @@ fn shared_pool_overflow_does_not_publish_a_partial_registry() {
         .is_err());
     assert_eq!(node.state.tags, tags);
     assert_eq!(node.state.routes.len(), 3);
-    assert!(node.warm.generated_pool.is_empty());
+    assert_eq!(node.warm.generated_pool.len(), 1);
+    assert_eq!(node.warm.generated_pool.as_ptr(), pool_storage);
+    assert_eq!(
+        node.warm.generated_pool[0].entries.as_ptr(),
+        entries_storage
+    );
+    assert_eq!(node.warm.generated_pool[0].entries, retained.entries);
+    assert_eq!(node.warm.generated_pool[0].identity, retained.identity);
     assert_eq!(node.master.costs.len(), columns);
     assert_eq!(node.warm.bound, bound);
 }
@@ -585,4 +603,39 @@ fn forked_registries_detach_on_pool_registration_and_preserve_siblings() {
         expected.master.lp
     );
     assert_eq!(child.solve(options).unwrap().master.lp, expected.master.lp);
+}
+
+#[test]
+fn repeated_seeding_preserves_existing_pool_storage_and_column_buffers() {
+    let mut node = compact();
+    let pool = pool();
+    assert_eq!(
+        pool.seed(&mut node, Instant::now() + Duration::from_secs(10))
+            .unwrap(),
+        6
+    );
+    let storage = node.warm.generated_pool.as_ptr();
+    let columns = node.warm.generated_pool.clone();
+    let buffers: Vec<_> = node
+        .warm
+        .generated_pool
+        .iter()
+        .map(|c| (c.entries.as_ptr(), c.identity.as_ptr()))
+        .collect();
+    assert_eq!(
+        pool.seed(&mut node, Instant::now() + Duration::from_secs(10))
+            .unwrap(),
+        0
+    );
+    assert_eq!(node.warm.generated_pool.as_ptr(), storage);
+    for ((actual, expected), &(entries, identity)) in
+        node.warm.generated_pool.iter().zip(&columns).zip(&buffers)
+    {
+        assert_eq!(actual.tag, expected.tag);
+        assert_eq!(actual.cost, expected.cost);
+        assert_eq!(actual.entries, expected.entries);
+        assert_eq!(actual.identity, expected.identity);
+        assert_eq!(actual.entries.as_ptr(), entries);
+        assert_eq!(actual.identity.as_ptr(), identity);
+    }
 }

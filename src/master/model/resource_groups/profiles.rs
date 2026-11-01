@@ -91,7 +91,9 @@ pub(in crate::master::model) fn refresh<const D: usize>(
         }
     }
     let complete_universe = node.state.universe.is_some();
-    for (tag, route) in Arc::make_mut(&mut node.state.routes).iter_mut().enumerate() {
+    let mut schedules_changed = false;
+    for tag in 0..node.state.routes.len() {
+        let route = &node.state.routes[tag];
         let Some(domain) = domains.get(&route.network) else {
             continue;
         };
@@ -146,15 +148,26 @@ pub(in crate::master::model) fn refresh<const D: usize>(
                 "route paired selection is unavailable in the refreshed domain",
             ));
         }
-        let route = Arc::make_mut(route);
-        route.route.resources = canonical.resources;
-        route.route.resource_profile = canonical.resource_profile;
+        if route.route.resources != canonical.resources
+            || route.route.resource_profile != canonical.resource_profile
+        {
+            let route = Arc::make_mut(&mut Arc::make_mut(&mut node.state.routes)[tag]);
+            route.route.resources = canonical.resources;
+            route.route.resource_profile = canonical.resource_profile;
+            schedules_changed = true;
+        }
     }
-    let tags = Arc::make_mut(&mut node.state.tags);
-    tags.clear();
-    for (tag, route) in node.state.routes.iter().enumerate() {
-        tags.entry((route.network, route.route.identity()))
-            .or_insert(tag as i32);
+    if schedules_changed {
+        // A shared map will be rebuilt; copying its old strings first is wasted work.
+        if Arc::get_mut(&mut node.state.tags).is_none() {
+            node.state.tags = Arc::new(HashMap::with_capacity(node.state.routes.len()));
+        }
+        let tags = Arc::get_mut(&mut node.state.tags).unwrap();
+        tags.clear();
+        for (tag, route) in node.state.routes.iter().enumerate() {
+            tags.entry((route.network, route.route.identity()))
+                .or_insert(tag as i32);
+        }
     }
     let state = &node.state;
     for (column, metadata) in node.warm.columns.iter_mut().enumerate() {
@@ -207,3 +220,7 @@ pub(in crate::master::model) fn refresh<const D: usize>(
     }
     Ok(fixed_impossible)
 }
+
+#[cfg(test)]
+#[path = "../../../../tests/unit/master/model/resource_profile_tests.rs"]
+mod tests;
