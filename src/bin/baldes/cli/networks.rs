@@ -17,6 +17,7 @@ Solve shared master rows with multiple pricing networks (Clp).
   --variable-boxes FILE  Verified variable-box envelopes JSON
   --mapped-strong-branching  Rank branch proposals by strong trial solves (native default: off)
   --no-mapped-strong-branching  Rank branch proposals without trial solves (default)
+  --greedy              Initial residual construction with shifted costs (requires --tree)
   --local-search FILE     Partial-incumbent diving controls JSON (--tree; depth_limit >= 0 enables)
   --proximal FILE         Proximal configuration JSON (replaces smoothing)
   --proximal-finite-box-step  finite-cap box-step initialization/schedule
@@ -87,6 +88,7 @@ fn parse_options(args: Vec<String>) -> Result<Option<NetworkOptions>, String> {
                 options.proximal =
                     Some(baldes::master::stabilization::ProximalParameters::finite_box_step());
             }
+            "--greedy" => options.greedy = true,
             "--local-search" => {
                 let text = std::fs::read_to_string(value()?).map_err(|e| e.to_string())?;
                 options.local_search = Some(

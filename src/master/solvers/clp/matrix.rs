@@ -264,8 +264,28 @@ impl ClpMaster {
         }
         self.ensure_backend()?;
         if let Some(model) = self.model {
+            let was_nonempty = value == 0. && unsafe { Clp_getNumElements(model.as_ptr()) != 0 };
             unsafe {
-                Clp_modifyCoefficient(model.as_ptr(), row as i32, column as i32, value, true);
+                // Retaining structural zeros can leave an all-zero matrix
+                // on Clp's ordinary warm-basis path with stale primal values.
+                // Removing them lets its empty-problem path reoptimize bounds.
+                Clp_modifyCoefficient(
+                    model.as_ptr(),
+                    row as i32,
+                    column as i32,
+                    value,
+                    value != 0.,
+                );
+            }
+            if was_nonempty && unsafe { Clp_getNumElements(model.as_ptr()) == 0 } {
+                // Clp's emptyProblem computes a fresh bound-only primal, but
+                // retained simplex work arrays can overwrite it on finish.
+                // Recreate only the owned native handle at this transition;
+                // ordinary edits retain their basis and all Rust telemetry.
+                self.solved = false;
+                let mut rebuilt = self.export_for_worker()?.restore()?;
+                self.model = rebuilt.model.take();
+                unsafe { Clp_deleteModel(model.as_ptr()) };
             }
         }
         #[cfg(feature = "highs")]

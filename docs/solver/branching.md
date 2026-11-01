@@ -369,6 +369,37 @@ set per-child resource limits. Local-search solves contribute to
 `diving_nodes`; their bounds never prune the main tree.
 The local-search schedule sets its own dive depth, discrepancy and stopping
 controls; overriding those nested `dive` fields is rejected.
-Partial fixing supports nonnegative and nonpositive static master variables;
-active local search rejects free signed static variables until their residual
-translation is represented explicitly.
+Partial fixing supports nonnegative, nonpositive and free signed static master
+variables. Signed residual translation preserves the original domain and cost.
+Nested `dive.column_selection_criteria` accepts an ordered vector of selection
+strategy tokens: 0/1 first found, 2 priority, 3/4 most/least fractional, 5/7/12/16
+fractional weighted cost, 6 closest round up, 8 incumbent guided, 9 cost,
+10 reduced cost, 11 greedy cost, and 15 terminal-resource score. Tokens 13/17
+retain their defined no-selection behavior. An empty vector keeps the default.
+These controls rank route columns and integer static variables; continuous
+static variables are excluded. `dive.network_column_priorities` and
+`dive.master_variable_priorities` map pricing-network and original static IDs to
+selection priorities (default one). Unknown IDs and nonfinite priorities reject
+configuration. These controls do not change random neighborhood sampling.
+Static contributions use private residual offsets; declared positive/negative
+signs clamp the residual in that direction, while free variables retain their
+original domain, rows and objective.
+
+The optional `greedy` tree control constructs an initial solution before root
+column generation. It shifts each pricing network's variable costs, prices one
+network at a time, and carries feasible integer route quantities into private
+residual children. `greedy_nodes` counts these evaluations. Candidate solutions
+are checked against the original model before they update the incumbent.
+It is disabled by default; use `--greedy` with `--tree`, or pass `greedy=True`
+to Python network solving.
+
+Rust network-model trees accept application primal heuristics through
+`ModelTreeOptions.primal_heuristics`. Register `PrimalHeuristic::fractional`
+for the current original solution, or `PrimalHeuristic::enumerated` for retained
+patterns ordered by reduced cost. Each callback returns an optional
+`PrimalHeuristicSolution` containing full original route quantities and static
+master values. Missing static values mean zero. The solver rebuilds costs and
+visits, validates the original integer solution, and accepts only improving
+candidates. Enumerated callbacks run only when a retained pattern domain is
+available; their input identifies any objective cutoff limiting that domain.
+Callbacks must be `Send + Sync` and are runtime Rust registrations.

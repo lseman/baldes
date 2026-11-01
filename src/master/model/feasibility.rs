@@ -65,6 +65,24 @@ pub(super) fn recover<const D: usize>(
             arc.reduced_cost = 0.;
         }
         oracle.solver.restore_arcs();
+        // Restoring pricing caches retains explicit hard arc restrictions.
+        // Add proved zeros without replacing those inherited prohibitions.
+        oracle.solver.set_forbidden_arcs(
+            oracle
+                .solver
+                .forbidden_arcs
+                .iter()
+                .enumerate()
+                .filter_map(|(arc, &zero)| zero.then_some(arc))
+                .chain(
+                    oracle
+                        .proved_zero_arcs
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(arc, &zero)| zero.then_some(arc)),
+                )
+                .collect(),
+        )?;
         oracle.solver.rollback_point_saved = false;
         oracle.solver.requires_rollback = false;
         oracle.solver.cutoff = f64::INFINITY;
@@ -125,6 +143,9 @@ pub(super) fn recover<const D: usize>(
     }
     let mut violations = vec![];
     for row in 0..private.rhs.len() {
+        if state.retired_rows.contains(&row) {
+            continue;
+        }
         for sign in [1., -1.] {
             if (sign > 0. && private.senses[row] == RowSense::LessEqual)
                 || (sign < 0. && private.senses[row] == RowSense::GreaterEqual)
@@ -270,7 +291,7 @@ pub(super) fn recover<const D: usize>(
             else {
                 continue;
             };
-            let coefficients = entries(oracle, &candidate.route, origin.shared_offset)?;
+            let coefficients = retirement::active_entries(&origin, oracle, &candidate.route)?;
             let mut route = candidate.as_ref().clone();
             route.route.original_cost = cost;
             route.route.cost = cost;

@@ -767,16 +767,17 @@ fn native_restricted_screen_control_counts_exact_work_and_continues_lp_survivors
     assert_eq!(result.strong_branching_trials, 6);
     assert_eq!(result.processed_nodes, 3);
     assert_eq!(result.iterations, 10);
-    // Nonnegative box admission skips physical pricing without changing
-    // phase work. Native reports twenty accounting calls and eight physical
-    // entries here; its remaining admission guards are a separate boundary.
+    // This whole-incoming assignment mapping is separate from the pinned
+    // half-incident native control. Retiring a redundant child row shifts
+    // dual prices onto proved-zero arcs; conservative all-arc admission adds
+    // three physical calls without changing phase work or proof bounds.
     assert_eq!(
         result
             .oracle_calls
             .iter()
             .map(|(_, count)| count)
             .sum::<usize>(),
-        2
+        5
     );
     assert_eq!(
         result

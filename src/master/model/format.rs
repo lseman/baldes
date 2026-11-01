@@ -541,6 +541,8 @@ pub struct SolveOptions {
     pub aggregate_variable_branching: Vec<crate::master::model::AggregateVariableBranching>,
     /// Diving primal heuristic (tree only); disabled when absent.
     pub diving: Option<crate::master::tree::DivingOptions>,
+    /// Initial shifted-cost residual construction (tree only).
+    pub greedy: bool,
     /// Random incumbent partial fixing and child diving (tree only).
     pub local_search: Option<crate::master::tree::LocalSearchOptions>,
     /// Restricted-master integer heuristic (tree only, highs feature).
@@ -609,6 +611,7 @@ impl Default for SolveOptions {
             use_branching_history: true,
             tree_threads: 1,
             diving: None,
+            greedy: false,
             local_search: None,
             branching_expressions: vec![],
             aggregate_variable_branching: vec![],
@@ -701,6 +704,9 @@ impl SolveOptions {
         if self.diving.is_some() && !self.tree {
             return Err(invalid("diving requires tree=true"));
         }
+        if self.greedy && !self.tree {
+            return Err(invalid("greedy requires tree=true"));
+        }
         if self.local_search.is_some() && !self.tree {
             return Err(invalid("local_search requires tree=true"));
         }
@@ -788,6 +794,7 @@ impl SolveOptions {
             clusters: self.clusters.clone(),
             ryan_foster: self.ryan_foster.clone(),
             diving: self.diving.clone(),
+            greedy: self.greedy,
             local_search: self.local_search.clone(),
             restricted_master_mip: self.restricted_master_mip.clone(),
             absolute_gap: self.absolute_gap,
@@ -985,6 +992,7 @@ pub struct SolveResult {
     pub enumerated_mip_nodes: usize,
     pub enumerated_mip_failures: usize,
     pub diving_nodes: usize,
+    pub greedy_nodes: usize,
     pub strong_branching_trials: usize,
     pub mapped_history_ranked: usize,
     pub mapped_branch_evaluations: Vec<MappedBranchEvaluation>,
@@ -1068,6 +1076,7 @@ impl SolveResult {
             enumerated_mip_nodes: 0,
             enumerated_mip_failures: 0,
             diving_nodes: 0,
+            greedy_nodes: 0,
             strong_branching_trials: 0,
             mapped_history_ranked: 0,
             mapped_branch_evaluations: vec![],
@@ -1117,6 +1126,7 @@ impl SolveResult {
             enumerated_mip_nodes: output.enumerated_mip_nodes,
             enumerated_mip_failures: output.enumerated_mip_failures,
             diving_nodes: output.diving_nodes,
+            greedy_nodes: output.greedy_nodes,
             strong_branching_trials: output.strong_branching_trials,
             mapped_history_ranked: output.mapped_history_ranked,
             mapped_branch_evaluations: output.mapped_branch_evaluations.clone(),
@@ -1171,6 +1181,7 @@ impl SolveResult {
             enumerated_mip_nodes: output.mip.nodes,
             enumerated_mip_failures: 0,
             diving_nodes: 0,
+            greedy_nodes: 0,
             strong_branching_trials: 0,
             mapped_history_ranked: 0,
             mapped_branch_evaluations: vec![],

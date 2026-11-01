@@ -213,7 +213,14 @@ fn network_minimum<const D: usize>(
     // if complete resource-aware coverage is unavailable.
     let allowance = (*resource_work / 4).min(100_000);
     let mut remaining = allowance;
-    let resource_minimum = resource::dag_minimum(graph, &weights, &mut remaining, deadline);
+    let resource_minimum =
+        resource::dag_minimum_filtered(graph, &weights, &mut remaining, deadline, |a| {
+            oracle
+                .proved_zero_arcs
+                .get(position(a))
+                .copied()
+                .unwrap_or(false)
+        });
     *resource_work -= allowance - remaining;
     match resource_minimum {
         Some(Some(value)) => minimum = minimum.max(value),
@@ -258,7 +265,14 @@ fn network_minimum<const D: usize>(
     // Keep resource windows and registered penalties jointly on bounded walks.
     // This is an independent directed proof, not numerical pricing evidence.
     // Exhaustion retains the cheaper unrestricted certificate above.
-    if !oracle.resource_groups.is_empty()
+    let joint_component = oracle.presence_rows.iter().any(|&(input, _)| {
+        oracle.solver.presence_rows()[input]
+            .row
+            .is_component_class()
+    });
+    let mut walk_presence = None;
+    if joint_component
+        || !oracle.resource_groups.is_empty()
         || oracle
             .nonlinear_rows
             .iter()
@@ -277,7 +291,12 @@ fn network_minimum<const D: usize>(
         );
         *resource_work -= allowance - remaining;
         match restricted {
-            Some(Some(value)) => minimum = minimum.max(value),
+            Some(Some(value)) => {
+                minimum = minimum.max(value);
+                if joint_component {
+                    walk_presence = Some(value);
+                }
+            }
             Some(None) => return Some(None),
             None => {}
         }
@@ -332,6 +351,9 @@ fn network_minimum<const D: usize>(
         Some(None) => return Some(None),
         None => {}
     }
+    if let Some(value) = walk_presence {
+        minimum = minimum.max(value);
+    }
     minimum = add(minimum, coupled_cost)?;
     for &(row, coefficient) in &oracle.route_entries {
         minimum = subtract_product(minimum, duals[row], coefficient)?;
@@ -347,7 +369,7 @@ pub(super) fn certificate<const D: usize>(
     master: &ClpMaster,
     duals: &[f64],
 ) -> Option<f64> {
-    certificate_inner(state, master, duals, true)
+    certificate_inner(state, master, &retirement::duals(state, duals), true)
 }
 
 /// A split-domain certificate whose original-variable caps remain valid when
@@ -357,7 +379,7 @@ pub(super) fn extension_certificate<const D: usize>(
     master: &ClpMaster,
     duals: &[f64],
 ) -> Option<f64> {
-    certificate_inner(state, master, duals, false)
+    certificate_inner(state, master, &retirement::duals(state, duals), false)
 }
 
 fn master_dual_base<const D: usize>(

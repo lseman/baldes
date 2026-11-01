@@ -227,10 +227,11 @@ pub(super) fn tracks_integer_witness<const D: usize>(state: &State<D>) -> bool {
 /// Compact routing masters with aligned registry rows. More general models
 /// retain their rows until all their row-indexed structures support remapping.
 pub(super) fn supports_row_cleanup<const D: usize>(state: &State<D>) -> bool {
-    state
-        .cuts
-        .as_ref()
-        .is_some_and(|cuts| cuts.recourse.is_none() && cuts.knapsack_separator.is_none())
+    state.retired_rows.is_empty()
+        && state
+            .cuts
+            .as_ref()
+            .is_some_and(|cuts| cuts.recourse.is_none() && cuts.knapsack_separator.is_none())
         && !state.oracles.is_empty()
         && state.master_variables.is_empty()
         && state.variable_boxes.is_empty()
@@ -1644,7 +1645,7 @@ impl<const D: usize> Round<'_, D> {
                 class: cg::CurvatureRowClass::Dynamic,
                 active: true,
             }));
-        self.state.rhs = master.rhs.clone();
+        retirement::sync_rhs(self.state, master);
         Ok(())
     }
 

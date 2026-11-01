@@ -181,6 +181,7 @@ fn registered_tree_pairs_network_identities_sides_ranks_and_feasible_node_bounds
             enumerated_mip_failures: 0,
             enumeration_reports: vec![],
             diving_nodes: 0,
+            greedy_nodes: 0,
             restricted_mip_calls: 0,
         };
         let deadline = Instant::now() + std::time::Duration::from_secs(10);

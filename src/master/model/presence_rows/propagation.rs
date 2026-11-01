@@ -43,6 +43,9 @@ fn support<const D: usize>(
     blocked: impl Fn(usize) -> bool,
     work: &mut Work,
 ) -> Option<Vec<usize>> {
+    if input.row.is_component_class() {
+        return None;
+    }
     // Compress only events occurring in pairs. Declared event IDs can be large
     // and sparse; neither memory nor work scales with the declared domain.
     let mut positions = HashMap::new();

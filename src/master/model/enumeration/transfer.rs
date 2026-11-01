@@ -187,7 +187,7 @@ pub(super) fn install_collected_with<const D: usize>(
         let column = cg::Column {
             cost: route.route.original_cost,
             reduced_cost: 0.,
-            entries: entries(oracle, &route.route, state.shared_offset)?,
+            entries: retirement::active_entries(state, oracle, &route.route)?,
             acceptable: true,
             tag: tag as i32,
             identity: format!("{}:{}", route.network, route.route.identity()),

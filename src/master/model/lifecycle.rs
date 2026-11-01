@@ -105,12 +105,15 @@ impl<const D: usize> State<D> {
             rhs: self.rhs.clone(),
             deadline: self.deadline,
             shared_rows: self.shared_rows.clone(),
+            retired_rows: self.retired_rows.clone(),
             curvature_rows: self.curvature_rows.clone(),
             fixed_routes: self.fixed_routes.clone(),
             universe: self.universe.clone(),
             enumeration_report: self.enumeration_report.clone(),
             preprocessing: self.preprocessing.clone(),
             master_variables: self.master_variables.clone(),
+            master_variable_signs: self.master_variable_signs.clone(),
+            master_variable_bound_rows: self.master_variable_bound_rows.clone(),
             route_upper_bounds: self.route_upper_bounds.clone(),
             cuts: self.cuts.clone(),
         }
@@ -311,7 +314,7 @@ impl<const D: usize> NodeSnapshot<D> {
             class,
             active: true,
         });
-        node.state.rhs = node.master.rhs.clone();
+        retirement::sync_rhs(&mut node.state, &node.master);
         // Row dimensions and objectives differ; the old smoothing center is
         // not a dual point for this child. Keep valid inherited lower bounds.
         node.warm.stabilization = None;
@@ -527,7 +530,7 @@ impl<const D: usize> NodeSnapshot<D> {
             ));
         }
         let coefficients = entries(oracle, &route.route, node.state.shared_offset)?;
-        let mut rhs = node.master.rhs.clone();
+        let mut rhs = node.state.rhs.clone();
         for (row, value) in coefficients {
             rhs[row] -= quantity * value;
         }
@@ -554,9 +557,10 @@ impl<const D: usize> NodeSnapshot<D> {
                 }
             }
         }
-        node.master.set_rhs(&rhs)?;
-        node.master.objective_offset = offset;
         node.state.rhs = rhs;
+        node.master
+            .set_rhs(&retirement::physical_rhs(&node.state))?;
+        node.master.objective_offset = offset;
         node.state.fixed_routes.push(FixedRoute {
             route: route.as_ref().clone(),
             quantity,
@@ -628,7 +632,7 @@ pub(super) fn install_fixed_routes<const D: usize>(
         oracle.network.multiplicity.lower = (oracle.network.multiplicity.lower - q).max(0.);
         state.fixed_routes.push(fixed.clone());
     }
-    master.set_rhs(&state.rhs)?;
+    master.set_rhs(&retirement::physical_rhs(state))?;
     Ok(())
 }
 
@@ -651,7 +655,7 @@ pub(super) fn install_seed_routes<const D: usize>(
         if state.tags.contains_key(&key) {
             continue;
         }
-        let coefficients = entries(oracle, &seed.route, state.shared_offset)?;
+        let coefficients = retirement::active_entries(state, oracle, &seed.route)?;
         let cost = original_costs::route_cost(oracle, &seed.route)?;
         if !cost.is_finite() {
             return Err(invalid("seed route cost overflow"));

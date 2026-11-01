@@ -119,6 +119,7 @@ impl History {
 /// Lightweight original-domain restriction; full masters are forked only after
 /// native priority/quota admission, never for the entire physical-arc registry.
 pub(super) enum Restriction {
+    Component(ComponentClassBranching),
     Mapped(MappedBranchVariable),
     Resource(ResourceGroupCandidate),
     Assignment {
@@ -164,6 +165,10 @@ impl Proposal {
             },
         ];
         match &self.restriction {
+            Restriction::Component(class) => bounds
+                .into_iter()
+                .map(|b| node.with_component_bounds(class, b))
+                .collect(),
             Restriction::Mapped(variable) => bounds
                 .into_iter()
                 .map(|b| variable.apply(node, b))
@@ -388,6 +393,11 @@ pub(super) fn registered_proposals<const D: usize>(
     options: &ModelTreeOptions,
 ) -> Result<Vec<Proposal>> {
     let mut proposals = mapped_proposals(output, &options.mapped_variables, options.tolerance)?;
+    for class in &options.component_classes {
+        if let Some(proposal) = class.proposal(output, options.tolerance)? {
+            proposals.push(proposal);
+        }
+    }
     for clusters in &options.clusters {
         proposals.extend(clusters.proposals(output, options.tolerance)?);
     }
@@ -535,6 +545,7 @@ pub(super) fn choose_proposals<const D: usize>(
         priorities.push(packing.priority);
     }
     priorities.extend(options.clusters.iter().map(|c| c.priority));
+    priorities.extend(options.component_classes.iter().map(|c| c.priority));
     priorities.extend(options.ryan_foster.iter().map(|r| r.priority));
     if options.branching != NetworkBranchingPolicy::Phased {
         // Preset policies rank inferred families relative to the registered

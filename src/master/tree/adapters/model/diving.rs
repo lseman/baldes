@@ -15,6 +15,7 @@
 //! supply incumbents; their bounds restrict a heuristic subspace and are never
 //! published as tree bounds.
 use super::*;
+mod selection;
 
 /// Native parameters: `DivingHeurUseDepthLimit`, `CallFrequencyOfDivingHeur`,
 /// `MaxLDSdepth`, `MaxLDSbreadth`, `StrongDivingCandidatesNumber`,
@@ -34,6 +35,12 @@ pub struct DivingOptions {
     pub max_discrepancy: usize,
     /// Rounded children evaluated per dive node; one is a plain greedy dive.
     pub strong_candidates: usize,
+    /// Ordered selection-strategy tokens; empty retains closest-round-up selection.
+    pub column_selection_criteria: Vec<i32>,
+    /// Generated-column selection priority by pricing network (default one).
+    pub network_column_priorities: std::collections::BTreeMap<i32, f64>,
+    /// Static integer-variable selection priority by original ID (default one).
+    pub master_variable_priorities: std::collections::BTreeMap<i32, f64>,
     pub stop_after_first_solution: bool,
     /// Fix columns with positive integer values before rounding.
     pub fix_integer_columns: bool,
@@ -52,6 +59,9 @@ impl Default for DivingOptions {
             lds_depth: 0,
             max_discrepancy: 0,
             strong_candidates: 1,
+            column_selection_criteria: vec![],
+            network_column_priorities: Default::default(),
+            master_variable_priorities: Default::default(),
             stop_after_first_solution: false,
             fix_integer_columns: true,
             max_iterations: 5000,
@@ -71,6 +81,15 @@ impl DivingOptions {
             return Err(invalid(
                 "diving requires positive candidates and iterations and a finite time limit",
             ));
+        }
+        selection::validate(&self.column_selection_criteria)?;
+        if self
+            .network_column_priorities
+            .values()
+            .chain(self.master_variable_priorities.values())
+            .any(|v| !v.is_finite())
+        {
+            return Err(invalid("diving selection priorities must be finite"));
         }
         Ok(())
     }
@@ -110,6 +129,13 @@ impl Dive {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum Variable {
+    Route(usize),
+    Master(usize),
+}
+type Residuals = HashMap<usize, f64>;
+
 enum Pending<const D: usize> {
     Solved(Output<D>),
     Fixed(NodeSnapshot<D>),
@@ -121,29 +147,47 @@ struct Entry<const D: usize> {
     discrepancy: usize,
     order: usize,
     /// Columns this dive node may not round (native `tabuVariables`).
-    tabu: Vec<usize>,
+    tabu: Vec<Variable>,
+    residuals: Residuals,
 }
 
 /// Positive route columns of a solved node with their master values.
-fn route_columns<const D: usize>(output: &Output<D>, tolerance: f64) -> Vec<(usize, f64)> {
+fn route_columns<const D: usize>(
+    output: &Output<D>,
+    tolerance: f64,
+    residuals: &Residuals,
+) -> Vec<(Variable, f64)> {
     let node = &output.snapshot;
     if !node.master.solved() {
         return vec![];
     }
     let values = node.master.values();
-    node.warm
-        .columns
+    let mut columns: Vec<_> = output
+        .master_values
         .iter()
         .enumerate()
-        .filter_map(|(column, metadata)| {
-            let tag = metadata.as_ref()?.tag;
-            if tag < 0 || master_variables::decode(tag).is_some() {
-                return None;
-            }
-            let value = values[column];
-            (value.is_finite() && value > tolerance).then_some((tag as usize, value))
+        .filter(|(i, _)| node.state.master_variables[*i].integer)
+        .filter_map(|(i, &(_, x))| {
+            let value = x - residuals.get(&i).copied().unwrap_or(0.);
+            (value.is_finite() && value.abs() > tolerance).then_some((Variable::Master(i), value))
         })
-        .collect()
+        .collect();
+    columns.extend(
+        node.warm
+            .columns
+            .iter()
+            .enumerate()
+            .filter_map(|(column, metadata)| {
+                let tag = metadata.as_ref()?.tag;
+                if tag < 0 || master_variables::decode(tag).is_some() {
+                    return None;
+                }
+                let value = values[column];
+                (value.is_finite() && value > tolerance)
+                    .then_some((Variable::Route(tag as usize), value))
+            }),
+    );
+    columns
 }
 
 fn is_integer(value: f64) -> bool {
@@ -157,6 +201,60 @@ pub(super) fn run<const D: usize>(
     incumbent: f64,
     deadline: Instant,
 ) -> Result<Dive> {
+    run_with_guidance(root, options, config, incumbent, deadline, None)
+}
+
+pub(super) fn run_with_guidance<const D: usize>(
+    root: &Output<D>,
+    options: &ModelTreeOptions,
+    config: &DivingOptions,
+    incumbent: f64,
+    deadline: Instant,
+    guidance: Option<&IntegerWitness>,
+) -> Result<Dive> {
+    run_with_residuals(
+        root,
+        options,
+        config,
+        incumbent,
+        deadline,
+        guidance,
+        &Residuals::new(),
+    )
+}
+
+pub(super) fn run_with_residuals<const D: usize>(
+    root: &Output<D>,
+    options: &ModelTreeOptions,
+    config: &DivingOptions,
+    incumbent: f64,
+    deadline: Instant,
+    guidance: Option<&IntegerWitness>,
+    residuals: &Residuals,
+) -> Result<Dive> {
+    for id in config.network_column_priorities.keys() {
+        if !root
+            .snapshot
+            .state
+            .oracles
+            .iter()
+            .any(|o| o.network.id == *id)
+        {
+            return Err(invalid("unknown diving priority network"));
+        }
+    }
+    for id in config.master_variable_priorities.keys() {
+        if !root
+            .snapshot
+            .state
+            .master_variables
+            .iter()
+            .any(|v| v.id == *id)
+        {
+            return Err(invalid("unknown diving priority master variable"));
+        }
+    }
+    let mut guidance = guidance.cloned();
     let end = deadline.min(
         Instant::now()
             .checked_add(Duration::from_secs_f64(config.time_limit))
@@ -170,10 +268,10 @@ pub(super) fn run<const D: usize>(
     let mut current: Option<Entry<D>> = None;
     loop {
         let solved;
-        let (output, depth, discrepancy, tabu) = match current.take() {
+        let (output, depth, discrepancy, tabu, residuals) = match current.take() {
             None if dive.nodes == 0 && order == 0 => {
                 order += 1;
-                (root, 0, 0, vec![])
+                (root, 0, 0, vec![], residuals.clone())
             }
             None => break,
             Some(entry) => {
@@ -197,12 +295,19 @@ pub(super) fn run<const D: usize>(
                     }
                 };
                 solved = output;
-                (&solved, entry.depth, entry.discrepancy, entry.tabu)
+                (
+                    &solved,
+                    entry.depth,
+                    entry.discrepancy,
+                    entry.tabu,
+                    entry.residuals,
+                )
             }
         };
         if let Some(witness) = output.snapshot.integer_witness(tolerance)? {
             if witness.0 < best {
                 best = witness.0;
+                guidance = Some(witness.clone());
                 dive.incumbent = Some(witness);
                 if config.stop_after_first_solution {
                     break;
@@ -214,19 +319,22 @@ pub(super) fn run<const D: usize>(
             options,
             config,
             best,
+            guidance.as_ref(),
             depth,
             discrepancy,
             &tabu,
+            &residuals,
             end,
             &mut dive,
         )?;
-        for (pending, discrepancy, tabu) in children {
+        for (pending, discrepancy, tabu, residuals) in children {
             heap.push(Entry {
                 pending,
                 depth: depth + 1,
                 discrepancy,
                 order,
                 tabu,
+                residuals,
             });
             order += 1;
         }
@@ -277,12 +385,14 @@ fn children<const D: usize>(
     options: &ModelTreeOptions,
     config: &DivingOptions,
     best: f64,
+    guidance: Option<&IntegerWitness>,
     depth: usize,
     discrepancy: usize,
-    tabu: &[usize],
+    tabu: &[Variable],
+    residuals: &Residuals,
     end: Instant,
     dive: &mut Dive,
-) -> Result<Vec<(Pending<D>, usize, Vec<usize>)>> {
+) -> Result<Vec<(Pending<D>, usize, Vec<Variable>, Residuals)>> {
     let tolerance = options.tolerance;
     // Native prunes a dive node whose LP does not improve the primal bound.
     if output.master.status != cg::Status::Optimal
@@ -291,38 +401,58 @@ fn children<const D: usize>(
     {
         return Ok(vec![]);
     }
-    let columns = route_columns(output, tolerance);
+    let columns = route_columns(output, tolerance, residuals);
     let mut base: Option<NodeSnapshot<D>> = None;
+    let mut fixed_residuals = residuals.clone();
     if config.fix_integer_columns {
         for &(tag, value) in &columns {
-            if is_integer(value) && value.round() >= 1. {
+            if is_integer(value) && value.round().abs() >= 1. {
                 let parent = base.as_ref().unwrap_or(&output.snapshot);
-                if let Ok(fixed) = parent.fix_route(tag, value.round()) {
+                if let Ok(fixed) = fix_variable(parent, tag, value.round(), &mut fixed_residuals) {
                     base = Some(fixed);
                 }
             }
         }
     }
+    let parent = base.as_ref().unwrap_or(&output.snapshot);
     let mut candidates: Vec<_> = columns
         .into_iter()
         .filter(|&(tag, value)| !is_integer(value) && !tabu.contains(&tag))
         .collect();
-    // Round the column closest to its ceiling first.
-    candidates.sort_by(|a, b| {
-        (a.1.ceil() - a.1)
-            .total_cmp(&(b.1.ceil() - b.1))
-            .then(a.0.cmp(&b.0))
-    });
-    let parent = base.as_ref().unwrap_or(&output.snapshot);
+    if config.column_selection_criteria.is_empty() {
+        candidates.sort_by(|a, b| {
+            (a.1.ceil() - a.1)
+                .total_cmp(&(b.1.ceil() - b.1))
+                .then(a.0.cmp(&b.0))
+        });
+        for (_, value) in &mut candidates {
+            *value = value.ceil();
+        }
+    } else {
+        candidates = selection::rank(parent, candidates, config, guidance, &fixed_residuals)?;
+    }
     if config.strong_candidates <= 1 {
         for (tag, value) in candidates {
-            if let Ok(child) = parent.fix_route(tag, value.ceil()) {
-                return Ok(vec![(Pending::Fixed(child), discrepancy, tabu.to_vec())]);
+            let mut child_residuals = fixed_residuals.clone();
+            if let Ok(child) = fix_variable(parent, tag, value, &mut child_residuals) {
+                return Ok(vec![(
+                    Pending::Fixed(child),
+                    discrepancy,
+                    tabu.to_vec(),
+                    child_residuals,
+                )]);
             }
         }
         // Only integer columns remained fractional-free: dive on the fixings.
         return Ok(base
-            .map(|node| vec![(Pending::Fixed(node), discrepancy, tabu.to_vec())])
+            .map(|node| {
+                vec![(
+                    Pending::Fixed(node),
+                    discrepancy,
+                    tabu.to_vec(),
+                    fixed_residuals.clone(),
+                )]
+            })
             .unwrap_or_default());
     }
     let mut evaluated = vec![];
@@ -333,7 +463,8 @@ fn children<const D: usize>(
         {
             break;
         }
-        let Ok(child) = parent.fix_route(tag, value.ceil()) else {
+        let mut child_residuals = fixed_residuals.clone();
+        let Ok(child) = fix_variable(parent, tag, value, &mut child_residuals) else {
             continue;
         };
         match solve_child(&child, options, config, best, end) {
@@ -342,7 +473,7 @@ fn children<const D: usize>(
                 if solved.master.status == cg::Status::Optimal
                     && !model_strong::proven_infeasible(&solved)
                 {
-                    evaluated.push((tag, solved));
+                    evaluated.push((tag, solved, child_residuals));
                 }
             }
             Err(error) if budget_error(&error) => {}
@@ -360,16 +491,56 @@ fn children<const D: usize>(
     // Limited-discrepancy siblings: a child that deviates from the better
     // roundings may not round their columns again in its subtree.
     let kept: Vec<_> = evaluated.into_iter().take(allowed).collect();
-    let tags: Vec<usize> = kept.iter().map(|(tag, _)| *tag).collect();
+    let tags: Vec<Variable> = kept.iter().map(|(tag, _, _)| *tag).collect();
     Ok(kept
         .into_iter()
         .enumerate()
-        .map(|(rank, (_, solved))| {
+        .map(|(rank, (_, solved, residuals))| {
             let mut inherited = tabu.to_vec();
             inherited.extend_from_slice(&tags[..rank]);
-            (Pending::Solved(solved), discrepancy + rank, inherited)
+            (
+                Pending::Solved(solved),
+                discrepancy + rank,
+                inherited,
+                residuals,
+            )
         })
         .collect())
+}
+
+fn fix_variable<const D: usize>(
+    node: &NodeSnapshot<D>,
+    variable: Variable,
+    quantity: f64,
+    residuals: &mut Residuals,
+) -> Result<NodeSnapshot<D>> {
+    if !quantity.is_finite() || quantity.abs() <= 1e-6 {
+        return Err(invalid("diving requires a nonzero fixed contribution"));
+    }
+    match variable {
+        Variable::Route(tag) => node.fix_route(tag, quantity),
+        Variable::Master(index) => {
+            let variable = &node.state.master_variables[index];
+            let offset = residuals.get(&index).copied().unwrap_or(0.) + quantity;
+            if !offset.is_finite() {
+                return Err(invalid("static diving residual overflow"));
+            }
+            let mut bounds = variable.bounds;
+            let child = match node.state.master_variable_signs[index] {
+                1 => {
+                    bounds.lower = bounds.lower.max(offset);
+                    node.with_master_variable_bounds(variable.id, bounds)?
+                }
+                -1 => {
+                    bounds.upper = bounds.upper.min(offset);
+                    node.with_master_variable_bounds(variable.id, bounds)?
+                }
+                _ => node.fork()?,
+            };
+            residuals.insert(index, offset);
+            Ok(child)
+        }
+    }
 }
 
 #[cfg(test)]

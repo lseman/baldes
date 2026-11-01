@@ -2,6 +2,11 @@ use super::*;
 
 /// The controller owns incumbent tracking and the pricing route universe.
 pub trait Controller<M> {
+    /// Stable physical slots for proved redundant rows. No phase-I variable
+    /// or stabilization geometry may reactivate these semantic tombstones.
+    fn inactive_rows(&self) -> Vec<usize> {
+        vec![]
+    }
     /// A whole-domain LP infeasibility proof obtained before pricing.
     fn proven_infeasible(&self) -> bool {
         false

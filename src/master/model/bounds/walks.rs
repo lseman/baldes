@@ -123,6 +123,42 @@ fn penalty<const D: usize>(
         // Taking the smaller nonnegative penalty covers either encoding.
         value = super::subtract_product(value, dual, f64::from(limited.min(full)))?;
     }
+    if !oracle.presence_rows.iter().any(|&(input, _)| {
+        oracle.solver.presence_rows()[input]
+            .row
+            .is_component_class()
+    }) {
+        return Some(value);
+    }
+    for &(input, row) in &oracle.presence_rows {
+        if Instant::now() >= deadline {
+            return None;
+        }
+        let dual = duals[offset + row];
+        if dual == 0. {
+            continue;
+        }
+        let input = &oracle.solver.presence_rows()[input];
+        let arcs = path
+            .iter()
+            .map(|&(_, _, id)| oracle.index.get(&id).copied())
+            .collect::<Option<Vec<_>>>()?;
+        let count = arcs
+            .iter()
+            .try_fold(0usize, |n, &a| n.checked_add(input.arc_events[a].len()))?;
+        *work = work.checked_sub(input.row.replay_work(count)?.checked_add(arcs.len())?)?;
+        let coefficient = input
+            .row
+            .coefficient_for_events(
+                arcs.iter()
+                    .flat_map(|&a| input.arc_events[a].iter().copied()),
+            )
+            .ok()?;
+        if coefficient as u128 > (1_u128 << 53) {
+            return None;
+        }
+        value = super::subtract_product(value, dual, coefficient as f64)?;
+    }
     Some(value)
 }
 

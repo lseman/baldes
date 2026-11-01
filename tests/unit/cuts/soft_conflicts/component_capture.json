@@ -1,0 +1,225 @@
+{
+  "binary_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "threshold_name": "BapCodCutViolationTolerance",
+  "threshold": 0.02,
+  "fraction_cases": [
+    {
+      "value": 0.01,
+      "fraction": 0.01
+    },
+    {
+      "value": 0.02,
+      "fraction": 0.02
+    },
+    {
+      "value": 0.0200009,
+      "fraction": 0.0200009
+    },
+    {
+      "value": 0.020002,
+      "fraction": 0.020002
+    },
+    {
+      "value": 0.5,
+      "fraction": 0.5
+    },
+    {
+      "value": 0.98,
+      "fraction": 0.020000000000000018
+    },
+    {
+      "value": 1.0,
+      "fraction": 0.0
+    },
+    {
+      "value": 1.98,
+      "fraction": 0.020000000000000018
+    },
+    {
+      "value": 2.0,
+      "fraction": 0.0
+    }
+  ],
+  "membership_cases": [
+    {
+      "sense": "G",
+      "bound": 0.0,
+      "value": -2e-06,
+      "accepted": false
+    },
+    {
+      "sense": "G",
+      "bound": 0.0,
+      "value": -5e-07,
+      "accepted": true
+    },
+    {
+      "sense": "G",
+      "bound": 0.0,
+      "value": 0.0,
+      "accepted": true
+    },
+    {
+      "sense": "G",
+      "bound": 0.0,
+      "value": 5e-07,
+      "accepted": true
+    },
+    {
+      "sense": "G",
+      "bound": 0.0,
+      "value": 2e-06,
+      "accepted": true
+    },
+    {
+      "sense": "G",
+      "bound": 2.0,
+      "value": 1.999998,
+      "accepted": false
+    },
+    {
+      "sense": "G",
+      "bound": 2.0,
+      "value": 1.9999995,
+      "accepted": true
+    },
+    {
+      "sense": "G",
+      "bound": 2.0,
+      "value": 2.0,
+      "accepted": true
+    },
+    {
+      "sense": "G",
+      "bound": 2.0,
+      "value": 2.0000005,
+      "accepted": true
+    },
+    {
+      "sense": "G",
+      "bound": 2.0,
+      "value": 2.000002,
+      "accepted": true
+    },
+    {
+      "sense": "G",
+      "bound": 1000000000.0,
+      "value": 999999999.999998,
+      "accepted": true
+    },
+    {
+      "sense": "G",
+      "bound": 1000000000.0,
+      "value": 999999999.9999995,
+      "accepted": true
+    },
+    {
+      "sense": "G",
+      "bound": 1000000000.0,
+      "value": 1000000000.0,
+      "accepted": true
+    },
+    {
+      "sense": "G",
+      "bound": 1000000000.0,
+      "value": 1000000000.0000005,
+      "accepted": true
+    },
+    {
+      "sense": "G",
+      "bound": 1000000000.0,
+      "value": 1000000000.000002,
+      "accepted": true
+    },
+    {
+      "sense": "L",
+      "bound": 0.0,
+      "value": -2e-06,
+      "accepted": true
+    },
+    {
+      "sense": "L",
+      "bound": 0.0,
+      "value": -5e-07,
+      "accepted": true
+    },
+    {
+      "sense": "L",
+      "bound": 0.0,
+      "value": 0.0,
+      "accepted": true
+    },
+    {
+      "sense": "L",
+      "bound": 0.0,
+      "value": 5e-07,
+      "accepted": true
+    },
+    {
+      "sense": "L",
+      "bound": 0.0,
+      "value": 2e-06,
+      "accepted": false
+    },
+    {
+      "sense": "L",
+      "bound": 2.0,
+      "value": 1.999998,
+      "accepted": true
+    },
+    {
+      "sense": "L",
+      "bound": 2.0,
+      "value": 1.9999995,
+      "accepted": true
+    },
+    {
+      "sense": "L",
+      "bound": 2.0,
+      "value": 2.0,
+      "accepted": true
+    },
+    {
+      "sense": "L",
+      "bound": 2.0,
+      "value": 2.0000005,
+      "accepted": true
+    },
+    {
+      "sense": "L",
+      "bound": 2.0,
+      "value": 2.000002,
+      "accepted": false
+    },
+    {
+      "sense": "L",
+      "bound": 1000000000.0,
+      "value": 999999999.999998,
+      "accepted": true
+    },
+    {
+      "sense": "L",
+      "bound": 1000000000.0,
+      "value": 999999999.9999995,
+      "accepted": true
+    },
+    {
+      "sense": "L",
+      "bound": 1000000000.0,
+      "value": 1000000000.0,
+      "accepted": true
+    },
+    {
+      "sense": "L",
+      "bound": 1000000000.0,
+      "value": 1000000000.0000005,
+      "accepted": true
+    },
+    {
+      "sense": "L",
+      "bound": 1000000000.0,
+      "value": 1000000000.000002,
+      "accepted": true
+    }
+  ]
+}

@@ -85,8 +85,9 @@ pub(in crate::master::model) fn refresh<const D: usize>(
             return Err(invalid("fixed route row refresh overflow"));
         }
         if rhs != node.state.rhs {
-            node.master.set_rhs(&rhs)?;
             node.state.rhs = rhs;
+            node.master
+                .set_rhs(&retirement::physical_rhs(&node.state))?;
         }
     }
     let complete_universe = node.state.universe.is_some();
@@ -174,7 +175,7 @@ pub(in crate::master::model) fn refresh<const D: usize>(
             .iter()
             .find(|o| o.network.id == route.network)
             .unwrap();
-        let updated = super::super::entries(oracle, &route.route, state.shared_offset)?;
+        let updated = super::super::retirement::active_entries(state, oracle, &route.route)?;
         let mut coefficients: BTreeMap<_, _> =
             metadata.entries.iter().map(|&(r, _)| (r, 0.)).collect();
         coefficients.extend(updated.iter().copied());
@@ -202,7 +203,7 @@ pub(in crate::master::model) fn refresh<const D: usize>(
             .iter()
             .find(|o| o.network.id == route.network)
             .unwrap();
-        metadata.entries = super::super::entries(oracle, &route.route, state.shared_offset)?;
+        metadata.entries = super::super::retirement::active_entries(state, oracle, &route.route)?;
         metadata.identity = format!("{}:{}", route.network, route.route.identity());
     }
     Ok(fixed_impossible)

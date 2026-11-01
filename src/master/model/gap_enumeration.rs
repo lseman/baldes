@@ -103,7 +103,7 @@ fn column<const D: usize>(state: &State<D>, tag: i32, duals: &[f64]) -> Result<c
         .iter()
         .find(|o| o.network.id == route.network)
         .ok_or_else(|| invalid("unknown enumerated route network"))?;
-    let entries = entries(oracle, &route.route, state.shared_offset)?;
+    let entries = retirement::active_entries(state, oracle, &route.route)?;
     let cost = route.route.original_cost;
     let reduced_cost = entries.iter().fold(cost, |value, &(row, a)| {
         value - duals.get(row).copied().unwrap_or(0.) * a
@@ -421,7 +421,7 @@ pub(super) fn restore_limited_memory<const D: usize>(
                 .iter()
                 .find(|o| o.network.id == route.network)
                 .ok_or_else(|| invalid("cached route network"))?;
-            let refreshed = entries(oracle, &route.route, state.shared_offset)?;
+            let refreshed = retirement::active_entries(state, oracle, &route.route)?;
             let old: HashMap<_, _> = column.entries.iter().copied().collect();
             let new: HashMap<_, _> = refreshed.iter().copied().collect();
             for row in old

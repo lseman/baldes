@@ -20,6 +20,15 @@ impl PresencePricing {
         let mut bound = 0.;
         for (input, state) in self.rows.iter().zip(states) {
             if input.dual <= 0. {
+                if input.row.is_component_class() {
+                    let Some(term) = product(input.dual, input.row.coefficient(state)?) else {
+                        return Ok(None);
+                    };
+                    let Some(sum) = add_down(bound, term) else {
+                        return Ok(None);
+                    };
+                    bound = sum;
+                }
                 continue;
             }
             let remaining = input.row.maximum_coefficient() - input.row.coefficient(state)?;
@@ -45,7 +54,12 @@ impl PresencePricing {
         for (input, state) in self.rows.iter().zip(states) {
             let current = input.row.coefficient(state)?;
             let (factor, coefficient) = if input.dual < 0. {
-                (input.dual, current)
+                (
+                    input.dual,
+                    current
+                        + usize::from(input.row.is_component_class())
+                            * input.row.maximum_coefficient(),
+                )
             } else {
                 (-input.dual, input.row.maximum_coefficient() - current)
             };

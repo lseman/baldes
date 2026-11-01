@@ -23,7 +23,12 @@ pub(in crate::master::model) fn bounds<const D: usize>(
     for (index, sense, rhs) in inferred {
         let shared = state.shared_rows.len();
         let physical = master.add_row(sense, rhs, &[(2 * index, 1.), (2 * index + 1, -1.)])?;
+        state.master_variable_bound_rows.insert(physical);
         state.shared_rows.push(Row { sense, rhs });
+        state.curvature_rows.push(cg::CurvatureRow {
+            class: cg::CurvatureRowClass::Ordinary,
+            active: true,
+        });
         state.master_variables[index].entries.push((shared, 1.));
         let update = |metadata: &mut cg::Column| {
             if let Some((v, sign)) = decode(metadata.tag) {
@@ -58,6 +63,6 @@ pub(in crate::master::model) fn bounds<const D: usize>(
             warm.artificials.push(column);
         }
     }
-    state.rhs = master.rhs.clone();
+    retirement::sync_rhs(state, master);
     Ok(())
 }

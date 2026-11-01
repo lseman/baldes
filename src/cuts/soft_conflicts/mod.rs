@@ -5,7 +5,9 @@
 //! This module does not register a separator or modify labeling automatically.
 use crate::{invalid, Result};
 use std::sync::Arc;
+mod component;
 mod pricing;
+pub use component::{ComponentBound, ComponentSense, ComponentSequence};
 pub use pricing::{PresencePricing, PricingInput};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -21,6 +23,7 @@ pub struct PresenceRow {
     events: usize,
     pairs: Vec<(usize, usize)>,
     mode: Mode,
+    component: Option<component::Class>,
 }
 
 /// Route event incidence. Equality is a sufficient state test for dominance;
@@ -29,6 +32,7 @@ pub struct PresenceRow {
 pub struct PresenceState {
     events: usize,
     words: Vec<u64>,
+    values: Vec<i64>,
 }
 
 /// Optional per-row route incidence carried by extended labeling records.
@@ -44,12 +48,16 @@ impl PresenceRow {
             events,
             pairs,
             mode,
+            component: None,
         })
     }
 
     /// Upper bound over every possible route incidence, independent of graph
     /// reachability. Repeated stored pairs count separately in pair-count mode.
     pub fn maximum_coefficient(&self) -> usize {
+        if self.component.is_some() {
+            return 1;
+        }
         match self.mode {
             Mode::PairCount => self.pairs.len(),
             Mode::AnyPair => usize::from(!self.pairs.is_empty()),
@@ -70,6 +78,10 @@ impl PresenceRow {
         PresenceState {
             events: self.events,
             words: vec![0; self.events / 64 + usize::from(self.events % 64 != 0)],
+            values: self
+                .component
+                .as_ref()
+                .map_or_else(Vec::new, |c| vec![0; c.coordinates]),
         }
     }
 
@@ -83,6 +95,9 @@ impl PresenceRow {
     /// Exact coefficient of the route incidence, including repeated pairs.
     pub fn coefficient(&self, state: &PresenceState) -> Result<usize> {
         self.check(state)?;
+        if let Some(class) = &self.component {
+            return class.coefficient(state);
+        }
         let present = |event: usize| state.words[event / 64] & (1 << (event % 64)) != 0;
         let matching = self
             .pairs
@@ -97,17 +112,32 @@ impl PresenceRow {
     /// Mark one original variable present. Returns the coefficient increment;
     /// emitting an already-present event changes neither state nor cost.
     pub fn visit(&self, state: &mut PresenceState, event: usize) -> Result<usize> {
+        if self.is_component_class() {
+            return Err(invalid("component rows require signed transitions"));
+        }
+        let delta = self.advance(state, event)?;
+        usize::try_from(delta)
+            .map_err(|_| invalid("component coefficient decreased; use pricing transitions"))
+    }
+
+    fn advance(&self, state: &mut PresenceState, event: usize) -> Result<i64> {
         self.check(state)?;
         if event >= self.events {
             return Err(invalid("soft-conflict event outside domain"));
         }
         let bit = 1 << (event % 64);
+        if let Some(class) = &self.component {
+            let before = self.coefficient(state)?;
+            class.advance(state, event)?;
+            return Ok(self.coefficient(state)? as i64 - before as i64);
+        }
         if state.words[event / 64] & bit != 0 {
             return Ok(0);
         }
         let before = self.coefficient(state)?;
         state.words[event / 64] |= bit;
-        Ok(self.coefficient(state)? - before)
+        i64::try_from(self.coefficient(state)? - before)
+            .map_err(|_| invalid("presence coefficient overflow"))
     }
 
     /// Concatenate forward/backward incidence by union, including an overlap
@@ -115,9 +145,13 @@ impl PresenceRow {
     pub fn join(&self, a: &PresenceState, b: &PresenceState) -> Result<PresenceState> {
         self.check(a)?;
         self.check(b)?;
+        if let Some(class) = &self.component {
+            return class.join(a, b);
+        }
         Ok(PresenceState {
             events: self.events,
             words: a.words.iter().zip(&b.words).map(|(a, b)| a | b).collect(),
+            values: vec![],
         })
     }
 
@@ -136,6 +170,10 @@ impl PresenceRow {
             .ok_or_else(|| invalid("soft-conflict join overflow"))
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/cuts/soft_conflicts/component_tests.rs"]
+mod component_tests;
 
 #[cfg(test)]
 #[path = "../../../tests/unit/cuts/soft_conflicts/tests.rs"]

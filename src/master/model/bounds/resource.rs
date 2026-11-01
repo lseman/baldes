@@ -102,6 +102,18 @@ pub(super) fn dag_minimum<const D: usize>(
     work: &mut usize,
     deadline: Instant,
 ) -> Option<Option<f64>> {
+    dag_minimum_filtered(graph, weights, work, deadline, |_| false)
+}
+
+/// Preserve original arc positions for coupled replay while excluding arcs
+/// with a separate whole-domain zero-activity proof.
+pub(super) fn dag_minimum_filtered<const D: usize>(
+    graph: &Graph<D>,
+    weights: &[f64],
+    work: &mut usize,
+    deadline: Instant,
+    mut forbidden: impl FnMut(usize) -> bool,
+) -> Option<Option<f64>> {
     let coupled = graph.coupled_kernel();
     if (graph.resources.is_empty() && coupled.is_none())
         || weights.len() != graph.arcs.len()
@@ -115,7 +127,9 @@ pub(super) fn dag_minimum<const D: usize>(
     }
     let mut outgoing = vec![Vec::new(); graph.vertices.len()];
     for (p, arc) in graph.arcs.iter().enumerate() {
-        outgoing[arc.tail].push(p);
+        if !forbidden(p) {
+            outgoing[arc.tail].push(p);
+        }
     }
     let mut initial = [0.; D];
     for (r, value) in initial.iter_mut().enumerate().take(graph.resources.len()) {

@@ -125,6 +125,7 @@ fn integer_encoding_error<const D: usize>(
             return Ok(f64::INFINITY);
         }
         worst = worst.max(cost.sign().abs() / master.costs[column].abs().max(1.));
+        rows.retain(|row, _| !state.retired_rows.contains(row));
         for (row, a) in master.column_entries(column)? {
             if rows.entry(row).or_default().add(-a).is_none() {
                 return Ok(f64::INFINITY);
@@ -204,7 +205,7 @@ impl<const D: usize> NodeSnapshot<D> {
                     || integer && value.fract() != 0.
                     || value > master.upper[column]
                     || value > 9_007_199_254_740_992.
-                    || metadata.tag < 0
+                    || metadata.tag < 0 && static_variable.is_none()
                 {
                     return Ok(None);
                 }
@@ -339,7 +340,7 @@ impl<const D: usize> NodeSnapshot<D> {
                 let metadata = cg::Column {
                     cost: route.route.original_cost,
                     reduced_cost: 0.,
-                    entries: entries(oracle, &route.route, self.state.shared_offset)?,
+                    entries: retirement::active_entries(&self.state, oracle, &route.route)?,
                     acceptable: true,
                     tag: tag as i32,
                     identity: format!("{}:{}", route.network, route.route.identity()),

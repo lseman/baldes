@@ -35,6 +35,7 @@ Options:
                         resource, clusters, assignment, Ryan–Foster, arc flow)
   --strong-branching    Strong trials on branch candidates (native default: off)
   --no-strong-branching  Skip strong trials (default)
+  --greedy              Initial residual construction with shifted costs (requires --tree)
   --diving              Strong limited-discrepancy diving every 10 nodes (off by default)
   --no-diving           Disable diving (default)
   --local-search FILE   Partial-incumbent diving controls JSON (--tree; depth_limit >= 0 enables)
@@ -87,6 +88,7 @@ struct RoutingOptions {
     branching: String,
     strong_branching: bool,
     diving: bool,
+    greedy: bool,
     local_search: Option<baldes::master::tree::LocalSearchOptions>,
     tree_controls: TreeControls,
     enumerated_mip: bool,
@@ -123,6 +125,7 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
     let mut branching = "default".to_string();
     let mut strong_branching = false;
     let mut diving = false;
+    let mut greedy = false;
     let mut local_search = None;
     let mut tree_controls = TreeControls::default();
     let mut enumerated_mip = false;
@@ -308,6 +311,7 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
             }
             "--strong-branching" => strong_branching = true,
             "--no-strong-branching" => strong_branching = false,
+            "--greedy" => greedy = true,
             "--diving" => diving = true,
             "--no-diving" => diving = false,
             "--local-search" => {
@@ -431,6 +435,7 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
         branching,
         strong_branching,
         diving,
+        greedy,
         local_search,
         tree_controls,
         enumerated_mip,
@@ -463,6 +468,7 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
         branching,
         strong_branching,
         diving,
+        greedy,
         local_search,
         tree_controls,
         enumerated_mip,
@@ -499,6 +505,9 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
     }
     if tree_controls.threads > 1 && !tree {
         return Err("--tree-threads requires --tree".into());
+    }
+    if greedy && !tree {
+        return Err("--greedy requires --tree".into());
     }
     if local_search.is_some() && !tree {
         return Err("--local-search requires --tree".into());
@@ -769,6 +778,7 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
                 ..Default::default()
             }),
             local_search,
+            greedy,
             node_limit,
             time_limit: node.cg.time_limit,
             enumerated_mip: enumerated_mip.then(|| baldes::master::solvers::mip::MipOptions {

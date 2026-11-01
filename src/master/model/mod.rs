@@ -24,6 +24,7 @@ use std::{
 
 mod bounds;
 mod column_pool;
+mod component;
 mod enumeration;
 pub mod format;
 mod gap_enumeration;
@@ -31,6 +32,10 @@ pub mod imported;
 mod lifecycle;
 mod nonlinear;
 mod presence_rows;
+mod retirement;
+pub use component::{
+    ComponentBound, ComponentClassBranching, ComponentCoordinate, ComponentSense, ComponentSequence,
+};
 mod resource_groups;
 mod ryan_foster;
 pub use ryan_foster::{RyanFosterBranching, RyanFosterMember};
@@ -352,12 +357,18 @@ struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     rhs: Vec<f64>,
     deadline: Instant,
     shared_rows: Vec<Row>,
+    /// Physical zero-row slots; original row identities and replay data survive.
+    retired_rows: HashSet<usize>,
     curvature_rows: Vec<cg::CurvatureRow>,
     fixed_routes: Vec<FixedRoute>,
     universe: Option<Vec<usize>>,
     enumeration_report: EnumerationReport,
     preprocessing: PreprocessingReport,
     master_variables: Vec<MasterVariable>,
+    /// Declared P/N/F domains, unaffected by inferred bound tightening.
+    master_variable_signs: Vec<i8>,
+    /// Physical rows representing static bounds rather than shared constraints.
+    master_variable_bound_rows: HashSet<usize>,
     route_upper_bounds: HashMap<usize, f64>,
     /// Automatic cut separation state, inherited by descendants.
     cuts: Option<separation::CutState>,

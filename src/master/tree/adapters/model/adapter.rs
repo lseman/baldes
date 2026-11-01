@@ -284,6 +284,13 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                 restore_ready: false,
             });
         }
+        primal_callbacks::run(&output, options, result, deadline)?;
+        if options.closes(bound, result.incumbent) {
+            if let Some(history) = &mut subtree_history {
+                history.close(lineage);
+            }
+            return Ok(Decision::Continue);
+        }
         if let Some((objective, routes, master_values)) =
             output.snapshot.integer_witness(options.tolerance)?
         {

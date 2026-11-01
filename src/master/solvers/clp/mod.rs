@@ -66,6 +66,7 @@ extern "C" {
     fn Clp_getVectorLengths(m: *mut Model) -> *const i32;
     fn Clp_getIndices(m: *mut Model) -> *const i32;
     fn Clp_getElements(m: *mut Model) -> *const f64;
+    fn Clp_getNumElements(m: *mut Model) -> i32;
 }
 /// Outcome for this LP only; it is not an original routing-domain certificate.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

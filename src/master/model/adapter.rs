@@ -109,6 +109,12 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
         }
         Ok(())
     }
+    fn inactive_rows(&self) -> Vec<usize> {
+        self.0.borrow().retired_rows.iter().copied().collect()
+    }
+    fn unstabilized_rows(&self) -> Vec<usize> {
+        self.inactive_rows()
+    }
     fn protected_rows(&self) -> Vec<usize> {
         separation::protected_rows(&self.0.borrow())
     }
@@ -171,7 +177,7 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
                 .iter()
                 .find(|o| o.network.id == route.network)
                 .ok_or_else(|| invalid("cached route network"))?;
-            column.entries = entries(oracle, &route.route, state.shared_offset)?;
+            column.entries = retirement::active_entries(&state, oracle, &route.route)?;
         }
         Ok(())
     }
@@ -222,7 +228,7 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
                     .iter()
                     .find(|oracle| oracle.network.id == route.network)
                     .ok_or_else(|| invalid("cached route network"))?;
-                column.entries = entries(oracle, &route.route, state.shared_offset)?;
+                column.entries = retirement::active_entries(&state, oracle, &route.route)?;
             }
         }
         Ok(())
@@ -510,7 +516,13 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
         Ok(Some(bound))
     }
     fn prepare_pricing_duals(&self, duals: &mut [f64]) {
-        separation::repair_theta_duals(&self.0.borrow(), duals);
+        let state = self.0.borrow();
+        for &row in &state.retired_rows {
+            if let Some(value) = duals.get_mut(row) {
+                *value = 0.;
+            }
+        }
+        separation::repair_theta_duals(&state, duals);
     }
     fn pricing_subgradient(&self, _rhs: &[f64]) -> Option<Vec<f64>> {
         self.0.borrow().gradient.clone()
@@ -553,7 +565,7 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
         {
             return Ok(None);
         }
-        let entries = entries(oracle, &route.route, state.shared_offset)?;
+        let entries = retirement::active_entries(&state, oracle, &route.route)?;
         let cost = route.route.original_cost;
         let reduced_cost = entries
             .iter()
@@ -612,6 +624,8 @@ impl<const D: usize> Coordinator<D> {
 
 impl<const D: usize> State<D> {
     pub(super) fn price(&mut self, phase: usize, duals: &[f64]) -> Result<cg::Answer> {
+        let projected = retirement::duals(self, duals);
+        let duals = projected.as_slice();
         for &(network, resource, bounds) in &self.preprocessing.paired_owner_bounds {
             if self
                 .oracles
@@ -657,7 +671,7 @@ impl<const D: usize> State<D> {
         self.correction = None;
         self.gradient = None;
         self.scheduler.complete = false;
-        let rhs = self.rhs.clone();
+        let rhs = retirement::physical_rhs(self);
         let context = crate::master::pricing::Context {
             phase,
             duals,
@@ -715,6 +729,8 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
         admission: bool,
     ) -> Result<crate::master::pricing::Request> {
         use crate::master::pricing::{Envelopes, Request};
+        let projected = retirement::duals(self.state, duals);
+        let duals = projected.as_slice();
         let oracle = &mut self.state.oracles[index];
         if self.state.universe.is_some()
             || self.state.gap_pool_cutoff.is_some()
@@ -908,7 +924,8 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
                     .copied()
                     .unwrap_or(oracle.multiplicity_upper())
                     .min(oracle.multiplicity_upper());
-                let coefficients = entries(oracle, &route.route, self.state.shared_offset)?;
+                let mut coefficients = entries(oracle, &route.route, self.state.shared_offset)?;
+                coefficients.retain(|(row, _)| !self.state.retired_rows.contains(row));
                 let reduced = coefficients
                     .iter()
                     .fold(route.route.original_cost, |v, &(r, a)| v - duals[r] * a);
@@ -944,7 +961,8 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
         let mut new_improving_columns = 0;
         let mut best: Option<(f64, Vec<(usize, f64)>, Route)> = None;
         for mut route in routes {
-            let coefficients = entries(oracle, &route, self.state.shared_offset)?;
+            let mut coefficients = entries(oracle, &route, self.state.shared_offset)?;
+            coefficients.retain(|(row, _)| !self.state.retired_rows.contains(row));
             let cost = original_costs::route_cost(oracle, &route)?;
             let reduced_cost = coefficients
                 .iter()
@@ -1202,9 +1220,11 @@ pub(super) fn cache_duals<const D: usize>(
     // preceding gap pass left a complete retained pool.
     let retained = state.oracles[index].solver.enumeration.take();
     let coverage = state.gap_pool_cutoff.take();
+    let universe = state.universe.take();
     let prepared = NetworkAdapter { state, tolerance }.prepare(index, 0, duals, false);
     state.oracles[index].solver.enumeration = retained;
     state.gap_pool_cutoff = coverage;
+    state.universe = universe;
     let request = prepared?;
     let oracle = &mut state.oracles[index];
     oracle

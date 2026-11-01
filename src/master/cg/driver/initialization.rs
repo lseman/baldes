@@ -94,8 +94,13 @@ pub(super) fn initialize<M: LpMaster, C: Controller<M>>(
     };
     out.column_tags.resize(master.costs().len(), -1);
     if artificial_cost > 0. && !is_resume {
+        let inactive: HashSet<_> = controller.inactive_rows().into_iter().collect();
         let rows = 0..master.rhs().len();
-        for (_, column) in append_artificials(master, rows, artificial_cost)? {
+        for (row, column) in append_artificials(master, rows, artificial_cost)? {
+            if inactive.contains(&row) {
+                master.set_upper(column, 0.)?;
+                master.set_coefficient(row, column, 0.)?;
+            }
             out.artificials.push(column);
             loaded.push(None);
             out.column_tags.push(-1);

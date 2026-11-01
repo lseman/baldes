@@ -30,6 +30,8 @@ pub(in crate::master::model) fn cutoff_plan<const D: usize>(
     work: &mut usize,
     deadline: Instant,
 ) -> Option<Vec<NetworkCutoff>> {
+    let projected = retirement::duals(state, duals);
+    let duals = projected.as_slice();
     if !incumbent.is_finite() || state.universe.is_some() || Instant::now() >= deadline {
         return None;
     }

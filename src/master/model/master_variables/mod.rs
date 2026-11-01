@@ -58,6 +58,7 @@ pub(super) fn coefficients<const D: usize>(
     Ok(variable
         .entries
         .iter()
+        .filter(|&&(r, _)| !state.retired_rows.contains(&(state.shared_offset + r)))
         .map(|&(r, a)| (state.shared_offset + r, sign * a))
         .collect())
 }
@@ -233,7 +234,9 @@ impl<const D: usize> NodeSnapshot<D> {
             (RowSense::LessEqual, bounds.upper),
         ] {
             if rhs.is_finite() {
+                let physical = node.master.rhs.len();
                 node = node.with_master_row(Row { sense, rhs }, &[], &[(id, 1.)])?;
+                node.state.master_variable_bound_rows.insert(physical);
             }
         }
         Ok(node)

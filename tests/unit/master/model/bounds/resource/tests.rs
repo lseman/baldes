@@ -404,3 +404,55 @@ fn counted_limit_excludes_an_arc_beyond_a_dyadic_budget() {
     .unwrap();
     assert_eq!(bound, -2.);
 }
+
+#[test]
+fn dag_resource_certificate_excludes_proved_zero_arcs_without_renumbering() {
+    let mut graph = Graph::<2>::new(4, 1).unwrap();
+    for v in 0..4 {
+        graph.set_bounds(v, 0, 0., 2.).unwrap();
+    }
+    for (u, v, cost) in [(0, 1, -1.), (1, 3, 0.), (0, 2, 1.), (2, 3, 0.)] {
+        graph.add_arc(u, v, cost).unwrap();
+    }
+    let weights = [-1., 0., 1., 0.];
+    assert_eq!(
+        dag_minimum(
+            &graph,
+            &weights,
+            &mut 10_000,
+            Instant::now() + Duration::from_secs(1)
+        ),
+        Some(Some(-1.))
+    );
+    assert_eq!(
+        dag_minimum_filtered(
+            &graph,
+            &weights,
+            &mut 10_000,
+            Instant::now() + Duration::from_secs(1),
+            |a| a == 0
+        ),
+        Some(Some(1.))
+    );
+    assert_eq!(
+        dag_minimum_filtered(
+            &graph,
+            &weights,
+            &mut 10_000,
+            Instant::now() + Duration::from_secs(1),
+            |a| a == 0 || a == 2
+        ),
+        Some(None)
+    );
+    // An unfinished proof remains unknown, even when the cheap arc is excluded.
+    assert_eq!(
+        dag_minimum_filtered(
+            &graph,
+            &weights,
+            &mut 0,
+            Instant::now() + Duration::from_secs(1),
+            |a| a == 0
+        ),
+        None
+    );
+}

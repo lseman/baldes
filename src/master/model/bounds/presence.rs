@@ -59,7 +59,10 @@ pub(super) fn minimum<const D: usize>(
     let mut positions = HashMap::new();
     let mut rows = vec![];
     for (i, &(input, dual)) in inputs.iter().enumerate() {
-        if !dual.is_finite() || input.arc_events.len() != graph.arcs.len() {
+        if input.row.is_component_class()
+            || !dual.is_finite()
+            || input.arc_events.len() != graph.arcs.len()
+        {
             return None;
         }
         let mut pairs = vec![];

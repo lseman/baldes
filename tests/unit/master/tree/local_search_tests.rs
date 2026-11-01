@@ -128,12 +128,6 @@ fn local_search_fixed_static_contributions_leave_the_remaining_domain_open() {
         .unwrap();
     assert_eq!(additional.master_values, vec![(100, 4.)]);
     assert_eq!(root.snapshot.state.master_variables[0].bounds.lower, 0.);
-    let mut signed = root.snapshot.fork().unwrap();
-    signed.state.master_variables[0].bounds = crate::master::preprocessing::Bounds {
-        lower: -10.,
-        upper: 10.,
-    };
-    assert!(fix_entry(&signed, &IncumbentEntry::Master(0, 3.)).is_err());
 }
 
 #[test]
@@ -282,4 +276,127 @@ fn each_initial_and_partial_child_consumes_one_node_from_its_own_dive_budget() {
     assert_eq!(result.incumbent.unwrap().0, 2.);
     assert_eq!(root.snapshot.master.objective(), 2.);
     assert!(root.snapshot.state.fixed_routes.is_empty());
+}
+
+#[test]
+fn local_search_signed_residual_translation_preserves_opposite_sign_values_and_parent() {
+    for (cost, selected, optimum) in [(1., 3., -9.), (-1., -3., 10.)] {
+        let mut problem = triangle();
+        let row = problem.rows.len();
+        problem.rows.push(crate::master::formulation::Row {
+            sense: RowSense::Equal,
+            rhs: 1.,
+        });
+        let variable = MasterVariable {
+            id: 100,
+            cost,
+            bounds: crate::master::preprocessing::Bounds {
+                lower: -10.,
+                upper: 10.,
+            },
+            integer: true,
+            entries: vec![(row, 1.)],
+        };
+        let root = super::super::super::solve_with_master_variables(
+            problem,
+            vec![
+                variable.clone(),
+                MasterVariable {
+                    id: 101,
+                    cost: 0.,
+                    ..variable
+                },
+            ],
+            node_options(),
+        )
+        .unwrap();
+        let before = root.snapshot.master.objective();
+        let bounds = root.snapshot.state.master_variables[0].bounds;
+        let child = fix_entry(&root.snapshot, &IncumbentEntry::Master(0, selected)).unwrap();
+        let solved = child.solve(node_options()).unwrap();
+        assert_eq!(
+            solved.master_values,
+            vec![(100, optimum), (101, 1. - optimum)]
+        );
+        assert!((solved.master.lp - root.master.lp).abs() < 1e-8);
+        assert_eq!(root.snapshot.master.objective(), before);
+        assert_eq!(
+            root.snapshot.state.master_variables[0].bounds.lower,
+            bounds.lower
+        );
+        assert_eq!(
+            root.snapshot.state.master_variables[0].bounds.upper,
+            bounds.upper
+        );
+    }
+}
+
+#[test]
+fn local_search_custom_selection_criteria_reach_isolated_child_dives() {
+    let root = super::super::super::solve(triangle(), node_options()).unwrap();
+    let tree = ModelTreeOptions {
+        node: node_options(),
+        ..Default::default()
+    };
+    let mut config = LocalSearchOptions {
+        depth_limit: 0,
+        max_iterations: 0,
+        ..Default::default()
+    };
+    config.dive.column_selection_criteria = vec![2, 9];
+    let result = run(
+        &root,
+        &tree,
+        &config,
+        None,
+        &mut GnuRand::new(1),
+        Instant::now() + Duration::from_secs(10),
+    )
+    .unwrap();
+    assert_eq!(result.incumbent.as_ref().map(|w| w.0), Some(2.));
+    assert!(result.nodes >= 2);
+    assert!(root.snapshot.state.fixed_routes.is_empty());
+    assert!((root.master.lp - 1.5).abs() < 1e-8);
+    let json = serde_json::to_string(&config).unwrap();
+    let restored: LocalSearchOptions = serde_json::from_str(&json).unwrap();
+    assert_eq!(restored.dive.column_selection_criteria, vec![2, 9]);
+}
+
+#[test]
+fn enabled_local_search_accepts_signed_master_domains_without_a_false_directional_fix() {
+    let root = super::super::super::solve_with_master_variables(
+        triangle(),
+        vec![MasterVariable {
+            id: 100,
+            cost: 1.,
+            integer: true,
+            entries: vec![],
+            bounds: crate::master::preprocessing::Bounds {
+                lower: -10.,
+                upper: 10.,
+            },
+        }],
+        node_options(),
+    )
+    .unwrap();
+    let result = run(
+        &root,
+        &ModelTreeOptions {
+            node: node_options(),
+            ..Default::default()
+        },
+        &LocalSearchOptions {
+            depth_limit: 0,
+            fixed_column_ratio: 0.5,
+            ..Default::default()
+        },
+        None,
+        &mut GnuRand::new(1),
+        Instant::now() + Duration::from_secs(10),
+    )
+    .unwrap();
+    let witness = result.incumbent.unwrap();
+    assert_eq!(witness.0, -8.);
+    assert_eq!(witness.2, vec![(100, -10.)]);
+    assert_eq!(root.master_values, vec![(100, -10.)]);
 }

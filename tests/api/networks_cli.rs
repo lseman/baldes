@@ -961,11 +961,11 @@ fn mapped_phase_continuation_separates_native_screens_from_processed_exact_nodes
             .iter()
             .map(|entry| entry[1].as_u64().unwrap())
             .sum();
-        // This fixture deliberately puts each whole assignment on incoming
-        // arcs. Nonnegative box admission leaves only two physical entries;
-        // native accounting36 is not a count of actual solver invocations.
-        // The incident-arc paired control has its own integration regression.
-        assert_eq!(calls, 2);
+        // This unpaired fixture puts each whole assignment on incoming arcs.
+        // Redundant-row retirement changes its dual basis, leaving negative
+        // prices on proved-zero arcs that conservatively enter physical pricing.
+        // The pinned half-incident native control is tested separately.
+        assert_eq!(calls, 9);
     }
 }
 

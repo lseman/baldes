@@ -49,7 +49,8 @@ def test_local_search_partial_incumbent_dives_reach_the_public_network_tree():
     assert disabled.diving_nodes == 0
     active = triangle().solve(
         tree=True, stabilize=False, node_limit=1,
-        local_search={"depth_limit": 0, "fixed_column_ratio": 0.5, "max_iterations": 2},
+        local_search={"depth_limit": 0, "fixed_column_ratio": 0.5, "max_iterations": 2,
+                      "dive": {"column_selection_criteria": [2, 9]}},
     )
     assert active.diving_nodes > 0
     assert active.incumbent == pytest.approx(2.0)
@@ -593,7 +594,10 @@ def test_native_multiphase_screens_are_distinct_from_processed_exact_trials(mode
     assert result.tree_processed_nodes == 3
     assert result.strong_branching_trials == 6
     assert result.iterations == 18
-    assert sum(calls for _, calls in result.oracle_calls) == 2
+    # Whole-incoming mapping: retirement shifts dual prices onto proved-zero
+    # arcs, so conservative all-arc admission makes nine physical calls.
+    # The separately pinned native control uses half-incident coefficients.
+    assert sum(calls for _, calls in result.oracle_calls) == 9
 
 
 @pytest.mark.parametrize("mode", ["numerical", "certified"])
@@ -1119,3 +1123,13 @@ def test_paired_front_program_and_fractional_waiting_rates_round_trip():
                              paired_machine_waiting_rates=((0, (1.5,)),))
     restored = NetworkProblem.from_json(NetworkProblem((), network).to_json())
     assert restored.networks[0].paired_machine_waiting_rates == ((0, (1.5,)),)
+
+
+def test_greedy_initial_construction_reaches_network_options_and_reports_work():
+    result = triangle().solve(tree=True, stabilize=False, greedy=True)
+    assert result.greedy_nodes > 0
+    assert result.incumbent == pytest.approx(2.0)
+    assert result.bound <= result.incumbent
+    assert json.loads(result.to_json())["greedy_nodes"] == result.greedy_nodes
+    with pytest.raises(ValueError, match="greedy requires tree"):
+        triangle().solve(greedy=True)

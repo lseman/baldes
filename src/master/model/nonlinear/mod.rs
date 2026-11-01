@@ -252,7 +252,11 @@ pub(super) fn refresh_row<const D: usize>(
             if metadata.tag < 0 {
                 continue;
             }
-            let coefficient = value(&node.state.routes[metadata.tag as usize])?;
+            let coefficient = if node.state.retired_rows.contains(&physical) {
+                0.
+            } else {
+                value(&node.state.routes[metadata.tag as usize])?
+            };
             if coefficient != 0. || metadata.entries.iter().any(|&(row, _)| row == physical) {
                 node.master.set_coefficient(physical, column, coefficient)?;
             }
@@ -266,13 +270,18 @@ pub(super) fn refresh_row<const D: usize>(
         if metadata.tag < 0 {
             continue;
         }
-        let coefficient = value(&node.state.routes[metadata.tag as usize])?;
+        let coefficient = if node.state.retired_rows.contains(&physical) {
+            0.
+        } else {
+            value(&node.state.routes[metadata.tag as usize])?
+        };
         metadata.entries.retain(|&(row, _)| row != physical);
         if coefficient != 0. {
             metadata.entries.push((physical, coefficient));
         }
     }
     node.state.rhs[physical] = rhs;
-    node.master.set_rhs(&node.state.rhs)?;
+    node.master
+        .set_rhs(&retirement::physical_rhs(&node.state))?;
     Ok(node)
 }

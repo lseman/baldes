@@ -81,13 +81,27 @@ pub(super) fn solve_with_fixed_routes<const D: usize>(
 }
 
 pub(super) fn solve_with_seed_routes<const D: usize>(
+    problem: Problem<D>,
+    variables: Vec<MasterVariable>,
+    options: Options,
+    fixed: &[FixedRoute],
+    nonlinear: &[(usize, nonlinear::RowKernels)],
+    seeds: &[NetworkRoute],
+) -> Result<Output<D>> {
+    let (master, state, options) =
+        prepare_with_seed_routes(problem, variables, options, fixed, nonlinear, seeds)?;
+    run(master, state, options)
+}
+
+/// Prepare an owned original model without running column generation.
+pub(super) fn prepare_with_seed_routes<const D: usize>(
     mut problem: Problem<D>,
     mut variables: Vec<MasterVariable>,
     mut options: Options,
     fixed: &[FixedRoute],
     nonlinear: &[(usize, nonlinear::RowKernels)],
     seeds: &[NetworkRoute],
-) -> Result<Output<D>> {
+) -> Result<(ClpMaster, State<D>, Options)> {
     problem.validate()?;
     let synchronized_services = synchronization::prepare(
         &mut problem,
@@ -97,7 +111,9 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
     if options.separation.route_recourse.is_some() {
         variables.extend(separation::theta_variables(&problem)?);
     }
+    let first_static_bound_row = problem.rows.len();
     master_variables::install(&mut problem, &mut variables)?;
+    let static_bound_rows = first_static_bound_row..problem.rows.len();
     if options.cg.warm_start.is_some() || !options.cg.known.is_empty() {
         return Err(invalid("shared root requires a fresh column registry"));
     }
@@ -185,7 +201,7 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
         box_pricing_admission: false,
         variable_boxes: HashMap::new(),
         grouped_variable_boxes: HashMap::new(),
-        original_variable_costs: Arc::new(vec![]),
+        original_variable_costs: options.original_variable_costs.clone(),
         pricing_master: None,
         pricing_gap: (options.cg.gap_absolute, options.cg.gap_relative),
         previous_fixing_gap: 1e12,
@@ -229,6 +245,7 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
             .collect(),
         deadline,
         shared_rows,
+        retired_rows: HashSet::new(),
         fixed_routes: vec![],
         // With no pricing subproblems every original variable is already
         // loaded. Completeness requires no synthetic graph or enumeration.
@@ -238,6 +255,19 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
             ..Default::default()
         },
         preprocessing: PreprocessingReport::default(),
+        master_variable_signs: variables
+            .iter()
+            .map(|v| {
+                if v.bounds.lower >= 0. {
+                    1
+                } else if v.bounds.upper <= 0. {
+                    -1
+                } else {
+                    0
+                }
+            })
+            .collect(),
+        master_variable_bound_rows: static_bound_rows.map(|r| shared_offset + r).collect(),
         master_variables: variables,
         route_upper_bounds: HashMap::new(),
         cuts: None,
@@ -255,7 +285,7 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
         &mut options.cg.known,
         &caller_seeds,
     )?;
-    run(master, state, options)
+    Ok((master, state, options))
 }
 
 pub(super) fn run<const D: usize>(
@@ -433,6 +463,14 @@ pub(super) fn run<const D: usize>(
         &mut options.cg.known,
         options.cg.warm_start.as_mut(),
     )?;
+    if options.preprocessing.enabled {
+        retirement::apply(
+            &mut master,
+            &mut state,
+            &mut options.cg,
+            options.preprocessing.work_limit,
+        )?;
+    }
     if !auto_search {
         let (output, _) = execute_node_cg(master, state, options, None, false)?;
         return Ok(output);
@@ -820,7 +858,7 @@ fn execute_node_cg<const D: usize>(
             duals: if preprocessing_proof {
                 vec![0.; master.rhs.len()]
             } else {
-                master.duals()
+                retirement::duals(&state, &master.duals())
             },
             oracle_calls: state
                 .oracles

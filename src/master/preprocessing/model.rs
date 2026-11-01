@@ -37,6 +37,8 @@ pub struct PreprocessingReport {
     pub tightened_columns: usize,
     pub fixed_columns: usize,
     pub forbidden_arcs: usize,
+    /// Stable physical row slots retired by whole-domain activity proofs.
+    pub retired_rows: Vec<usize>,
     pub skipped: Option<String>,
     pub networks: Vec<NetworkActivityBounds>,
     pub master_bounds: Vec<(i32, Bounds)>,
@@ -122,6 +124,9 @@ pub(super) fn apply<const D: usize>(
                 f64::INFINITY
             };
             for &(r, a) in &variable.entries {
+                if state.retired_rows.contains(&(state.shared_offset + r)) {
+                    continue;
+                }
                 rows[state.shared_offset + r]
                     .entries
                     .push((column, sign * a));
@@ -176,6 +181,9 @@ pub(super) fn apply<const D: usize>(
             return Ok(());
         }
         for (row, value) in coefficients {
+            if state.retired_rows.contains(&row) {
+                continue;
+            }
             rows[row].entries.push((column, value));
         }
     }
@@ -265,6 +273,17 @@ impl<const D: usize> NodeSnapshot<D> {
             &mut vec![],
             Some(&mut node.warm),
         )?;
+        let mut cg = cg::Options::default();
+        cg.warm_start = Some(node.warm);
+        if options.enabled {
+            super::retirement::apply(
+                &mut node.master,
+                &mut node.state,
+                &mut cg,
+                options.work_limit,
+            )?;
+        }
+        node.warm = cg.warm_start.take().unwrap();
         Ok(node)
     }
 }

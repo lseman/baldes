@@ -117,9 +117,10 @@ impl PresencePricing {
         // Validate the state and arc before sharing. Repeated events are also
         // no-ops: a zero coefficient delta alone would not imply equal state.
         if self.rows.iter().zip(states).all(|(input, state)| {
-            input.arc_events[arc]
-                .iter()
-                .all(|&event| state.words[event / 64] & (1 << (event % 64)) != 0)
+            !input.row.is_component_class()
+                && input.arc_events[arc]
+                    .iter()
+                    .all(|&event| state.words[event / 64] & (1 << (event % 64)) != 0)
         }) {
             return Ok((state.clone(), 0.));
         }
@@ -128,11 +129,9 @@ impl PresencePricing {
         for (input, state) in self.rows.iter().zip(&mut next) {
             let before = input.row.coefficient(state)?;
             for &event in &input.arc_events[arc] {
-                input.row.visit(state, event)?;
+                input.row.advance(state, event)?;
             }
-            let delta = input.row.coefficient(state)? - before;
-            let delta =
-                i64::try_from(delta).map_err(|_| invalid("soft-conflict coefficient overflow"))?;
+            let delta = input.row.coefficient(state)? as i64 - before as i64;
             cost += Self::cost(input.dual, delta)?;
             if !cost.is_finite() {
                 return Err(invalid("soft-conflict pricing cost overflow"));
@@ -186,7 +185,7 @@ impl PresencePricing {
             }
             for (input, state) in self.rows.iter().zip(&mut states) {
                 for &event in &input.arc_events[arc] {
-                    input.row.visit(state, event)?;
+                    input.row.advance(state, event)?;
                 }
             }
         }

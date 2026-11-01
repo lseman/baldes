@@ -387,6 +387,7 @@ class NetworkResult:
     cut_rounds: int = 0
     lp_before_cuts: Optional[float] = None
     diving_nodes: int = 0
+    greedy_nodes: int = 0
     feasibility: Tuple[Mapping[str, Any], ...] = ()
     snapshot: Optional[NetworkNode] = field(default=None, repr=False, compare=False)
 

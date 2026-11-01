@@ -138,14 +138,16 @@ fn fix_entry<const D: usize>(
             let mut bounds = variable.bounds;
             // Residual fixing preserves additional contribution in the
             // variable's sign direction; it does not impose an equality.
-            if bounds.lower >= 0. {
+            if node.state.master_variable_signs[*index] > 0 {
                 bounds.lower = bounds.lower.max(*value);
-            } else if bounds.upper <= 0. {
+            } else if node.state.master_variable_signs[*index] < 0 {
                 bounds.upper = bounds.upper.min(*value);
-            } else if *value != 0. {
-                return Err(invalid(
-                    "local search does not support partial fixing of free signed master variables",
-                ));
+            } else {
+                // Native signed residuals have bounds [l-q,u-q], RHS b-a*q
+                // and objective offset c*q, without a sign clamp. In our
+                // original coordinates x=q+y this is exactly the same domain,
+                // rows and objective; retain it on an independent child.
+                return node.fork();
             }
             node.with_master_variable_bounds(variable.id, bounds)
         }
@@ -221,6 +223,8 @@ fn child_dive<const D: usize>(
     options: &ModelTreeOptions,
     config: &DivingOptions,
     incumbent: f64,
+    guidance: Option<&IntegerWitness>,
+    residuals: &HashMap<usize, f64>,
     deadline: Instant,
 ) -> Result<diving::Dive> {
     if config.node_limit == 0 || config.time_limit == 0. || Instant::now() >= deadline {
@@ -266,7 +270,9 @@ fn child_dive<const D: usize>(
     let mut remaining = config.clone();
     remaining.node_limit -= 1;
     let cutoff = total.incumbent.as_ref().map_or(incumbent, |w| w.0);
-    let next = diving::run(&solved, options, &remaining, cutoff, end)?;
+    let guide = total.incumbent.as_ref().or(guidance);
+    let next =
+        diving::run_with_residuals(&solved, options, &remaining, cutoff, end, guide, residuals)?;
     let mut best = total.incumbent.clone();
     merge(&mut total, next, &mut best);
     Ok(total)
@@ -287,17 +293,6 @@ pub(super) fn run<const D: usize>(
     if Instant::now() >= deadline || config.dive.node_limit == 0 || config.dive.time_limit == 0. {
         return Ok(total);
     }
-    if root
-        .snapshot
-        .state
-        .master_variables
-        .iter()
-        .any(|v| v.bounds.lower < 0. && v.bounds.upper > 0.)
-    {
-        return Err(invalid(
-            "local search does not support partial fixing of free signed master variables",
-        ));
-    }
     let mut initial = config.dive.clone();
     initial.lds_depth = 10_000;
     initial.max_discrepancy = 1;
@@ -307,6 +302,8 @@ pub(super) fn run<const D: usize>(
         options,
         &initial,
         best.as_ref().map_or(f64::INFINITY, |w| w.0),
+        best.as_ref(),
+        &HashMap::new(),
         deadline,
     )?;
     merge(&mut total, first, &mut best);
@@ -323,9 +320,15 @@ pub(super) fn run<const D: usize>(
         };
         let mut node = root.snapshot.fork()?;
         let mut valid = true;
+        let mut residuals = HashMap::new();
         for index in selected {
             match fix_entry(&node, &entries[index]) {
-                Ok(child) => node = child,
+                Ok(child) => {
+                    node = child;
+                    if let IncumbentEntry::Master(index, value) = &entries[index] {
+                        residuals.insert(*index, *value);
+                    }
+                }
                 Err(_) => {
                     valid = false;
                     break;
@@ -339,7 +342,15 @@ pub(super) fn run<const D: usize>(
         partial.lds_depth = 0;
         partial.max_discrepancy = 0;
         partial.stop_after_first_solution = false;
-        let next = child_dive(&node, options, &partial, witness.0, deadline)?;
+        let next = child_dive(
+            &node,
+            options,
+            &partial,
+            witness.0,
+            Some(witness),
+            &residuals,
+            deadline,
+        )?;
         merge(&mut total, next, &mut best);
     }
     Ok(total)

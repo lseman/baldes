@@ -4,11 +4,16 @@ use super::*;
 mod adapter;
 mod branching;
 mod diving;
+mod greedy;
 mod integer_objective;
 mod local_search;
 mod parallel;
+mod primal_callbacks;
 pub use diving::DivingOptions;
 pub use local_search::LocalSearchOptions;
+pub use primal_callbacks::{
+    PrimalHeuristic, PrimalHeuristicInput, PrimalHeuristicSolution, PrimalHeuristicSource,
+};
 pub(super) mod proposals;
 mod time_windows;
 use crate::master::{tree::TreeStatus, LpMaster};
@@ -127,6 +132,8 @@ pub struct ModelTreeOptions {
     pub branch_directions: BTreeMap<String, NetworkBranchDirection>,
     /// Explicit original integer variables spanning networks and static masters.
     pub mapped_variables: Vec<MappedBranchVariable>,
+    /// Explicit whole-column classes; automatic native class-tree generation is separate.
+    pub component_classes: Vec<ComponentClassBranching>,
     pub packing: Option<PackingBranching>,
     /// Cluster boundary and pair generators, each on one network's arcs.
     pub clusters: Vec<NetworkClusterBranching>,
@@ -134,6 +141,10 @@ pub struct ModelTreeOptions {
     pub ryan_foster: Option<RyanFosterBranching>,
     /// Diving primal heuristic; disabled by default, as in the native solver.
     pub diving: Option<DivingOptions>,
+    /// Construct an initial residual solution by shifted-cost network pricing.
+    pub greedy: bool,
+    /// Application-defined primal candidates, replayed before acceptance.
+    pub primal_heuristics: Vec<PrimalHeuristic>,
     /// Random incumbent partial-column fixing and child diving; disabled by default.
     pub local_search: Option<LocalSearchOptions>,
     /// Restricted-master integer heuristic; disabled by default, as in native.
@@ -233,10 +244,13 @@ impl Default for ModelTreeOptions {
             branch_priorities: NetworkBranchPriorities::default(),
             branch_directions: BTreeMap::new(),
             mapped_variables: vec![],
+            component_classes: vec![],
             packing: None,
             clusters: vec![],
             ryan_foster: None,
             diving: None,
+            greedy: false,
+            primal_heuristics: vec![],
             local_search: None,
             restricted_master_mip: None,
             absolute_gap: 1e-6,
@@ -282,6 +296,7 @@ pub struct ModelTreeOutput {
     pub enumeration_reports: Vec<EnumerationReport>,
     /// Column-generation solves inside diving heuristics (not tree nodes).
     pub diving_nodes: usize,
+    pub greedy_nodes: usize,
     /// Restricted-master integer heuristic solves.
     pub restricted_mip_calls: usize,
 }
@@ -536,7 +551,38 @@ fn solve<const D: usize>(start: Start<D>, options: ModelTreeOptions) -> Result<M
     {
         let mut options = options;
         problem.validate()?;
+        let component_positions: HashMap<_, HashMap<_, _>> = problem
+            .networks
+            .iter()
+            .map(|n| {
+                (
+                    n.id,
+                    n.graph
+                        .arcs
+                        .iter()
+                        .enumerate()
+                        .map(|(i, a)| (a.id, i))
+                        .collect(),
+                )
+            })
+            .collect();
         let windows = time_windows::split(&mut problem, resource)?;
+        for class in &mut options.component_classes {
+            if let Some(w) = windows.iter().find(|w| w.network == class.network) {
+                let positions = &component_positions[&class.network];
+                for coordinate in &mut class.coordinates {
+                    if coordinate.arc_values.len() != positions.len() {
+                        return Err(invalid("component coordinate mapping"));
+                    }
+                    let original = coordinate.arc_values.clone();
+                    for copy in w.split.arcs.iter().filter(|a| a.arc != a.original) {
+                        coordinate
+                            .arc_values
+                            .push(original[positions[&copy.original]]);
+                    }
+                }
+            }
+        }
         for variable in &mut options.mapped_variables {
             for contribution in &mut variable.networks {
                 if let Some(w) = windows.iter().find(|w| w.network == contribution.network) {
@@ -590,6 +636,13 @@ fn solve_split<const D: usize>(
     validate_options(&options.node)?;
     options.node.integer_primal_termination = true;
     options.branch_priorities.validate()?;
+    if options
+        .primal_heuristics
+        .iter()
+        .any(|h| h.name.trim().is_empty())
+    {
+        return Err(invalid("primal heuristic name must be nonempty"));
+    }
     if options
         .branch_directions
         .keys()
@@ -731,6 +784,27 @@ fn solve_split<const D: usize>(
             &node.state.master_variables,
         )?,
     }
+    let mut class_names = HashSet::new();
+    for class in &options.component_classes {
+        if !class_names.insert(&class.name) {
+            return Err(invalid("duplicate component class name"));
+        }
+        let graph = match &start {
+            Start::Fresh(problem, _) => problem
+                .networks
+                .iter()
+                .find(|n| n.id == class.network)
+                .map(|n| &n.graph),
+            Start::Snapshot(node) => node
+                .state
+                .oracles
+                .iter()
+                .find(|o| o.network.id == class.network)
+                .map(|o| o.network.graph.as_ref()),
+        }
+        .ok_or_else(|| invalid("component class network"))?;
+        class.for_graph(graph)?;
+    }
     let networks: Vec<_> = match &start {
         Start::Fresh(problem, variables) => {
             problem.validate()?;
@@ -785,6 +859,7 @@ fn solve_split<const D: usize>(
         enumerated_mip_failures: 0,
         enumeration_reports: vec![],
         diving_nodes: 0,
+        greedy_nodes: 0,
         restricted_mip_calls: 0,
     };
     if let Some((cost, routes)) = &options.initial_solution {
@@ -844,17 +919,46 @@ fn solve_split<const D: usize>(
         node.cg.time_limit = node.cg.time_limit.min(remaining);
         node
     };
+    let initial_routes = result.routes.clone();
     let configured = node_options(deadline.saturating_duration_since(Instant::now()));
     let root = match start {
         Start::Fresh(problem, variables) => {
-            solve_with_master_variables(problem, variables, configured)?
+            if options.greedy {
+                let (master, state, configured) =
+                    solve::prepare_with_seed_routes(problem, variables, configured, &[], &[], &[])?;
+                greedy::run(
+                    &master,
+                    &state,
+                    &configured,
+                    None,
+                    &options,
+                    &mut result,
+                    deadline,
+                )?;
+                solve::run(master, state, configured)?
+            } else {
+                solve_with_master_variables(problem, variables, configured)?
+            }
         }
         Start::Snapshot(mut node) => {
             node.state.mapped_lineage = 0;
+            if options.greedy {
+                let mut prepared = configured.clone();
+                prepared.cg.known = node.warm.columns.iter().filter_map(Clone::clone).collect();
+                greedy::run(
+                    &node.master,
+                    &node.state,
+                    &prepared,
+                    Some(&node.warm),
+                    &options,
+                    &mut result,
+                    deadline,
+                )?;
+            }
             node.solve(configured)?
         }
     };
-    if options.initial_solution.is_some() {
+    if let Some((supplied_cost, _)) = &options.initial_solution {
         let mut zero_master: Vec<_> = root
             .snapshot
             .state
@@ -862,18 +966,20 @@ fn solve_split<const D: usize>(
             .iter()
             .map(|variable| (variable.id, 0.))
             .collect();
-        let validated = validate_routes(&root.snapshot.state, &result.routes, &mut zero_master)?
+        let validated = validate_routes(&root.snapshot.state, &initial_routes, &mut zero_master)?
             .ok_or_else(|| {
-                invalid("initial tree solution is not feasible in the original model")
-            })?;
-        if validated > result.incumbent + 1e-6 + 1e-10 * validated.abs().max(result.incumbent.abs())
-        {
+            invalid("initial tree solution is not feasible in the original model")
+        })?;
+        if validated > supplied_cost + 1e-6 + 1e-10 * validated.abs().max(supplied_cost.abs()) {
             return Err(invalid(
                 "initial tree solution objective understates its replayed cost",
             ));
         }
-        result.incumbent = validated;
-        result.master_values = zero_master;
+        if validated <= result.incumbent {
+            result.incumbent = validated;
+            result.routes = initial_routes;
+            result.master_values = zero_master;
+        }
     }
     let base_depth = root.snapshot.state.node_depth;
     let mut subtree_history = options

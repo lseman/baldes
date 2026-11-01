@@ -137,7 +137,7 @@ impl Pool {
             {
                 continue;
             }
-            let coefficients = entries(oracle, &route, node.state.shared_offset)?;
+            let coefficients = retirement::active_entries(&node.state, oracle, &route)?;
             let cost = original_costs::route_cost(oracle, &route)?;
             if !cost.is_finite() {
                 return Err(invalid("inactive shared route cost overflow"));
