@@ -13,12 +13,42 @@ use crate::cuts::capacity::{CapacityKind, CapacitySeparator};
 use crate::cuts::knapsack::{KnapsackColumn, KnapsackKind, ResourceKnapsackSeparator};
 use crate::cuts::kpath::{GeneralKPathSeparator, KPathSeparator};
 use crate::cuts::FractionalColumn;
+use crate::cuts::MemoryKind;
 use crate::master::LpMaster;
 mod options;
 pub(crate) use options::KPathSeparation;
 pub use options::{
     CapacityCutConfig, CutOptions, GeneralKPathCutConfig, KPathCutConfig, KnapsackCutConfig,
 };
+
+/// An installed row's selected memory, shared cheaply by node checkpoints.
+/// Compare borrowed registry memory before taking a new owned snapshot.
+#[derive(Clone, Debug)]
+enum CutMemory {
+    Vertex(Arc<Vec<bool>>),
+    Arc(Arc<std::collections::BTreeSet<i32>>),
+}
+impl CutMemory {
+    fn capture(cut: &crate::cuts::RankOneCut, graph: i32) -> Self {
+        match cut.memory_kind {
+            MemoryKind::Vertex => Self::Vertex(Arc::new(cut.memory_for_graph(graph))),
+            MemoryKind::Arc => Self::Arc(Arc::new(cut.arc_memory_for_graph(graph))),
+        }
+    }
+    fn matches(&self, cut: &crate::cuts::RankOneCut, graph: i32) -> bool {
+        match (self, cut.memory_kind) {
+            (Self::Vertex(before), MemoryKind::Vertex) => match cut.memory_for_graph_ref(graph) {
+                Some(memory) => before.as_slice() == memory,
+                None => before.len() == cut.weights.len() && before.iter().all(|&v| !v),
+            },
+            (Self::Arc(before), MemoryKind::Arc) => match cut.arc_memory_for_graph_ref(graph) {
+                Some(memory) => before.as_ref() == memory,
+                None => before.is_empty(),
+            },
+            _ => false,
+        }
+    }
+}
 
 const CAPACITY_PRIORITY: f64 = 3.;
 const RANK_ONE_PRIORITY: f64 = 1.;
@@ -148,7 +178,7 @@ pub(super) struct CutState {
     /// Registry cut index and shared row of separated rank-one/k-path cuts.
     rows: Vec<(usize, usize)>,
     /// Cut memory when the coefficients of `rows` were last written.
-    memories: Vec<Vec<Vec<bool>>>,
+    memories: Vec<Vec<CutMemory>>,
     pub lp_before_cuts: f64,
     separation_lp: f64,
     rounds: usize,
@@ -1038,16 +1068,13 @@ impl<const D: usize> Round<'_, D> {
         index: usize,
         network: i32,
         path: &[(usize, usize, i32)],
+        enumerated: bool,
     ) -> Result<f64> {
         let oracle = self.oracle_of(network)?;
         Ok(oracle
             .solver
             .cuts
-            .route_coefficient(&oracle.solver.graph, index, path, {
-                let mut arcs: Vec<_> = path.iter().map(|arc| arc.2).collect();
-                arcs.sort_unstable();
-                oracle.enumerated.contains(&arcs)
-            })? as f64)
+            .route_coefficient(&oracle.solver.graph, index, path, enumerated)? as f64)
     }
 
     /// Queue rows for registry cuts `before..` and refresh changed memories
@@ -1064,17 +1091,20 @@ impl<const D: usize> Round<'_, D> {
         kpath: bool,
     ) -> Result<bool> {
         let after = self.state.oracles[0].solver.cuts.cuts.len();
-        let added: Vec<_> = self.state.oracles[0].solver.cuts.cuts[before..after].to_vec();
-        for oracle in self.state.oracles.iter_mut().skip(1) {
-            let registry = &mut oracle.solver.cuts;
-            // Cuts registered per network (strong k-path) are already there.
-            if registry.cuts.len() == before {
-                registry.cuts.extend(added.iter().cloned());
-            } else if registry.cuts.len() != after {
-                return Err(invalid("network cut registries are out of step"));
+        if self.state.oracles.len() > 1 {
+            let added: Vec<_> = self.state.oracles[0].solver.cuts.cuts[before..after].to_vec();
+            for oracle in self.state.oracles.iter_mut().skip(1) {
+                let registry = &mut oracle.solver.cuts;
+                // Cuts registered per network (strong k-path) are already there.
+                if registry.cuts.len() == before {
+                    registry.cuts.extend(added.iter().cloned());
+                } else if registry.cuts.len() != after {
+                    return Err(invalid("network cut registries are out of step"));
+                }
             }
         }
-        // Resolve arc IDs once per route, rather than once per cut and route.
+        // Resolve arc IDs and enumeration membership once per route, not once
+        // per cut and route. Membership does not change while rows are installed.
         let paths = self
             .tagged
             .iter()
@@ -1083,6 +1113,7 @@ impl<const D: usize> Round<'_, D> {
                 Ok((
                     route.network,
                     physical(self.oracle_of(route.network)?, &route.route)?,
+                    self.oracle_of(route.network)?.is_enumerated(&route.route),
                 ))
             })
             .collect::<Result<Vec<_>>>()?;
@@ -1095,21 +1126,22 @@ impl<const D: usize> Round<'_, D> {
                 Ok((
                     route.network,
                     physical(self.oracle_of(route.network)?, &route.route)?,
+                    self.oracle_of(route.network)?.is_enumerated(&route.route),
                     fixed.quantity,
                 ))
             })
             .collect::<Result<Vec<_>>>()?;
         for index in before..after {
             let mut entries = vec![];
-            for (&(column, _), (network, path)) in self.tagged.iter().zip(&paths) {
-                let c = self.network_coefficient(index, *network, path)?;
+            for (&(column, _), (network, path, enumerated)) in self.tagged.iter().zip(&paths) {
+                let c = self.network_coefficient(index, *network, path, *enumerated)?;
                 if c != 0. {
                     entries.push((column, c));
                 }
             }
             let mut fixed = 0.;
-            for (network, path, quantity) in &fixed_paths {
-                fixed += self.network_coefficient(index, *network, path)? * quantity;
+            for (network, path, enumerated, quantity) in &fixed_paths {
+                fixed += self.network_coefficient(index, *network, path, *enumerated)? * quantity;
             }
             if !fixed.is_finite() {
                 return Err(invalid("fixed-route contribution overflow"));
@@ -1122,8 +1154,10 @@ impl<const D: usize> Round<'_, D> {
                 .oracles
                 .iter()
                 .map(|oracle| {
-                    oracle.solver.cuts.cuts[index]
-                        .memory_for_graph(oracle.solver.graph.graph_id.max(0))
+                    CutMemory::capture(
+                        &oracle.solver.cuts.cuts[index],
+                        oracle.solver.graph.graph_id.max(0),
+                    )
                 })
                 .collect();
             for oracle in &mut self.state.oracles {
@@ -1141,23 +1175,35 @@ impl<const D: usize> Round<'_, D> {
             if shared >= rows.base_shared {
                 continue;
             }
-            let memory: Vec<_> = self
+            let previous = &self.cuts.memories[k];
+            if previous.len() == self.state.oracles.len()
+                && previous
+                    .iter()
+                    .zip(&self.state.oracles)
+                    .all(|(memory, oracle)| {
+                        memory.matches(
+                            &oracle.solver.cuts.cuts[index],
+                            oracle.solver.graph.graph_id.max(0),
+                        )
+                    })
+            {
+                continue;
+            }
+            changed = true;
+            self.cuts.memories[k] = self
                 .state
                 .oracles
                 .iter()
                 .map(|oracle| {
-                    oracle.solver.cuts.cuts[index]
-                        .memory_for_graph(oracle.solver.graph.graph_id.max(0))
+                    CutMemory::capture(
+                        &oracle.solver.cuts.cuts[index],
+                        oracle.solver.graph.graph_id.max(0),
+                    )
                 })
                 .collect();
-            if memory == self.cuts.memories[k] {
-                continue;
-            }
-            changed = true;
-            self.cuts.memories[k] = memory;
             let row = self.state.shared_offset + shared;
-            for (&(column, _), (network, path)) in self.tagged.iter().zip(&paths) {
-                let c = self.network_coefficient(index, *network, path)?;
+            for (&(column, _), (network, path, enumerated)) in self.tagged.iter().zip(&paths) {
+                let c = self.network_coefficient(index, *network, path, *enumerated)?;
                 master.set_coefficient(row, column, c)?;
             }
         }

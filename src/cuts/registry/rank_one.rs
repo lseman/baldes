@@ -209,7 +209,11 @@ impl CutRegistry {
                     }
                     match cut.memory_kind {
                         MemoryKind::Vertex => {
-                            for (v, present) in cut.memory_for_graph(graph).into_iter().enumerate()
+                            for (v, &present) in cut
+                                .memory_for_graph_ref(graph)
+                                .unwrap_or(&[])
+                                .iter()
+                                .enumerate()
                             {
                                 if present {
                                     touched.insert(v);
@@ -217,11 +221,12 @@ impl CutRegistry {
                             }
                         }
                         MemoryKind::Arc => {
-                            let memory = cut.arc_memory_for_graph(graph);
-                            for arc in &gg.arcs {
-                                if memory.contains(&arc.id) {
-                                    touched.insert(arc.tail);
-                                    touched.insert(arc.head);
+                            if let Some(memory) = cut.arc_memory_for_graph_ref(graph) {
+                                for arc in &gg.arcs {
+                                    if memory.contains(&arc.id) {
+                                        touched.insert(arc.tail);
+                                        touched.insert(arc.head);
+                                    }
                                 }
                             }
                         }

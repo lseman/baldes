@@ -418,7 +418,7 @@ fn build_inputs_with_duals<const D: usize>(
             });
             continue;
         }
-        let memory = cut.memory_for_graph(graph);
+        let memory = cut.memory_for_graph_ref(graph).unwrap_or(&[]);
         if cut.visit_once {
             let support: Vec<bool> = (0..vertices).map(|v| weights[v] != 0).collect();
             let memory_vertices: Vec<usize> = (0..vertices)

@@ -458,7 +458,7 @@ impl<'a, const D: usize> Sweep<'a, D> {
                                     ),
                                 )
                             };
-                            let Some((label, _resources)) = extension else {
+                            let Some((mut label, _resources)) = extension else {
                                 continue;
                             };
                             if self.ctx.load_completion.is_some_and(|bound| {
@@ -485,92 +485,96 @@ impl<'a, const D: usize> Sweep<'a, D> {
                                 self.terminals.push((group, cost, target));
                                 continue;
                             }
-                            let mut unsplit = Some(label);
-                            let mut pieces =
-                                if matches!(self.ctx.controls.paired_split_strategy, 1 | 2) {
-                                    Some(
-                                        self.ctx
-                                            .split_paired_label(
-                                                g,
-                                                forward,
-                                                unsplit.take().unwrap(),
-                                            )?
-                                            .into_iter(),
-                                    )
-                                } else {
-                                    None
-                                };
-                            while let Some(mut label) = pieces
-                                .as_mut()
-                                .and_then(|p| p.next())
-                                .or_else(|| unsplit.take())
+                            // Keep the unsplit label in place. Moving it through
+                            // Option/Iterator::next copies the whole wide payload
+                            // on every ordinary extension, before dominance.
+                            let mut pieces = None;
+                            if R::OWNS_AUXILIARY
+                                && matches!(self.ctx.controls.paired_split_strategy, 1 | 2)
                             {
-                                let q = self.ctx.label_coordinates(g, forward, &label).ok_or_else(
-                                    || incomplete("paired label coordinate is unavailable"),
-                                )?;
-                                let side = if forward {
-                                    if q[0] > self.ctx.grid.middle + EPSILON {
+                                let mut split =
+                                    self.ctx.split_paired_label(g, forward, label)?.into_iter();
+                                let Some(first) = split.next() else { continue };
+                                label = first;
+                                pieces = Some(split);
+                            }
+                            loop {
+                                'piece: {
+                                    let q =
+                                        self.ctx.label_coordinates(g, forward, &label).ok_or_else(
+                                            || incomplete("paired label coordinate is unavailable"),
+                                        )?;
+                                    let side = if forward {
+                                        if q[0] > self.ctx.grid.middle + EPSILON {
+                                            2
+                                        } else {
+                                            1
+                                        }
+                                    } else if q[0] <= self.ctx.grid.middle + EPSILON {
                                         2
                                     } else {
                                         1
+                                    };
+                                    if flags & side == 0 {
+                                        if forward && flags & 2 == 0 {
+                                            let v = label.vertex;
+                                            let target = self.storage.retain_for::<R>(label);
+                                            self.storage.crossing[v].push(target);
+                                        }
+                                        break 'piece;
                                     }
-                                } else if q[0] <= self.ctx.grid.middle + EPSILON {
-                                    2
-                                } else {
-                                    1
-                                };
-                                if flags & side == 0 {
-                                    if forward && flags & 2 == 0 {
-                                        let v = label.vertex;
-                                        let target = self.storage.retain_for::<R>(label);
-                                        self.storage.crossing[v].push(target);
+                                    if self.fixing_completion.as_ref().is_some_and(|gate| {
+                                        !self.ctx.completion_exists_in(
+                                            gate.opposite,
+                                            g,
+                                            forward,
+                                            &label,
+                                            label.bucket,
+                                            gate.threshold,
+                                            gate.scan,
+                                            gate.complete,
+                                            false,
+                                            Some((started, controls.time_limit)),
+                                        )
+                                    }) {
+                                        self.statistics.completion_pruned += 1;
+                                        break 'piece;
                                     }
-                                    continue;
-                                }
-                                if self.fixing_completion.as_ref().is_some_and(|gate| {
-                                    !self.ctx.completion_exists_in(
-                                        gate.opposite,
-                                        g,
-                                        forward,
-                                        &label,
-                                        label.bucket,
-                                        gate.threshold,
-                                        gate.scan,
-                                        gate.complete,
-                                        false,
-                                        Some((started, controls.time_limit)),
-                                    )
-                                }) {
-                                    self.statistics.completion_pruned += 1;
-                                    continue;
-                                }
-                                self.ctx.vertex_step_with_branching::<BRANCHING>(&mut label);
-                                let hot = HotLabel {
-                                    resources: label.resources.0,
-                                    ..HotLabel::of(&label)
-                                };
-                                if label.bucket == id {
-                                    self.pending.push((label, hot));
-                                    continue;
-                                }
-                                let destination = label.bucket;
-                                let inserted = if BRANCHING || R::OWNS_AUXILIARY {
-                                    self.insert::<BRANCHING, R, _>(g, forward, label, hot, controls)
-                                } else {
-                                    self.insert::<BRANCHING, R, _>(
-                                        g, forward, &label, hot, controls,
-                                    )
-                                };
-                                // Only accepted labels can require another component pass.
-                                if inserted
-                                    && self.ctx.grid.direction(forward).buckets[destination.vertex]
-                                        [destination.bucket]
-                                        .component
-                                        == self.ctx.grid.direction(forward).buckets[id.vertex]
-                                            [id.bucket]
+                                    self.ctx.vertex_step_with_branching::<BRANCHING>(&mut label);
+                                    let hot = HotLabel {
+                                        resources: label.resources.0,
+                                        ..HotLabel::of(&label)
+                                    };
+                                    if label.bucket == id {
+                                        self.pending.push((label, hot));
+                                        break 'piece;
+                                    }
+                                    let destination = label.bucket;
+                                    let inserted = if BRANCHING || R::OWNS_AUXILIARY {
+                                        self.insert::<BRANCHING, R, _>(
+                                            g, forward, label, hot, controls,
+                                        )
+                                    } else {
+                                        self.insert::<BRANCHING, R, _>(
+                                            g, forward, &label, hot, controls,
+                                        )
+                                    };
+                                    // Only accepted labels can require another component pass.
+                                    if inserted
+                                        && self.ctx.grid.direction(forward).buckets
+                                            [destination.vertex][destination.bucket]
                                             .component
-                                {
-                                    repeat = true;
+                                            == self.ctx.grid.direction(forward).buckets[id.vertex]
+                                                [id.bucket]
+                                                .component
+                                    {
+                                        repeat = true;
+                                    }
+                                }
+                                if let Some(next) = pieces.as_mut().and_then(|p| p.next()) {
+                                    label = next;
+                                } else {
+                                    break;
                                 }
                             }
                         }

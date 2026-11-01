@@ -121,6 +121,22 @@ impl RankOneCut {
             self.graph_pricing_support.get(&graph)
         }
     }
+    /// Borrow the selected graph's vertex memory; an absent graph remembers nothing.
+    pub(crate) fn memory_for_graph_ref(&self, graph: i32) -> Option<&[bool]> {
+        if self.graph_dependent_memory {
+            self.graph_memories.get(&graph).map(Vec::as_slice)
+        } else {
+            Some(&self.memory)
+        }
+    }
+    /// Borrow the selected graph's arc memory without cloning its tree nodes.
+    pub(crate) fn arc_memory_for_graph_ref(&self, graph: i32) -> Option<&BTreeSet<i32>> {
+        if self.graph_dependent_memory {
+            self.graph_arc_memories.get(&graph)
+        } else {
+            Some(&self.arc_memory)
+        }
+    }
     pub fn memory_for_graph(&self, graph: i32) -> Vec<bool> {
         if !self.graph_dependent_memory {
             return self.memory.clone();

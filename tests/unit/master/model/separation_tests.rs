@@ -445,3 +445,133 @@ fn rank_one_neighbourhood_cap_defaults_to_sixteen_and_reaches_the_separator() {
         .separate_default(graph, &options, &customers, &[])
         .is_err());
 }
+
+#[test]
+fn changed_rank_one_memory_refreshes_installed_coefficients_in_each_memory_mode() {
+    use crate::cuts::{CutClass, RankOneCut};
+    use crate::graph::Graph;
+    use crate::master::{LpMaster, RowSense};
+    use std::collections::{BTreeMap, BTreeSet};
+    for memory_kind in [MemoryKind::Vertex, MemoryKind::Arc] {
+        for dependent in [false, true] {
+            let mut graph = Graph::<2>::new(5, 0).unwrap();
+            for v in 0..4 {
+                graph.add_arc(v, v + 1, 1.).unwrap();
+            }
+            let problem = Problem::set_partitioning(graph, 3.).unwrap();
+            let mut options = Options::default();
+            options.separation.rank_one.enabled = true;
+            let mut output = super::super::solve(problem, options).unwrap();
+            let snapshot = &mut output.snapshot;
+            let tagged: Vec<_> = snapshot
+                .warm
+                .columns
+                .iter()
+                .enumerate()
+                .filter_map(|(column, c)| {
+                    c.as_ref()
+                        .filter(|c| c.tag >= 0)
+                        .map(|c| (column, c.tag as usize))
+                })
+                .collect();
+            let column = tagged
+                .iter()
+                .find(|(_, tag)| snapshot.state.routes[*tag].route.nodes == [0, 1, 2, 3, 4])
+                .unwrap()
+                .0;
+            let memory = vec![false, true, false, true, false];
+            let arcs = BTreeSet::from([1]);
+            let registry = &mut snapshot.state.oracles[0].solver.cuts;
+            assert!(registry.cuts.is_empty());
+            registry.cuts.push(RankOneCut {
+                weights: vec![0, 1, 0, 1, 0],
+                graph_support: BTreeMap::new(),
+                graph_pricing_support: BTreeMap::new(),
+                general_kpath_support: None,
+                memory: memory.clone(),
+                graph_dependent_memory: dependent,
+                graph_memories: if dependent {
+                    BTreeMap::from([(0, memory)])
+                } else {
+                    BTreeMap::new()
+                },
+                memory_kind,
+                arc_memory: arcs.clone(),
+                graph_arc_memories: if dependent {
+                    BTreeMap::from([(0, arcs)])
+                } else {
+                    BTreeMap::new()
+                },
+                arc_weights: BTreeMap::new(),
+                visit_once: false,
+                type2: false,
+                denominator: 2,
+                dual: 0.,
+                class: CutClass::Packing,
+                rhs: 1,
+                kind: 0,
+                id: 0,
+                ordered_support: Some(vec![(1, 1), (3, 1)]),
+            });
+            let mut cuts = snapshot.state.cuts.take().unwrap();
+            let values = snapshot.master.values().to_vec();
+            let row = snapshot.master.rhs().len();
+            let mut round = super::Round {
+                state: &mut snapshot.state,
+                cuts: &mut cuts,
+                tagged,
+                values,
+            };
+            let mut rows = round.new_rows(&snapshot.master).unwrap();
+            round
+                .install_registry_cuts(
+                    &mut snapshot.master,
+                    &mut rows,
+                    0,
+                    |_, _| RowSense::LessEqual,
+                    false,
+                )
+                .unwrap();
+            round.install(&mut snapshot.master, rows).unwrap();
+            let coefficient = |master: &crate::master::clp::ClpMaster| {
+                master
+                    .column_entries(column)
+                    .unwrap()
+                    .into_iter()
+                    .find(|(r, _)| *r == row)
+                    .map_or(0., |(_, v)| v)
+            };
+            assert_eq!(coefficient(&snapshot.master), 0.);
+            let cut = &mut round.state.oracles[0].solver.cuts.cuts[0];
+            match (memory_kind, dependent) {
+                (MemoryKind::Vertex, false) => cut.memory[2] = true,
+                (MemoryKind::Vertex, true) => cut.graph_memories.get_mut(&0).unwrap()[2] = true,
+                (MemoryKind::Arc, false) => {
+                    cut.arc_memory.insert(2);
+                }
+                (MemoryKind::Arc, true) => {
+                    cut.graph_arc_memories.get_mut(&0).unwrap().insert(2);
+                }
+            }
+            let mut rows = round.new_rows(&snapshot.master).unwrap();
+            let changed = round
+                .install_registry_cuts(
+                    &mut snapshot.master,
+                    &mut rows,
+                    1,
+                    |_, _| RowSense::LessEqual,
+                    false,
+                )
+                .unwrap();
+            assert!(
+                changed,
+                "memory kind={memory_kind:?}, graph dependent={dependent}"
+            );
+            assert_eq!(
+                coefficient(&snapshot.master),
+                1.,
+                "memory kind={memory_kind:?}, graph dependent={dependent}"
+            );
+        }
+    }
+}
