@@ -102,7 +102,7 @@ pub(super) fn recover<const D: usize>(
     for variable in &mut state.master_variables {
         variable.cost = 0.;
     }
-    for route in &mut state.routes {
+    for route in Arc::make_mut(&mut state.routes) {
         let route = Arc::make_mut(route);
         route.route.original_cost = 0.;
         route.route.cost = 0.;
@@ -302,8 +302,8 @@ pub(super) fn recover<const D: usize>(
             } else {
                 let tag = i32::try_from(routes.len())
                     .map_err(|_| invalid("phase-I network route tag overflow"))?;
-                tags.insert(key, tag);
-                routes.push(Arc::new(route));
+                Arc::make_mut(&mut tags).insert(key, tag);
+                Arc::make_mut(&mut routes).push(Arc::new(route));
                 tag
             };
             columns.push(cg::Column {

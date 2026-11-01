@@ -669,6 +669,7 @@ pub(super) fn choose_proposals<const D: usize>(
     );
     let mut best_size: f64 = 1e12;
     let mut best_score = -1e12;
+    let mut parent_columns_absorbed = false;
     for (phase_index, phase) in config.phases.iter().enumerate() {
         candidates.truncate(phase.candidates);
         if candidates.is_empty() || Instant::now() >= end {
@@ -731,7 +732,12 @@ pub(super) fn choose_proposals<const D: usize>(
             for side in sides {
                 let mut child = candidate.children.as_ref().unwrap()[side].fork()?;
                 if options.share_inactive_columns {
-                    history.column_pool.absorb(&output.snapshot);
+                    // The parent is unchanged throughout candidate evaluation;
+                    // the shared pool only grows as trial columns are added.
+                    if !parent_columns_absorbed {
+                        history.column_pool.absorb(&output.snapshot);
+                        parent_columns_absorbed = true;
+                    }
                     history.column_pool.seed(&mut child, end)?;
                 }
                 child.state.node_depth = output.snapshot.state.node_depth.saturating_add(1);
@@ -797,7 +803,7 @@ pub(super) fn choose_proposals<const D: usize>(
                         .checked_add(remaining)
                         .unwrap_or(end)
                         .min(end);
-                    match child.solve(node) {
+                    match child.solve_forked(node) {
                         Ok(result) => {
                             if options.share_inactive_columns {
                                 history.column_pool.absorb(&result.snapshot);

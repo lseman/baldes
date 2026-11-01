@@ -57,30 +57,33 @@ fn compact() -> NodeSnapshot<2> {
         .map(|c| c.tag as usize)
         .collect();
     let mut remap = HashMap::new();
-    node.state.routes = node
-        .state
-        .routes
-        .into_iter()
-        .enumerate()
-        .filter_map(|(old, r)| {
-            if retained.contains(&old) {
-                remap.insert(old, remap.len());
-                Some(r)
-            } else {
-                None
-            }
-        })
-        .collect();
+    node.state.routes = Arc::new(
+        node.state
+            .routes
+            .iter()
+            .cloned()
+            .enumerate()
+            .filter_map(|(old, r)| {
+                if retained.contains(&old) {
+                    remap.insert(old, remap.len());
+                    Some(r)
+                } else {
+                    None
+                }
+            })
+            .collect(),
+    );
     for c in node.warm.columns.iter_mut().flatten() {
         c.tag = remap[&(c.tag as usize)] as i32;
     }
-    node.state.tags = node
-        .state
-        .routes
-        .iter()
-        .enumerate()
-        .map(|(tag, r)| ((r.network, r.route.identity()), tag as i32))
-        .collect();
+    node.state.tags = Arc::new(
+        node.state
+            .routes
+            .iter()
+            .enumerate()
+            .map(|(tag, r)| ((r.network, r.route.identity()), tag as i32))
+            .collect(),
+    );
     assert!(node.state.route_upper_bounds.is_empty());
     node.warm.generated_pool.clear();
     assert_eq!(node.state.routes.len(), 3);
@@ -89,7 +92,7 @@ fn compact() -> NodeSnapshot<2> {
 
 fn donor_with_active_columns() -> NodeSnapshot<2> {
     let mut donor = root().snapshot;
-    for route in &mut donor.state.routes {
+    for route in Arc::make_mut(&mut donor.state.routes) {
         let route = Arc::make_mut(route);
         route.route.original_cost = -9999.;
         route.route.cost = -9999.;
@@ -158,7 +161,7 @@ fn registry_only_routes_are_not_treated_as_donor_pool_columns() {
     let mut speculative = donor.state.routes[0].as_ref().clone();
     speculative.route.arcs = vec![i32::MAX];
     let speculative_path = (speculative.network, speculative.route.identity());
-    donor.state.routes.push(Arc::new(speculative));
+    Arc::make_mut(&mut donor.state.routes).push(Arc::new(speculative));
 
     let expected: HashSet<_> = donor
         .warm
@@ -200,7 +203,7 @@ fn distinct_donor_schedules_for_one_physical_path_are_both_shared() {
     let network = alias.network;
     let identity = alias.route.identity();
     let tag = donor.state.routes.len();
-    donor.state.routes.push(Arc::new(alias));
+    Arc::make_mut(&mut donor.state.routes).push(Arc::new(alias));
     let mut column = source_column;
     column.tag = tag as i32;
     column.identity = format!("{network}:{identity}");
@@ -364,10 +367,8 @@ fn shared_paths_cannot_bypass_a_profile_alias_zero_cap() {
     }
     alias.route.resources[0] += 1.;
     let tag = node.state.routes.len();
-    node.state
-        .tags
-        .insert((alias.network, alias.route.identity()), tag as i32);
-    node.state.routes.push(Arc::new(alias));
+    Arc::make_mut(&mut node.state.tags).insert((alias.network, alias.route.identity()), tag as i32);
+    Arc::make_mut(&mut node.state.routes).push(Arc::new(alias));
     assert_eq!(
         pool()
             .seed(&mut node, Instant::now() + Duration::from_secs(10))
@@ -544,4 +545,44 @@ fn paired_column_values_match_registered_native_values_and_reject_stale_pool_met
     stale.coupled_values.clear();
     assert!(!compatible_schedule(oracle, &stale));
     assert!(domain.exact_route_feasible(&stale).is_none());
+}
+
+#[test]
+fn forked_registries_detach_on_pool_registration_and_preserve_siblings() {
+    let parent = compact();
+    let sibling = parent.fork().unwrap();
+    let mut child = parent.fork().unwrap();
+    assert!(Arc::ptr_eq(&parent.state.routes, &child.state.routes));
+    assert!(Arc::ptr_eq(&parent.state.tags, &child.state.tags));
+    let old_tags = parent.state.tags.clone();
+    let old_routes = parent.state.routes.clone();
+    assert!(
+        pool()
+            .seed(&mut child, Instant::now() + Duration::from_secs(10))
+            .unwrap()
+            > 0
+    );
+    assert!(child.state.routes.len() > parent.state.routes.len());
+    assert!(!Arc::ptr_eq(&parent.state.routes, &child.state.routes));
+    assert!(!Arc::ptr_eq(&parent.state.tags, &child.state.tags));
+    assert!(Arc::ptr_eq(&parent.state.routes, &sibling.state.routes));
+    assert!(Arc::ptr_eq(&parent.state.tags, &sibling.state.tags));
+    assert_eq!(parent.state.tags, old_tags);
+    assert_eq!(parent.state.routes.len(), old_routes.len());
+    for (key, &tag) in old_tags.iter() {
+        assert_eq!(child.state.tags.get(key), Some(&tag));
+        assert!(Arc::ptr_eq(
+            &child.state.routes[tag as usize],
+            &old_routes[tag as usize]
+        ));
+    }
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    options.cg.artificial_cost = 100.;
+    let expected = parent.solve(options.clone()).unwrap();
+    assert_eq!(
+        sibling.solve(options.clone()).unwrap().master.lp,
+        expected.master.lp
+    );
+    assert_eq!(child.solve(options).unwrap().master.lp, expected.master.lp);
 }

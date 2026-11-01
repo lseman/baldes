@@ -180,7 +180,20 @@ impl<const D: usize> NodeSnapshot<D> {
 
     /// Resume this node with a new time/iteration budget and no external registry.
     pub fn solve(&self, mut options: Options) -> Result<Output<D>> {
-        validate_options(&options)?;
+        let deadline = self.resume_deadline(&mut options)?;
+        self.fork()?.solve_forked_at(options, deadline)
+    }
+
+    /// Consume an independent node fork already prepared by a tree worker or
+    /// strong-branching trial. Its owner has performed the normal fork reset;
+    /// copying the LP, graph and warm column pool again would be redundant.
+    pub(crate) fn solve_forked(self, mut options: Options) -> Result<Output<D>> {
+        let deadline = self.resume_deadline(&mut options)?;
+        self.solve_forked_at(options, deadline)
+    }
+
+    fn resume_deadline(&self, options: &mut Options) -> Result<Instant> {
+        validate_options(options)?;
         if !options.synchronized_services.is_empty() {
             if options.synchronized_services
                 != self
@@ -196,16 +209,18 @@ impl<const D: usize> NodeSnapshot<D> {
             }
             options.synchronized_services.clear();
         }
-        let deadline = Instant::now()
+        Instant::now()
             .checked_add(options.cg.time_limit)
-            .ok_or_else(|| invalid("network time limit"))?;
-        let mut node = self.fork()?;
-        for oracle in &mut node.state.oracles {
+            .ok_or_else(|| invalid("network time limit"))
+    }
+
+    fn solve_forked_at(mut self, mut options: Options, deadline: Instant) -> Result<Output<D>> {
+        for oracle in &mut self.state.oracles {
             oracle.solver.restore_node_state()?;
         }
-        node.state.deadline = deadline;
-        options.cg.warm_start = Some(node.warm);
-        run(node.master, node.state, options)
+        self.state.deadline = deadline;
+        options.cg.warm_start = Some(self.warm);
+        run(self.master, self.state, options)
     }
 
     /// Append a shared additive row to both retained columns and future pricing.
@@ -431,6 +446,10 @@ impl<const D: usize> NodeSnapshot<D> {
             ));
         }
         let mut candidates = vec![];
+        // The node is immutable during scoring. Replay a referenced route's
+        // coefficients once, then reuse them for all eligible assignment rows.
+        // Distinguish registry tags from fixed-route positions in the cache.
+        let mut coefficient_cache = HashMap::new();
         for shared_row in 0..self.state.shared_rows.len() {
             for oracle in &self.state.oracles {
                 if self
@@ -440,14 +459,19 @@ impl<const D: usize> NodeSnapshot<D> {
                     continue;
                 }
                 let physical = self.state.shared_offset + shared_row;
-                let coefficient = |route: &NetworkRoute| -> Result<f64> {
+                let mut coefficient = |key: (bool, usize), route: &NetworkRoute| -> Result<f64> {
                     if route.network != oracle.network.id {
                         return Ok(0.);
                     }
-                    Ok(entries(oracle, &route.route, self.state.shared_offset)?
-                        .into_iter()
-                        .find(|&(r, _)| r == physical)
-                        .map_or(0., |(_, v)| v))
+                    let coefficients = match coefficient_cache.entry(key) {
+                        std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
+                        std::collections::hash_map::Entry::Vacant(entry) => {
+                            entry.insert(entries(oracle, &route.route, self.state.shared_offset)?)
+                        }
+                    };
+                    Ok(coefficients
+                        .binary_search_by_key(&physical, |&(row, _)| row)
+                        .map_or(0., |i| coefficients[i].1))
                 };
                 let mut value = 0.;
                 for (column, metadata) in self.warm.columns.iter().enumerate() {
@@ -456,11 +480,14 @@ impl<const D: usize> NodeSnapshot<D> {
                             continue;
                         }
                         value += self.master.values()[column]
-                            * coefficient(&self.state.routes[metadata.tag as usize])?;
+                            * coefficient(
+                                (false, metadata.tag as usize),
+                                &self.state.routes[metadata.tag as usize],
+                            )?;
                     }
                 }
-                for fixed in &self.state.fixed_routes {
-                    value += fixed.quantity * coefficient(&fixed.route)?;
+                for (index, fixed) in self.state.fixed_routes.iter().enumerate() {
+                    value += fixed.quantity * coefficient((true, index), &fixed.route)?;
                 }
                 if value > tolerance && value < 1. - tolerance {
                     candidates.push(Assignment {
@@ -676,8 +703,8 @@ pub(super) fn install_seed_routes<const D: usize>(
             tag,
             identity: format!("{}:{identity}", seed.network),
         });
-        state.tags.insert(key, tag);
-        state.routes.push(Arc::new(route));
+        Arc::make_mut(&mut state.tags).insert(key, tag);
+        Arc::make_mut(&mut state.routes).push(Arc::new(route));
     }
     Ok(())
 }

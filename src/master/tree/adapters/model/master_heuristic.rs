@@ -117,8 +117,8 @@ fn load<const D: usize>(node: &mut NodeSnapshot<D>, routes: &[FixedRoute]) -> Re
         } else {
             let tag = i32::try_from(node.state.routes.len())
                 .map_err(|_| invalid("master heuristic route tag overflow"))?;
-            node.state.routes.push(Arc::new(route.clone()));
-            node.state.tags.insert(key, tag);
+            Arc::make_mut(&mut node.state.routes).push(Arc::new(route.clone()));
+            Arc::make_mut(&mut node.state.tags).insert(key, tag);
             tag
         };
         let mut cap = node.state.oracles[oracle].multiplicity_upper().min(

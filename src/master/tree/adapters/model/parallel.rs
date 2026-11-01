@@ -107,7 +107,7 @@ pub(super) fn evaluate<const D: usize>(
         jobs.into_par_iter()
             .map(|job| {
                 job.restore()?
-                    .solve(options.clone())
+                    .solve_forked(options.clone())
                     .and_then(Output::into_transfer)
             })
             .collect()

@@ -230,9 +230,7 @@ fn physical_path_aliases_cannot_restore_an_independent_column_cap() {
     Arc::make_mut(&mut alias).route.resource_profile[2][0] = 1.;
     Arc::make_mut(&mut alias).route.resources[0] = 1.;
     let tag = node.state.routes.len();
-    node.state
-        .tags
-        .insert((alias.network, alias.route.identity()), tag as i32);
+    Arc::make_mut(&mut node.state.tags).insert((alias.network, alias.route.identity()), tag as i32);
     let coefficients = entries(
         &node.state.oracles[0],
         &alias.route,
@@ -253,7 +251,7 @@ fn physical_path_aliases_cannot_restore_an_independent_column_cap() {
     };
     node.warm.columns.push(Some(metadata.clone()));
     node.warm.generated_pool.push(metadata);
-    node.state.routes.push(alias);
+    Arc::make_mut(&mut node.state.routes).push(alias);
     let complete = node.enumerate(&EnumerationOptions::default()).unwrap();
     assert_eq!(complete.master.upper[column], 0.);
     assert_eq!(complete.state.route_upper_bounds.get(&tag), Some(&0.));

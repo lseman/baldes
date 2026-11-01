@@ -91,7 +91,7 @@ pub(in crate::master::model) fn refresh<const D: usize>(
         }
     }
     let complete_universe = node.state.universe.is_some();
-    for (tag, route) in node.state.routes.iter_mut().enumerate() {
+    for (tag, route) in Arc::make_mut(&mut node.state.routes).iter_mut().enumerate() {
         let Some(domain) = domains.get(&route.network) else {
             continue;
         };
@@ -150,11 +150,10 @@ pub(in crate::master::model) fn refresh<const D: usize>(
         route.route.resources = canonical.resources;
         route.route.resource_profile = canonical.resource_profile;
     }
-    node.state.tags.clear();
+    let tags = Arc::make_mut(&mut node.state.tags);
+    tags.clear();
     for (tag, route) in node.state.routes.iter().enumerate() {
-        node.state
-            .tags
-            .entry((route.network, route.route.identity()))
+        tags.entry((route.network, route.route.identity()))
             .or_insert(tag as i32);
     }
     let state = &node.state;

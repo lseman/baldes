@@ -91,8 +91,8 @@ fn register<const D: usize>(state: &mut State<D>, network: i32, mut route: Route
     route.original_cost = cost;
     let tag =
         i32::try_from(state.routes.len()).map_err(|_| invalid("network route tag overflow"))?;
-    state.tags.insert(key, tag);
-    state.routes.push(Arc::new(NetworkRoute { network, route }));
+    Arc::make_mut(&mut state.tags).insert(key, tag);
+    Arc::make_mut(&mut state.routes).push(Arc::new(NetworkRoute { network, route }));
     Ok(tag)
 }
 
@@ -162,11 +162,17 @@ pub(super) fn finish<const D: usize>(state: &mut State<D>, commit: bool) {
         oracle.costs = costs;
         oracle.enumerated = enumerated;
     }
-    state.routes.truncate(saved.route_count);
+    if state.routes.len() != saved.route_count {
+        Arc::make_mut(&mut state.routes).truncate(saved.route_count);
+    }
     let count = saved.route_count;
-    state
+    if state
         .tags
-        .retain(|_, tag| *tag >= 0 && (*tag as usize) < count);
+        .values()
+        .any(|&tag| tag < 0 || tag as usize >= count)
+    {
+        Arc::make_mut(&mut state.tags).retain(|_, tag| *tag >= 0 && (*tag as usize) < count);
+    }
     state.previous_fixing_gap = saved.previous_fixing_gap;
     state.enumerated_routes = saved.enumerated_routes;
     state.objective_fixed = saved.objective_fixed;

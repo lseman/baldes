@@ -256,8 +256,8 @@ pub(super) fn run<const D: usize>(
                 let mut route = seed.clone();
                 route.route.original_cost =
                     original_costs::route_cost(&current.state.oracles[index], &route.route)?;
-                current.state.routes.push(Arc::new(route));
-                current.state.tags.insert(key, tag);
+                Arc::make_mut(&mut current.state.routes).push(Arc::new(route));
+                Arc::make_mut(&mut current.state.tags).insert(key, tag);
                 tag
             };
             if !current

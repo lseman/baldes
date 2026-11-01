@@ -440,3 +440,17 @@ fn regeneration_keeps_ng_transitions_network_local_and_refreshes_between_calls()
     state.oracles[0].solver.forbidden_arcs[1] = true;
     assert_eq!(accepted(&mut state), [tags[2], tags[3]].repeat(2));
 }
+
+#[test]
+fn gap_rollback_without_registration_keeps_shared_registries() {
+    let mut output = fixture();
+    let sibling = output.snapshot.fork().unwrap();
+    let state = &mut output.snapshot.state;
+    state.gap_enumeration = true;
+    state.tree_incumbent = 2.;
+    state.pricing_witness = None;
+    assert!(begin(state, 0.).unwrap());
+    finish(state, false);
+    assert!(Arc::ptr_eq(&state.routes, &sibling.state.routes));
+    assert!(Arc::ptr_eq(&state.tags, &sibling.state.tags));
+}

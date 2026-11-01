@@ -186,8 +186,8 @@ fn fix_entry<const D: usize>(
             route.route.original_cost = original_costs::route_cost(oracle, &route.route)?;
             let tag = i32::try_from(child.state.routes.len())
                 .map_err(|_| invalid("local-search route tag overflow"))?;
-            child.state.tags.insert(key, tag);
-            child.state.routes.push(Arc::new(route));
+            Arc::make_mut(&mut child.state.tags).insert(key, tag);
+            Arc::make_mut(&mut child.state.routes).push(Arc::new(route));
             child.fix_route(tag as usize, quantity)
         }
     }

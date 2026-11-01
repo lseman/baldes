@@ -358,8 +358,10 @@ struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     synchronized_services: Vec<synchronization::Service>,
     oracles: Vec<Oracle<D>>,
     shared_offset: usize,
-    routes: Vec<Arc<NetworkRoute>>,
-    tags: HashMap<(i32, String), i32>,
+    // Node forks share registry metadata until a child appends or replays a
+    // route. Route objects themselves remain independently copy-on-write.
+    routes: Arc<Vec<Arc<NetworkRoute>>>,
+    tags: Arc<HashMap<(i32, String), i32>>,
     correction: Option<f64>,
     gradient: Option<Vec<f64>>,
     rhs: Vec<f64>,

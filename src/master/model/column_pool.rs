@@ -165,11 +165,11 @@ impl Pool {
                     let mut route = route;
                     route.cost = cost;
                     route.original_cost = cost;
-                    registry.push(Arc::new(NetworkRoute {
+                    Arc::make_mut(&mut registry).push(Arc::new(NetworkRoute {
                         network: seed.network,
                         route,
                     }));
-                    tags.insert((seed.network, identity.clone()), signed);
+                    Arc::make_mut(&mut tags).insert((seed.network, identity.clone()), signed);
                     identities.insert((seed.network, identity.clone()), tag);
                     path_caps
                         .entry(path)

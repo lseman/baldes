@@ -169,8 +169,8 @@ pub(super) fn install_collected_with<const D: usize>(
         } else {
             let index = registry.len();
             let tag = i32::try_from(index).map_err(|_| invalid("enumeration tag overflow"))?;
-            tags.insert((route.network, route.route.identity()), tag);
-            registry.push(Arc::new(route));
+            Arc::make_mut(&mut tags).insert((route.network, route.route.identity()), tag);
+            Arc::make_mut(&mut registry).push(Arc::new(route));
             path_tags.insert(key, index);
             index
         };

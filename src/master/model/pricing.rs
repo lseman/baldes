@@ -367,8 +367,8 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkPricingAdapt
                 new_improving_columns += usize::from(reduced_cost < -self.tolerance);
                 let tag = i32::try_from(self.state.routes.len())
                     .map_err(|_| invalid("network route tag overflow"))?;
-                self.state.tags.insert(key, tag);
-                self.state.routes.push(Arc::new(NetworkRoute {
+                Arc::make_mut(&mut self.state.tags).insert(key, tag);
+                Arc::make_mut(&mut self.state.routes).push(Arc::new(NetworkRoute {
                     network: oracle.network.id,
                     route,
                 }));
