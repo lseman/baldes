@@ -61,6 +61,10 @@ A single network is a collection of length one. Start with
 
 ## Specialized models and algorithms
 
+- [Standalone AILS-II search with SISR perturbations](guides/ails-ii.md).
+- [BKS-seeded HGS intensification](extensions/hgs-intensify.md).
+- [HGS customer-clustering search](extensions/hgs-dri.md).
+
 - [Coupled resources](extensions/coupled-resources.md).
 - [Multiple time windows](extensions/multi-time-windows.md).
 - [P-step CVRP](extensions/pstep.md).

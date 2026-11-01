@@ -1,5 +1,7 @@
 # Standalone AILS-II search
 
+[Documentation index](../README.md) · [HGS intensification](../extensions/hgs-intensify.md)
+
 Run the heuristic independently with:
 
 ```sh
@@ -20,5 +22,5 @@ recreation. The implementation is inspired by AILS-II and supports time
 windows; its repair and SWAP* neighborhoods are not the published granular
 implementations.
 
-The AILS-II module and search do not invoke HGS. HGS is a separate command;
+The AILS-II module and search do not invoke HGS. [HGS intensification](../extensions/hgs-intensify.md) is a separate command;
 `--population-size` and `--nb-iter` apply to HGS, not to AILS-II.

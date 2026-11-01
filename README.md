@@ -138,6 +138,8 @@ New here? Start with [Your first solve](docs/guides/first-solve.md).
 - [Network modeling](docs/solver/models.md)
 - [CLI usage and options](docs/guides/cli.md)
 - [pyBaldes handbook and API reference](docs/pybaldes/README.md)
+- [Standalone AILS-II search](docs/guides/ails-ii.md)
+- [BKS-seeded HGS intensification](docs/extensions/hgs-intensify.md)
 - [Branch-and-price](docs/solver/tree.md)
 - [Pricing controls](docs/reference/options.md)
 - [Algorithms and references](docs/reference/algorithms.md)

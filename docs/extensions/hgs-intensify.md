@@ -1,5 +1,7 @@
 # BKS-seeded HGS intensification
 
+[Documentation index](../README.md) · [Standalone AILS-II search](../guides/ails-ii.md)
+
 The `hgs` command has optional BKS seeding and route-decomposition search.
 Ordinary `baldes hgs INSTANCE` retains its existing behavior. Build the CLI with
 `cargo build --release --features clp --bin baldes`.
