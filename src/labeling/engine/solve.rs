@@ -17,6 +17,24 @@ impl<const D: usize> LabelingEngine<D> {
         controls: &Controls,
         allow_partial: bool,
     ) -> Result<PricingResult> {
+        // Completion bounds prune labels that cannot improve. A route improves
+        // when its label cost is below `zero_threshold` (minus any route-level
+        // offset such as a fleet dual), so the configured threshold is relative
+        // to it. Pruning against 0 would discard improving routes and then
+        // floor the reported minimum below the true improving threshold.
+        let base = self.controls.load_completion_threshold;
+        self.controls.load_completion_threshold = base + controls.zero_threshold;
+        let result = self.solve_relative(g, controls, allow_partial);
+        self.controls.load_completion_threshold = base;
+        result
+    }
+
+    fn solve_relative(
+        &mut self,
+        g: &Graph<D>,
+        controls: &Controls,
+        allow_partial: bool,
+    ) -> Result<PricingResult> {
         if let Some(kernel) = g.coupled_kernel() {
             kernel.validate_for(g)?;
         }

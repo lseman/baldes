@@ -194,9 +194,26 @@ def test_hgs_columns_and_ipm_master(columns):
     )
     assert result.status == "Optimal"
     assert result.ipm_iterations > 0
+    assert result.to_dict()["ipm_iterations"] == result.ipm_iterations
+    assert json.loads(result.to_json())["ipm_iterations"] == result.ipm_iterations
     assert result.lp == pytest.approx(4 + math.sqrt(2), abs=1e-6)
     assert all(step.alpha == 0 for step in result.history)
     assert_routes(result, 3, 2)
+
+
+def test_root_backend_iteration_counters_are_zero_without_master_work():
+    # The positive Python budget rounds to zero at Rust Duration resolution.
+    result = solve(triangle(), master_solver="ipm", time_limit=1e-12)
+    assert result.status == "TimeLimit"
+    assert result.iterations == 0
+    assert result.simplex_iterations == 0
+    assert result.ipm_iterations == 0
+    # Existing callers constructing the typed result without backend counters
+    # retain the zero defaults; solver responses supply the actual counters.
+    data = result.to_dict()
+    del data["simplex_iterations"], data["ipm_iterations"]
+    restored = pybaldes.RootResult(**data)
+    assert restored.simplex_iterations == restored.ipm_iterations == 0
 
 
 @pytest.mark.parametrize("options", [

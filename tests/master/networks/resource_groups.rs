@@ -804,6 +804,7 @@ fn public_triangle_group_mapping_survives_actual_shared_tree_descendants() {
             .snapshot
             .solve_tree(baldes::master::tree::ModelTreeOptions {
                 node: configured.clone(),
+                mapped_strong_branching: None,
                 ..Default::default()
             })
             .unwrap();
@@ -830,6 +831,7 @@ fn public_triangle_group_mapping_survives_actual_shared_tree_descendants() {
             let tree = child
                 .solve_tree(baldes::master::tree::ModelTreeOptions {
                     node: configured.clone(),
+                    mapped_strong_branching: None,
                     ..Default::default()
                 })
                 .unwrap();

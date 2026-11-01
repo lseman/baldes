@@ -240,6 +240,8 @@ pub(super) fn solve_routing(
         oracle_calls: usize,
         cuts: usize,
         lp_before_cuts: f64,
+        simplex_iterations: usize,
+        ipm_iterations: usize,
     }
     let output = py
         .detach(move || -> baldes::Result<_> {
@@ -283,6 +285,8 @@ pub(super) fn solve_routing(
                 oracle_calls: output.oracle_calls.iter().map(|(_, calls)| calls).sum(),
                 cuts: output.cuts,
                 lp_before_cuts: output.lp_before_cuts,
+                simplex_iterations: output.snapshot.master_simplex_iterations(),
+                ipm_iterations: output.snapshot.master_ipm_iterations(),
                 master: output.master,
             })
         })
@@ -304,6 +308,8 @@ pub(super) fn solve_routing(
     field!("cuts", output.cuts);
     field!("cut_rounds", output.master.cut_rounds);
     field!("iterations", output.master.iterations);
+    field!("simplex_iterations", output.simplex_iterations);
+    field!("ipm_iterations", output.ipm_iterations);
     field!("pricing_calls", output.master.pricing_calls);
     field!("oracle_calls", output.oracle_calls);
     let mut feasibility = Vec::new();

@@ -8,6 +8,10 @@ pub struct MipOptions {
     /// Search only for objectives strictly better than this value. No solution
     /// is implied by a finite cutoff supplied by the caller.
     pub objective_cutoff: f64,
+    /// DeLuxing column filtering before an all-integer complete-pool MIP
+    /// with a finite cutoff. Ignored for any other model. Not a native
+    /// MetaSolver feature; disabled by default.
+    pub deluxing: Option<crate::master::deluxing::DeluxingOptions>,
 }
 impl Default for MipOptions {
     fn default() -> Self {
@@ -15,6 +19,7 @@ impl Default for MipOptions {
             node_limit: 2_000_000,
             time_limit: Duration::from_secs(360_000),
             objective_cutoff: f64::INFINITY,
+            deluxing: None,
         }
     }
 }

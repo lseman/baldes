@@ -58,9 +58,13 @@ impl<const D: usize> State<D> {
             pricing_gap: self.pricing_gap,
             previous_fixing_gap: self.previous_fixing_gap,
             gap_enumeration: self.gap_enumeration,
+            tree_bound_floor: self.tree_bound_floor,
             fixing_bound: None,
+            fixing_cutoffs: None,
             gap_checkpoint: None,
             enumerated_routes: self.enumerated_routes,
+            gap_pool_cutoff: self.gap_pool_cutoff,
+            gap_mip: self.gap_mip.clone(),
             fixing_calls: self.fixing_calls,
             objective_fixed: self.objective_fixed,
             phase_one_infeasible: self.phase_one_infeasible,
@@ -124,6 +128,18 @@ impl<const D: usize> State<D> {
 }
 
 impl<const D: usize> NodeSnapshot<D> {
+    /// Simplex pivots recorded on this retained master since its last fork.
+    /// Forks reset the counter; discarded trial/checkpoint masters are excluded.
+    pub fn master_simplex_iterations(&self) -> usize {
+        self.master.simplex_iterations
+    }
+
+    /// Completed IPM Newton iterations on this retained master since its last fork.
+    /// Forks reset the counter; discarded trial/checkpoint masters are excluded.
+    pub fn master_ipm_iterations(&self) -> usize {
+        self.master.ipm_iterations
+    }
+
     pub(crate) fn fork(&self) -> Result<Self> {
         let mut node = Self {
             master: self.master.try_clone()?,
@@ -142,6 +158,7 @@ impl<const D: usize> NodeSnapshot<D> {
                 oracle.solver.restore_arcs();
             }
             node.state.objective_fixed = false;
+            node.state.gap_pool_cutoff = None;
             node.state.previous_fixing_gap = 1e12;
             node.warm.bound = f64::NEG_INFINITY;
             node.warm.numerical_bound = f64::NEG_INFINITY;

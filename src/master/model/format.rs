@@ -541,6 +541,8 @@ pub struct SolveOptions {
     pub aggregate_variable_branching: Vec<crate::master::model::AggregateVariableBranching>,
     /// Diving primal heuristic (tree only); disabled when absent.
     pub diving: Option<crate::master::tree::DivingOptions>,
+    /// Random incumbent partial fixing and child diving (tree only).
+    pub local_search: Option<crate::master::tree::LocalSearchOptions>,
     /// Restricted-master integer heuristic (tree only, highs feature).
     pub restricted_master_mip: Option<crate::master::model::tree_adapter::RestrictedMasterMip>,
     /// Absolute and relative node-closing gaps (native defaults 1e-6, 1e-9).
@@ -557,6 +559,7 @@ pub struct SolveOptions {
     pub clusters: Vec<crate::master::model::NetworkClusterBranching>,
     /// Packing-set Ryan–Foster branching (tree only).
     pub ryan_foster: Option<crate::master::model::RyanFosterBranching>,
+    /// Strong trials; off by default (native `ApplyStrongBranchingEvaluation`).
     pub mapped_strong_branching: bool,
     pub synchronized_services: Vec<SynchronizedService>,
     pub enumerate: bool,
@@ -606,11 +609,12 @@ impl Default for SolveOptions {
             use_branching_history: true,
             tree_threads: 1,
             diving: None,
+            local_search: None,
             branching_expressions: vec![],
             aggregate_variable_branching: vec![],
             clusters: vec![],
             ryan_foster: None,
-            mapped_strong_branching: true,
+            mapped_strong_branching: false,
             synchronized_services: vec![],
             enumerate: false,
             enumeration_route_limit: 10000,
@@ -697,6 +701,9 @@ impl SolveOptions {
         if self.diving.is_some() && !self.tree {
             return Err(invalid("diving requires tree=true"));
         }
+        if self.local_search.is_some() && !self.tree {
+            return Err(invalid("local_search requires tree=true"));
+        }
         if self.ryan_foster.is_some() && !self.tree {
             return Err(invalid("Ryan–Foster branching requires tree=true"));
         }
@@ -781,6 +788,7 @@ impl SolveOptions {
             clusters: self.clusters.clone(),
             ryan_foster: self.ryan_foster.clone(),
             diving: self.diving.clone(),
+            local_search: self.local_search.clone(),
             restricted_master_mip: self.restricted_master_mip.clone(),
             absolute_gap: self.absolute_gap,
             relative_gap: self.relative_gap,
@@ -799,6 +807,7 @@ impl SolveOptions {
                         .map_err(|_| invalid("MIP time limit"))?,
                     node_limit: self.mip_node_limit,
                     objective_cutoff: self.mip_objective_cutoff.unwrap_or(f64::INFINITY),
+                    deluxing: None,
                 })
             } else {
                 None
@@ -920,6 +929,35 @@ pub struct OriginalVariableResult {
     pub lower: f64,
     pub upper: f64,
 }
+/// One phase-I feasibility recovery round of a root or node solve.
+#[derive(Debug, Serialize)]
+pub struct FeasibilityResult {
+    pub status: &'static str,
+    pub iterations: usize,
+    pub pricing_calls: usize,
+    pub simplex_iterations: usize,
+    pub ipm_iterations: usize,
+    pub seconds: f64,
+    pub artificial_activity: Option<f64>,
+    /// A bound on artificial activity, never an original-objective bound.
+    pub lower_bound: Option<f64>,
+    pub certified_infeasible: bool,
+}
+impl FeasibilityResult {
+    fn new(report: &cg::FeasibilityReport) -> Self {
+        Self {
+            status: report.status.as_str(),
+            iterations: report.iterations,
+            pricing_calls: report.pricing_calls,
+            simplex_iterations: report.simplex_iterations,
+            ipm_iterations: report.ipm_iterations,
+            seconds: report.seconds,
+            artificial_activity: report.artificial_activity.and_then(finite),
+            lower_bound: report.lower_bound.and_then(finite),
+            certified_infeasible: report.certified_infeasible,
+        }
+    }
+}
 #[derive(Debug, Serialize)]
 pub struct SolveResult {
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -954,6 +992,9 @@ pub struct SolveResult {
     pub cuts: usize,
     pub cut_rounds: usize,
     pub lp_before_cuts: Option<f64>,
+    /// Phase-I recovery rounds (root solves that needed one).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub feasibility: Vec<FeasibilityResult>,
 }
 fn finite(value: f64) -> Option<f64> {
     value.is_finite().then_some(value)
@@ -1033,6 +1074,12 @@ impl SolveResult {
             cuts: output.cuts,
             cut_rounds: output.master.cut_rounds,
             lp_before_cuts: finite(output.lp_before_cuts),
+            feasibility: output
+                .master
+                .feasibility
+                .iter()
+                .map(FeasibilityResult::new)
+                .collect(),
             seconds,
         }
     }
@@ -1044,8 +1091,13 @@ impl SolveResult {
             bound_mode: output.bound_mode.as_str().into(),
             lp: None,
             bound: finite(output.bound),
-            numerical_bound: None,
-            certified_bound: None,
+            // The tree tracks only its selected proof channel.
+            numerical_bound: (output.bound_mode == cg::BoundMode::Numerical)
+                .then(|| finite(output.bound))
+                .flatten(),
+            certified_bound: (output.bound_mode == cg::BoundMode::Certified)
+                .then(|| finite(output.bound))
+                .flatten(),
             incumbent: finite(output.incumbent),
             routes: output
                 .routes
@@ -1071,6 +1123,7 @@ impl SolveResult {
             cuts: 0,
             cut_rounds: 0,
             lp_before_cuts: None,
+            feasibility: vec![],
             seconds,
         }
     }
@@ -1111,6 +1164,7 @@ impl SolveResult {
             cuts: 0,
             cut_rounds: 0,
             lp_before_cuts: None,
+            feasibility: vec![],
             seconds,
             enumeration_reports: vec![report.clone()],
             enumerated_mip_calls: 1,

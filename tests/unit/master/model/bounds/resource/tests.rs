@@ -343,3 +343,64 @@ fn coupled_dag_feasibility_unknown_keeps_the_path_and_objective_is_not_double_co
         Some(Some(-2.))
     );
 }
+
+#[test]
+fn counted_positive_arcs_make_single_axis_loop_bounds_exact_and_sound() {
+    // One adverse self-loop consuming `scale` under budget `loops * scale`:
+    // the exact walk optimum takes the loop `loops` times. The counted
+    // relaxation must reach that optimum and never exceed it.
+    for loops in 0..=5usize {
+        for scale in [0.125, 0.7, 1., 3.] {
+            let mut graph = Graph::<2>::new(3, 1).unwrap();
+            let budget = loops as f64 * scale;
+            for vertex in 0..3 {
+                graph.set_bounds(vertex, 0, 0., budget).unwrap();
+            }
+            graph.initial[0] = Some(0.);
+            graph.add_arc(0, 1, 0.).unwrap();
+            let lap = graph.add_arc(1, 1, -1.).unwrap();
+            graph.arc_mut(lap).unwrap().consumption[0] = scale;
+            graph.add_arc(1, 2, 0.).unwrap();
+            let weights: Vec<_> = graph.arcs.iter().map(|a| a.cost).collect();
+            let (_, limit) = positive_arc_limit(&graph).unwrap();
+            // A multiple of scale may round either way; the limit may only
+            // overcount by the one arc the directed check cannot exclude.
+            assert!(limit == loops || limit == loops + 1, "{loops} {scale}");
+            let bound = minimum(
+                &graph,
+                &weights,
+                &mut 1_000_000,
+                Instant::now() + Duration::from_secs(1),
+            )
+            .unwrap()
+            .unwrap();
+            assert!(bound <= -(loops as f64), "{loops} {scale}: {bound}");
+            assert!(bound >= -(limit as f64), "{loops} {scale}: {bound}");
+        }
+    }
+}
+
+#[test]
+fn counted_limit_excludes_an_arc_beyond_a_dyadic_budget() {
+    // Two unit arcs exactly fill a budget of two; a third cannot fit.
+    let mut graph = Graph::<2>::new(3, 1).unwrap();
+    for vertex in 0..3 {
+        graph.set_bounds(vertex, 0, 0., 2.).unwrap();
+    }
+    graph.initial[0] = Some(0.);
+    graph.add_arc(0, 1, 0.).unwrap();
+    let lap = graph.add_arc(1, 1, -1.).unwrap();
+    graph.arc_mut(lap).unwrap().consumption[0] = 1.;
+    graph.add_arc(1, 2, 0.).unwrap();
+    assert_eq!(positive_arc_limit(&graph), Some((0, 2)));
+    let weights: Vec<_> = graph.arcs.iter().map(|a| a.cost).collect();
+    let bound = minimum(
+        &graph,
+        &weights,
+        &mut 1_000_000,
+        Instant::now() + Duration::from_secs(1),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(bound, -2.);
+}

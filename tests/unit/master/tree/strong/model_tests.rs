@@ -93,7 +93,7 @@ fn mapped_near_ties_keep_registration_order_without_moving_other_families() {
 #[test]
 fn strong_branching_trials_the_first_registered_equal_candidate() {
     let output = root();
-    let mut options = ModelTreeOptions::default();
+    let mut options = strong_tree_options();
     options.mapped_variables = vec![mapping("z-first", 42), mapping("a-second", 42)];
     options.mapped_strong_branching = Some(StrongBranchingOptions {
         phases: vec![StrongPhase {
@@ -127,7 +127,7 @@ fn strong_branching_trials_the_first_registered_equal_candidate() {
 fn native_mapped_direction_orders_trials_and_preserves_paired_child_bounds() {
     let output = root();
     for direction in [None, Some(NetworkBranchDirection::LowerFirst)] {
-        let mut options = ModelTreeOptions::default();
+        let mut options = strong_tree_options();
         options.branching = NetworkBranchingPolicy::Phased;
         options.node.cg.stabilize = false;
         options.mapped_variables = vec![mapping("count42", 42)];
@@ -190,7 +190,7 @@ fn native_mapped_direction_orders_trials_and_preserves_paired_child_bounds() {
 #[test]
 fn native_direction_without_trials_orders_the_original_disjunction() {
     let output = root();
-    let mut options = ModelTreeOptions::default();
+    let mut options = strong_tree_options();
     options.branching = NetworkBranchingPolicy::Phased;
     options.mapped_strong_branching = None;
     options.mapped_variables = vec![mapping("count42", 42)];
@@ -255,7 +255,7 @@ fn mapped_native_phase_skips_preserve_parent_and_reuse_exact_children() {
     let output = root();
     let before_rows = output.snapshot.state.shared_rows.len();
     let before_columns = output.snapshot.master.costs.len();
-    let mut options = ModelTreeOptions::default();
+    let mut options = strong_tree_options();
     options.node.cg.stabilize = false;
     options.mapped_variables = vec![mapping("network42", 42)];
     let mut history = History::default();
@@ -289,7 +289,7 @@ fn mapped_native_phase_skips_preserve_parent_and_reuse_exact_children() {
 fn strong_trials_retain_original_incumbents_and_only_completed_exact_bounds() {
     for restricted_master_only in [false, true] {
         let output = root();
-        let mut options = ModelTreeOptions::default();
+        let mut options = strong_tree_options();
         options.node.cg.stabilize = false;
         options.mapped_variables = vec![mapping("network42", 42)];
         if restricted_master_only {
@@ -319,7 +319,12 @@ fn strong_trials_retain_original_incumbents_and_only_completed_exact_bounds() {
         let (objective, routes, masters) = history.incumbent.as_ref().expect("trial incumbent");
         assert_eq!(*objective, 2.);
         assert_eq!(
-            super::tree_adapter::validate_routes(&output.snapshot.state, routes, masters).unwrap(),
+            super::tree_adapter::validate_routes(
+                &output.snapshot.state,
+                routes,
+                &mut masters.clone()
+            )
+            .unwrap(),
             Some(*objective)
         );
         assert!(output
@@ -339,7 +344,7 @@ fn mapped_native_subtree_budget_limits_actual_restricted_trials() {
     let mut output = root();
     output.snapshot.state.mapped_subtree_size = 2.;
     output.snapshot.state.mapped_subtree_priority = 1.;
-    let mut options = ModelTreeOptions::default();
+    let mut options = strong_tree_options();
     let a = mapping("count42", 42);
     // The two distinct original mappings are fractional at the triangle root.
     let b =
@@ -397,7 +402,7 @@ fn mapped_native_subtree_budget_limits_actual_restricted_trials() {
 fn heuristic_and_incomplete_trials_never_prepare_child_proof_bounds() {
     for (pricing_phase_floor, max_iterations) in [(1, 100), (0, 1)] {
         let output = root();
-        let mut options = ModelTreeOptions::default();
+        let mut options = strong_tree_options();
         options.node.cg.stabilize = false;
         options.mapped_variables = vec![mapping("network42", 42)];
         options.mapped_strong_branching.as_mut().unwrap().phases = vec![StrongPhase {
@@ -442,7 +447,7 @@ fn mapped_scoring_uses_numerical_parent_without_changing_selected_proof_channel(
         output.snapshot.warm.bound_mode = cg::BoundMode::Certified;
         output.snapshot.warm.bound = 0.5;
         output.snapshot.warm.certified_bound = 0.5;
-        let mut options = ModelTreeOptions::default();
+        let mut options = strong_tree_options();
         options.node.cg.stabilize = false;
         options.mapped_variables = vec![mapping("count42", 42)];
         let mut history = History::default();
@@ -466,7 +471,7 @@ fn mapped_scoring_uses_numerical_parent_without_changing_selected_proof_channel(
 #[test]
 fn trial_incumbent_is_published_after_the_scoring_pass() {
     let output = root();
-    let mut options = ModelTreeOptions::default();
+    let mut options = strong_tree_options();
     options.node.cg.stabilize = false;
     let mut total = mapping("total-routes", 7);
     total.networks.extend(mapping("other", 42).networks);
@@ -506,7 +511,7 @@ fn scoring_cutoff_margin_changes_subtree_prediction_without_changing_proof_bound
     let output = root();
     let mut sizes = vec![];
     for margin in [0., 0.4] {
-        let mut options = ModelTreeOptions::default();
+        let mut options = strong_tree_options();
         options.node.cg.stabilize = false;
         options.scoring_gap_tolerance = margin;
         options.mapped_variables = vec![mapping("count42", 42)];
@@ -532,7 +537,7 @@ fn scoring_cutoff_margin_changes_subtree_prediction_without_changing_proof_bound
 fn exact_infeasible_trials_retain_original_phase_one_proof_but_heuristics_do_not() {
     let output = root();
     for floor in [0, 1] {
-        let mut options = ModelTreeOptions::default();
+        let mut options = strong_tree_options();
         options.node.cg.stabilize = false;
         options.node.cg.max_penalty_updates = 0;
         let mut total = mapping("total", 7);
@@ -614,7 +619,7 @@ fn compact_pricing_root() -> Output<2> {
 }
 
 fn continuation_options(exact_last: bool) -> ModelTreeOptions {
-    let mut options = ModelTreeOptions::default();
+    let mut options = strong_tree_options();
     options.node.cg.stabilize = false;
     options.node.cg.artificial_cost = 100.;
     options.mapped_variables = vec![mapping("screen-a", 42), mapping("screen-b", 42)];
@@ -745,7 +750,7 @@ fn native_restricted_screen_control_counts_exact_work_and_continues_lp_survivors
     .unwrap()
     .problem::<2>()
     .unwrap();
-    let mut options = ModelTreeOptions::default();
+    let mut options = strong_tree_options();
     options.node.cg.stabilize = false;
     options.branching = NetworkBranchingPolicy::ResourceFirst;
     options.mapped_variables = serde_json::from_str(include_str!(concat!(
@@ -896,7 +901,7 @@ fn incomplete_exact_trial_keeps_independent_published_bounds_without_a_completed
         oracle.solver.phases.truncate(1);
         assert!(oracle.solver.phases[0].exact());
     }
-    let mut options = ModelTreeOptions::default();
+    let mut options = strong_tree_options();
     options.node.cg.stabilize = false;
     options.node.cg.artificial_cost = 100.;
     options.node.cg.bound_mode = cg::BoundMode::Certified;
@@ -946,7 +951,7 @@ fn incomplete_exact_trial_keeps_independent_published_bounds_without_a_completed
 #[test]
 fn admitted_zero_budget_trials_keep_unknown_estimates_and_inherited_proofs() {
     let output = root();
-    let mut options = ModelTreeOptions::default();
+    let mut options = strong_tree_options();
     options.node.cg.stabilize = false;
     options.mapped_variables = vec![mapping("count42", 42)];
     let strong = options.mapped_strong_branching.as_mut().unwrap();
@@ -997,7 +1002,7 @@ fn admitted_zero_budget_trials_keep_unknown_estimates_and_inherited_proofs() {
 #[test]
 fn admitted_count_candidate_finishes_sibling_attempt_after_local_deadline() {
     let output = root();
-    let mut options = ModelTreeOptions::default();
+    let mut options = strong_tree_options();
     options.node.cg.stabilize = false;
     // This fixture is also exercised by the retained read-only GDB observer,
     // which pauses after the first result until this local budget expires.
@@ -1048,5 +1053,14 @@ fn admitted_count_candidate_finishes_sibling_attempt_after_local_deadline() {
         // A timed-out sibling is still attempted; its untouched inherited
         // bound remains independent of the completed first side's proof.
         assert_eq!(selected.children[0].warm.bound, output.snapshot.warm.bound);
+    }
+}
+
+/// Strong trials are opt-in (native `ApplyStrongBranchingEvaluation = false`);
+/// these tests exercise them with the default phase schedule.
+fn strong_tree_options() -> ModelTreeOptions {
+    ModelTreeOptions {
+        mapped_strong_branching: Some(crate::master::tree::StrongBranchingOptions::default()),
+        ..ModelTreeOptions::default()
     }
 }

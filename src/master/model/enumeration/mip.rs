@@ -5,33 +5,37 @@ use super::*;
 // coefficients and fixed reductions. Witness replay cannot detect a route
 // which the rounded model excluded before returning any solution.
 #[cfg(feature = "highs")]
-fn exact_integer_encoding<const D: usize>(
+/// Worst mismatch between the MIP model and the exact original encoding of
+/// every loaded column: 0 when exact, relative to each cost and absolute per
+/// row coefficient, or infinity when it cannot be evaluated.
+fn integer_encoding_error<const D: usize>(
     state: &State<D>,
     master: &ClpMaster,
     columns: &[Option<cg::Column>],
     deadline: Instant,
-) -> Result<bool> {
+) -> Result<f64> {
     use crate::master::numerics::ExactSum;
     if !super::super::bounds::exact_fixed_reduction(state, master)? {
-        return Ok(false);
+        return Ok(f64::INFINITY);
     }
     let mut proof_work = 1_000_000;
+    let mut worst = 0f64;
     for (column, metadata) in columns.iter().enumerate() {
         if Instant::now() >= deadline {
-            return Ok(false);
+            return Ok(f64::INFINITY);
         }
         if master.upper[column] == 0. {
             continue;
         }
         let Some(metadata) = metadata else {
-            return Ok(false);
+            return Ok(f64::INFINITY);
         };
         let mut cost = ExactSum::default();
         let mut rows = BTreeMap::<usize, ExactSum>::new();
         if let Some((index, sign)) = super::super::master_variables::decode(metadata.tag) {
             let variable = &state.master_variables[index];
             if cost.product(sign, variable.cost).is_none() {
-                return Ok(false);
+                return Ok(f64::INFINITY);
             }
             for &(row, a) in &variable.entries {
                 if rows
@@ -40,7 +44,7 @@ fn exact_integer_encoding<const D: usize>(
                     .product(sign, a)
                     .is_none()
                 {
-                    return Ok(false);
+                    return Ok(f64::INFINITY);
                 }
             }
         } else {
@@ -48,10 +52,10 @@ fn exact_integer_encoding<const D: usize>(
                 .ok()
                 .and_then(|tag| state.routes.get(tag))
             else {
-                return Ok(false);
+                return Ok(f64::INFINITY);
             };
             let Some(oracle) = state.oracles.iter().find(|o| o.network.id == route.network) else {
-                return Ok(false);
+                return Ok(f64::INFINITY);
             };
             if !oracle.activity_rows.is_empty()
                 && super::super::bounds::columns::exact_activity_entries_using(
@@ -62,23 +66,23 @@ fn exact_integer_encoding<const D: usize>(
                 )
                 .is_none()
             {
-                return Ok(false);
+                return Ok(f64::INFINITY);
             }
             if let Some(kernel) = oracle.network.graph.coupled_kernel() {
                 let arcs: Vec<_> = route.route.arcs.iter().map(|id| oracle.index[id]).collect();
                 let Some((true, bounds)) =
                     kernel.certify_with_budget(&arcs, &mut proof_work, Some(deadline))
                 else {
-                    return Ok(false);
+                    return Ok(f64::INFINITY);
                 };
                 if bounds[0] != bounds[1] || cost.add(bounds[0]).is_none() {
-                    return Ok(false);
+                    return Ok(f64::INFINITY);
                 }
             }
             for &arc in &route.route.arcs {
                 let position = oracle.index[&arc];
                 if cost.add(oracle.network.graph.arcs[position].cost).is_none() {
-                    return Ok(false);
+                    return Ok(f64::INFINITY);
                 }
                 for &(row, a) in &oracle.network.arc_entries[position] {
                     if rows
@@ -87,13 +91,13 @@ fn exact_integer_encoding<const D: usize>(
                         .add(a)
                         .is_none()
                     {
-                        return Ok(false);
+                        return Ok(f64::INFINITY);
                     }
                 }
             }
             for &(row, a) in &oracle.route_entries {
                 if rows.entry(row).or_default().add(a).is_none() {
-                    return Ok(false);
+                    return Ok(f64::INFINITY);
                 }
             }
             for &(row, a) in oracle.network.route_entries.iter() {
@@ -103,7 +107,7 @@ fn exact_integer_encoding<const D: usize>(
                     .add(a)
                     .is_none()
                 {
-                    return Ok(false);
+                    return Ok(f64::INFINITY);
                 }
             }
             for (row, a) in super::super::nonlinear::entries(oracle, &route.route)? {
@@ -113,23 +117,28 @@ fn exact_integer_encoding<const D: usize>(
                     .add(a)
                     .is_none()
                 {
-                    return Ok(false);
+                    return Ok(f64::INFINITY);
                 }
             }
         }
-        if cost.add(-master.costs[column]).is_none() || cost.sign() != 0. {
-            return Ok(false);
+        if cost.add(-master.costs[column]).is_none() {
+            return Ok(f64::INFINITY);
         }
+        worst = worst.max(cost.sign().abs() / master.costs[column].abs().max(1.));
         for (row, a) in master.column_entries(column)? {
             if rows.entry(row).or_default().add(-a).is_none() {
-                return Ok(false);
+                return Ok(f64::INFINITY);
             }
         }
-        if rows.values().any(|value| value.sign() != 0.) {
-            return Ok(false);
+        for value in rows.values() {
+            worst = worst.max(value.sign().abs());
         }
     }
-    Ok(Instant::now() < deadline)
+    Ok(if Instant::now() < deadline {
+        worst
+    } else {
+        f64::INFINITY
+    })
 }
 
 impl<const D: usize> NodeSnapshot<D> {
@@ -168,7 +177,7 @@ impl<const D: usize> NodeSnapshot<D> {
                     })
                 })
                 .collect::<Vec<_>>();
-            let mip = crate::master::solvers::highs::solve_integer(&master, &integers, options)?;
+            let mip = solve_pool(&master, &integers, options)?;
             let Some(solution) = mip.solution else {
                 return Ok(None);
             };
@@ -211,10 +220,50 @@ impl<const D: usize> NodeSnapshot<D> {
             let Some(routes) = synchronization::witness(&self.state, &routes)? else {
                 return Ok(None);
             };
-            Ok(
-                super::super::tree_adapter::validate_routes(&self.state, &routes, &master_values)?
-                    .map(|objective| (objective, routes, master_values)),
-            )
+            Ok(super::super::tree_adapter::validate_routes(
+                &self.state,
+                &routes,
+                &mut master_values,
+            )?
+            .map(|objective| (objective, routes, master_values)))
+        }
+    }
+
+    /// Native end-of-node MIP route threshold: `ControlParameters::postTreatment`
+    /// raises `maxNumOfEnumSolsForEndOfNodeMIP` to `maxNumOfEnumSolutionsForMIP`.
+    /// With several networks, the tightest network threshold applies.
+    pub(crate) fn end_of_node_mip_route_limit(&self) -> Result<usize> {
+        let mut limit = usize::MAX;
+        for oracle in &self.state.oracles {
+            #[cfg(feature = "highs")]
+            let (normal, end) = (
+                oracle
+                    .solver
+                    .options
+                    .get("BALDESmaxNumOfEnumSolutionsForMIP")?,
+                oracle
+                    .solver
+                    .options
+                    .get("BALDESmaxNumOfEnumSolsForEndOfNodeMIP")?,
+            );
+            #[cfg(not(feature = "highs"))]
+            let (normal, end): (f64, f64) = {
+                let _ = oracle;
+                (10_000., 0.)
+            };
+            if !(normal >= 0. && end >= 0.) {
+                return Err(invalid("enumerated MIP route limits must be nonnegative"));
+            }
+            limit = limit.min(normal.max(end) as usize);
+        }
+        Ok(limit)
+    }
+    /// Routes in this node's complete universe or retained gap pool.
+    pub(crate) fn enumerated_route_count(&self) -> usize {
+        if self.state.enumeration_report.complete {
+            self.state.enumeration_report.routes
+        } else {
+            self.state.enumerated_routes
         }
     }
 
@@ -233,7 +282,7 @@ impl<const D: usize> NodeSnapshot<D> {
         {
             return Ok(None);
         }
-        if self.state.universe.is_none() {
+        if self.state.universe.is_none() && self.state.gap_pool_cutoff.is_none() {
             return Ok(None);
         }
         #[cfg(not(feature = "highs"))]
@@ -256,7 +305,27 @@ impl<const D: usize> NodeSnapshot<D> {
             // Cleanup may retire a route from the restricted LP without
             // changing complete-domain coverage. Restore every missing path
             // before claiming an integer optimum for that complete domain.
-            for &tag in self.state.universe.as_ref().unwrap() {
+            let gap_routes;
+            let universe = if let Some(universe) = &self.state.universe {
+                universe
+            } else {
+                gap_routes = self
+                    .state
+                    .routes
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, route)| {
+                        self.state
+                            .oracles
+                            .iter()
+                            .find(|oracle| oracle.network.id == route.network)
+                            .is_some_and(|oracle| oracle.is_enumerated(&route.route))
+                    })
+                    .map(|(tag, _)| tag)
+                    .collect::<Vec<_>>();
+                &gap_routes
+            };
+            for &tag in universe {
                 if !present.insert(tag) {
                     continue;
                 }
@@ -313,7 +382,7 @@ impl<const D: usize> NodeSnapshot<D> {
                     })
                 })
                 .collect::<Vec<_>>();
-            let encoding_exact = exact_integer_encoding(
+            let encoding_error = integer_encoding_error(
                 &self.state,
                 &master,
                 &columns,
@@ -323,8 +392,23 @@ impl<const D: usize> NodeSnapshot<D> {
             )?;
             let mut options = options.clone();
             options.time_limit = options.time_limit.saturating_sub(started.elapsed());
-            let mut mip =
-                crate::master::solvers::highs::solve_integer(&master, &integers, &options)?;
+            let mut mip = solve_pool(&master, &integers, &options)?;
+            // A gap pool covers only objectives below its cutoff: always
+            // weaken the MIP claims accordingly.
+            if let Some(cutoff) = self.state.gap_pool_cutoff {
+                mip.bound = mip.bound.min(cutoff);
+                if mip.status == MipStatus::Infeasible {
+                    mip.status = MipStatus::ObjectiveCutoff;
+                    mip.bound = cutoff;
+                }
+            }
+            // Certified mode needs the exact original encoding. Numerical mode
+            // tolerates floating rounding of costs and coefficients, never a
+            // materially different model (e.g. cancellation).
+            let encoding_exact = match self.warm.bound_mode {
+                cg::BoundMode::Certified => encoding_error == 0.,
+                cg::BoundMode::Numerical => encoding_error <= 1e-9,
+            };
             if !encoding_exact {
                 mip.bound = f64::NEG_INFINITY;
                 if matches!(
@@ -384,10 +468,11 @@ impl<const D: usize> NodeSnapshot<D> {
                     }
                 }
                 if mip.solution.is_some() {
+                    let encoded_master_values = master_values.clone();
                     if let Some(upper) = super::super::tree_adapter::validate_routes(
                         &self.state,
                         &routes,
-                        &master_values,
+                        &mut master_values,
                     )? {
                         let objective = mip.solution.as_ref().unwrap().objective;
                         if (upper - objective).abs()
@@ -399,7 +484,22 @@ impl<const D: usize> NodeSnapshot<D> {
                             mip.bound = f64::NEG_INFINITY;
                         }
                         if upper < options.objective_cutoff {
-                            mip.solution.as_mut().unwrap().objective = upper;
+                            let solution = mip.solution.as_mut().unwrap();
+                            // Replay can raise Theta to pay exact recourse.
+                            // Publish the same repaired static witness in both
+                            // original-variable and backend-column coordinates.
+                            for (column, metadata) in columns.iter().enumerate() {
+                                let Some((index, sign)) = metadata.as_ref().and_then(|metadata| {
+                                    super::super::master_variables::decode(metadata.tag)
+                                }) else {
+                                    continue;
+                                };
+                                let value = master_values[index].1;
+                                if value != encoded_master_values[index].1 {
+                                    solution.values[column] = (sign * value).max(0.);
+                                }
+                            }
+                            solution.objective = upper;
                         } else {
                             // Original-unit replay could not establish a strict
                             // improvement, even though the backend rounded down.
@@ -426,8 +526,32 @@ impl<const D: usize> NodeSnapshot<D> {
                 mip,
                 route_values: routes,
                 master_values,
-                coverage_cutoff: f64::INFINITY,
+                coverage_cutoff: self.state.gap_pool_cutoff.unwrap_or(f64::INFINITY),
             }))
         }
+    }
+}
+
+/// Complete-pool integer solve. DeLuxing only removes columns that cannot
+/// occur in a solution at most the cutoff, so it requires every column to be
+/// integer and a finite cutoff; otherwise the plain solve is used.
+#[cfg(feature = "highs")]
+fn solve_pool<M: crate::master::LpMaster>(
+    master: &M,
+    integers: &[usize],
+    options: &MipOptions,
+) -> Result<crate::master::solvers::mip::MipOutput> {
+    match &options.deluxing {
+        Some(fixing)
+            if options.objective_cutoff.is_finite() && integers.len() == master.costs().len() =>
+        {
+            Ok(
+                crate::master::solvers::highs::solve_integer_with_deluxing(
+                    master, options, fixing,
+                )?
+                .0,
+            )
+        }
+        _ => crate::master::solvers::highs::solve_integer(master, integers, options),
     }
 }

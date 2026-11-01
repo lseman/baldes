@@ -124,3 +124,75 @@ fn empty_single_arc_window_is_detected_without_changing_the_graph() {
         0.5
     );
 }
+
+#[test]
+fn single_arc_group_coefficients_match_threshold_membership_at_adjacent_floats() {
+    use crate::pricing::restrictions::AccumulatedResourceBranch;
+    let boundary = 1. - AccumulatedResourceBranch::THRESHOLD_OFFSET;
+    for q in [
+        boundary - 1e-6,
+        f64::from_bits(boundary.to_bits() - 1),
+        boundary,
+        f64::from_bits(boundary.to_bits() + 1),
+        1. - 0.5e-6,
+        f64::from_bits(1f64.to_bits() - 1),
+        1.,
+        f64::from_bits(1f64.to_bits() + 1),
+    ] {
+        let mut graph = Graph::<5>::new(3, 5).unwrap();
+        for v in 0..3 {
+            for r in 0..5 {
+                graph.set_bounds(v, r, 0., 3.).unwrap();
+            }
+        }
+        let target = graph.add_arc(0, 1, 1.).unwrap();
+        let parallel = graph.add_arc(0, 1, 2.).unwrap();
+        let back = graph.add_arc(1, 0, 0.).unwrap();
+        let end = graph.add_arc(1, 2, 0.).unwrap();
+        let profile = vec![0., 0., 0., 0., q];
+        let mut route = Route {
+            coupled_values: Vec::new(),
+            nodes: vec![0, 1, 0, 1, 2],
+            arcs: vec![target, back, target, end],
+            cost: 2.,
+            original_cost: 2.,
+            resources: profile.clone(),
+            resource_profile: vec![
+                vec![0.; 5],
+                profile.clone(),
+                profile.clone(),
+                profile.clone(),
+                profile,
+            ],
+        };
+        for upper in [false, true] {
+            let rule = AccumulatedResourceBranch {
+                arc: target,
+                resource: 4,
+                threshold: 1.,
+                upper,
+            };
+            let group = AccumulatedResourceGroupBranch::new(0, vec![target], 4, 1., upper)
+                .unwrap()
+                .prepare(&graph)
+                .unwrap();
+            assert_eq!(group.boundary(), rule.boundary());
+            // A repeated occurrence still has one Boolean violation.
+            assert_eq!(
+                group.coefficient(&route, false),
+                if rule.satisfied_by(q) { 0. } else { 1. },
+                "q={q} upper={upper}"
+            );
+            route.arcs = vec![parallel, back, parallel, end];
+            assert_eq!(group.coefficient(&route, false), 0.);
+            route.arcs = vec![target, back, target, end];
+        }
+        // Without a schedule, membership cannot be shown: conservatively violated.
+        route.resource_profile.clear();
+        let group = AccumulatedResourceGroupBranch::new(0, vec![target], 4, 1., false)
+            .unwrap()
+            .prepare(&graph)
+            .unwrap();
+        assert_eq!(group.coefficient(&route, false), 1.);
+    }
+}

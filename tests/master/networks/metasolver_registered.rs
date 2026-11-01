@@ -74,8 +74,11 @@ fn registered_mixed_networks_match_reference_roots_trees_and_singular_collection
                 if tree {
                     let mut configured = ModelTreeOptions::default();
                     configured.node = options;
+                    // Mirror the reference's `ApplyStrongBranchingEvaluation`.
                     if case["strong_branching"] == true {
                         configured.branching = baldes::master::tree::NetworkBranchingPolicy::Phased;
+                        configured.mapped_strong_branching =
+                            Some(baldes::master::tree::StrongBranchingOptions::default());
                     }
                     let output =
                         baldes::master::tree::solve(parse(&case["model"]), configured.clone())

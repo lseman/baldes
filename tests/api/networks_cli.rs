@@ -583,6 +583,7 @@ fn native_depth_budgets_and_registered_aggregate_branches_preserve_objectives() 
     for strong in [true, false] {
         let mut flags = vec![
             "--tree",
+            "--mapped-strong-branching",
             "--network-branching",
             "phased",
             "--mapped-variables",
@@ -611,7 +612,12 @@ fn native_depth_budgets_and_registered_aggregate_branches_preserve_objectives() 
 
 #[test]
 fn native_phased_registry_evaluates_original_fallback_candidates() {
-    let tree = solve(&["--tree", "--network-branching", "phased"]);
+    let tree = solve(&[
+        "--tree",
+        "--mapped-strong-branching",
+        "--network-branching",
+        "phased",
+    ]);
     assert_eq!(tree["status"], "Optimal");
     assert_eq!(tree["incumbent"], 2.);
     assert!(tree["strong_branching_trials"].as_u64().unwrap() > 0);
@@ -628,6 +634,7 @@ fn native_phased_trial_budget_and_prepared_children_match_retained_controls() {
             let limit = case["limit"].as_u64().unwrap().to_string();
             let tree = solve(&[
                 "--tree",
+                "--mapped-strong-branching",
                 "--network-branching",
                 "phased",
                 "--nodes",
@@ -873,6 +880,7 @@ fn exact_infeasible_trial_is_not_resolved_or_left_open_at_native_budget_boundari
                 .arg(&model)
                 .args([
                     "--tree",
+                    "--mapped-strong-branching",
                     "--network-branching",
                     "phased",
                     "--network-tree-search",
@@ -923,6 +931,7 @@ fn mapped_phase_continuation_separates_native_screens_from_processed_exact_nodes
             .arg(fixture())
             .args([
                 "--tree",
+                "--mapped-strong-branching",
                 "--network-branching",
                 "resource-first",
                 "--mapped-variables",
@@ -990,6 +999,7 @@ fn native_packing_file_registers_original_assignment_branching() {
     for mode in ["numerical", "certified"] {
         let result = solve(&[
             "--tree",
+            "--mapped-strong-branching",
             "--packing",
             packing.to_str().unwrap(),
             "--no-stabilization",
@@ -1019,6 +1029,7 @@ fn named_native_branch_direction_controls_trial_order_through_cli() {
     let directions = fixtures.join("multi_network_native_branch_directions.json");
     let result = solve(&[
         "--tree",
+        "--mapped-strong-branching",
         "--no-stabilization",
         "--packing",
         packing.to_str().unwrap(),

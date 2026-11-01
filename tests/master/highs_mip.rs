@@ -181,44 +181,106 @@ mod routing {
     use super::*;
     use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
-        branching::BranchConstraint,
-        routing::{
-            self, CapacityCutConfig, EnumerationMipPolicy, KPathCutConfig, KnapsackCutConfig,
-            RootOptions, RoutingContext,
+        formulation::Row,
+        model::{
+            self,
+            separation::{CapacityCutConfig, KPathCutConfig, KnapsackCutConfig},
+            EnumerationOptions, NodeSnapshot, Options, Problem, RowCoefficients, RyanFosterMember,
         },
+        preprocessing::Bounds,
     };
-    use baldes::pricing::restrictions::RyanFosterConstraint;
     fn instance() -> Instance {
         Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap()
+    }
+    fn problem() -> Problem<2> {
+        Problem::set_partitioning(instance().graph(3, Rounding::None).unwrap(), 3.).unwrap()
+    }
+    #[derive(Clone, Copy, Debug)]
+    enum Branch {
+        Vehicles,
+        Together,
+        Apart,
+        NoFirstArc,
+        UnassignedCustomer,
+    }
+    fn restrict(node: &NodeSnapshot<2>, branch: Branch, arcs: usize) -> NodeSnapshot<2> {
+        let pair = |together| {
+            node.with_ryan_foster(
+                &[RyanFosterMember {
+                    network: 0,
+                    first: 1,
+                    second: 2,
+                }],
+                together,
+            )
+        };
+        match branch {
+            Branch::Vehicles => node.with_multiplicity(
+                0,
+                Bounds {
+                    lower: 3.,
+                    upper: 3.,
+                },
+            ),
+            Branch::Together => pair(true),
+            Branch::Apart => pair(false),
+            Branch::NoFirstArc => {
+                let mut coefficients = vec![0.; arcs];
+                coefficients[0] = 1.;
+                node.with_row(
+                    Row {
+                        sense: RowSense::LessEqual,
+                        rhs: 0.,
+                    },
+                    &[RowCoefficients {
+                        network: 0,
+                        arcs: coefficients,
+                        per_route: 0.,
+                    }],
+                )
+            }
+            // Customer 1 covers shared row 0.
+            Branch::UnassignedCustomer => node.branch_assignment(0, 0, false),
+        }
+        .unwrap()
     }
     #[test]
     fn enumerated_mip_keeps_active_cut_families_and_typed_child_rows() {
         let instance = instance();
-        let problem =
-            RoutingContext::set_partitioning(instance.graph(3, Rounding::None).unwrap(), 3.)
-                .unwrap();
+        let problem = problem();
+        let arcs = problem.networks[0].graph.arcs.len();
+        let first_arc = problem.networks[0].graph.arcs[0].id;
         for family in 0..6 {
-            let mut options = RootOptions::default();
-            options.capture_state = true;
-            options.enumerate = true;
-            options.incumbent = 100.;
+            let mut options = Options::default();
             options.cg.stabilize = false;
-            options = match family {
-                1 => options.with_rank_one_cuts(),
-                2 => options.with_capacity_cuts(CapacityCutConfig::new(vec![0., 1., 1., 1.], 2.)),
-                3 => options.with_kpath_cuts(KPathCutConfig::new(vec![0., 1., 1., 1.], 2.)),
-                4 => options.with_knapsack_cuts(KnapsackCutConfig::new(vec![
-                    baldes::cuts::knapsack::KnapsackRow::new(0, 1, 1., 3),
-                ])),
-                5 => options.with_knapsack_cuts(instance.fenchel_cut_config().unwrap()),
-                _ => options,
-            };
-            let parent = routing::solve(problem.clone(), options.clone()).unwrap();
-            let snapshot = parent.snapshot.as_ref().unwrap();
-            assert!(snapshot.enumerated_routes().is_some(), "family {family}");
-            if family > 0 {
-                assert!(snapshot.active_cuts() > 0, "family {family}");
+            match family {
+                1 => options.separation.rank_one.enabled = true,
+                2 => {
+                    options.separation.capacity =
+                        Some(CapacityCutConfig::new(vec![0., 1., 1., 1.], 2.))
+                }
+                3 => options.separation.kpath = Some(KPathCutConfig::new(vec![0., 1., 1., 1.], 2.)),
+                4 => {
+                    options.separation.knapsack = Some(KnapsackCutConfig::new(vec![
+                        baldes::cuts::knapsack::KnapsackRow::new(0, 1, 1., 3),
+                    ]))
+                }
+                5 => options.separation.knapsack = Some(instance.fenchel_cut_config().unwrap()),
+                _ => {}
             }
+            let parent = model::solve(problem.clone(), options.clone()).unwrap();
+            if family > 0 {
+                assert!(parent.cuts > 0, "family {family}");
+            }
+            let snapshot = parent
+                .snapshot
+                .enumerate(&EnumerationOptions::default())
+                .unwrap();
+            assert!(
+                snapshot.enumeration_report().complete,
+                "family {family}: {:?}",
+                snapshot.enumeration_report()
+            );
             let mip = snapshot
                 .solve_enumerated_mip(&MipOptions::default())
                 .unwrap()
@@ -230,76 +292,48 @@ mod routing {
             );
             assert!((mip.mip.solution.unwrap().objective - (4. + 2f64.sqrt())).abs() < 1e-6);
             for branch in [
-                BranchConstraint::NumberOfVehicles {
-                    graph_id: 0,
-                    sense: RowSense::GreaterEqual,
-                    rhs: 3.,
-                },
-                BranchConstraint::RyanFoster(RyanFosterConstraint {
-                    first: 1,
-                    second: 2,
-                    together: true,
-                }),
-                BranchConstraint::RyanFoster(RyanFosterConstraint {
-                    first: 1,
-                    second: 2,
-                    together: false,
-                }),
-                BranchConstraint::ArcFlow {
-                    arc: 0,
-                    sense: RowSense::LessEqual,
-                    rhs: 0.,
-                },
-                BranchConstraint::PackingSetAssignment {
-                    vertex: 1,
-                    graph_id: 0,
-                    assigned: false,
-                },
+                Branch::Vehicles,
+                Branch::Together,
+                Branch::Apart,
+                Branch::NoFirstArc,
+                Branch::UnassignedCustomer,
             ] {
-                let child = routing::inherit_branches(snapshot, &[branch.clone()], options.clone())
+                let child = restrict(&snapshot, branch, arcs)
+                    .solve(options.clone())
                     .unwrap();
-                if matches!(
-                    branch,
-                    BranchConstraint::PackingSetAssignment {
-                        assigned: false,
-                        ..
-                    }
-                ) {
-                    assert!(child.preprocessing.infeasible);
-                    assert_eq!(child.master.status, baldes::master::cg::Status::Infeasible);
-                    assert_eq!(child.master.pricing_calls, 0);
-                    assert!(child.snapshot.is_none());
+                if matches!(branch, Branch::UnassignedCustomer) {
+                    assert_eq!(
+                        child.master.status,
+                        baldes::master::cg::Status::Infeasible,
+                        "{child:?}"
+                    );
                     continue;
                 }
-                let child = child.snapshot.unwrap();
                 let mip = child
+                    .snapshot
                     .solve_enumerated_mip(&MipOptions::default())
                     .unwrap()
                     .unwrap_or_else(|| {
                         panic!(
-                            "missing child universe: family={family} branch={branch:?} count={:?}",
-                            child.enumerated_routes()
+                            "missing child universe: family={family} branch={branch:?} {:?}",
+                            child.snapshot.enumeration_report()
                         )
                     });
                 assert_eq!(mip.mip.status, MipStatus::Optimal, "{mip:?}");
-                if matches!(branch, BranchConstraint::NumberOfVehicles { .. }) {
-                    assert_eq!(mip.route_values.len(), 3);
-                } else {
-                    for (r, _) in &mip.route_values {
-                        match branch {
-                            BranchConstraint::RyanFoster(rule) if rule.together => {
-                                assert_eq!(r.nodes.contains(&1), r.nodes.contains(&2))
-                            }
-                            BranchConstraint::RyanFoster(_) => {
-                                assert!(!(r.nodes.contains(&1) && r.nodes.contains(&2)))
-                            }
-                            BranchConstraint::ArcFlow { arc, .. } => {
-                                assert!(!r
-                                    .arcs
-                                    .contains(&problem.model.networks[0].graph.arcs[arc].id))
-                            }
-                            _ => unreachable!(),
+                if matches!(branch, Branch::Vehicles) {
+                    let total: f64 = mip.route_values.iter().map(|r| r.quantity).sum();
+                    assert_eq!(total, 3.);
+                    continue;
+                }
+                for fixed in &mip.route_values {
+                    let r = &fixed.route.route;
+                    match branch {
+                        Branch::Together => {
+                            assert_eq!(r.nodes.contains(&1), r.nodes.contains(&2))
                         }
+                        Branch::Apart => assert!(!(r.nodes.contains(&1) && r.nodes.contains(&2))),
+                        Branch::NoFirstArc => assert!(!r.arcs.contains(&first_arc)),
+                        _ => unreachable!(),
                     }
                 }
             }
@@ -312,34 +346,28 @@ mod routing {
     }
     #[test]
     fn optional_tree_mip_closes_only_complete_enumeration() {
-        use baldes::master::tree::{self, TreeOptions, TreeStatus};
-        let problem =
-            RoutingContext::set_partitioning(instance().graph(3, Rounding::None).unwrap(), 3.)
-                .unwrap();
-        let mut options = TreeOptions::default();
-        options.root.cg.stabilize = false;
-        options.strong_branching = None;
-        options.diving = None;
+        use baldes::master::tree::{self, ModelTreeOptions, TreeStatus};
+        let mut options = ModelTreeOptions::default();
+        options.node.cg.stabilize = false;
         options.enumerated_mip = Some(MipOptions::default());
-        // Automatic enumeration needs a finite incumbent gap. Keep the
-        // feasible-witness heuristic enabled instead of relying on implicit
-        // singleton columns in the root master.
-        let result = tree::solve(problem.clone(), options.clone()).unwrap();
+        // Automatic enumeration needs a finite incumbent gap, supplied here
+        // by the validated pricing witness.
+        let result = tree::solve(problem(), options.clone()).unwrap();
         assert_eq!(result.status, TreeStatus::Optimal, "{result:?}");
         assert!(result.enumerated_mip_calls > 0, "{result:?}");
-        assert_eq!(result.nodes, 1, "{result:?}");
-        options.root.enumerate = false;
-        let result = tree::solve(problem.clone(), options.clone()).unwrap();
-        assert_eq!(result.status, TreeStatus::Optimal);
-        assert_eq!(result.enumerated_mip_calls, 0);
-        assert!(result.nodes > 1);
-        options.root.enumerate = true;
+        // Without gap enumeration the incumbent-cutoff collection still feeds
+        // the end-of-node MIP; the optimum must not change.
+        options.node.gap_enumeration = false;
+        let result = tree::solve(problem(), options.clone()).unwrap();
+        assert_eq!(result.status, TreeStatus::Optimal, "{result:?}");
+        assert!((result.incumbent - (4. + 2f64.sqrt())).abs() < 1e-6);
+        options.node.gap_enumeration = true;
         options.enumerated_mip = Some(MipOptions {
             node_limit: 0,
             ..Default::default()
         });
         options.node_limit = 1;
-        let result = tree::solve(problem, options).unwrap();
+        let result = tree::solve(problem(), options).unwrap();
         assert_ne!(result.status, TreeStatus::Optimal, "{result:?}");
         assert!(result.open_nodes > 0);
         assert!(result.bound < result.incumbent);

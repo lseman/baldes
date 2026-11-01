@@ -13,6 +13,7 @@ pub(super) struct NetworkSearch<'a, const D: usize> {
     pub selected_nodes: &'a mut usize,
     pub unresolved: &'a mut Option<f64>,
     pub workers: Option<&'a rayon::ThreadPool>,
+    pub local_search_rng: crate::rng::GnuRand,
 }
 impl<const D: usize> Model for NetworkSearch<'_, D> {
     type Node = NodeSnapshot<D>;
@@ -37,7 +38,7 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
         if entry.proven_infeasible()
             || self
                 .options
-                .closes(entry.node.warm.bound, self.result.incumbent)
+                .closes(entry.node.tree_bound(), self.result.incumbent)
         {
             if let Some(history) = self.subtree_history.as_mut() {
                 history.close(entry.node.state.mapped_lineage);
@@ -121,7 +122,7 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
         let windows = self.windows;
         let base_depth = self.base_depth;
         let mut subtree_history = &mut *self.subtree_history;
-        let mut mapped_history = &mut *self.mapped_history;
+        let mapped_history = &mut *self.mapped_history;
         let selected_nodes = &mut *self.selected_nodes;
         let unresolved = &mut *self.unresolved;
         if !reused {
@@ -163,12 +164,21 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
         }
         if let Some(configured) = &options.enumerated_mip {
             let mut configured = configured.clone();
-            configured.time_limit = configured
-                .time_limit
-                .min(deadline.saturating_duration_since(Instant::now()));
+            // Native Alg4EvalByMip::setupAlgo reserves 2% of the remaining
+            // global budget for the rest of the search.
+            configured.time_limit = configured.time_limit.min(
+                deadline
+                    .saturating_duration_since(Instant::now())
+                    .mul_f64(0.98),
+            );
             configured.objective_cutoff = configured.objective_cutoff.min(result.incumbent);
-            let attempt = if output.snapshot.enumeration_report().complete {
-                Some(output.snapshot.solve_enumerated_mip(&configured))
+            let route_limit = output.snapshot.end_of_node_mip_route_limit()?;
+            let attempt = if output.snapshot.enumeration_report().complete
+                || output.snapshot.state.gap_pool_cutoff.is_some()
+            {
+                // Native end-of-node MIP runs only on a small enough universe.
+                (output.snapshot.enumerated_route_count() <= route_limit)
+                    .then(|| output.snapshot.solve_enumerated_mip(&configured))
             } else if configured.objective_cutoff.is_finite() {
                 let mut limits = options.node.enumeration.clone().unwrap_or_default();
                 limits.time_limit = limits
@@ -180,10 +190,13 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                 {
                     Ok(view) => {
                         result.enumeration_reports.push(view.report().clone());
-                        configured.time_limit = configured
-                            .time_limit
-                            .min(deadline.saturating_duration_since(Instant::now()));
-                        Some(view.solve_mip(&configured).map(Some))
+                        configured.time_limit = configured.time_limit.min(
+                            deadline
+                                .saturating_duration_since(Instant::now())
+                                .mul_f64(0.98),
+                        );
+                        (view.report().routes <= route_limit)
+                            .then(|| view.solve_mip(&configured).map(Some))
                     }
                     Err(error) => {
                         result.enumeration_reports.push(EnumerationReport {
@@ -320,6 +333,54 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                 return Ok(Decision::Continue);
             }
         }
+        if let Some(config) = options
+            .local_search
+            .as_ref()
+            .filter(|config| config.due(output.snapshot.state.node_depth))
+        {
+            let incumbent = result.incumbent.is_finite().then(|| {
+                (
+                    result.incumbent,
+                    result.routes.clone(),
+                    result.master_values.clone(),
+                )
+            });
+            let dive = local_search::run(
+                &output,
+                options,
+                config,
+                incumbent,
+                &mut self.local_search_rng,
+                deadline,
+            )?;
+            result.diving_nodes += dive.nodes;
+            result.iterations += dive.iterations;
+            result.pricing_calls += dive.pricing_calls;
+            for (id, calls) in dive.oracle_calls {
+                if let Some((_, total)) = result
+                    .oracle_calls
+                    .iter_mut()
+                    .find(|(network, _)| *network == id)
+                {
+                    *total += calls;
+                }
+            }
+            if let Some((objective, routes, master_values)) = dive.incumbent {
+                if objective < result.incumbent {
+                    result.incumbent = objective;
+                    result.routes = routes;
+                    result.master_values = master_values;
+                }
+            }
+            // Neighborhood bounds cover only that private dive. The node's
+            // selected-channel bound remains the sole pruning authority.
+            if options.closes(bound, result.incumbent) {
+                if let Some(history) = &mut subtree_history {
+                    history.close(lineage);
+                }
+                return Ok(Decision::Continue);
+            }
+        }
         if let Some(config) = options.restricted_master_mip.as_ref().filter(|config| {
             config.due(
                 output.snapshot.state.node_depth.saturating_sub(base_depth),
@@ -332,6 +393,8 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                     .min(deadline.saturating_duration_since(Instant::now())),
                 node_limit: config.node_limit,
                 objective_cutoff: result.incumbent,
+                // A restricted master is not a complete pool.
+                deluxing: None,
             };
             result.restricted_mip_calls += 1;
             // A failed heuristic leaves normal branching available.
@@ -408,9 +471,16 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                 .as_mut()
                 .map(|h| h.split(lineage))
                 .unwrap_or([0; 2]);
+            // Objective-dependent exclusions only remove solutions costing at
+            // least the incumbent, so this floor holds for every child even
+            // when its fork dropped incumbent-justified warm bounds.
+            let floor = bound.min(result.incumbent);
             for (side, child) in children.iter_mut().enumerate() {
                 child.state.node_depth = output.snapshot.state.node_depth.saturating_add(1);
                 child.state.mapped_lineage = lineages[side];
+                if floor.is_finite() {
+                    child.state.tree_bound_floor = child.state.tree_bound_floor.max(floor);
+                }
             }
             for (side, child) in selection.children.into_iter().enumerate() {
                 pending.push_evaluated(

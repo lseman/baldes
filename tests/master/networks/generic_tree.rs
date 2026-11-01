@@ -56,6 +56,7 @@ fn tree_from_snapshot_branches_signed_integer_master_variables() {
                 .snapshot
                 .solve_tree(ModelTreeOptions {
                     node: configured.clone(),
+                    mapped_strong_branching: None,
                     ..Default::default()
                 })
                 .unwrap();
@@ -108,6 +109,7 @@ fn tree_branches_multiplicity_and_original_arc_activity_without_assignment_candi
                 .snapshot
                 .solve_tree(ModelTreeOptions {
                     node: configured.clone(),
+                    mapped_strong_branching: None,
                     ..Default::default()
                 })
                 .unwrap();
@@ -119,6 +121,7 @@ fn tree_branches_multiplicity_and_original_arc_activity_without_assignment_candi
                 .solve_tree(ModelTreeOptions {
                     node: configured.clone(),
                     node_limit: 1,
+                    mapped_strong_branching: None,
                     ..Default::default()
                 })
                 .unwrap();

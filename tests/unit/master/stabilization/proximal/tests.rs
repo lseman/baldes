@@ -174,6 +174,21 @@ fn center_moves_only_on_completed_improving_pricing() {
     assert_eq!(state.center, vec![6.]);
 }
 
+#[test]
+fn proximal_serious_steps_require_relative_and_absolute_bound_improvement() {
+    for (bound, insufficient, sufficient) in [(2., 5e-7, 2e-6), (1e9, 0.05, 0.2)] {
+        let mut state = ProximalState::default();
+        state.reset();
+        state.observe(&[1.], bound, true);
+        state.observe(&[2.], bound + insufficient, true);
+        assert_eq!(state.center, vec![1.]);
+        assert_eq!(state.bound, bound);
+        state.observe(&[3.], bound + sufficient, true);
+        assert_eq!(state.center, vec![3.]);
+        assert_eq!(state.bound, bound + sufficient);
+    }
+}
+
 #[cfg(feature = "clp")]
 #[test]
 fn hard_and_soft_bands_solve_only_a_private_master() {

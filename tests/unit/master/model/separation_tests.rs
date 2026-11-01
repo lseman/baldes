@@ -1,6 +1,65 @@
+use super::repair_theta_duals;
 use super::{prefer_arc_memory, separation_gap_closed};
 use crate::cuts::{MemoryKind, MemoryType};
+use crate::master::model::master_variables;
 use crate::master::model::{Options, Problem};
+
+#[test]
+fn theta_dual_repair_proves_static_feasibility_without_changing_row_signs() {
+    use crate::extensions::stochastic::{Demand, Policy};
+    let stochastic = crate::extensions::stochastic::Problem::new(
+        2,
+        vec![Demand::new(vec![(1, 1.)]).unwrap()],
+        vec![vec![0., 1.], vec![1., 0.]],
+    )
+    .unwrap();
+    let (problem, recourse) = stochastic.theta_cut_model(Policy::Classical, 1, 1).unwrap();
+    let mut options = Options::default();
+    options.cg.time_limit = std::time::Duration::ZERO;
+    options.separation.route_recourse = Some(recourse);
+    let mut output = super::super::solve(problem, options).unwrap();
+    let state = &mut output.snapshot.state;
+    let variable = state
+        .cuts
+        .as_ref()
+        .unwrap()
+        .theta
+        .iter()
+        .flatten()
+        .next()
+        .copied()
+        .unwrap();
+    let row = state.shared_offset + state.master_variables[variable].entries[0].0;
+    let mut duals = vec![0.; state.rhs.len()];
+    duals[row] = 1. + f64::EPSILON;
+    assert_eq!(
+        master_variables::reduced_cost_nonnegative(
+            &state.master_variables[variable],
+            1.,
+            &duals,
+            state.shared_offset
+        ),
+        Some(false)
+    );
+    repair_theta_duals(state, &mut duals);
+    assert!(duals[row] >= 0. && duals[row] <= 1.);
+    assert_eq!(
+        master_variables::reduced_cost_nonnegative(
+            &state.master_variables[variable],
+            1.,
+            &duals,
+            state.shared_offset
+        ),
+        Some(true)
+    );
+    // A shared static row requires a joint projection. Decline it instead of
+    // changing another variable's dual constraint through a local repair.
+    let other = state.master_variables[variable].clone();
+    state.master_variables.push(other);
+    duals[row] = 1. + f64::EPSILON;
+    repair_theta_duals(state, &mut duals);
+    assert_eq!(duals[row], 1. + f64::EPSILON);
+}
 
 #[test]
 fn separation_gap_requires_a_finite_and_close_incumbent() {
@@ -61,10 +120,14 @@ fn several_networks_share_rank_one_cuts_over_their_packing_rows() {
     let base = super::super::solve(rc101_networks(25, 2), plain).unwrap();
     let both = super::super::solve(rc101_networks(25, 2), capacity).unwrap();
     assert!(both.master.lp >= base.master.lp - 1e-6);
-    // Relaxation improvement (dynamic ng) has no multi-network form yet.
+    // Relaxation improvement strengthens each network independently.
     let mut general = cut;
     general.separation.relaxation_improvement_priority = 1.;
-    assert!(super::super::solve(rc101_networks(5, 2), general).is_err());
+    assert!(super::super::solve(rc101_networks(5, 2), general)
+        .unwrap()
+        .master
+        .lp
+        .is_finite());
 }
 
 #[test]
@@ -213,4 +276,172 @@ fn automatic_rank_one_memory_skips_arc_pass_on_tailing_off_and_closed_incumbent(
             .and_then(|c| c.resolved_memory_type),
         Some(MemoryType::Vertex)
     );
+}
+
+#[test]
+fn every_network_receives_knapsack_resource_mapping_and_exact_fenchel_mode() {
+    use super::KnapsackCutConfig;
+    use crate::cuts::knapsack::KnapsackRow;
+    use std::collections::BTreeMap;
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    let mut row = KnapsackRow::new(0, 7, 1., 10000);
+    row.graph_resources.insert(1, (7, 1.));
+    options.separation.knapsack = Some(
+        KnapsackCutConfig::new(vec![row])
+            .with_resource_indices(BTreeMap::from([(7, 0)]))
+            .with_fenchel(Default::default()),
+    );
+    let output = super::super::solve(rc101_networks(5, 2), options).unwrap();
+    for oracle in &output.snapshot.state.oracles {
+        assert_eq!(oracle.solver.knapsack_indices().get(&7), Some(&0));
+        assert!(oracle.solver.knapsack_exact_coefficients);
+    }
+}
+
+#[test]
+fn general_kpath_accepts_and_validates_each_network_graph() {
+    use crate::cuts::kpath::KPathGraph;
+    use crate::cuts::rank_one::separation::{prepare_incidence, ArcData, GraphData, VertexData};
+    let problem = rc101_networks(5, 2);
+    let graphs: Vec<_> = problem
+        .networks
+        .iter()
+        .map(|network| {
+            let mut graph = GraphData {
+                id: network.id,
+                source: network.graph.source as i32,
+                sink: network.graph.sink as i32,
+                elem_set_count: 5,
+                packing_set_count: 5,
+                covering_set_count: 5,
+                ..Default::default()
+            };
+            for v in 0..network.graph.vertices.len() {
+                let sets = if v > 0 && v <= 5 {
+                    vec![(v - 1) as i32]
+                } else {
+                    vec![]
+                };
+                graph.vertices.push(VertexData {
+                    id: v as i32,
+                    elem_sets: sets.clone(),
+                    packing_sets: sets.clone(),
+                    covering_sets: sets,
+                });
+            }
+            graph.arcs = network
+                .graph
+                .arcs
+                .iter()
+                .map(|arc| ArcData {
+                    id: arc.id,
+                    tail: arc.tail as i32,
+                    head: arc.head as i32,
+                    ..Default::default()
+                })
+                .collect();
+            KPathGraph {
+                incidence: prepare_incidence(&graph),
+                graph,
+                ..Default::default()
+            }
+        })
+        .collect();
+    let root = env!("CARGO_MANIFEST_DIR");
+    let mut instance =
+        crate::inputs::Instance::read(format!("{root}/instances/Solomon/RC101.txt")).unwrap();
+    instance.truncate(5).unwrap();
+    let demands = instance
+        .customers
+        .iter()
+        .skip(1)
+        .map(|customer| customer.demand)
+        .collect();
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    options.separation.general_kpath = Some(super::GeneralKPathCutConfig::new(
+        graphs,
+        demands,
+        instance.capacity,
+        true,
+    ));
+    let valid = super::super::solve(problem.clone(), options.clone()).unwrap();
+    assert!(valid.master.lp.is_finite());
+    options.separation.general_kpath.as_mut().unwrap().graphs[1]
+        .graph
+        .arcs
+        .clear();
+    let error = super::super::solve(problem, options).unwrap_err();
+    assert!(error.message.contains("arc incidence"), "{error}");
+}
+
+#[test]
+fn strong_kpath_keeps_network_registries_and_master_coefficients_aligned() {
+    let root = env!("CARGO_MANIFEST_DIR");
+    let mut instance =
+        crate::inputs::Instance::read(format!("{root}/instances/Solomon/RC101.txt")).unwrap();
+    instance.truncate(25).unwrap();
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    options.separation.kpath = Some(super::KPathCutConfig::new(
+        instance
+            .customers
+            .iter()
+            .map(|customer| customer.demand)
+            .collect(),
+        instance.capacity,
+    ));
+    let output = super::super::solve(rc101_networks(25, 2), options).unwrap();
+    assert!(output.master.lp.is_finite());
+    let state = &output.snapshot.state;
+    let first = &state.oracles[0];
+    for oracle in &state.oracles {
+        assert_eq!(oracle.solver.cuts.cuts.len(), first.solver.cuts.cuts.len());
+        assert_eq!(oracle.nonlinear_rows, first.nonlinear_rows);
+        assert_eq!(oracle.solver.cuts.retired, first.solver.cuts.retired);
+    }
+    for column in output.snapshot.warm.columns.iter().flatten() {
+        let Ok(tag) = usize::try_from(column.tag) else {
+            continue;
+        };
+        let Some(route) = state.routes.get(tag) else {
+            continue;
+        };
+        let oracle = state
+            .oracles
+            .iter()
+            .find(|oracle| oracle.network.id == route.network)
+            .unwrap();
+        assert_eq!(
+            column.entries,
+            super::super::entries(oracle, &route.route, state.shared_offset).unwrap()
+        );
+    }
+}
+
+#[test]
+fn rank_one_neighbourhood_cap_defaults_to_sixteen_and_reaches_the_separator() {
+    let problem = rc101_networks(5, 1);
+    let graph = &problem.networks[0].graph;
+    let customers = problem.customers();
+    let mut registry = crate::cuts::CutRegistry::default();
+    let mut options = crate::core::options::Options::default();
+    assert_eq!(
+        options.get("BALDESrankOneCutsNeighbourhoodSize").unwrap(),
+        16.
+    );
+    options
+        .set("BALDESrankOneCutsNeighbourhoodSize", 7.)
+        .unwrap();
+    registry
+        .separate_default(graph, &options, &customers, &[])
+        .unwrap();
+    assert_eq!(registry.parameters.neighbourhood_size, 7);
+    options
+        .set("BALDESrankOneCutsNeighbourhoodSize", 0.)
+        .unwrap();
+    assert!(registry
+        .separate_default(graph, &options, &customers, &[])
+        .is_err());
 }

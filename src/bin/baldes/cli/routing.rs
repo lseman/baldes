@@ -33,9 +33,11 @@ Options:
                         then arc flow), ryan-foster (route count, customer-pair
                         Ryan–Foster, then arc flow) or hybrid (phased: route count,
                         resource, clusters, assignment, Ryan–Foster, arc flow)
-  --no-strong-branching  Skip strong trials on mapped arc/edge variables
+  --strong-branching    Strong trials on branch candidates (native default: off)
+  --no-strong-branching  Skip strong trials (default)
   --diving              Strong limited-discrepancy diving every 10 nodes (off by default)
   --no-diving           Disable diving (default)
+  --local-search FILE   Partial-incumbent diving controls JSON (--tree; depth_limit >= 0 enables)
   --restricted-mip      Restricted-master integer heuristic at the root (HiGHS)
   --mip-nodes N         Node budget of that heuristic (enables it)
   --no-mip-heuristic    Disable it (default)
@@ -54,6 +56,7 @@ Options:
   --no-stabilization    Disable dual stabilization
   --stabilization-max-tree-depth N  Activate only below depth N (default: 10000)
   --enumerated-mip      Solve complete enumerated node masters with HiGHS (--tree; highs feature)
+  --deluxing            Filter enumerated MIP columns (enables --enumerated-mip; requires --tree)
   --no-enumeration      Disable reduced-cost fixing and enumeration
   --upper-bound X       Initial incumbent
   --dynamic-ng P        Strengthen NG memories from master cycles at separator
@@ -84,6 +87,7 @@ struct RoutingOptions {
     branching: String,
     strong_branching: bool,
     diving: bool,
+    local_search: Option<baldes::master::tree::LocalSearchOptions>,
     tree_controls: TreeControls,
     enumerated_mip: bool,
     rounding: Option<Rounding>,
@@ -117,8 +121,9 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
     let mut capacity = false;
     let mut two_path = false;
     let mut branching = "default".to_string();
-    let mut strong_branching = true;
+    let mut strong_branching = false;
     let mut diving = false;
+    let mut local_search = None;
     let mut tree_controls = TreeControls::default();
     let mut enumerated_mip = false;
     let mut rounding = Some(Rounding::Tenth);
@@ -261,6 +266,10 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
             }
             "--no-enumeration" => enumerate = false,
             "--enumerated-mip" => enumerated_mip = true,
+            "--deluxing" => {
+                tree_controls.deluxing = true;
+                enumerated_mip = true;
+            }
             "--rounding" => {
                 rounding_specified = true;
                 rounding = Some(
@@ -297,9 +306,17 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
                     return Err(format!("unknown branching mode: {branching}"));
                 }
             }
+            "--strong-branching" => strong_branching = true,
             "--no-strong-branching" => strong_branching = false,
             "--diving" => diving = true,
             "--no-diving" => diving = false,
+            "--local-search" => {
+                let path = args.next().ok_or("missing local search configuration")?;
+                let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+                local_search = Some(
+                    serde_json::from_str(&text).map_err(|e| format!("local search JSON: {e}"))?,
+                );
+            }
             "--restricted-mip" => tree_controls.restricted_mip = true,
             "--no-mip-heuristic" => tree_controls.restricted_mip = false,
             "--mip-nodes" => {
@@ -414,6 +431,7 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
         branching,
         strong_branching,
         diving,
+        local_search,
         tree_controls,
         enumerated_mip,
         rounding,
@@ -445,6 +463,7 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
         branching,
         strong_branching,
         diving,
+        local_search,
         tree_controls,
         enumerated_mip,
         rounding,
@@ -466,6 +485,23 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
     let mut instance = Instance::read(file).map_err(|e| e.to_string())?;
     if let Some(n) = customers {
         instance.truncate(n).map_err(|e| e.to_string())?;
+    }
+    if tree_controls.deluxing {
+        if !tree {
+            return Err("--deluxing requires --tree".into());
+        }
+        if !enumerate {
+            return Err("--deluxing conflicts with --no-enumeration".into());
+        }
+        if kind == "hgs" {
+            return Err("--deluxing requires a routing solve, not hgs".into());
+        }
+    }
+    if tree_controls.threads > 1 && !tree {
+        return Err("--tree-threads requires --tree".into());
+    }
+    if local_search.is_some() && !tree {
+        return Err("--local-search requires --tree".into());
     }
     if enumerated_mip && !tree {
         return Err("--enumerated-mip requires --tree".into());
@@ -732,9 +768,15 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
                 time_limit: 2.,
                 ..Default::default()
             }),
+            local_search,
             node_limit,
             time_limit: node.cg.time_limit,
-            enumerated_mip: enumerated_mip.then(Default::default),
+            enumerated_mip: enumerated_mip.then(|| baldes::master::solvers::mip::MipOptions {
+                deluxing: tree_controls
+                    .deluxing
+                    .then(baldes::master::deluxing::DeluxingOptions::default),
+                ..Default::default()
+            }),
             initial_solution,
             node,
             ..ModelTreeOptions::default()
@@ -756,9 +798,10 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
         instance.name,
         result.mode,
         result.status,
-        result.lp.map_or("unknown".into(), |v| v.to_string()),
-        result.incumbent.map_or("unknown".into(), |v| v.to_string()),
-        result.bound.map_or("unknown".into(), |v| v.to_string()),
+        // Human-readable summary; JSON output keeps full precision.
+        result.lp.map_or("unknown".into(), |v| format!("{v:.2}")),
+        result.incumbent.map_or("unknown".into(), |v| format!("{v:.2}")),
+        result.bound.map_or("unknown".into(), |v| format!("{v:.2}")),
         result.bound_mode,
         result.nodes,
         result.iterations,
@@ -785,6 +828,7 @@ struct TreeControls {
     relative_gap: f64,
     integer_objective: bool,
     history: bool,
+    deluxing: bool,
 }
 impl Default for TreeControls {
     fn default() -> Self {
@@ -796,6 +840,7 @@ impl Default for TreeControls {
             relative_gap: 1e-9,
             integer_objective: false,
             history: true,
+            deluxing: false,
         }
     }
 }

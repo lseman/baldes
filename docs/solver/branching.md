@@ -157,7 +157,8 @@ prefer completed subtree sizes at the current depth. Until that depth has an
 observation, the parent estimate remains the fallback. Partial or interrupted
 subtrees do not enter this average. The default keeps parent estimates.
 `StrongBranchingOptions` exposes the phase and time
-budgets. Disable it with `--no-strong-branching`.
+budgets. Strong branching is off by default, matching the native
+`ApplyStrongBranchingEvaluation = false`; enable it with `--strong-branching`.
 
 For JSON models using `--network-branching phased`, multiplicity candidates
 keep network registration order within each priority. Priced trials that still
@@ -166,8 +167,8 @@ penalty objective does not determine candidate selection. These estimates do
 not certify a child bound. Between product-score phases, equivalent scored
 child estimates retain one candidate before the next phase's quota is applied.
 Distinct child estimates remain separate even when their product scores agree.
-Disable these trials with
-`--no-mapped-strong-branching`.
+These trials are off by default (native `ApplyStrongBranchingEvaluation =
+false`); enable them with `--mapped-strong-branching`.
 
 Strong round-up diving uses isolated route-fixing trials and depth,
 discrepancy, node, and time limits. Disable it with `--no-diving`.
@@ -347,3 +348,27 @@ cargo run --release --features clp --bin baldes -- \
   solve instances/Solomon/R101.txt --customers 10 --tree \
   --branching hybrid --time 60 --json /tmp/tree.json
 ```
+
+The tree can also improve an incumbent by fixing a random subset of its column
+contributions and diving on the resulting child. Enable this with
+`ModelTreeOptions::local_search`, the JSON/Python `local_search` option, or
+`--local-search FILE` in either CLI. The controls are:
+
+```json
+{"depth_limit": 0, "fixed_column_ratio": 0.8, "max_iterations": 3, "seed": 1}
+```
+
+The default `depth_limit` is `-1`, which disables local search even when an
+empty configuration object is supplied. A nonnegative limit runs it at every
+tree node up to that depth. It first dives to obtain an incumbent, then tries
+up to `max_iterations` partial-incumbent children. Selection uses distinct
+incumbent variables, retaining each selected variable's full contribution;
+additional copies remain allowed. If the rounded fixing count would fix every
+incumbent variable, the partial-neighborhood loop stops. Nested `dive` controls
+set per-child resource limits. Local-search solves contribute to
+`diving_nodes`; their bounds never prune the main tree.
+The local-search schedule sets its own dive depth, discrepancy and stopping
+controls; overriding those nested `dive` fields is rejected.
+Partial fixing supports nonnegative and nonpositive static master variables;
+active local search rejects free signed static variables until their residual
+translation is represented explicitly.

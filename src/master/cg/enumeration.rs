@@ -46,7 +46,13 @@ pub(super) fn transfer<M: LpMaster, C: Controller<M>>(
         // Cached admissible paths need not have a representative's identity.
         let regenerated =
             controller.regenerate_enumerated_columns(pool, duals, output.bound, &universe)?;
-        let removed: Vec<_> = (0..loaded.len()).filter(|&i| loaded[i].is_some()).collect();
+        let removed: Vec<_> = (0..loaded.len())
+            .filter(|&i| {
+                loaded[i]
+                    .as_ref()
+                    .is_some_and(|column| !controller.preserve_enumeration_column(column))
+            })
+            .collect();
         let (_, map) = destination.remove(&[], &removed)?;
         let mut next = Transfer {
             master: destination,

@@ -714,7 +714,12 @@ pub(super) fn choose_proposals<const D: usize>(
                     observation
                 } else {
                     let mut node = options.node.clone();
-                    node.fixing_upper_bound = incumbent.is_finite().then_some(incumbent);
+                    let current_incumbent = history
+                        .incumbent
+                        .as_ref()
+                        .map_or(incumbent, |witness| incumbent.min(witness.0));
+                    node.fixing_upper_bound =
+                        current_incumbent.is_finite().then_some(current_incumbent);
                     node.search_inactive_columns |= options.share_inactive_columns;
                     node.enumeration = None;
                     node.cg.max_iterations = phase.max_iterations;

@@ -148,7 +148,7 @@ fn registered_tree_pairs_network_identities_sides_ranks_and_feasible_node_bounds
             .unwrap()
             .problem::<2>()
             .unwrap();
-        let mut options = ModelTreeOptions::default();
+        let mut options = strong_tree_options();
         options.node.cg.stabilize = false;
         options.node.cg.bound_mode = cg::BoundMode::Certified;
         // The reference runner records these controls without strong branching.
@@ -199,6 +199,7 @@ fn registered_tree_pairs_network_identities_sides_ranks_and_feasible_node_bounds
             selected_nodes: &mut selected_nodes,
             unresolved: &mut unresolved,
             workers: None,
+            local_search_rng: crate::rng::GnuRand::new(1),
         };
         let mut observer = Observed {
             inner,
@@ -300,7 +301,7 @@ fn observed_default_strong_multiplicity_selection_preserves_registered_network_o
             .unwrap()
             .problem::<2>()
             .unwrap();
-        let mut options = ModelTreeOptions::default();
+        let mut options = strong_tree_options();
         options.node.cg.stabilize = false;
         options.branching = NetworkBranchingPolicy::Phased;
         let root = solve_with_master_variables(problem, vec![], options.node.clone()).unwrap();
@@ -357,5 +358,14 @@ fn observed_default_strong_multiplicity_selection_preserves_registered_network_o
             tree.strong_branching_trials as u64,
             case["reference_children_count"].as_u64().unwrap()
         );
+    }
+}
+
+/// Strong trials are opt-in (native `ApplyStrongBranchingEvaluation = false`);
+/// these tests exercise them with the default phase schedule.
+fn strong_tree_options() -> ModelTreeOptions {
+    ModelTreeOptions {
+        mapped_strong_branching: Some(crate::master::tree::StrongBranchingOptions::default()),
+        ..ModelTreeOptions::default()
     }
 }

@@ -469,8 +469,14 @@ mod mip {
         let tree = baldes::master::tree::solve(problem(), configured.clone()).unwrap();
         assert_eq!(tree.status, TreeStatus::Optimal);
         assert_eq!(tree.incumbent, 2.);
-        assert_eq!(tree.nodes, 1);
-        assert_eq!(tree.enumerated_mip_calls, 1);
+        // Enumeration is gap-based (native runReducedCostFixingAndEnumeration):
+        // the root has no incumbent, so the complete transfer happens below it.
+        assert_eq!(tree.nodes, 6, "{tree:?}");
+        assert!(tree
+            .enumeration_reports
+            .iter()
+            .any(|r| r.complete && r.coverage_cutoff.is_some()));
+        assert_eq!(tree.enumerated_mip_calls, 2, "{tree:?}");
         configured.node.enumeration = Some(EnumerationOptions {
             max_routes: 5,
             ..Default::default()
@@ -565,7 +571,10 @@ fn phase_one_and_enumerated_mip_close_original_activity_children() {
     let solved = baldes::master::tree::solve(model, configured).unwrap();
     assert_eq!(solved.status, TreeStatus::Optimal);
     assert_eq!(solved.incumbent, 2.);
-    assert_eq!(solved.nodes, 1);
+    // No incumbent exists at the root, so the gap-based complete enumeration
+    // and its MIP close a descendant instead (native strong evaluation off).
+    assert_eq!(solved.nodes, 3, "{solved:?}");
+    assert_eq!(solved.enumerated_mip_calls, 1, "{solved:?}");
 }
 
 #[test]

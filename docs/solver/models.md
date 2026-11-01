@@ -1083,7 +1083,10 @@ estimates and history rank candidates; estimates do not become proof bounds.
 Trial solutions that pass original-model integer witness validation can improve
 the global incumbent, including solutions found in restricted-master trials.
 Their objective is recomputed from original route and master-variable costs.
-Set `mapped_strong_branching=False` to select by priority/fractionality alone.
+Trials run only with `mapped_strong_branching=True` (Rust: a `Some` value in
+`ModelTreeOptions::mapped_strong_branching`). The default is off, matching the
+native `ApplyStrongBranchingEvaluation = false`; candidates are then selected by
+priority/fractionality alone.
 Branch scores use the numerical parent bound even in certified mode. Their
 continuous-objective cutoff is the parent incumbent minus half
 `network_scoring_gap_tolerance` (default `1e-6`), matching the native absolute-gap
@@ -1094,7 +1097,7 @@ Trial witnesses update the tree incumbent after the evaluation pass returns;
 they do not replace the parent cutoff during the same pass.
 Results expose `strong_branching_trials`, `mapped_history_ranked` and
 `mapped_branch_evaluations`. The CLI accepts `--mapped-variables FILE` and
-`--no-mapped-strong-branching`; see
+`--mapped-strong-branching`/`--no-mapped-strong-branching`; see
 [`mapped_variables.json`](../../examples/networks/mapped_variables.json).
 
 Recovered explicit proximal defaults are available through
@@ -1247,7 +1250,7 @@ and from the native binary. This does not promise identical symmetric branch
 IDs or universal search trajectories. Explicit mappings may coexist, with
 names distinct from the generated `ESA_<network>_<group>` names.
 
-With `mapped_strong_branching=False` (CLI `--no-mapped-strong-branching`),
+With `mapped_strong_branching=False` (the default; CLI `--no-mapped-strong-branching`),
 the packing separator is bypassed; ordinary count/original-activity
 branching continues. Explicit `mapped_variables` retain their separate
 rank-without-trials behavior.
@@ -1533,7 +1536,8 @@ can be retained with `with_route_controls`; paired shared-row pricing uses this
 same optimizer under a shared query budget.
 
 For integer solves, `Options::gap_enumeration` enables gap-triggered bucket
-fixing and retained-route pricing in eligible one-network models. It defaults
+fixing and retained-route pricing across eligible pricing networks and explicit
+master variables. It defaults
 to true. This retained pool covers improving integer solutions at the supplied
 objective bound; it does not mark whole-domain enumeration complete. Explicit
 `Options::enumeration` continues to request whole-domain enumeration separately.
@@ -1544,3 +1548,21 @@ may supply a known feasible original-model integer objective through this option
 It is not a node-local witness or a published solution. Reusable snapshots do not
 carry that authority into another solve. LP-only solves do not apply these
 objective-dependent restrictions.
+
+Automatic cut separation supports multiple pricing networks sharing the same
+unit packing-row partition. Rank-one and strong k-path cuts use each network's
+own vertices; general k-path configuration supplies graph-specific incidence,
+supports, and memory. Capacity cuts map through the common packing rows.
+Resource-knapsack rows may bind only selected graph IDs, with original resource
+IDs mapped to solver coordinates on every network. Dynamic NG and relaxed
+selection strengthening operate independently on each network's paths.
+Route-recourse separation remains restricted to one network.
+
+`Options::gap_mip` requests a HiGHS integer solve immediately after the CG loop
+installs a complete retained gap pool. Missing retained routes are loaded into a
+private MIP copy along with the original master variables. Returned incumbents
+are replayed against the original model. Finite-cutoff coverage is reported
+separately from whole-domain enumeration; failure to improve the cutoff is not
+reported as original-model infeasibility. Tree `enumerated_mip` options also
+configure this handoff. The enumerated-route-count limit remains controlled by
+`BALDESmaxNumOfEnumSolutionsForMIP`.

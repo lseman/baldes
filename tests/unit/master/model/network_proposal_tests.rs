@@ -12,7 +12,7 @@ fn problem() -> Problem<2> {
     .unwrap()
 }
 fn options() -> ModelTreeOptions {
-    let mut options = ModelTreeOptions::default();
+    let mut options = strong_tree_options();
     options.branching = NetworkBranchingPolicy::Phased;
     options.node.cg.stabilize = false;
     options.node.cg.artificial_cost = 100.;
@@ -216,7 +216,7 @@ fn multiplicity_first_runs_exact_strong_trials_on_the_route_count_split() {
     // with quantity one half, so the total route count is 1.5.
     instance.networks[0].arc_entries[4] = vec![(0, 1.), (2, 1.)];
     for strong in [false, true] {
-        let mut configured = ModelTreeOptions::default();
+        let mut configured = strong_tree_options();
         configured.node.cg.stabilize = false;
         configured.node.cg.artificial_cost = 100.;
         configured.node_limit = 20;
@@ -239,5 +239,14 @@ fn multiplicity_first_runs_exact_strong_trials_on_the_route_count_split() {
         } else {
             assert_eq!(output.strong_branching_trials, 0);
         }
+    }
+}
+
+/// Strong trials are opt-in (native `ApplyStrongBranchingEvaluation = false`);
+/// these tests exercise them with the default phase schedule.
+fn strong_tree_options() -> ModelTreeOptions {
+    ModelTreeOptions {
+        mapped_strong_branching: Some(crate::master::tree::StrongBranchingOptions::default()),
+        ..ModelTreeOptions::default()
     }
 }

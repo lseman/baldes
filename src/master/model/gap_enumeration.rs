@@ -1,5 +1,5 @@
 //! Reduced-cost arc fixing and enumeration of the routes within the gap to
-//! the incumbent, in the labeling engine of a one-network model.
+//! the incumbent, using each network's labeling engine and a shared cutoff plan.
 //!
 //! An attempt runs after exact pricing converged when the gap
 //! `upper - bound` (upper is the incumbent, or 1e12 without one) has shrunk
@@ -11,13 +11,12 @@ use super::*;
 
 /// Live pricing state saved before a tentative fixing/enumeration pass.
 pub(super) struct GapCheckpoint<const D: usize> {
-    solver: Solver<D>,
-    costs: Vec<f64>,
-    enumerated: Arc<HashSet<Vec<i32>>>,
+    oracles: Vec<(Solver<D>, Vec<f64>, Arc<HashSet<Vec<i32>>>)>,
     route_count: usize,
     previous_fixing_gap: f64,
     enumerated_routes: usize,
     objective_fixed: bool,
+    gap_pool_cutoff: Option<f64>,
 }
 
 const FIXING_RATIO: f32 = 0.9;
@@ -41,10 +40,15 @@ fn eligible_gap<const D: usize>(state: &State<D>, bound: f64) -> Option<f64> {
         || !state.integer_primal_termination
         || !bound.is_finite()
         || !state.original_variable_costs.is_empty()
-        || state.oracles.len() != 1
-        || !state.master_variables.is_empty()
+        || state.oracles.is_empty()
+        || ((state.oracles.len() != 1
+            || !state.master_variables.is_empty()
+            || state
+                .oracles
+                .iter()
+                .any(|oracle| oracle.network.multiplicity.lower != 0.))
+            && state.fixing_cutoffs.is_none())
         || state.universe.is_some()
-        || state.oracles[0].network.multiplicity.lower != 0.
     {
         return None;
     }
@@ -122,18 +126,26 @@ pub(super) fn begin<const D: usize>(state: &mut State<D>, bound: f64) -> Result<
     if state.gap_checkpoint.is_some() {
         return Err(invalid("nested enumeration transaction"));
     }
-    let oracle = &mut state.oracles[0];
-    let mut tentative = oracle.solver.fork_for_node();
-    // Unified network branching distinguishes physical arc paths.
-    tentative.enumeration_preserve_arc_paths = true;
+    let oracles = state
+        .oracles
+        .iter_mut()
+        .map(|oracle| {
+            let mut tentative = oracle.solver.fork_for_node();
+            tentative.enumeration_preserve_arc_paths = true;
+            (
+                std::mem::replace(&mut oracle.solver, tentative),
+                oracle.costs.clone(),
+                oracle.enumerated.clone(),
+            )
+        })
+        .collect();
     state.gap_checkpoint = Some(Box::new(GapCheckpoint {
-        solver: std::mem::replace(&mut oracle.solver, tentative),
-        costs: oracle.costs.clone(),
-        enumerated: oracle.enumerated.clone(),
+        oracles,
         route_count: state.routes.len(),
         previous_fixing_gap: state.previous_fixing_gap,
         enumerated_routes: state.enumerated_routes,
         objective_fixed: state.objective_fixed,
+        gap_pool_cutoff: state.gap_pool_cutoff,
     }));
     Ok(true)
 }
@@ -145,10 +157,11 @@ pub(super) fn finish<const D: usize>(state: &mut State<D>, commit: bool) {
     if commit {
         return;
     }
-    let oracle = &mut state.oracles[0];
-    oracle.solver = saved.solver;
-    oracle.costs = saved.costs;
-    oracle.enumerated = saved.enumerated;
+    for (oracle, (solver, costs, enumerated)) in state.oracles.iter_mut().zip(saved.oracles) {
+        oracle.solver = solver;
+        oracle.costs = costs;
+        oracle.enumerated = enumerated;
+    }
     state.routes.truncate(saved.route_count);
     let count = saved.route_count;
     state
@@ -157,6 +170,7 @@ pub(super) fn finish<const D: usize>(state: &mut State<D>, commit: bool) {
     state.previous_fixing_gap = saved.previous_fixing_gap;
     state.enumerated_routes = saved.enumerated_routes;
     state.objective_fixed = saved.objective_fixed;
+    state.gap_pool_cutoff = saved.gap_pool_cutoff;
 }
 
 /// Fix arcs and enumerate every route with reduced cost below the gap.
@@ -177,57 +191,94 @@ pub(super) fn universe<const D: usize>(
     } else {
         0
     };
-    let offset = adapter::cache_duals(state, 0, duals)?;
-    let cutoff = gap.max(0.) - offset;
-    let remaining = state.deadline.saturating_duration_since(Instant::now());
-    if remaining.is_zero() {
-        return Err(incomplete("node time limit"));
+    let mut columns = vec![];
+    let mut total_routes = 0;
+    let mut coverage = upper;
+    for index in 0..state.oracles.len() {
+        let ceiling = match state.fixing_cutoffs.as_ref().map(|cutoffs| cutoffs[index]) {
+            Some(Some(ceiling)) => ceiling,
+            Some(None) => {
+                state.oracles[index].solver.restore_arcs();
+                state.oracles[index].enumerated = Arc::new(HashSet::new());
+                continue;
+            }
+            None => gap,
+        };
+        let offset = adapter::cache_duals(state, index, duals)?;
+        let cutoff = ceiling - offset;
+        let remaining = state.deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(incomplete("node time limit"));
+        }
+        let solver = &mut state.oracles[index].solver;
+        // Native false-gap controls may deliberately enumerate a smaller
+        // domain. Record that smaller coverage instead of claiming the full
+        // incumbent cutoff for the retained MIP.
+        let false_gap = solver.options.get("BALDESredCostFixingFalseGap")?;
+        if mode == 0 && (false_gap > 1. || (false_gap < -1. && solver.has_cuts())) {
+            let other = crate::core::rounding::add_down(upper, -ceiling)
+                .ok_or_else(|| invalid("gap coverage overflow"))?;
+            let reduced =
+                crate::core::rounding::add_down((cutoff / false_gap.abs()).next_down(), offset)
+                    .ok_or_else(|| invalid("gap coverage overflow"))?;
+            coverage = coverage.min(
+                crate::core::rounding::add_down(other, reduced)
+                    .ok_or_else(|| invalid("gap coverage overflow"))?,
+            );
+        }
+        let saved_time = solver.controls.time_limit;
+        let saved_modes = (
+            solver.cuts.round_duals,
+            solver.exact_cut_duals,
+            solver.knapsack_exact_coefficients,
+        );
+        solver.cuts.round_duals = false;
+        solver.exact_cut_duals = true;
+        solver.knapsack_exact_coefficients = true;
+        let saved_fixing_time = solver.options.get("BALDESredCostFixingTimeThreshold")?;
+        solver.controls.time_limit = saved_time.min(remaining);
+        solver.options.set(
+            "BALDESredCostFixingTimeThreshold",
+            saved_fixing_time.min(remaining.as_secs_f64()),
+        )?;
+        let fixed = solver.run_fixing_enumeration(mode, 0., cutoff);
+        solver.controls.time_limit = saved_time;
+        solver.cuts.round_duals = saved_modes.0;
+        solver.exact_cut_duals = saved_modes.1;
+        solver.knapsack_exact_coefficients = saved_modes.2;
+        solver
+            .options
+            .set("BALDESredCostFixingTimeThreshold", saved_fixing_time)?;
+        let fixed = fixed?;
+        state.fixing_calls += 1;
+        state.objective_fixed |= fixed.eliminated > 0 || fixed.state == 2 || fixed.state == 3;
+        if fixed.state != 2 && fixed.state != 3 {
+            if mode == -1 {
+                continue;
+            }
+            return Err(incomplete("network gap enumeration did not complete"));
+        }
+        let solver = &state.oracles[index].solver;
+        let routes = solver
+            .enumeration
+            .as_ref()
+            .ok_or_else(|| invalid("complete enumeration without a route pool"))?
+            .paths
+            .routes(&solver.graph)?;
+        total_routes += routes.len();
+        state.oracles[index].enumerated = Arc::new(routes.iter().map(sorted).collect());
+        let network = state.oracles[index].network.id;
+        for route in routes {
+            let tag = register(state, network, route)?;
+            columns.push(column(state, tag, duals)?);
+        }
     }
-    let solver = &mut state.oracles[0].solver;
-    let saved_time = solver.controls.time_limit;
-    let saved_modes = (
-        solver.cuts.round_duals,
-        solver.exact_cut_duals,
-        solver.knapsack_exact_coefficients,
-    );
-    solver.cuts.round_duals = false;
-    solver.exact_cut_duals = true;
-    solver.knapsack_exact_coefficients = true;
-    let saved_fixing_time = solver.options.get("BALDESredCostFixingTimeThreshold")?;
-    solver.controls.time_limit = saved_time.min(remaining);
-    solver.options.set(
-        "BALDESredCostFixingTimeThreshold",
-        saved_fixing_time.min(remaining.as_secs_f64()),
-    )?;
-    let fixed = solver.run_fixing_enumeration(mode, 0., cutoff);
-    solver.controls.time_limit = saved_time;
-    solver.cuts.round_duals = saved_modes.0;
-    solver.exact_cut_duals = saved_modes.1;
-    solver.knapsack_exact_coefficients = saved_modes.2;
-    solver
-        .options
-        .set("BALDESredCostFixingTimeThreshold", saved_fixing_time)?;
-    let fixed = fixed?;
-    state.fixing_calls += 1;
-    state.objective_fixed |= fixed.eliminated > 0 || fixed.state == 2 || fixed.state == 3;
-    if fixed.state != 2 && fixed.state != 3 {
+    if mode == -1 {
         return Ok(None);
     }
-    let solver = &state.oracles[0].solver;
-    let routes = solver
-        .enumeration
-        .as_ref()
-        .ok_or_else(|| invalid("complete enumeration without a route pool"))?
-        .paths
-        .routes(&solver.graph)?;
-    state.enumerated_routes = routes.len();
-    state.oracles[0].enumerated = Arc::new(routes.iter().map(sorted).collect());
-    let network = state.oracles[0].network.id;
-    let mut columns = Vec::with_capacity(routes.len());
-    for route in routes {
-        let tag = register(state, network, route)?;
-        columns.push(column(state, tag, duals)?);
-    }
+    state.enumerated_routes = total_routes;
+    state.gap_pool_cutoff = Some(coverage);
+    state.objective_fixed = true;
     Ok(Some(columns))
 }
 
@@ -240,18 +291,31 @@ pub(super) fn regenerate<const D: usize>(
     bound: f64,
 ) -> Result<Vec<cg::Column>> {
     let gap = upper(state) - bound;
-    let oracle = &state.oracles[0];
-    let graph = &oracle.solver.graph;
-    let ng = crate::graph::ng::PreparedNg::new(graph)?;
     let mut retained = vec![];
     for cached in pool {
         let Some(route) = usize::try_from(cached.tag)
             .ok()
             .and_then(|tag| state.routes.get(tag))
-            .filter(|route| route.network == oracle.network.id)
         else {
             continue;
         };
+        let Some(index) = state
+            .oracles
+            .iter()
+            .position(|oracle| oracle.network.id == route.network)
+        else {
+            continue;
+        };
+        if state
+            .fixing_cutoffs
+            .as_ref()
+            .is_some_and(|cutoffs| cutoffs[index].is_none())
+        {
+            continue;
+        }
+        let oracle = &state.oracles[index];
+        let graph = &oracle.solver.graph;
+        let ng = crate::graph::ng::PreparedNg::new(graph)?;
         let route = &route.route;
         if oracle.solver.ryan_foster.iter().any(|rule| {
             !rule.satisfied_by(route.nodes.iter().map(|&v| v as usize))
@@ -287,18 +351,23 @@ pub(super) fn regenerate<const D: usize>(
             vertex = arc.head;
         }
         if proper && vertex == graph.sink {
-            retained.push((cached.tag, sorted(route)));
+            retained.push((index, cached.tag, sorted(route)));
         }
     }
     // Admissible cached paths also use the enumeration coefficient contract.
-    let mut enumerated = (*state.oracles[0].enumerated).clone();
-    enumerated.extend(retained.iter().map(|(_, arcs)| arcs.clone()));
-    state.oracles[0].enumerated = Arc::new(enumerated);
+    for (index, _, arcs) in &retained {
+        Arc::make_mut(&mut state.oracles[*index].enumerated).insert(arcs.clone());
+    }
     let mut columns = vec![];
-    for (tag, _) in retained {
+    for (index, tag, _) in retained {
         let refreshed = column(state, tag, duals)?;
+        let ceiling = state
+            .fixing_cutoffs
+            .as_ref()
+            .and_then(|cutoffs| cutoffs[index])
+            .unwrap_or(gap);
         let rc = refreshed.reduced_cost;
-        if rc < gap - (gap.abs().max(rc.abs()) * 1e-10 + 1e-6) {
+        if rc < ceiling - (ceiling.abs().max(rc.abs()) * 1e-10 + 1e-6) {
             columns.push(refreshed);
         }
     }
@@ -312,17 +381,28 @@ pub(super) fn restore_limited_memory<const D: usize>(
     master: &mut ClpMaster,
     loaded: &mut [Option<cg::Column>],
 ) -> Result<bool> {
-    let Some(oracle) = state.oracles.first() else {
-        return Ok(false);
-    };
-    if oracle.solver.enumeration.is_some() || oracle.enumerated.is_empty() {
+    let previous: Vec<_> = state
+        .oracles
+        .iter_mut()
+        .enumerate()
+        .filter_map(|(index, oracle)| {
+            (oracle.solver.enumeration.is_none() && !oracle.enumerated.is_empty()).then(|| {
+                (
+                    index,
+                    std::mem::replace(&mut oracle.enumerated, Arc::new(HashSet::new())),
+                )
+            })
+        })
+        .collect();
+    if previous.is_empty() {
         return Ok(false);
     }
-    let previous = std::mem::replace(&mut state.oracles[0].enumerated, Arc::new(HashSet::new()));
     let mut destination = match master.try_clone() {
         Ok(destination) => destination,
         Err(error) => {
-            state.oracles[0].enumerated = previous;
+            for (index, enumerated) in previous {
+                state.oracles[index].enumerated = enumerated;
+            }
             return Err(error);
         }
     };
@@ -360,9 +440,12 @@ pub(super) fn restore_limited_memory<const D: usize>(
         Ok(())
     })();
     if let Err(error) = result {
-        state.oracles[0].enumerated = previous;
+        for (index, enumerated) in previous {
+            state.oracles[index].enumerated = enumerated;
+        }
         return Err(error);
     }
+    state.gap_pool_cutoff = None;
     *master = destination;
     loaded.clone_from_slice(&refreshed_loaded);
     Ok(true)

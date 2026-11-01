@@ -262,14 +262,41 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
     }
     fn fix_pricing(&mut self, master: &ClpMaster, duals: &[f64]) -> Result<()> {
         self.0.borrow_mut().fixing_bound = None;
+        self.0.borrow_mut().fixing_cutoffs = None;
         if self.4.is_none() && self.8 {
             let bound = bounds::certificate(&self.0.borrow(), master, duals);
             self.0.borrow_mut().fixing_bound = bound.filter(|value| value.is_finite());
-            if !self.0.borrow().gap_enumeration {
+            if self.0.borrow().gap_enumeration {
+                let state = self.0.borrow();
+                let upper = state.tree_incumbent.min(
+                    state
+                        .pricing_witness
+                        .as_ref()
+                        .map_or(f64::INFINITY, |w| w.0),
+                );
+                let mut work = 10_000_000;
+                let plan =
+                    bounds::cutoff_plan(&state, master, duals, upper, &mut work, state.deadline);
+                drop(state);
+                self.0.borrow_mut().fixing_cutoffs = plan.map(|plan| {
+                    plan.into_iter()
+                        .map(|cutoff| match cutoff {
+                            bounds::NetworkCutoff::Empty { .. } => None,
+                            bounds::NetworkCutoff::Cost {
+                                other_contributions,
+                                ..
+                            } => crate::core::rounding::add_up(upper, -other_contributions),
+                        })
+                        .collect()
+                });
+            } else {
                 fixing::apply(&mut self.0.borrow_mut(), master, duals)?;
             }
         }
         Ok(())
+    }
+    fn preserve_enumeration_column(&self, column: &cg::Column) -> bool {
+        master_variables::decode(column.tag).is_some()
     }
     fn begin_enumeration_transaction(&mut self, _bound: f64) -> Result<bool> {
         if !self.8 || self.4.is_some() {
@@ -307,6 +334,68 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
         loaded: &mut [Option<cg::Column>],
     ) -> Result<bool> {
         gap_enumeration::restore_limited_memory(&mut self.0.borrow_mut(), master, loaded)
+    }
+    fn enumeration_installed(
+        &mut self,
+        master: &ClpMaster,
+        loaded: &[Option<cg::Column>],
+        artificials: &[usize],
+    ) -> Result<()> {
+        let state = self.0.borrow();
+        let Some(mut options) = state.gap_mip.clone() else {
+            return Ok(());
+        };
+        if state.gap_pool_cutoff.is_none() {
+            return Ok(());
+        }
+        #[cfg(feature = "highs")]
+        if let Some(oracle) = state.oracles.first() {
+            let limit = oracle
+                .solver
+                .options
+                .get("BALDESmaxNumOfEnumSolutionsForMIP")?
+                .max(0.) as usize;
+            if state.enumerated_routes > limit {
+                return Ok(());
+            }
+        }
+        let mut warm = cg::WarmStart::empty(cg::BoundMode::Numerical);
+        warm.columns = loaded.to_vec();
+        warm.artificials = artificials.to_vec();
+        options.time_limit = options
+            .time_limit
+            .min(state.deadline.saturating_duration_since(Instant::now()));
+        options.objective_cutoff = options.objective_cutoff.min(
+            state.tree_incumbent.min(
+                state
+                    .pricing_witness
+                    .as_ref()
+                    .map_or(f64::INFINITY, |w| w.0),
+            ),
+        );
+        let snapshot = NodeSnapshot {
+            master: master.try_clone()?,
+            warm,
+            state: state.snapshot_for_checkpoint(),
+        };
+        drop(state);
+        if let Some(output) = snapshot.solve_enumerated_mip(&options)? {
+            if let Some(solution) = output.mip.solution {
+                let mut state = self.0.borrow_mut();
+                if state
+                    .pricing_witness
+                    .as_ref()
+                    .map_or(true, |old| solution.objective < old.0)
+                {
+                    state.pricing_witness = Some((
+                        solution.objective,
+                        output.route_values,
+                        output.master_values,
+                    ));
+                }
+            }
+        }
+        Ok(())
     }
     fn pricing_complete(&self) -> bool {
         self.0.borrow().scheduler.complete
@@ -405,18 +494,23 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
         // not the unrestricted LP optimum. Never publish a bound above the
         // feasible objective that authorized these exclusions.
         let bound = if state.objective_fixed {
-            bound.min(
-                state.tree_incumbent.min(
-                    state
-                        .pricing_witness
-                        .as_ref()
-                        .map_or(f64::INFINITY, |w| w.0),
-                ),
-            )
+            bound
+                .min(state.gap_pool_cutoff.unwrap_or(f64::INFINITY))
+                .min(
+                    state.tree_incumbent.min(
+                        state
+                            .pricing_witness
+                            .as_ref()
+                            .map_or(f64::INFINITY, |w| w.0),
+                    ),
+                )
         } else {
             bound
         };
         Ok(Some(bound))
+    }
+    fn prepare_pricing_duals(&self, duals: &mut [f64]) {
+        separation::repair_theta_duals(&self.0.borrow(), duals);
     }
     fn pricing_subgradient(&self, _rhs: &[f64]) -> Option<Vec<f64>> {
         self.0.borrow().gradient.clone()
@@ -622,7 +716,10 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
     ) -> Result<crate::master::pricing::Request> {
         use crate::master::pricing::{Envelopes, Request};
         let oracle = &mut self.state.oracles[index];
-        if self.state.universe.is_some() || oracle.solver.enumeration.is_some() {
+        if self.state.universe.is_some()
+            || self.state.gap_pool_cutoff.is_some()
+            || oracle.solver.enumeration.is_some()
+        {
             return Ok(Request {
                 phase,
                 exact: true,
@@ -769,7 +866,9 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
         let gap_universe;
         let universe = if let Some(universe) = self.state.universe.as_ref() {
             universe
-        } else if self.state.oracles[index].solver.enumeration.is_some() {
+        } else if self.state.gap_pool_cutoff.is_some()
+            || self.state.oracles[index].solver.enumeration.is_some()
+        {
             let oracle = &self.state.oracles[index];
             gap_universe = self
                 .state
@@ -1098,7 +1197,15 @@ pub(super) fn cache_duals<const D: usize>(
 ) -> Result<f64> {
     use crate::master::pricing::Networks;
     let tolerance = state.scheduler.tolerance;
-    let request = NetworkAdapter { state, tolerance }.prepare(index, 0, duals, false)?;
+    // Retained-pool pricing normally skips labeling preparation. Fixing and
+    // inspection must instead refresh costs at these raw duals, even when a
+    // preceding gap pass left a complete retained pool.
+    let retained = state.oracles[index].solver.enumeration.take();
+    let coverage = state.gap_pool_cutoff.take();
+    let prepared = NetworkAdapter { state, tolerance }.prepare(index, 0, duals, false);
+    state.oracles[index].solver.enumeration = retained;
+    state.gap_pool_cutoff = coverage;
+    let request = prepared?;
     let oracle = &mut state.oracles[index];
     oracle
         .solver

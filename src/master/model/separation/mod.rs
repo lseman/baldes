@@ -1,7 +1,7 @@
 //! Automatic cut separation between column-generation rounds.
 //!
-//! Separation applies to models with exactly one pricing network whose shared
-//! rows partition its interior vertices (see [`Problem::set_partitioning`]).
+//! Separation applies to networks whose shared unit rows partition their interior
+//! vertices consistently (see [`Problem::set_partitioning`]).
 //! Separated cuts become dynamic shared rows: rank-one and strong k-path cuts
 //! are full registry cuts priced by the labeling engine, knapsack cuts are
 //! resource rows and capacity cuts are arc-linear rows of the network.
@@ -148,7 +148,7 @@ pub(super) struct CutState {
     /// Registry cut index and shared row of separated rank-one/k-path cuts.
     rows: Vec<(usize, usize)>,
     /// Cut memory when the coefficients of `rows` were last written.
-    memories: Vec<Vec<bool>>,
+    memories: Vec<Vec<Vec<bool>>>,
     pub lp_before_cuts: f64,
     separation_lp: f64,
     rounds: usize,
@@ -224,25 +224,27 @@ pub(super) fn tracks_integer_witness<const D: usize>(state: &State<D>) -> bool {
         .is_some_and(|cuts| cuts.recourse.is_none())
 }
 
-/// Compact only ordinary one-network routing masters. More general models
+/// Compact routing masters with aligned registry rows. More general models
 /// retain their rows until all their row-indexed structures support remapping.
 pub(super) fn supports_row_cleanup<const D: usize>(state: &State<D>) -> bool {
-    state.cuts.as_ref().is_some_and(|cuts| {
-        cuts.recourse.is_none()
-            && cuts.knapsack_separator.is_none()
-            && cuts.kpath_separator.is_none()
-    }) && state.oracles.len() == 1
+    state
+        .cuts
+        .as_ref()
+        .is_some_and(|cuts| cuts.recourse.is_none() && cuts.knapsack_separator.is_none())
+        && !state.oracles.is_empty()
         && state.master_variables.is_empty()
         && state.variable_boxes.is_empty()
         && state.grouped_variable_boxes.is_empty()
         && state.synchronized_services.is_empty()
         && state.fixed_routes.is_empty()
         && state.universe.is_none()
-        && state.oracles[0].activity_rows.is_empty()
-        && state.oracles[0].presence_rows.is_empty()
-        && state.oracles[0].knapsack_rows.is_empty()
-        && state.oracles[0].resource_groups.is_empty()
-        && state.oracles[0].ryan_foster_rows.is_empty()
+        && state.oracles.iter().all(|oracle| {
+            oracle.activity_rows.is_empty()
+                && oracle.presence_rows.is_empty()
+                && oracle.knapsack_rows.is_empty()
+                && oracle.resource_groups.is_empty()
+                && oracle.ryan_foster_rows.is_empty()
+        })
 }
 
 pub(super) fn protected_rows<const D: usize>(state: &State<D>) -> Vec<usize> {
@@ -289,37 +291,38 @@ pub(super) fn remap_rows<const D: usize>(
                 .and_then(|row| row.checked_sub(offset))
         })
         .collect();
-    let oracle = &mut state.oracles[0];
-    for entries in Arc::make_mut(&mut oracle.network.arc_entries) {
-        entries.retain_mut(|(row, _)| match shared_map.get(*row).copied().flatten() {
-            Some(next) => {
-                *row = next;
-                true
+    for oracle in &mut state.oracles {
+        for entries in Arc::make_mut(&mut oracle.network.arc_entries) {
+            entries.retain_mut(|(row, _)| match shared_map.get(*row).copied().flatten() {
+                Some(next) => {
+                    *row = next;
+                    true
+                }
+                None => false,
+            });
+        }
+        Arc::make_mut(&mut oracle.network.route_entries).retain_mut(|(row, _)| {
+            match shared_map.get(*row).copied().flatten() {
+                Some(next) => {
+                    *row = next;
+                    true
+                }
+                None => false,
             }
-            None => false,
+        });
+        oracle.nonlinear_rows.retain_mut(|(cut, row)| {
+            match shared_map.get(*row).copied().flatten() {
+                Some(next) => {
+                    *row = next;
+                    true
+                }
+                None => {
+                    oracle.solver.cuts.retire(*cut);
+                    false
+                }
+            }
         });
     }
-    Arc::make_mut(&mut oracle.network.route_entries).retain_mut(|(row, _)| {
-        match shared_map.get(*row).copied().flatten() {
-            Some(next) => {
-                *row = next;
-                true
-            }
-            None => false,
-        }
-    });
-    oracle
-        .nonlinear_rows
-        .retain_mut(|(cut, row)| match shared_map.get(*row).copied().flatten() {
-            Some(next) => {
-                *row = next;
-                true
-            }
-            None => {
-                oracle.solver.cuts.retire(*cut);
-                false
-            }
-        });
     let cuts = state
         .cuts
         .as_mut()
@@ -416,7 +419,7 @@ fn partition_rows<const D: usize>(
 /// separators and cuts and restarts the round counters for its depth.
 pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -> Result<()> {
     let separation = &options.separation;
-    if let [oracle] = state.oracles.as_slice() {
+    for oracle in &state.oracles {
         let graph = &oracle.network.graph;
         if graph.max_route_arcs().is_some() && !graph.bounded_walks_are_vertex_simple() {
             if separation.relaxation_improvement_priority > 0. {
@@ -463,14 +466,11 @@ pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -
             return Ok(());
         }
         if state.oracles.len() != 1
-            && (separation.general_kpath.is_some()
-                || separation.route_recourse.is_some()
-                || separation.relaxation_improvement_priority > 0.
-                || relaxed_selection
+            && (separation.route_recourse.is_some()
                 || state.oracles.iter().any(|o| o.network.id < 0))
         {
             return Err(invalid(
-                "several pricing networks do not support general k-path, recourse or relaxation separators",
+                "several pricing networks do not support route recourse or negative graph IDs",
             ));
         }
         let mut network_customers = vec![];
@@ -510,6 +510,11 @@ pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -
                 map
             })
             .collect();
+        let pricing_graphs: Vec<_> = state
+            .oracles
+            .iter()
+            .map(|oracle| oracle.solver.graph.clone())
+            .collect();
         let oracle = &mut state.oracles[0];
         let graph = &oracle.network.graph;
         let routing_layout = |demands: usize| {
@@ -536,27 +541,29 @@ pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -
             return Err(invalid("select standalone or native k-path configuration"));
         }
         let kpath_separator = if let Some(config) = separator_options.general_kpath.take() {
-            let graph_id = graph.graph_id.max(0);
-            let input = config
-                .graphs
-                .iter()
-                .find(|g| g.graph.id == graph_id)
-                .ok_or_else(|| invalid("native k-path configuration has no pricing graph"))?;
-            if input.graph.source != graph.source as i32
-                || input.graph.sink != graph.sink as i32
-                || input
-                    .graph
-                    .vertices
+            for graph in &pricing_graphs {
+                let graph_id = graph.graph_id.max(0);
+                let input = config
+                    .graphs
                     .iter()
-                    .any(|v| v.id < 0 || v.id as usize >= graph.vertices.len())
-            {
-                return Err(invalid("native k-path pricing vertices/terminals differ"));
-            }
-            for arc in &graph.arcs {
-                if !input.graph.arcs.iter().any(|a| {
-                    a.id == arc.id && a.tail == arc.tail as i32 && a.head == arc.head as i32
-                }) {
-                    return Err(invalid("native k-path pricing arc incidence differs"));
+                    .find(|g| g.graph.id == graph_id)
+                    .ok_or_else(|| invalid("native k-path configuration has no pricing graph"))?;
+                if input.graph.source != graph.source as i32
+                    || input.graph.sink != graph.sink as i32
+                    || input
+                        .graph
+                        .vertices
+                        .iter()
+                        .any(|v| v.id < 0 || v.id as usize >= graph.vertices.len())
+                {
+                    return Err(invalid("native k-path pricing vertices/terminals differ"));
+                }
+                for arc in &graph.arcs {
+                    if !input.graph.arcs.iter().any(|a| {
+                        a.id == arc.id && a.tail == arc.tail as i32 && a.head == arc.head as i32
+                    }) {
+                        return Err(invalid("native k-path pricing arc incidence differs"));
+                    }
                 }
             }
             let mut separator = GeneralKPathSeparator::new(config.use_packing_sets);
@@ -601,17 +608,15 @@ pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -
                 ));
             }
             for row in &config.rows {
-                let Some(&(resource, scale)) = row.graph_resources.get(&graph_id) else {
-                    return Err(invalid(
-                        "knapsack original row has no resource for pricing graph",
-                    ));
-                };
-                if !indices.contains_key(&resource) || !scale.is_finite() || scale <= 0. {
-                    return Err(invalid("knapsack original row resource/scaling"));
+                if let Some(&(resource, scale)) = row.graph_resources.get(&graph_id) {
+                    if !indices.contains_key(&resource) || !scale.is_finite() || scale <= 0. {
+                        return Err(invalid("knapsack original row resource/scaling"));
+                    }
                 }
             }
             for (name, value) in &options.pricing_options {
-                match name.as_str() {
+                let name = crate::core::options::Options::canonical_name(name).unwrap_or(name);
+                match name {
                     "BALDESresConsKnapsackCutsMode" => {
                         config.parameters.use_rounding = *value > 0.;
                         config.parameters.max_one_k = value.abs() as i32;
@@ -680,10 +685,40 @@ pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -
             state.cuts.as_mut().unwrap().theta = theta;
         }
     }
+    // Resource IDs are original-model IDs; every graph must configure its
+    // solver coordinates before graph-specific knapsack separation/pricing.
+    if let Some(config) = &options.separation.knapsack {
+        for oracle in &mut state.oracles {
+            let solver = &mut oracle.solver;
+            solver.knapsack_resource_indices = config.resource_indices.clone();
+            if config.parameters.fenchel.is_some() {
+                solver.knapsack_exact_coefficients = true;
+            }
+            let indices = solver.knapsack_indices();
+            if indices
+                .values()
+                .any(|&resource| resource >= solver.graph.resources.len())
+            {
+                return Err(invalid(
+                    "knapsack resource mapping exceeds solver coordinates",
+                ));
+            }
+            let graph_id = solver.graph.graph_id.max(0);
+            for row in &config.rows {
+                if let Some(&(resource, scale)) = row.graph_resources.get(&graph_id) {
+                    if !indices.contains_key(&resource) || !scale.is_finite() || scale <= 0. {
+                        return Err(invalid("knapsack original row resource/scaling"));
+                    }
+                }
+            }
+        }
+    }
     let cuts = state.cuts.as_mut().unwrap();
     if let Some(separator) = cuts.capacity_separator.as_mut() {
         for (name, value) in &options.pricing_options {
-            match name.as_str() {
+            // Accept the legacy RCSP aliases of these registered options.
+            let name = crate::core::options::Options::canonical_name(name).unwrap_or(name);
+            match name {
                 "BALDESuseCapacityCuts" => separator.parameters.enabled = *value != 0.,
                 "BALDEScapCutsMaxNumPerRound" => {
                     separator.parameters.max_cuts_per_round = *value as usize
@@ -732,6 +767,133 @@ pub(super) fn prefer_arc_memory(
     let tol = node_bound.abs().max(arc_bound.abs()) * 1e-10 + 1e-6;
     let strictly_better = arc_bound - node_bound > tol;
     (strictly_better && score > 1.0, score)
+}
+
+/// Exact recourse excess of an integer route set, summed per Theta anchor
+/// (each route's lowest interior vertex), as master-variable IDs and values;
+/// None without route recourse. Visits are recovered from the arc heads, so
+/// routes supplied without node lists are evaluated correctly.
+pub(super) fn recourse_theta<const D: usize>(
+    state: &State<D>,
+    routes: &[FixedRoute],
+) -> Result<Option<Vec<(i32, f64)>>> {
+    let Some(recourse) = state.cuts.as_ref().and_then(|c| c.recourse.as_ref()) else {
+        return Ok(None);
+    };
+    let mut theta = BTreeMap::<i32, f64>::new();
+    for fixed in routes {
+        let oracle = state
+            .oracles
+            .iter()
+            .find(|o| o.network.id == fixed.route.network)
+            .ok_or_else(|| invalid("recourse route network"))?;
+        let graph = &oracle.network.graph;
+        let customers: Vec<usize> = fixed
+            .route
+            .route
+            .arcs
+            .iter()
+            .map(|id| {
+                oracle
+                    .index
+                    .get(id)
+                    .map(|&a| graph.arcs[a].head)
+                    .ok_or_else(|| invalid("recourse route arc"))
+            })
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .filter(|&v| v != graph.sink)
+            .collect();
+        let Some(&anchor) = customers.iter().min() else {
+            continue;
+        };
+        let excess = recourse.0.excess(&customers)?;
+        if !excess.is_finite() || excess < 0. {
+            return Err(invalid(
+                "route recourse excess must be finite and nonnegative",
+            ));
+        }
+        let id = THETA_VARIABLE_BASE
+            .checked_add(i32::try_from(anchor).map_err(|_| invalid("Theta vertex"))?)
+            .ok_or_else(|| invalid("Theta vertex"))?;
+        // The stored cut uses a rounded reciprocal. Paying `excess` exactly
+        // can leave its exact binary64 row activity just below one. Increase
+        // the charge until directed multiplication proves the encoded row.
+        let mut charge = excess;
+        if excess > 0. {
+            let reciprocal = 1. / excess;
+            if !reciprocal.is_finite() {
+                return Err(invalid("route recourse reciprocal overflow"));
+            }
+            while crate::core::rounding::multiply_down(charge, reciprocal)
+                .map_or(true, |value| value < 1.)
+            {
+                charge = f64::from_bits(charge.to_bits() + 1);
+                if !charge.is_finite() {
+                    return Err(invalid("route recourse charge overflow"));
+                }
+            }
+        }
+        let contribution = -crate::core::rounding::multiply_down(-charge, fixed.quantity)
+            .ok_or_else(|| invalid("route recourse quantity overflow"))?;
+        let value = theta.entry(id).or_default();
+        *value = crate::core::rounding::add_up(*value, contribution)
+            .ok_or_else(|| invalid("route recourse sum overflow"))?;
+    }
+    Ok(Some(theta.into_iter().collect()))
+}
+
+/// Theta has no finite upper bound, so even a one-ulp adverse dual residual
+/// prevents a finite Lagrangian certificate. Reduce its exclusive positive
+/// row prices until their directed sum is at most the unit objective cost.
+/// This changes the pricing point, never the LP matrix or a reported primal.
+pub(super) fn repair_theta_duals<const D: usize>(state: &State<D>, duals: &mut [f64]) {
+    let Some(cuts) = state.cuts.as_ref().filter(|c| c.recourse.is_some()) else {
+        return;
+    };
+    for &index in cuts.theta.iter().flatten() {
+        let variable = &state.master_variables[index];
+        if master_variables::reduced_cost_nonnegative(variable, 1., duals, state.shared_offset)
+            == Some(true)
+        {
+            continue;
+        }
+        if variable.cost <= 0. || variable.entries.iter().any(|&(_, a)| a < 0.) {
+            continue;
+        }
+        // A row shared with another static variable needs a joint projection.
+        // The automatically generated Theta cuts have exclusive static support.
+        if variable.entries.iter().any(|&(row, a)| {
+            a != 0.
+                && state.master_variables.iter().enumerate().any(|(other, v)| {
+                    other != index && v.entries.iter().any(|&(r, b)| r == row && b != 0.)
+                })
+        }) {
+            continue;
+        }
+        let upper = variable.entries.iter().try_fold(0., |sum, &(row, a)| {
+            let price = duals[state.shared_offset + row].max(0.);
+            let term = -crate::core::rounding::multiply_down(-a, price)?;
+            crate::core::rounding::add_up(sum, term)
+        });
+        let Some(upper) = upper.filter(|&upper| upper > variable.cost) else {
+            continue;
+        };
+        let mut factor = variable.cost / upper;
+        while -crate::core::rounding::multiply_down(-factor, upper).unwrap_or(f64::NEG_INFINITY)
+            > variable.cost
+        {
+            factor = f64::from_bits(factor.to_bits() - 1);
+        }
+        for &(row, a) in &variable.entries {
+            let price = &mut duals[state.shared_offset + row];
+            if a > 0. && *price > 0. {
+                if let Some(repaired) = crate::core::rounding::multiply_down(*price, factor) {
+                    *price = repaired.max(0.);
+                }
+            }
+        }
+    }
 }
 
 fn interior(route: &Route) -> Vec<usize> {
@@ -901,7 +1063,6 @@ impl<const D: usize> Round<'_, D> {
         kpath: bool,
     ) -> Result<bool> {
         let after = self.state.oracles[0].solver.cuts.cuts.len();
-        let graph_id = self.state.oracles[0].solver.graph.graph_id.max(0);
         let added: Vec<_> = self.state.oracles[0].solver.cuts.cuts[before..after].to_vec();
         for oracle in self.state.oracles.iter_mut().skip(1) {
             let registry = &mut oracle.solver.cuts;
@@ -955,7 +1116,15 @@ impl<const D: usize> Round<'_, D> {
             let registry = &self.state.oracles[0].solver.cuts;
             let cut = &registry.cuts[index];
             let shared = rows.push(sense(registry, index), cut.rhs as f64, fixed, entries);
-            let memory = cut.memory_for_graph(graph_id);
+            let memory = self
+                .state
+                .oracles
+                .iter()
+                .map(|oracle| {
+                    oracle.solver.cuts.cuts[index]
+                        .memory_for_graph(oracle.solver.graph.graph_id.max(0))
+                })
+                .collect();
             for oracle in &mut self.state.oracles {
                 oracle.nonlinear_rows.push((index, shared));
             }
@@ -971,7 +1140,15 @@ impl<const D: usize> Round<'_, D> {
             if shared >= rows.base_shared {
                 continue;
             }
-            let memory = self.state.oracles[0].solver.cuts.cuts[index].memory_for_graph(graph_id);
+            let memory: Vec<_> = self
+                .state
+                .oracles
+                .iter()
+                .map(|oracle| {
+                    oracle.solver.cuts.cuts[index]
+                        .memory_for_graph(oracle.solver.graph.graph_id.max(0))
+                })
+                .collect();
             if memory == self.cuts.memories[k] {
                 continue;
             }
@@ -1025,7 +1202,6 @@ impl<const D: usize> Round<'_, D> {
         rows: &mut NewRows,
         fractional: &[FractionalColumn],
     ) -> Result<(usize, bool)> {
-        let graph_id = self.state.oracles[0].solver.graph.graph_id.max(0);
         let mut solutions = vec![];
         let mut values = vec![];
         if matches!(
@@ -1037,7 +1213,12 @@ impl<const D: usize> Round<'_, D> {
                     continue;
                 }
                 solutions.push(crate::cuts::separation::Solution {
-                    graph_id,
+                    graph_id: self
+                        .oracle_of(self.state.routes[tag].network)?
+                        .solver
+                        .graph
+                        .graph_id
+                        .max(0),
                     enumerated: self
                         .oracle_of(self.state.routes[tag].network)?
                         .is_enumerated(self.route(tag)),
@@ -1047,7 +1228,12 @@ impl<const D: usize> Round<'_, D> {
             }
             for fixed in &self.state.fixed_routes {
                 solutions.push(crate::cuts::separation::Solution {
-                    graph_id,
+                    graph_id: self
+                        .oracle_of(fixed.route.network)?
+                        .solver
+                        .graph
+                        .graph_id
+                        .max(0),
                     enumerated: true,
                     arc_ids: fixed.route.route.arcs.clone(),
                 });
@@ -1255,57 +1441,69 @@ impl<const D: usize> Round<'_, D> {
 
     /// Whether the master solution uses a route breaking a relaxed selection.
     fn uses_improper_selection(&self) -> bool {
-        let oracle = &self.state.oracles[0];
-        let Some(kernel) = oracle
-            .network
-            .graph
-            .coupled_kernel()
-            .filter(|k| k.selection_relaxed())
-        else {
-            return false;
-        };
         self.tagged.iter().any(|&(column, tag)| {
-            self.values[column] > 1e-9
-                && self
-                    .route(tag)
-                    .arcs
-                    .iter()
-                    .map(|id| oracle.index.get(id).copied())
-                    .collect::<Option<Vec<_>>>()
-                    .is_some_and(|arcs| !kernel.selection_proper(&arcs))
+            if self.values[column] <= 1e-9 {
+                return false;
+            }
+            let route = &self.state.routes[tag];
+            let Ok(oracle) = self.oracle_of(route.network) else {
+                return false;
+            };
+            let Some(kernel) = oracle
+                .network
+                .graph
+                .coupled_kernel()
+                .filter(|kernel| kernel.selection_relaxed())
+            else {
+                return false;
+            };
+            route
+                .route
+                .arcs
+                .iter()
+                .map(|id| oracle.index.get(id).copied())
+                .collect::<Option<Vec<_>>>()
+                .is_some_and(|arcs| !kernel.selection_proper(&arcs))
         })
     }
 
     /// Dynamic NG strengthening and relaxed-selection tightening; marks the
     /// master columns the stronger relaxation forbids for removal.
     fn improve_relaxation(&mut self, rank_one_in_master: bool) -> Result<bool> {
-        let paths: Vec<_> = self
-            .tagged
-            .iter()
-            .filter(|&&(column, _)| self.values[column] > 1e-9)
-            .map(|&(column, tag)| crate::graph::relaxation::FractionalPath {
-                arcs: self.route(tag).arcs.clone(),
-                value: self.values[column],
-            })
-            .collect();
-        let solver = &mut self.state.oracles[0].solver;
-        let selection = solver.strengthen_selection(&paths)?;
-        let option = |name: &str| solver.options.get(name);
-        let mode = option("BALDESdynamicNGmode")? as i32;
-        let ng = if mode == 0 || (mode < 0 && rank_one_in_master) {
-            0
-        } else {
-            let controls = crate::graph::relaxation::Controls {
-                mode: mode.abs(),
-                max_vertex_size: option("BALDESmaxNGneighbourhoodSize")?.max(0.) as usize,
-                max_average_size: option("BALDESmaxNGaverNeighbourhoodSize")?.max(0.) as usize,
-                max_columns: option("BALDESmaxNumOfColumnsInDynamicNG")?.max(0.) as usize,
-                max_cycle_size: option("BALDESmaxCycleSizeInDynamicNG")? as i32,
-                mirror: false,
+        let mut changed = false;
+        for index in 0..self.state.oracles.len() {
+            let network = self.state.oracles[index].network.id;
+            let paths: Vec<_> = self
+                .tagged
+                .iter()
+                .filter(|&&(column, tag)| {
+                    self.values[column] > 1e-9 && self.state.routes[tag].network == network
+                })
+                .map(|&(column, tag)| crate::graph::relaxation::FractionalPath {
+                    arcs: self.route(tag).arcs.clone(),
+                    value: self.values[column],
+                })
+                .collect();
+            let solver = &mut self.state.oracles[index].solver;
+            let selection = solver.strengthen_selection(&paths)?;
+            let option = |name: &str| solver.options.get(name);
+            let mode = option("BALDESdynamicNGmode")? as i32;
+            let ng = if mode == 0 || (mode < 0 && rank_one_in_master) {
+                0
+            } else {
+                let controls = crate::graph::relaxation::Controls {
+                    mode: mode.abs(),
+                    max_vertex_size: option("BALDESmaxNGneighbourhoodSize")?.max(0.) as usize,
+                    max_average_size: option("BALDESmaxNGaverNeighbourhoodSize")?.max(0.) as usize,
+                    max_columns: option("BALDESmaxNumOfColumnsInDynamicNG")?.max(0.) as usize,
+                    max_cycle_size: option("BALDESmaxCycleSizeInDynamicNG")? as i32,
+                    mirror: false,
+                };
+                solver.strengthen_ng(&paths, &controls)?.columns_forbidden
             };
-            solver.strengthen_ng(&paths, &controls)?.columns_forbidden
-        };
-        if selection == 0 && ng == 0 {
+            changed |= selection > 0 || ng > 0;
+        }
+        if !changed {
             return Ok(false);
         }
         self.cuts.removed_columns = self.forbidden_columns()?;
@@ -1313,10 +1511,11 @@ impl<const D: usize> Round<'_, D> {
     }
 
     fn forbidden_columns(&self) -> Result<Vec<usize>> {
-        let solver = &self.state.oracles[0].solver;
         let mut removed = vec![];
         for &(column, tag) in &self.tagged {
-            let route = self.route(tag);
+            let network_route = &self.state.routes[tag];
+            let solver = &self.oracle_of(network_route.network)?.solver;
+            let route = &network_route.route;
             if !solver.route_satisfies_relaxation(&route.nodes, &route.arcs)? {
                 removed.push(column);
             }

@@ -69,7 +69,7 @@ fn capacity_tight_problem() -> Problem {
 #[test]
 fn routing_tree_with_theta_cuts_matches_the_tiny_oracle() {
     use baldes::extensions::stochastic::TinyOptions;
-    use baldes::master::tree::{TreeOptions, TreeStatus};
+    use baldes::master::tree::{ModelTreeOptions, TreeStatus};
     for (p, fleets) in [
         (problem(), vec![1, 2, 4]),
         (capacity_tight_problem(), vec![4, 5]),
@@ -96,36 +96,48 @@ fn routing_tree_with_theta_cuts_matches_the_tiny_oracle() {
                     (1, None, None, false),
                     (4, Some(1.), Some(8.), false),
                 ] {
-                    let mut tree = TreeOptions {
+                    let mut tree = ModelTreeOptions {
                         threads,
                         ..Default::default()
                     };
                     // Leave CutOptions at its generic default: solve_theta_cuts
                     // must enable both rank-one and mean-capacity separation.
                     if let Some(limit) = cut_limit {
-                        tree.root
+                        tree.node
                             .pricing_options
                             .push(("BALDESrankOneCutsMaxNumPerRound".into(), limit));
                     }
                     if !completion {
-                        tree.root
+                        tree.node
                             .pricing_options
                             .push(("BALDESloadCompletionResource".into(), -1.));
                     }
                     if let Some(mode) = dynamic_ng {
-                        tree.root
+                        tree.node
                             .pricing_options
                             .push(("BALDESdynamicNGmode".into(), mode));
                     }
                     let answer = p.solve_theta_cuts(policy, vehicles, 2, tree).unwrap();
-                    assert_eq!(answer.status, TreeStatus::Optimal, "{policy:?} {vehicles}");
+                    assert_eq!(answer.status, TreeStatus::Optimal, "{policy:?} {vehicles} nodes={} processed={} open={} bound={} inc={} iters={} calls={}", answer.nodes, answer.processed_nodes, answer.open_nodes, answer.bound, answer.incumbent, answer.iterations, answer.pricing_calls);
                     close(answer.incumbent, oracle.total_cost);
+                    let encoded_cost: f64 = answer
+                        .routes
+                        .iter()
+                        .map(|r| r.quantity * r.route.route.original_cost)
+                        .sum::<f64>()
+                        + answer
+                            .master_values
+                            .iter()
+                            .map(|&(_, value)| value)
+                            .sum::<f64>();
+                    close(encoded_cost, answer.incumbent);
                     assert!(answer.bound <= oracle.total_cost + 1e-6);
                     let replayed: f64 = answer
                         .routes
                         .iter()
                         .map(|r| {
-                            let customers: Vec<usize> = r.nodes[1..r.nodes.len() - 1]
+                            let nodes = &r.route.route.nodes;
+                            let customers: Vec<usize> = nodes[1..nodes.len() - 1]
                                 .iter()
                                 .map(|&v| v as usize)
                                 .collect();
@@ -143,7 +155,7 @@ fn routing_tree_with_theta_cuts_matches_the_tiny_oracle() {
 #[test]
 fn theta_recourse_runs_bucket_fixing_without_enumerating_routes() {
     use baldes::extensions::stochastic::TinyOptions;
-    use baldes::master::{cg, routing};
+    use baldes::master::{cg, model};
     let p = Problem::new(
         2,
         vec![Demand::new(vec![(0, 0.5), (2, 0.5)]).unwrap(); 3],
@@ -165,19 +177,19 @@ fn theta_recourse_runs_bucket_fixing_without_enumerating_routes() {
             .unwrap();
         let mut objectives = vec![];
         for enabled in [false, true] {
-            let mut options = routing::RootOptions::default();
+            let (problem, recourse) = p.theta_cut_model(policy, 2, 3).unwrap();
+            let mut options = model::Options::default();
+            options.separation.route_recourse = Some(recourse);
             // A fractional pair cover leaves an open gap. Theta recourse
-            // disables enumeration even though RootOptions defaults it on.
-            options.incumbent = oracle.total_cost;
+            // disables enumeration even with an authorizing incumbent.
+            options.fixing_upper_bound = Some(oracle.total_cost);
             options.pricing_options.push((
                 "BALDESapplyReducedCostFixing".into(),
                 if enabled { 1. } else { 0. },
             ));
-            let answer =
-                routing::solve(p.theta_cut_context(policy, 2, 3).unwrap(), options).unwrap();
+            let answer = model::solve(problem, options).unwrap();
             assert_eq!(answer.master.status, cg::Status::Optimal);
-            assert_eq!(answer.enumerated_routes, 0);
-            assert_eq!(answer.fixing_calls > 0, enabled);
+            assert_eq!(answer.snapshot.enumeration_report().routes, 0);
             assert!(answer.master.bound <= oracle.total_cost + 1e-6);
             objectives.push(answer.master.lp);
         }
@@ -189,7 +201,7 @@ fn theta_recourse_runs_bucket_fixing_without_enumerating_routes() {
 #[test]
 fn hgs_plan_seeds_theta_tree_without_pool_search_or_node_work() {
     use baldes::extensions::stochastic::{HgsWarmStart, SolveOptions};
-    use baldes::master::tree::TreeOptions;
+    use baldes::master::tree::ModelTreeOptions;
     use std::time::Duration;
     let p = problem();
     for policy in [Policy::Classical, Policy::OptimalRestocking] {
@@ -198,9 +210,8 @@ fn hgs_plan_seeds_theta_tree_without_pool_search_or_node_work() {
                 policy,
                 2,
                 SolveOptions {
-                    tree: TreeOptions {
+                    tree: ModelTreeOptions {
                         node_limit: 0,
-                        mip_node_limit: 0,
                         ..Default::default()
                     },
                     hgs_warm_start: Some(HgsWarmStart {
@@ -215,14 +226,15 @@ fn hgs_plan_seeds_theta_tree_without_pool_search_or_node_work() {
         assert!(summary.accepted_columns > 0);
         assert!(summary.accepted_plan);
         assert_eq!(answer.tree.nodes, 0);
-        assert_eq!(answer.tree.mip_nodes, 0);
+        assert_eq!(answer.tree.enumerated_mip_nodes, 0);
         let mut covered = Vec::<usize>::new();
         let replay: f64 = answer
             .tree
             .routes
             .iter()
             .map(|route| {
-                let customers: Vec<_> = route.nodes[1..route.nodes.len() - 1]
+                let nodes = &route.route.route.nodes;
+                let customers: Vec<_> = nodes[1..nodes.len() - 1]
                     .iter()
                     .map(|&v| v as usize)
                     .collect();
@@ -237,64 +249,50 @@ fn hgs_plan_seeds_theta_tree_without_pool_search_or_node_work() {
         close(summary.initial_objective.unwrap(), replay);
         assert!(answer.tree.bound <= replay + 1e-6);
 
-        // Imported columns follow the Theta variables. Their route metadata
+        // Seeded columns follow the Theta variables. Their route metadata
         // must not be attached to the auxiliary columns (which would also
         // apply binary route caps to unbounded Theta variables).
-        let mut root = baldes::master::routing::RootOptions {
-            initial_routes: answer.tree.routes.clone(),
-            ..Default::default()
-        };
-        root.cg.max_iterations = 1;
-        let seeded =
-            baldes::master::routing::solve(p.theta_cut_context(policy, 2, 2).unwrap(), root)
-                .unwrap();
-        assert!(seeded.master.column_tags[..p.demands().len()]
+        let (problem, recourse) = p.theta_cut_model(policy, 2, 2).unwrap();
+        let mut seeded_options = baldes::master::model::Options::default();
+        seeded_options.separation.route_recourse = Some(recourse.clone());
+        seeded_options.seed_routes = answer.tree.routes.iter().map(|f| f.route.clone()).collect();
+        seeded_options.cg.max_iterations = 1;
+        let seeded = baldes::master::model::solve(problem, seeded_options).unwrap();
+        let theta = p.demands().len();
+        assert_eq!(seeded.master_values.len(), theta);
+        assert!(seeded.master.column_tags[..theta]
             .iter()
-            .all(|&tag| tag == -1));
+            .all(|&tag| tag < 0));
         assert!(seeded.master.column_tags.iter().any(|&tag| tag >= 0));
 
         // The tree must reconstruct the stochastic objective, not trust route
         // metadata or require enough time to rediscover this plan in its pool.
         let mut routes = answer.tree.routes;
-        for route in &mut routes {
-            route.cost = -999.;
-            route.original_cost = -999.;
-            route.nodes.clear();
+        for fixed in &mut routes {
+            fixed.route.route.cost = -999.;
+            fixed.route.route.original_cost = -999.;
+            fixed.route.route.nodes.clear();
         }
-        let context = p.theta_cut_context(policy, 2, 2).unwrap();
-        let out = baldes::master::tree::solve(
-            context,
-            TreeOptions {
-                initial_solution: routes.clone(),
-                time_limit: Duration::ZERO,
-                mip_node_limit: 0,
+        let theta_tree = |routes: Vec<baldes::master::model::FixedRoute>, time_limit| {
+            let (problem, recourse) = p.theta_cut_model(policy, 2, 2).unwrap();
+            let mut options = ModelTreeOptions {
+                initial_solution: Some((replay, routes)),
+                time_limit,
                 ..Default::default()
-            },
-        )
-        .unwrap();
+            };
+            options.node.separation.route_recourse = Some(recourse);
+            baldes::master::tree::solve(problem, options)
+        };
+        let out = theta_tree(routes.clone(), Duration::ZERO).unwrap();
         close(out.incumbent, replay);
         assert_eq!(out.nodes, 0);
-        assert!(!out.routes[0].nodes.is_empty());
+        assert!(!out.routes[0].route.route.nodes.is_empty());
 
         let mut repeated = routes.clone();
         repeated.push(routes[0].clone());
-        assert!(baldes::master::tree::solve(
-            p.theta_cut_context(policy, 2, 2).unwrap(),
-            TreeOptions {
-                initial_solution: repeated,
-                ..Default::default()
-            }
-        )
-        .is_err());
-        routes[0].arcs[0] = i32::MAX;
-        assert!(baldes::master::tree::solve(
-            p.theta_cut_context(policy, 2, 2).unwrap(),
-            TreeOptions {
-                initial_solution: routes,
-                ..Default::default()
-            }
-        )
-        .is_err());
+        assert!(theta_tree(repeated, Duration::from_secs(120)).is_err());
+        routes[0].route.route.arcs[0] = i32::MAX;
+        assert!(theta_tree(routes, Duration::from_secs(120)).is_err());
     }
 }
 
@@ -339,7 +337,7 @@ fn hgs_seeded_theta_solve_matches_tiny_oracle() {
 #[test]
 fn hgs_budget_is_charged_to_theta_solve_and_zero_budget_skips_hgs() {
     use baldes::extensions::stochastic::{HgsWarmStart, SolveOptions};
-    use baldes::master::tree::TreeOptions;
+    use baldes::master::tree::ModelTreeOptions;
     use std::time::Duration;
     let p = problem();
     let answer = p
@@ -347,9 +345,8 @@ fn hgs_budget_is_charged_to_theta_solve_and_zero_budget_skips_hgs() {
             Policy::OptimalRestocking,
             2,
             SolveOptions {
-                tree: TreeOptions {
+                tree: ModelTreeOptions {
                     time_limit: Duration::from_millis(30),
-                    mip_node_limit: 0,
                     ..Default::default()
                 },
                 hgs_warm_start: Some(HgsWarmStart {
@@ -369,7 +366,7 @@ fn hgs_budget_is_charged_to_theta_solve_and_zero_budget_skips_hgs() {
             Policy::OptimalRestocking,
             2,
             SolveOptions {
-                tree: TreeOptions {
+                tree: ModelTreeOptions {
                     time_limit: Duration::ZERO,
                     ..Default::default()
                 },

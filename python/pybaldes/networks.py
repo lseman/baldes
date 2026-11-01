@@ -386,6 +386,8 @@ class NetworkResult:
     cuts: int = 0
     cut_rounds: int = 0
     lp_before_cuts: Optional[float] = None
+    diving_nodes: int = 0
+    feasibility: Tuple[Mapping[str, Any], ...] = ()
     snapshot: Optional[NetworkNode] = field(default=None, repr=False, compare=False)
 
     def to_json(self, *, indent: Optional[int] = 2) -> str:
@@ -407,6 +409,7 @@ def _result(text: str, native: Any) -> NetworkResult:
     data["mapped_branch_evaluations"] = tuple(
         MappedBranchEvaluation(**e) for e in data.get("mapped_branch_evaluations", ())
     )
+    data["feasibility"] = tuple(data.get("feasibility", ()))
     data["duals"] = tuple(data["duals"])
     data["oracle_calls"] = tuple(tuple(c) for c in data["oracle_calls"])
     return NetworkResult(**data, snapshot=None if native is None else NetworkNode(native))

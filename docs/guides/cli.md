@@ -49,7 +49,8 @@ baldes solve examples/networks/triangle.json --tree --nodes 100 --json -
 | `--tree-threads N` | concurrent open-node evaluations; default `1`, requires `--tree` for `N > 1` |
 | `--nodes N` | tree node limit (default 10,000) |
 | `--branching MODE` | `default` (default), `vehicles`, `ryan-foster`, `arc`, `cluster`, `resource`, `hybrid`, or `edge` |
-| `--no-strong-branching` | use fractionality instead of phased strong branching |
+| `--strong-branching` | enable phased strong branching; off by default, as in the native solver |
+| `--no-strong-branching` | use fractionality instead of strong trials (default) |
 | `--no-diving` | disable strong diving |
 | `--no-mip-heuristic` | disable restricted-master integer search |
 | `--mip-nodes N` | node budget per restricted-master integer-search call |

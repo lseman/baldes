@@ -185,219 +185,216 @@ fn arc_fixing_applies_to_pricing_enumeration_rebuilds_and_siblings() {
 }
 
 #[cfg(feature = "clp")]
-#[test]
-fn original_flow_preprocessing_rejects_contradictions_before_pricing() {
+mod network {
+    use super::*;
     use baldes::master::{
-        branching::BranchConstraint,
-        routing::{self, RootOptions, RoutingContext},
-    };
-    let mut p = RoutingContext::set_partitioning(solver().graph, 2.).unwrap();
-    p.branch(BranchConstraint::ArcFlow {
-        arc: 1,
-        sense: GreaterEqual,
-        rhs: 1.,
-    })
-    .unwrap();
-    p.branch(BranchConstraint::ArcFlow {
-        arc: 1,
-        sense: LessEqual,
-        rhs: 0.,
-    })
-    .unwrap();
-    let result = routing::solve(p, RootOptions::default()).unwrap();
-    assert!(result.preprocessing.infeasible);
-    assert_eq!(result.master.pricing_calls, 0);
-    assert_eq!(result.simplex_iterations, 0);
-}
-
-#[cfg(feature = "clp")]
-#[test]
-fn a_required_arc_propagates_to_other_incoming_and_outgoing_arcs() {
-    use baldes::master::{
-        branching::BranchConstraint,
-        routing::{self, RootOptions, RoutingContext},
-    };
-    let mut p = RoutingContext::set_partitioning(solver().graph, 2.).unwrap();
-    p.branch(BranchConstraint::ArcFlow {
-        arc: 1,
-        sense: GreaterEqual,
-        rhs: 1.,
-    })
-    .unwrap();
-    let mut options = RootOptions::default();
-    options.cg.stabilize = false;
-    options.enumerate = false;
-    let result = routing::solve(p, options).unwrap();
-    assert!(!result.preprocessing.infeasible);
-    assert!(result.preprocessing.bound_updates > 0);
-    assert_eq!(result.master.status, baldes::master::cg::Status::Optimal);
-    // 1->2 required: 0->2 and 1->sink are fixed out by cover/conservation.
-    assert!(
-        result
-            .routes
-            .iter()
-            .all(|r| !r.arcs.contains(&3) && !r.arcs.contains(&5)),
-        "{:?}",
-        result.routes
-    );
-}
-
-#[cfg(feature = "clp")]
-#[test]
-fn tree_reports_proved_infeasibility_without_an_incumbent() {
-    use baldes::master::{
-        routing::RoutingContext,
-        tree::{self, TreeOptions, TreeStatus},
-    };
-    let mut graph = baldes::Graph::<2>::new(4, 1).unwrap();
-    for (u, v) in [(0, 1), (1, 3), (0, 2), (2, 3)] {
-        graph.add_arc(u, v, 1.).unwrap();
-    }
-    let p = RoutingContext::set_partitioning(graph, 0.5).unwrap();
-    let result = tree::solve(p, TreeOptions::default()).unwrap();
-    assert_eq!(result.status, TreeStatus::Infeasible, "{result:?}");
-    assert_eq!(result.open_nodes, 0);
-    assert_eq!(result.pricing_calls, 0);
-    assert!(!result.incumbent.is_finite());
-}
-
-#[cfg(feature = "clp")]
-#[test]
-fn positive_aggregate_bounds_do_not_filter_unrelated_routes() {
-    use baldes::master::{
-        branching::BranchConstraint,
-        routing::{self, RootOptions, RoutingContext},
-    };
-    let mut s = baldes::pricing::Solver::<2>::new(5, 1).unwrap();
-    for (u, v) in [(0, 1), (1, 2), (2, 4), (0, 3), (3, 4)] {
-        s.graph.add_arc(u, v, 1.).unwrap();
-    }
-    let mut p = RoutingContext::set_partitioning(s.graph, 2.).unwrap();
-    p.branch(BranchConstraint::ArcFlow {
-        arc: 1,
-        sense: GreaterEqual,
-        rhs: 1.,
-    })
-    .unwrap();
-    let mut options = RootOptions::default();
-    options.cg.stabilize = false;
-    let result = routing::solve(p, options).unwrap();
-    assert_eq!(result.master.status, baldes::master::cg::Status::Optimal);
-    assert!((result.master.lp - 5.).abs() < 1e-6);
-    assert!(result.routes.iter().any(|r| r.arcs == [3, 4]));
-}
-
-#[cfg(feature = "clp")]
-#[test]
-fn inherited_capacity_rows_detect_a_child_contradiction_before_pricing() {
-    use baldes::inputs::{Instance, Rounding};
-    use baldes::master::{
-        branching::BranchConstraint,
         cg::Status,
-        routing::{self, CapacityCutConfig, RootOptions, RoutingContext},
+        formulation::Row,
+        model::{self, NodeSnapshot, Options, Output, Problem, RowCoefficients, RyanFosterMember},
+        RowSense,
     };
-    let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
-    for complement in [false, true] {
-        let graph = instance.graph(3, Rounding::None).unwrap();
-        let start = graph
-            .arcs
-            .iter()
-            .position(|a| a.tail == graph.source && a.head == 3)
-            .unwrap();
-        let end = graph
-            .arcs
-            .iter()
-            .position(|a| a.tail == 3 && a.head == graph.sink)
-            .unwrap();
-        let problem = RoutingContext::set_partitioning(graph, 3.).unwrap();
-        let mut config = CapacityCutConfig::new(vec![0., 1., 1., 1.], 2.);
-        config.parameters.complement_form = complement;
-        let mut options = RootOptions::default().with_capacity_cuts(config);
-        options.capture_state = true;
-        options.enumerate = false;
-        options.cg.stabilize = false;
-        let parent = routing::solve(problem, options.clone()).unwrap();
-        let snapshot = parent.snapshot.as_ref().unwrap();
-        assert!(snapshot.active_cuts() > 0);
-        let child = routing::inherit_branches(
-            snapshot,
-            &[
-                BranchConstraint::NumberOfVehicles {
-                    graph_id: 0,
-                    sense: LessEqual,
-                    rhs: 1.,
-                },
-                BranchConstraint::ArcFlow {
-                    arc: start,
-                    sense: GreaterEqual,
-                    rhs: 1.,
-                },
-                BranchConstraint::ArcFlow {
-                    arc: end,
-                    sense: GreaterEqual,
-                    rhs: 1.,
-                },
-            ],
-            options.clone(),
-        )
-        .unwrap();
-        assert!(
-            child.preprocessing.infeasible,
-            "complement={complement}: {child:?}"
-        );
-        assert_eq!(child.master.status, Status::Infeasible);
-        assert_eq!(child.master.pricing_calls, 0);
-        assert_eq!(child.simplex_iterations, 0);
-        assert_eq!(child.inherited_cuts, snapshot.active_cuts());
-        // Neither an infeasible child nor its bound propagation mutates the
-        // parent pool, physical rows or a feasible sibling's warm start.
-        let sibling = routing::inherit_branches(
-            snapshot,
-            &[BranchConstraint::NumberOfVehicles {
-                graph_id: 0,
-                sense: GreaterEqual,
-                rhs: 2.,
-            }],
-            options.clone(),
-        )
-        .unwrap();
-        assert!(!sibling.preprocessing.infeasible);
-        assert_eq!(sibling.master.status, Status::Optimal);
-        let replay = routing::inherit_branches(snapshot, &[], options).unwrap();
-        assert!((replay.master.lp - parent.master.lp).abs() < 1e-7);
-        assert!(snapshot.active_cuts() > 0);
-    }
-}
+    use std::time::Duration;
 
-#[cfg(feature = "clp")]
-#[test]
-fn transitive_ryan_foster_contradictions_are_preprocessed_without_pricing() {
-    use baldes::master::{
-        branching::BranchConstraint,
-        routing::{self, RootOptions, RoutingContext},
-    };
-    use baldes::pricing::restrictions::RyanFosterConstraint;
-    let mut graph = baldes::Graph::<2>::new(5, 0).unwrap();
-    graph.elementary = true;
-    for u in 0..4 {
-        for v in 1..5 {
-            if u != v {
-                graph.add_arc(u, v, 1.).unwrap();
-            }
+    /// A snapshot without priced columns: restrictions apply before pricing
+    /// as a fresh-problem branch did.
+    pub(super) fn cold(problem: Problem<2>, options: &Options) -> NodeSnapshot<2> {
+        let mut cold = options.clone();
+        cold.cg.time_limit = Duration::ZERO;
+        let root = model::solve(problem, cold).unwrap();
+        assert_eq!(root.master.pricing_calls, 0);
+        root.snapshot
+    }
+
+    pub(super) fn arc_row(
+        node: &NodeSnapshot<2>,
+        arcs: usize,
+        arc: usize,
+        sense: RowSense,
+        rhs: f64,
+    ) -> NodeSnapshot<2> {
+        let mut coefficients = vec![0.; arcs];
+        coefficients[arc] = 1.;
+        node.with_row(
+            Row { sense, rhs },
+            &[RowCoefficients {
+                network: 0,
+                arcs: coefficients,
+                per_route: 0.,
+            }],
+        )
+        .unwrap()
+    }
+
+    fn assert_rejected_before_pricing(output: &Output<2>) {
+        assert_eq!(output.master.status, Status::Infeasible, "{output:?}");
+        assert_eq!(output.master.pricing_calls, 0, "{output:?}");
+    }
+
+    #[test]
+    fn original_flow_preprocessing_rejects_contradictions_before_pricing() {
+        let graph = solver().graph;
+        let arcs = graph.arcs.len();
+        let options = Options::default();
+        let node = cold(Problem::set_partitioning(graph, 2.).unwrap(), &options);
+        let node = arc_row(&node, arcs, 1, GreaterEqual, 1.);
+        let node = arc_row(&node, arcs, 1, LessEqual, 0.);
+        assert_rejected_before_pricing(&node.solve(options).unwrap());
+    }
+
+    #[test]
+    fn a_required_arc_propagates_to_other_incoming_and_outgoing_arcs() {
+        let graph = solver().graph;
+        let arcs = graph.arcs.len();
+        let mut options = Options::default();
+        options.cg.stabilize = false;
+        options.gap_enumeration = false;
+        let node = cold(Problem::set_partitioning(graph, 2.).unwrap(), &options);
+        let result = arc_row(&node, arcs, 1, GreaterEqual, 1.)
+            .solve(options)
+            .unwrap();
+        assert_eq!(result.master.status, Status::Optimal);
+        // 1->2 required: 0->2 and 1->sink are fixed out by cover/conservation.
+        assert!(
+            result
+                .routes
+                .iter()
+                .zip(&result.values)
+                .filter(|(_, &x)| x > 1e-9)
+                .all(|(r, _)| !r.route.arcs.contains(&3) && !r.route.arcs.contains(&5)),
+            "{:?}",
+            result.routes
+        );
+    }
+
+    #[test]
+    fn tree_reports_proved_infeasibility_without_an_incumbent() {
+        use baldes::master::tree::{self, ModelTreeOptions, TreeStatus};
+        let mut graph = baldes::Graph::<2>::new(4, 1).unwrap();
+        for (u, v) in [(0, 1), (1, 3), (0, 2), (2, 3)] {
+            graph.add_arc(u, v, 1.).unwrap();
+        }
+        let p = Problem::set_partitioning(graph, 0.5).unwrap();
+        let result = tree::solve(p, ModelTreeOptions::default()).unwrap();
+        assert_eq!(result.status, TreeStatus::Infeasible, "{result:?}");
+        assert_eq!(result.open_nodes, 0);
+        assert_eq!(result.pricing_calls, 0);
+        assert!(!result.incumbent.is_finite());
+    }
+
+    #[test]
+    fn positive_aggregate_bounds_do_not_filter_unrelated_routes() {
+        let mut s = baldes::pricing::Solver::<2>::new(5, 1).unwrap();
+        for (u, v) in [(0, 1), (1, 2), (2, 4), (0, 3), (3, 4)] {
+            s.graph.add_arc(u, v, 1.).unwrap();
+        }
+        let arcs = s.graph.arcs.len();
+        let mut options = Options::default();
+        options.cg.stabilize = false;
+        let node = cold(Problem::set_partitioning(s.graph, 2.).unwrap(), &options);
+        let result = arc_row(&node, arcs, 1, GreaterEqual, 1.)
+            .solve(options)
+            .unwrap();
+        assert_eq!(result.master.status, Status::Optimal);
+        assert!((result.master.lp - 5.).abs() < 1e-6);
+        assert!(result.routes.iter().any(|r| r.route.arcs == [3, 4]));
+    }
+
+    #[test]
+    fn inherited_capacity_rows_detect_a_child_contradiction_before_pricing() {
+        use baldes::inputs::{Instance, Rounding};
+        use baldes::master::{model::separation::CapacityCutConfig, preprocessing::Bounds};
+        let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
+        for complement in [false, true] {
+            let graph = instance.graph(3, Rounding::None).unwrap();
+            let arcs = graph.arcs.len();
+            let start = graph
+                .arcs
+                .iter()
+                .position(|a| a.tail == graph.source && a.head == 3)
+                .unwrap();
+            let end = graph
+                .arcs
+                .iter()
+                .position(|a| a.tail == 3 && a.head == graph.sink)
+                .unwrap();
+            let problem = Problem::set_partitioning(graph, 3.).unwrap();
+            let mut config = CapacityCutConfig::new(vec![0., 1., 1., 1.], 2.);
+            config.parameters.complement_form = complement;
+            let mut options = Options::default();
+            options.separation.capacity = Some(config);
+            options.gap_enumeration = false;
+            options.cg.stabilize = false;
+            let parent = model::solve(problem, options.clone()).unwrap();
+            assert!(parent.cuts > 0);
+            let snapshot = &parent.snapshot;
+            let one = snapshot
+                .with_multiplicity(
+                    0,
+                    Bounds {
+                        lower: 0.,
+                        upper: 1.,
+                    },
+                )
+                .unwrap();
+            let child = arc_row(
+                &arc_row(&one, arcs, start, GreaterEqual, 1.),
+                arcs,
+                end,
+                GreaterEqual,
+                1.,
+            )
+            .solve(options.clone())
+            .unwrap();
+            assert_rejected_before_pricing(&child);
+            // Neither an infeasible child nor its bound propagation mutates the
+            // parent pool, physical rows or a feasible sibling's warm start.
+            let sibling = snapshot
+                .with_multiplicity(
+                    0,
+                    Bounds {
+                        lower: 2.,
+                        upper: 3.,
+                    },
+                )
+                .unwrap()
+                .solve(options.clone())
+                .unwrap();
+            assert_eq!(sibling.master.status, Status::Optimal, "{sibling:?}");
+            let replay = snapshot.solve(options).unwrap();
+            assert!((replay.master.lp - parent.master.lp).abs() < 1e-7);
+            assert!(replay.cuts >= parent.cuts);
         }
     }
-    let mut problem = RoutingContext::set_partitioning(graph, 3.).unwrap();
-    for (first, second, together) in [(1, 2, true), (2, 3, true), (1, 3, false)] {
-        problem
-            .branch(BranchConstraint::RyanFoster(RyanFosterConstraint {
-                first,
-                second,
-                together,
-            }))
-            .unwrap();
+
+    #[test]
+    fn transitive_ryan_foster_contradictions_are_proved_infeasible() {
+        let mut graph = baldes::Graph::<2>::new(5, 0).unwrap();
+        graph.elementary = true;
+        for u in 0..4 {
+            for v in 1..5 {
+                if u != v {
+                    graph.add_arc(u, v, 1.).unwrap();
+                }
+            }
+        }
+        let options = Options::default();
+        let mut node = cold(Problem::set_partitioning(graph, 3.).unwrap(), &options);
+        for (first, second, together) in [(1, 2, true), (2, 3, true), (1, 3, false)] {
+            node = node
+                .with_ryan_foster(
+                    &[RyanFosterMember {
+                        network: 0,
+                        first,
+                        second,
+                    }],
+                    together,
+                )
+                .unwrap();
+        }
+        // The removed routing root also rejected this before pricing (a
+        // BALDES transitive-closure rule, not native); phase I proves it here.
+        let output = node.solve(options).unwrap();
+        assert_eq!(output.master.status, Status::Infeasible, "{output:?}");
+        assert_eq!(output.master.bound, f64::INFINITY);
     }
-    let result = routing::solve(problem, RootOptions::default()).unwrap();
-    assert!(result.preprocessing.infeasible);
-    assert_eq!(result.master.pricing_calls, 0);
-    assert_eq!(result.simplex_iterations, 0);
 }

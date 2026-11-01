@@ -118,6 +118,12 @@ class FeasibilityReport:
 
 @dataclass(frozen=True)
 class RootResult:
+    """Root LP result, with backend work on the retained master since its last fork.
+
+    ``simplex_iterations`` and ``ipm_iterations`` exclude discarded trial and
+    checkpoint masters. ``iterations`` counts column-generation rounds instead.
+    """
+
     status: str
     lp: float
     bound: float
@@ -139,6 +145,8 @@ class RootResult:
     history: Tuple[Iteration, ...]
     feasibility: Tuple[FeasibilityReport, ...] = ()
     oracle_calls: int = 0
+    simplex_iterations: int = 0
+    ipm_iterations: int = 0
 
     def to_dict(self) -> dict:
         """Return ordinary Python data, retaining infinite unknown incumbents."""

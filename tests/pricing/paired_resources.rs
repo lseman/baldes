@@ -262,20 +262,15 @@ fn paired_phase_i_restores_costs_and_certified_controls_allow_complete_transfer(
     use baldes::master::{
         cg::{FeasibilityStatus, Status},
         model::{self, format::Model, EnumerationOptions, Options},
-        routing::{self, RootOptions, RoutingContext},
     };
     let graph = fixture(PairedResourceMode::CostBounded, 0.);
-    let mut options = RootOptions {
-        enumerate: false,
-        round_reduced_costs: false,
-        ..Default::default()
-    };
+    let mut options = Options::default();
     options.cg.artificial_cost = 1.;
     options.cg.max_penalty_updates = 0;
     options.cg.insert_non_negative = false;
     options.cg.stabilize = false;
-    let output = routing::solve(
-        RoutingContext::set_partitioning(graph, 2.).unwrap(),
+    let output = model::solve(
+        model::Problem::set_partitioning(graph, 2.).unwrap(),
         options,
     )
     .unwrap();
@@ -289,9 +284,10 @@ fn paired_phase_i_restores_costs_and_certified_controls_allow_complete_transfer(
         .any(|r| r.status == FeasibilityStatus::Feasible));
     assert!(
         (output
-            .route_values()
+            .routes
             .iter()
-            .map(|(r, x)| r.original_cost * x)
+            .zip(&output.values)
+            .map(|(r, x)| r.route.original_cost * x)
             .sum::<f64>()
             - 11.)
             .abs()

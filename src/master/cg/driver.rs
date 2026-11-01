@@ -278,7 +278,8 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
         }
         out.lp = master.objective();
         out.iterations = iteration;
-        let raw = master.duals().to_vec();
+        let mut raw = master.duals().to_vec();
+        controller.prepare_pricing_duals(&mut raw);
         let positive = out.artificials.iter().any(|&i| master.values()[i] > 1e-6);
         if !positive {
             ipm_accuracy.upper = ipm_accuracy.upper.min(out.lp);
@@ -486,6 +487,12 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 if started.elapsed() >= options.time_limit {
                     out.status = Status::TimeLimit;
                     return finish(out, loaded, cut_artificials, pool, smoothing);
+                }
+                controller.prepare_pricing_duals(current.to_mut());
+                if stabilize {
+                    // Feedback centers on the point actually priced, including
+                    // any static-variable dual feasibility repair.
+                    smoothing.pricing.copy_from_slice(&current);
                 }
                 let mut answer = price(phase_walk.stage, &current)?;
                 // One exact key per returned column is reused for the pool,
@@ -903,6 +910,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     seen = next.seen;
                     pool = next.pool;
                     pool_seen = next.pool_seen;
+                    controller.enumeration_installed(master, &loaded, &out.artificials)?;
                     // eval restarts the phase walk whether or not the master changed.
                     smoothing.restart_schedule((schedule.len() - 1) as i32);
                     proximal_state.restart_schedule();

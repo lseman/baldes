@@ -44,10 +44,24 @@ def triangle():
     return NetworkProblem.from_file(FIXTURE)
 
 
+def test_local_search_partial_incumbent_dives_reach_the_public_network_tree():
+    disabled = triangle().solve(tree=True, stabilize=False, node_limit=1, local_search={})
+    assert disabled.diving_nodes == 0
+    active = triangle().solve(
+        tree=True, stabilize=False, node_limit=1,
+        local_search={"depth_limit": 0, "fixed_column_ratio": 0.5, "max_iterations": 2},
+    )
+    assert active.diving_nodes > 0
+    assert active.incumbent == pytest.approx(2.0)
+    assert active.bound <= active.incumbent
+    with pytest.raises(ValueError, match="local_search requires tree"):
+        triangle().solve(local_search={"depth_limit": 0})
+
+
 @pytest.mark.parametrize("direction,first_side", [("upper-first", 1), ("lower-first", 0)])
 def test_named_native_branch_direction_reaches_trial_evaluation(direction, first_side):
     result = triangle().solve(
-        tree=True, stabilize=False, network_branching="phased",
+        tree=True, stabilize=False, network_branching="phased", mapped_strong_branching=True,
         mapped_variables=({"name": "count42", "priority": 1000.,
                            "networks": [{"network": 42, "per_route": 1.}]},),
         network_branch_directions={"count42": direction},
@@ -64,13 +78,13 @@ def test_named_branch_directions_reject_root_calls_and_unknown_directions():
     with pytest.raises(ValueError, match="requires tree=true"):
         triangle().solve(network_branch_directions={"count42": "lower-first"})
     with pytest.raises(ValueError, match="unknown variant"):
-        triangle().solve(tree=True, network_branching="phased",
+        triangle().solve(tree=True, network_branching="phased", mapped_strong_branching=True,
                          network_branch_directions={"count42": "up"})
-    with pytest.raises(ValueError, match="require phased"):
-        triangle().solve(tree=True, node_limit=0,
-                         network_branch_directions={"count42": "lower-first"})
+    # Named directions apply under every branching policy (unified dispatcher).
+    triangle().solve(tree=True, node_limit=0,
+                     network_branch_directions={"count42": "lower-first"})
     with pytest.raises(ValueError, match="nonempty generator name"):
-        triangle().solve(tree=True, node_limit=0, network_branching="phased",
+        triangle().solve(tree=True, node_limit=0, network_branching="phased", mapped_strong_branching=True,
                          network_branch_directions={" ": "lower-first"})
 
 
@@ -571,7 +585,7 @@ def test_native_multiphase_screens_are_distinct_from_processed_exact_trials(mode
     mappings = json.loads((Path(__file__).resolve().parents[2] / "tests/fixtures/multi_network_native_phased_mappings.json").read_text())
     result = triangle().solve(tree=True, network_branching="resource-first",
                               mapped_variables=tuple(mappings), stabilize=False,
-                              bound_mode=mode)
+                              mapped_strong_branching=True, bound_mode=mode)
     assert result.status == "Optimal"
     assert result.incumbent == pytest.approx(2.)
     assert result.bound == pytest.approx(2.)
@@ -641,7 +655,7 @@ def test_native_packing_registration_without_manual_mappings(mode):
     fixture = Path(__file__).resolve().parents[2] / "tests/fixtures/multi_network_native_packing.json"
     packing = json.loads(fixture.read_text())
     result = triangle().solve(tree=True, packing=packing, stabilize=False,
-                              bound_mode=mode)
+                              mapped_strong_branching=True, bound_mode=mode)
     assert result.status == "Optimal"
     assert result.incumbent == pytest.approx(2.)
     assert result.bound == pytest.approx(2.)
@@ -767,8 +781,8 @@ def test_original_integer_registration_reaches_fresh_and_snapshot_trials():
     model = NetworkProblem.from_json(json.dumps(data))
     root = model.solve(stabilize=False)
     assert root.original_variables[0]["lower"] == pytest.approx(0.5)
-    for result in [model.solve(tree=True, network_branching="phased", stabilize=False),
-                   root.snapshot.solve(tree=True, network_branching="phased", stabilize=False)]:
+    for result in [model.solve(tree=True, network_branching="phased", mapped_strong_branching=True, stabilize=False),
+                   root.snapshot.solve(tree=True, network_branching="phased", mapped_strong_branching=True, stabilize=False)]:
         assert result.incumbent == 2.
         assert any(e.name == "X_7_4" for e in result.mapped_branch_evaluations)
         activity = result.original_variables[0]

@@ -226,7 +226,7 @@ contract. Root and tree APIs have different option sets from routing
 | `mapped_variables` | `()` | Registered original aggregate branch variables |
 | `packing` | `None` | Packing-assignment registration |
 | `variable_boxes` / `original_variable_boxes` | `()` | Verified variable envelopes |
-| `mapped_strong_branching` | `True` | Evaluate admitted mapped branch proposals in trials |
+| `mapped_strong_branching` | `False` | Evaluate admitted branch proposals in trials (native default off) |
 
 These controls configure the shared lifecycle's model registration. Network
 count does not select another engine. Routing-specific Python keywords belong

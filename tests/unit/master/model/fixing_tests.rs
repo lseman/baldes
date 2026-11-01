@@ -1,8 +1,12 @@
 use super::*;
 
 fn fixture() -> Output<2> {
+    fixture_with_cost(1.)
+}
+
+fn fixture_with_cost(cheap_cost: f64) -> Output<2> {
     let mut graph = Graph::<2>::new(4, 0).unwrap();
-    for (tail, head, cost) in [(0, 1, 1.), (1, 3, 0.), (0, 2, 50.), (2, 3, 0.)] {
+    for (tail, head, cost) in [(0, 1, cheap_cost), (1, 3, 0.), (0, 2, 50.), (2, 3, 0.)] {
         graph.add_arc(tail, head, cost).unwrap();
     }
     let problem = Problem {
@@ -25,6 +29,28 @@ fn fixture() -> Output<2> {
     options.cg.stabilize = false;
     options.preprocessing.enabled = false;
     solve(problem, options).unwrap()
+}
+
+#[test]
+fn cancelling_complement_and_route_offset_keep_an_improving_route() {
+    let incumbent = 1.;
+    let other = 1e16;
+    let offset = -1e16;
+    let margin = 2e-6;
+    let rounded_ceiling = incumbent - other + margin - offset;
+    assert_eq!(rounded_ceiling, 0.);
+    let ceiling = pricing_ceiling(incumbent, other, margin, offset).unwrap();
+    assert!(ceiling >= incumbent + margin);
+    let mut output = fixture_with_cost(0.5);
+    let solver = &mut output.snapshot.state.oracles[0].solver;
+    solver.run_fixing_enumeration(-1, 0., ceiling).unwrap();
+    let routes = solver.enumerate(100.).unwrap();
+    assert!(routes.iter().any(|route| route.arcs == [0, 1]));
+}
+
+#[test]
+fn pricing_cutoff_declines_overflow_instead_of_fixing() {
+    assert_eq!(pricing_ceiling(f64::MAX, -f64::MAX, 0., 0.), None);
 }
 
 #[test]
@@ -64,12 +90,17 @@ fn fixing_requires_an_integer_witness_and_a_positive_time_budget() {
 }
 
 #[test]
-fn mandatory_network_quantity_is_not_fixed_by_the_optional_quantity_cutoff() {
+fn mandatory_network_quantity_with_a_closed_bound_needs_no_fixing() {
     let mut output = fixture();
     output.snapshot.state.oracles[0].network.multiplicity.lower = 1.;
     let duals = vec![0.; output.snapshot.master.rhs.len()];
     apply(&mut output.snapshot.state, &output.snapshot.master, &duals).unwrap();
     assert_eq!(output.snapshot.state.previous_fixing_gap, 1e12);
+    let routes = output.snapshot.state.oracles[0]
+        .solver
+        .enumerate(100.)
+        .unwrap();
+    assert!(routes.iter().any(|route| route.arcs == [0, 1]));
 }
 
 #[test]

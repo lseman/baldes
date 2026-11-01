@@ -112,6 +112,7 @@ impl NetworkNode {
             time_limit: std::time::Duration::try_from_secs_f64(time_limit).map_err(error)?,
             node_limit,
             objective_cutoff: objective_cutoff.unwrap_or(f64::INFINITY),
+            ..Default::default()
         };
         self.snapshot
             .solve_enumerated_mip(&options)

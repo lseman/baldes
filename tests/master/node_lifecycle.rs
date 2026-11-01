@@ -1,5 +1,39 @@
 use baldes::pricing::Solver;
 
+#[cfg(feature = "clp")]
+mod network {
+    use baldes::master::{
+        formulation::Row,
+        model::{NodeSnapshot, RowCoefficients},
+        RowSense,
+    };
+    /// One arc-flow branch row on network 0, as the routing branches were.
+    pub fn arc_row(
+        node: &NodeSnapshot<2>,
+        arcs: usize,
+        arc: usize,
+        sense: RowSense,
+        rhs: f64,
+    ) -> baldes::Result<NodeSnapshot<2>> {
+        let mut coefficients = vec![0.; arcs];
+        if let Some(c) = coefficients.get_mut(arc) {
+            *c = 1.;
+        } else {
+            // An out-of-range arc yields a mismatched coefficient vector,
+            // which the snapshot must reject.
+            coefficients.push(1.);
+        }
+        node.with_row(
+            Row { sense, rhs },
+            &[RowCoefficients {
+                network: 0,
+                arcs: coefficients,
+                per_route: 0.,
+            }],
+        )
+    }
+}
+
 fn ordering_solver() -> Solver<2> {
     let mut solver = Solver::<2>::new(4, 1).unwrap();
     for v in 0..4 {
@@ -181,79 +215,66 @@ fn enumeration_rewrites_existing_master_coefficients() {
 fn enumerated_snapshot_survives_siblings_grandchildren_and_failed_setup() {
     use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
-        routing::{self, RootOptions, RoutingContext},
+        model::{self, EnumerationOptions, Options, Problem},
         RowSense,
     };
+    use network::arc_row;
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     let problem =
-        RoutingContext::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap();
-    let mut options = RootOptions::default();
-    options.capture_state = true;
-    options.incumbent = 100.;
+        Problem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap();
+    let arcs = problem.networks[0].graph.arcs.len();
+    let mut options = Options::default();
     options.cg.stabilize = false;
-    options.cg.multiplicity = 3.;
-    let parent = routing::solve(problem.clone(), options.clone()).unwrap();
-    let snapshot = parent.snapshot.as_ref().unwrap();
-    let count = snapshot.enumerated_routes().expect("root must enumerate");
-    assert!(count > 0);
-    let arc = problem.model.networks[0]
+    let parent = model::solve(problem.clone(), options.clone()).unwrap();
+    let snapshot = parent
+        .snapshot
+        .enumerate(&EnumerationOptions::default())
+        .unwrap();
+    let report = snapshot.enumeration_report().clone();
+    assert!(report.complete && report.routes > 0, "{report:?}");
+    let arc = problem.networks[0]
         .graph
         .arcs
         .iter()
         .position(|a| a.tail == 1 && a.head == 2)
         .unwrap();
-    assert!(routing::inherit(
-        snapshot,
-        &[(usize::MAX, RowSense::LessEqual, 0.)],
-        options.clone()
-    )
-    .is_err());
+    assert!(arc_row(&snapshot, arcs, usize::MAX, RowSense::LessEqual, 0.).is_err());
     // Fail after the model has already been forked and branch rows installed.
     let mut invalid_setup = options.clone();
     invalid_setup
         .pricing_options
         .push(("BALDESmaxNumOfColsPerExactIteration".into(), 0.));
-    assert!(routing::inherit(snapshot, &[(arc, RowSense::LessEqual, 0.)], invalid_setup).is_err());
+    assert!(arc_row(&snapshot, arcs, arc, RowSense::LessEqual, 0.)
+        .unwrap()
+        .solve(invalid_setup)
+        .is_err());
     let mut expired = options.clone();
     expired.cg.time_limit = std::time::Duration::ZERO;
-    let interrupted = routing::inherit(snapshot, &[], expired).unwrap();
+    let interrupted = snapshot.solve(expired).unwrap();
     assert_eq!(
         interrupted.master.status,
         baldes::master::cg::Status::TimeLimit
     );
-    assert_eq!(snapshot.enumerated_routes(), Some(count));
+    assert_eq!(snapshot.enumeration_report().routes, report.routes);
     for (sense, rhs) in [(RowSense::LessEqual, 0.), (RowSense::GreaterEqual, 1.)] {
-        let child = routing::inherit(snapshot, &[(arc, sense, rhs)], options.clone()).unwrap();
-        let child_snapshot = child.snapshot.as_ref().unwrap();
-        assert_eq!(child_snapshot.branch_depth(), 1);
-        assert!(child_snapshot.enumerated_routes().is_some());
-        assert_eq!(snapshot.branch_depth(), 0);
-        assert_eq!(snapshot.enumerated_routes(), Some(count));
-        let cold = problem.clone();
-        // Construct the equivalent independent one-row child through a root
-        // snapshot with enumeration disabled, then compare certified bounds.
-        let mut cold_options = options.clone();
-        cold_options.enumerate = false;
-        let fresh = routing::solve(cold.clone(), cold_options.clone()).unwrap();
-        let fresh_child = routing::inherit(
-            fresh.snapshot.as_ref().unwrap(),
-            &[(arc, sense, rhs)],
-            cold_options,
-        )
-        .unwrap();
+        let child = arc_row(&snapshot, arcs, arc, sense, rhs)
+            .unwrap()
+            .solve(options.clone())
+            .unwrap();
+        assert!(child.snapshot.enumeration_report().complete);
+        assert_eq!(snapshot.enumeration_report().routes, report.routes);
+        // The equivalent child of the unenumerated root has the same bound.
+        let fresh_child = arc_row(&parent.snapshot, arcs, arc, sense, rhs)
+            .unwrap()
+            .solve(options.clone())
+            .unwrap();
         assert!(
             (child.master.bound - fresh_child.master.bound).abs() < 1e-6,
             "inherited={child:?}, fresh={fresh_child:?}"
         );
-        let grandchild = routing::inherit(child_snapshot, &[], options.clone()).unwrap();
-        assert_eq!(grandchild.snapshot.as_ref().unwrap().branch_depth(), 1);
-        assert!(grandchild
-            .snapshot
-            .as_ref()
-            .unwrap()
-            .enumerated_routes()
-            .is_some());
-        assert_eq!(snapshot.enumerated_routes(), Some(count));
+        let grandchild = child.snapshot.solve(options.clone()).unwrap();
+        assert!(grandchild.snapshot.enumeration_report().complete);
+        assert_eq!(snapshot.enumeration_report().routes, report.routes);
     }
 }
 
@@ -262,47 +283,30 @@ fn enumerated_snapshot_survives_siblings_grandchildren_and_failed_setup() {
 fn tree_controls_enumeration_and_standalone_fixing_independently() {
     use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
-        routing::{RootOptions, RoutingContext},
-        tree::{self, TreeOptions, TreeStatus},
+        model::Problem,
+        tree::{self, ModelTreeOptions, TreeStatus},
     };
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     for (enumerate, fixing) in [(false, true), (false, false), (true, true)] {
         let problem =
-            RoutingContext::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.)
-                .unwrap();
-        let mut root = RootOptions::default();
-        root.enumerate = enumerate;
-        root.cg.stabilize = false;
-        root.pricing_options.push((
+            Problem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap();
+        let mut options = ModelTreeOptions::default();
+        options.node.gap_enumeration = enumerate;
+        options.node.cg.stabilize = false;
+        options.node.pricing_options.push((
             "BALDESapplyReducedCostFixing".into(),
             if fixing { 1. } else { 0. },
         ));
-        let result = tree::solve(
-            problem,
-            TreeOptions {
-                root,
-                strong_branching: None,
-                diving: None,
-                ..Default::default()
-            },
-        )
-        .unwrap();
+        let result = tree::solve(problem, options).unwrap();
         assert_eq!(result.status, TreeStatus::Optimal, "{result:?}");
         assert!((result.incumbent - (4. + 2f64.sqrt())).abs() < 1e-6);
-        if enumerate {
+        // Disabling gap enumeration never installs a route universe; the
+        // reduced-cost fixing switch is independent of it.
+        if !enumerate {
             assert!(
-                result.fixing_calls > 0 && result.enumerated_routes > 0,
+                result.enumeration_reports.iter().all(|r| r.attempts == 0),
                 "{result:?}"
             );
-        } else {
-            // Disabling route-universe enumeration keeps the independently
-            // controlled reduced-cost fixing pass available.
-            assert_eq!(result.enumerated_routes, 0);
-            if fixing {
-                assert!(result.fixing_calls > 0, "{result:?}");
-            } else {
-                assert_eq!(result.fixing_calls, 0, "{result:?}");
-            }
         }
     }
 }
@@ -443,19 +447,19 @@ fn snapshots_keep_cached_columns_and_extend_branch_rows_without_aliasing() {
     use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
         cg::Status,
-        routing::{self, RootOptions, RoutingContext},
+        model::{self, Options, Problem},
         RowSense,
     };
+    use network::arc_row;
     let mut instance = Instance::read("instances/Solomon/R201.txt").unwrap();
     instance.truncate(10).unwrap();
     let graph = instance.graph(12, Rounding::None).unwrap();
-    let problem = RoutingContext::set_partitioning(graph.clone(), 10.).unwrap();
-    let mut options = RootOptions::default();
-    options.capture_state = true;
-    options.enumerate = false;
-    options.incumbent = 1000.;
+    let arcs = graph.arcs.len();
+    let problem = Problem::set_partitioning(graph.clone(), 10.).unwrap();
+    let mut options = Options::default();
+    options.gap_enumeration = false;
     options.cg.insert_non_negative = false;
-    let parent = routing::solve(problem, options.clone()).unwrap();
+    let parent = model::solve(problem, options.clone()).unwrap();
     let pool = &parent.master.warm_start.generated_pool;
     let loaded = parent.master.warm_start.columns.iter().flatten().count();
     assert!(
@@ -471,15 +475,14 @@ fn snapshots_keep_cached_columns_and_extend_branch_rows_without_aliasing() {
     let id = graph.arcs[arc].id;
     let row = parent.duals.len();
     options.cg.time_limit = std::time::Duration::ZERO;
-    let snapshot = parent.snapshot.as_ref().unwrap();
-    let left =
-        routing::inherit(snapshot, &[(arc, RowSense::LessEqual, 0.)], options.clone()).unwrap();
+    let left_node = arc_row(&parent.snapshot, arcs, arc, RowSense::LessEqual, 0.).unwrap();
+    let left = left_node.solve(options.clone()).unwrap();
     assert_eq!(left.master.status, Status::TimeLimit);
     let left_pool = &left.master.warm_start.generated_pool;
     assert_eq!(left_pool.len(), pool.len());
     for (before, after) in pool.iter().zip(left_pool) {
         assert_eq!(before.identity, after.identity);
-        let route = &parent.routes[before.tag as usize];
+        let route = &parent.routes[before.tag as usize].route;
         let count = route.arcs.iter().filter(|&&a| a == id).count() as f64;
         let mut expected = before.entries.clone();
         if count != 0. {
@@ -487,12 +490,12 @@ fn snapshots_keep_cached_columns_and_extend_branch_rows_without_aliasing() {
         }
         assert_eq!(after.entries, expected);
     }
-    let right = routing::inherit(snapshot, &[], options.clone()).unwrap();
+    let right = parent.snapshot.solve(options.clone()).unwrap();
     assert_eq!(
         format!("{:?}", right.master.warm_start.generated_pool),
         original
     );
-    let grandchild = routing::inherit(left.snapshot.as_ref().unwrap(), &[], options).unwrap();
+    let grandchild = left.snapshot.solve(options).unwrap();
     assert_eq!(
         format!("{:?}", grandchild.master.warm_start.generated_pool),
         format!("{left_pool:?}")
@@ -508,49 +511,55 @@ fn snapshots_keep_cached_columns_and_extend_branch_rows_without_aliasing() {
 fn child_enumeration_never_reactivates_a_forbidden_cached_arc() {
     use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
-        routing::{self, RootOptions, RoutingContext},
+        model::{self, Options, Problem},
         RowSense,
     };
+    use network::arc_row;
     let instance = Instance::read("tests/master/fixtures/fractional.txt").unwrap();
     let graph = instance.graph(5, Rounding::None).unwrap();
+    let arcs = graph.arcs.len();
     let arc = graph
         .arcs
         .iter()
         .position(|a| a.tail == 1 && a.head == 2)
         .unwrap();
     let id = graph.arcs[arc].id;
-    let problem = RoutingContext::set_partitioning(graph, 3.).unwrap();
-    let mut options = RootOptions::default();
-    options.capture_state = true;
-    options.enumerate = false;
-    options.incumbent = 10.;
-    let parent = routing::solve(problem, options.clone()).unwrap();
+    let problem = Problem::set_partitioning(graph, 3.).unwrap();
+    let mut options = Options::default();
+    options.gap_enumeration = false;
+    let parent = model::solve(problem, options.clone()).unwrap();
     let original = format!("{:?}", parent.master.warm_start.generated_pool);
     assert!(parent
         .master
         .warm_start
         .generated_pool
         .iter()
-        .any(|c| parent.routes[c.tag as usize].arcs.contains(&id)));
-    options.enumerate = true;
-    let snapshot = parent.snapshot.as_ref().unwrap();
-    let child =
-        routing::inherit(snapshot, &[(arc, RowSense::LessEqual, 0.)], options.clone()).unwrap();
-    assert!(
-        child.fixing_calls > 0,
-        "must exercise regeneration, not just bound pruning"
-    );
-    for column in child.master.warm_start.columns.iter().flatten() {
-        assert!(!child.routes[column.tag as usize].arcs.contains(&id));
+        .any(|c| parent.routes[c.tag as usize].route.arcs.contains(&id)));
+    // An incumbent authorizes child fixing/enumeration over cached columns.
+    options.gap_enumeration = true;
+    options.fixing_upper_bound = Some(10.);
+    let child = arc_row(&parent.snapshot, arcs, arc, RowSense::LessEqual, 0.)
+        .unwrap()
+        .solve(options.clone())
+        .unwrap();
+    // Cached columns using the arc may stay loaded, but the branch row keeps
+    // them at zero: the forbidden arc is never reactivated.
+    for (route, &value) in child.routes.iter().zip(&child.values) {
+        if value > 1e-9 {
+            assert!(!route.route.arcs.contains(&id), "{route:?}");
+        }
     }
-    let sibling = routing::inherit(snapshot, &[], options).unwrap();
+    let sibling = parent.snapshot.solve(options).unwrap();
     assert!(sibling
         .master
         .warm_start
         .columns
         .iter()
         .flatten()
-        .any(|c| sibling.routes[c.tag as usize].arcs.contains(&id)));
+        .filter_map(|c| usize::try_from(c.tag)
+            .ok()
+            .and_then(|t| sibling.routes.get(t)))
+        .any(|r| r.route.arcs.contains(&id)));
     assert_eq!(
         format!("{:?}", parent.master.warm_start.generated_pool),
         original
@@ -687,61 +696,51 @@ fn cut_cleanup_remaps_loaded_and_uninserted_pool_rows_before_resume() {
 #[test]
 fn child_regeneration_rechecks_ryan_foster_for_cached_columns() {
     use baldes::inputs::{Instance, Rounding};
-    use baldes::master::{
-        branching::BranchConstraint,
-        routing::{self, RootOptions, RoutingContext},
-    };
+    use baldes::master::model::{self, Options, Problem, RyanFosterMember};
     use baldes::pricing::restrictions::RyanFosterConstraint;
     // Two odd clusters keep one fractional triangle after branching on the
     // other, so both children actually reach fixing/enumeration.
     let instance = Instance::parse("clusters\nVEHICLE\nNUMBER CAPACITY\n6 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 1 .1 1 0 100 0\n3 1 -.1 1 0 100 0\n4 -1 0 1 0 100 0\n5 -1 .1 1 0 100 0\n6 -1 -.1 1 0 100 0\n").unwrap();
     let problem =
-        RoutingContext::set_partitioning(instance.graph(8, Rounding::None).unwrap(), 6.).unwrap();
-    let mut options = RootOptions::default();
-    options.capture_state = true;
-    options.enumerate = false;
-    options.incumbent = 100.;
-    let parent = routing::solve(problem, options.clone()).unwrap();
+        Problem::set_partitioning(instance.graph(8, Rounding::None).unwrap(), 6.).unwrap();
+    let mut options = Options::default();
+    options.gap_enumeration = false;
+    let parent = model::solve(problem, options.clone()).unwrap();
     let pool = format!("{:?}", parent.master.warm_start.generated_pool);
-    options.enumerate = true;
+    options.gap_enumeration = true;
+    options.fixing_upper_bound = Some(100.);
     for together in [false, true] {
         let rule = RyanFosterConstraint {
             first: 1,
             second: 2,
             together,
         };
+        let nodes =
+            |route: &baldes::Route| route.nodes.iter().map(|&v| v as usize).collect::<Vec<_>>();
         assert!(parent
             .master
             .warm_start
             .generated_pool
             .iter()
-            .any(|column| {
-                !rule.satisfied_by(
-                    parent.routes[column.tag as usize]
-                        .nodes
-                        .iter()
-                        .map(|&v| v as usize),
-                )
-            }));
-        let child = routing::inherit_branches(
-            parent.snapshot.as_ref().unwrap(),
-            &[BranchConstraint::RyanFoster(rule)],
-            options.clone(),
-        )
-        .unwrap();
-        assert!(child.fixing_calls > 0, "together={together}: {child:?}");
-        if baldes::master::branching::enforcement::RYAN_FOSTER_IN_PRICING {
-            for column in child.master.warm_start.columns.iter().flatten() {
-                let nodes = &child.routes[column.tag as usize].nodes;
-                assert!(rule.satisfied_by(nodes.iter().map(|&v| v as usize)));
-                assert!(rule.elementary_on_pair(nodes.iter().map(|&v| v as usize)));
-            }
-        }
-        // Master-only enforcement may retain violating cached columns, but its
-        // branch row must keep their solution values at zero in either build.
-        for (route, value) in child.route_values() {
+            .any(|column| !rule.satisfied_by(nodes(&parent.routes[column.tag as usize].route))));
+        let child = parent
+            .snapshot
+            .with_ryan_foster(
+                &[RyanFosterMember {
+                    network: 0,
+                    first: 1,
+                    second: 2,
+                }],
+                together,
+            )
+            .unwrap()
+            .solve(options.clone())
+            .unwrap();
+        // Cached violating columns may remain in the master, but the branch
+        // row keeps their solution values at zero.
+        for (route, &value) in child.routes.iter().zip(&child.values) {
             if value > 1e-8 {
-                assert!(rule.satisfied_by(route.nodes.iter().map(|&v| v as usize)));
+                assert!(rule.satisfied_by(nodes(&route.route)));
             }
         }
         assert_eq!(

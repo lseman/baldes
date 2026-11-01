@@ -15,7 +15,9 @@ Solve shared master rows with multiple pricing networks (Clp).
   --packing FILE  packing-assignment registration JSON (--tree)
   --original-variable-boxes FILE  Original identity lower/upper envelopes JSON
   --variable-boxes FILE  Verified variable-box envelopes JSON
-  --no-mapped-strong-branching  Rank registered aggregates without trial solves
+  --mapped-strong-branching  Rank branch proposals by strong trial solves (native default: off)
+  --no-mapped-strong-branching  Rank branch proposals without trial solves (default)
+  --local-search FILE     Partial-incumbent diving controls JSON (--tree; depth_limit >= 0 enables)
   --proximal FILE         Proximal configuration JSON (replaces smoothing)
   --proximal-finite-box-step  finite-cap box-step initialization/schedule
   --proximal-explicit-three-piece  explicit three-piece initialization/schedule
@@ -85,6 +87,12 @@ fn parse_options(args: Vec<String>) -> Result<Option<NetworkOptions>, String> {
                 options.proximal =
                     Some(baldes::master::stabilization::ProximalParameters::finite_box_step());
             }
+            "--local-search" => {
+                let text = std::fs::read_to_string(value()?).map_err(|e| e.to_string())?;
+                options.local_search = Some(
+                    serde_json::from_str(&text).map_err(|e| format!("local search JSON: {e}"))?,
+                );
+            }
             "--proximal-explicit-three-piece" => {
                 options.proximal =
                     Some(baldes::master::stabilization::ProximalParameters::explicit_three_piece());
@@ -144,6 +152,7 @@ fn parse_options(args: Vec<String>) -> Result<Option<NetworkOptions>, String> {
                 options.mapped_variables = serde_json::from_str(&text)
                     .map_err(|e| format!("mapped variables JSON: {e}"))?;
             }
+            "--mapped-strong-branching" => options.mapped_strong_branching = true,
             "--no-mapped-strong-branching" => options.mapped_strong_branching = false,
             "--proximal" => {
                 let text = std::fs::read_to_string(value()?).map_err(|e| e.to_string())?;

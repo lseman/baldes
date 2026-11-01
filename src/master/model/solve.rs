@@ -2,6 +2,9 @@
 use super::*;
 
 pub(super) fn validate_options(options: &Options) -> Result<()> {
+    if options.gap_mip.is_some() && !cfg!(feature = "highs") {
+        return Err(invalid("gap enumeration MIP requires the highs feature"));
+    }
     if options
         .fixing_upper_bound
         .is_some_and(|bound| !bound.is_finite())
@@ -187,9 +190,13 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
         pricing_gap: (options.cg.gap_absolute, options.cg.gap_relative),
         previous_fixing_gap: 1e12,
         gap_enumeration: options.gap_enumeration,
+        tree_bound_floor: f64::NEG_INFINITY,
         fixing_bound: None,
+        fixing_cutoffs: None,
         gap_checkpoint: None,
         enumerated_routes: 0,
+        gap_pool_cutoff: None,
+        gap_mip: options.gap_mip.clone(),
         fixing_calls: 0,
         objective_fixed: false,
         phase_one_infeasible: false,
@@ -314,6 +321,7 @@ pub(super) fn run<const D: usize>(
     )?;
     state.tree_incumbent = options.fixing_upper_bound.unwrap_or(f64::INFINITY);
     state.gap_enumeration = options.gap_enumeration;
+    state.gap_mip = options.gap_mip.clone();
     state.pricing_witness = None;
     state.pricing_master = None;
     state.pricing_gap = (options.cg.gap_absolute, options.cg.gap_relative);
@@ -618,6 +626,31 @@ fn execute_node_cg<const D: usize>(
             }),
         },
     );
+    let log_context = options.cg.log_interval.is_some().then(|| {
+        let mut context = format!(
+            "  Master: {:?} | Node depth: {} | Stabilization: {} | Bound mode: {}",
+            options.master_solver,
+            state.borrow().node_depth,
+            if options.cg.stabilize && options.cg.smoothing.alpha_factor > 0. {
+                "on"
+            } else {
+                "off"
+            },
+            options.cg.bound_mode.as_str()
+        );
+        if matches!(
+            options.master_solver,
+            crate::master::clp::MasterSolver::Highs | crate::master::clp::MasterSolver::Gurobi
+        ) {
+            let workers = if options.master_threads == 0 {
+                std::thread::available_parallelism().map_or(1, usize::from)
+            } else {
+                options.master_threads
+            };
+            context.push_str(&format!(" | Workers: {workers}"));
+        }
+        context
+    });
     let gap = (options.cg.gap_absolute, options.cg.gap_relative);
     let started = Instant::now();
     let time_limit = options.cg.time_limit;
@@ -632,12 +665,13 @@ fn execute_node_cg<const D: usize>(
                 .saturating_duration_since(Instant::now()),
         );
         controller.9.prior_cg = previous.clone();
-        let optimized = cg::optimize(
+        let optimized = cg::optimize_with_log_context(
             &mut master,
             &schedule,
             |phase, duals| state.borrow_mut().price(phase, duals),
             &mut controller,
             options.cg.take_continuation(),
+            log_context.as_deref(),
         );
         let mut current = match optimized {
             Ok(current) => current,

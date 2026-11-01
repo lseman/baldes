@@ -1,5 +1,8 @@
 //! Resource-bounded walk relaxation, without elementarity assumptions.
-use crate::{core::rounding::add_down, graph::Graph};
+use crate::{
+    core::rounding::{add_down, multiply_down},
+    graph::Graph,
+};
 use std::time::Instant;
 
 /// Prove scalar-resource infeasibility on a DAG. Coordinate minima may come
@@ -292,6 +295,63 @@ fn zero_arcs_are_acyclic<const D: usize>(graph: &Graph<D>, axes: &[bool; D]) -> 
     processed == n
 }
 
+/// Largest number of positive-consumption arcs on any feasible walk, on the
+/// most restrictive scalar axis. Waiting only raises a disposable resource,
+/// so the consumed amount never exceeds `upper - initial`; each positive arc
+/// consumes at least the axis minimum `delta`. The floor is verified with
+/// directed arithmetic instead of a blanket safety margin.
+fn positive_arc_limit<const D: usize>(graph: &Graph<D>) -> Option<(usize, usize)> {
+    let mut best: Option<(usize, usize)> = None;
+    for r in 0..graph.resources.len() {
+        if graph
+            .arcs
+            .iter()
+            .any(|a| !a.consumption[r].is_finite() || a.consumption[r] < 0.)
+        {
+            continue;
+        }
+        let delta = graph
+            .arcs
+            .iter()
+            .map(|a| a.consumption[r])
+            .filter(|&v| v > 0.)
+            .fold(f64::INFINITY, f64::min);
+        if !delta.is_finite() {
+            continue;
+        }
+        let initial = graph.initial[r].unwrap_or(graph.vertices[graph.source].bounds[r].lower);
+        let upper = graph
+            .vertices
+            .iter()
+            .map(|v| v.bounds[r].upper)
+            .fold(f64::NEG_INFINITY, f64::max);
+        // An upward enclosure of the consumable budget.
+        let Some(budget) = add_down(initial, -upper).map(|v| -v) else {
+            continue;
+        };
+        let ratio = budget / delta;
+        if !ratio.is_finite() || ratio < 0. || ratio > 1_000_000. {
+            continue;
+        }
+        let floor = ratio.floor() as usize;
+        // (floor + 1) arcs are impossible only if their least consumption,
+        // rounded down, still exceeds the upward budget.
+        let next = floor + 1;
+        let limit = match multiply_down(next as f64, delta) {
+            Some(least) if least > budget => floor,
+            _ => next,
+        };
+        if best.map_or(true, |(_, old)| limit < old) {
+            best = Some((r, limit));
+        }
+    }
+    best
+}
+
+/// Arc-count states are kept only for small limits; larger ones fall back to
+/// the plain hop-limited walk.
+const MAX_COUNTED_ARCS: usize = 64;
+
 pub(super) fn minimum<const D: usize>(
     graph: &Graph<D>,
     weights: &[f64],
@@ -299,22 +359,37 @@ pub(super) fn minimum<const D: usize>(
     deadline: Instant,
 ) -> Option<Option<f64>> {
     let hops = hop_limit(graph, *work)?;
-    let mut previous = vec![None; graph.vertices.len()];
-    previous[graph.source] = Some(0.);
+    let (axis, limit) = positive_arc_limit(graph)
+        .filter(|&(_, limit)| limit < MAX_COUNTED_ARCS)
+        .map_or((None, 0), |(r, limit)| (Some(r), limit));
+    let layers = limit + 1;
+    let index = |v: usize, k: usize| v * layers + k;
+    let mut previous = vec![None; graph.vertices.len() * layers];
+    previous[index(graph.source, 0)] = Some(0.);
     for _ in 0..hops {
         if Instant::now() >= deadline {
             return None;
         }
-        *work = work.checked_sub(graph.arcs.len() + 2 * graph.vertices.len())?;
+        *work = work.checked_sub((graph.arcs.len() + 2 * graph.vertices.len()) * layers)?;
         // Synchronous relaxation: each pass adds at most one arc, making the
-        // resource-derived walk-length limit explicit.
+        // resource-derived walk-length limit explicit. The layer counts
+        // positive-consumption arcs on `axis` and never exceeds `limit`.
         let mut next = previous.clone();
         let mut changed = false;
         for (arc, &weight) in graph.arcs.iter().zip(weights) {
-            if let Some(tail) = previous[arc.tail] {
+            let step = usize::from(axis.is_some_and(|r| arc.consumption[r] > 0.));
+            for k in 0..layers {
+                let Some(tail) = previous[index(arc.tail, k)] else {
+                    continue;
+                };
+                let to = k + step;
+                if to >= layers {
+                    continue;
+                }
                 let value = add_down(tail, weight)?;
-                if next[arc.head].map_or(true, |old| value < old) {
-                    next[arc.head] = Some(value);
+                let slot = &mut next[index(arc.head, to)];
+                if slot.map_or(true, |old| value < old) {
+                    *slot = Some(value);
                     changed = true;
                 }
             }
@@ -324,7 +399,11 @@ pub(super) fn minimum<const D: usize>(
             break;
         }
     }
-    Some(previous[graph.sink])
+    Some(
+        (0..layers)
+            .filter_map(|k| previous[index(graph.sink, k)])
+            .reduce(f64::min),
+    )
 }
 
 #[cfg(test)]

@@ -173,12 +173,18 @@ fn imported_registered_composite_and_resource_rows_replay_fixed_routes_and_new_v
             let mut opts = options();
             opts.cg.bound_mode = mode;
             if mode == BoundMode::Certified {
-                // Registered/resource walk relaxations can drop a positive
-                // nonlinear penalty. A correct RMP alone is not a tight proof.
-                let weak = kind.snapshot(&parent).solve(opts.clone()).unwrap();
-                assert!((weak.output.master.lp - 212.).abs() < 1e-7);
-                assert!(weak.output.master.certified_bound < 212.);
-                assert_ne!(weak.output.master.status, Status::Optimal);
+                // Registered penalties now have a joint bounded-walk proof.
+                // Resource-load rows retain their independent lower envelope
+                // until complete enumeration supplies the tighter certificate.
+                let restricted = kind.snapshot(&parent).solve(opts.clone()).unwrap();
+                assert!((restricted.output.master.lp - 212.).abs() < 1e-7);
+                match kind {
+                    Kind::Registered | Kind::Composite => optimal(&restricted.output, 212.),
+                    Kind::Resource => {
+                        assert!(restricted.output.master.certified_bound < 212.);
+                        assert_ne!(restricted.output.master.status, Status::Optimal);
+                    }
+                }
                 opts.enumeration = Some(Default::default());
             }
             optimal(

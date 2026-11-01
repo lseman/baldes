@@ -520,6 +520,9 @@ fn assignment_tree_matches_exhaustive_integer_covers() {
     use baldes::master::tree::TreeStatus;
     let mut opts = baldes::master::tree::ModelTreeOptions::default();
     opts.node = options();
+    // Native `ApplyStrongBranchingEvaluation` defaults to false; this
+    // trajectory is the plain route-count split without strong trials.
+    opts.mapped_strong_branching = None;
     let tree = baldes::master::tree::solve(triangle(), opts.clone()).unwrap();
     // Independently enumerate the nine binary route choices. No optimum uses
     // repeated copies because every route covers a unit-demand customer.
@@ -1232,8 +1235,10 @@ fn native_half_incident_mapping_matches_physical_pricing_entries() {
                 "/tests/fixtures/multi_network_native_half_arc_mappings.json"
             )))
             .unwrap();
-            options.mapped_strong_branching.as_mut().unwrap().phases[1].candidates =
-                phase_two_candidates;
+            // The pinned native run enabled ApplyStrongBranchingEvaluation.
+            let mut strong = baldes::master::tree::StrongBranchingOptions::default();
+            strong.phases[1].candidates = phase_two_candidates;
+            options.mapped_strong_branching = Some(strong);
             let result = baldes::master::tree::solve(problem, options).unwrap();
             assert_eq!(result.status, baldes::master::tree::TreeStatus::Optimal);
             assert_eq!(result.incumbent, 2.);
@@ -1259,6 +1264,9 @@ fn native_plain_integral_child_closes_before_extra_pricing_phases() {
         let mut options = baldes::master::tree::ModelTreeOptions::default();
         options.node.cg.stabilize = false;
         options.node.cg.bound_mode = mode;
+        // The pinned native run used the default `ApplyStrongBranchingEvaluation
+        // = false`; strong trials would evaluate the route-count split.
+        options.mapped_strong_branching = None;
         let result = baldes::master::tree::solve(problem, options).unwrap();
         assert_eq!(result.status, baldes::master::tree::TreeStatus::Optimal);
         assert_eq!(result.incumbent, 2.);
@@ -1285,6 +1293,8 @@ fn native_packing_registration_branches_without_manual_expression_mappings() {
         .problem::<2>()
         .unwrap();
         let mut options = baldes::master::tree::ModelTreeOptions::default();
+        options.mapped_strong_branching =
+            Some(baldes::master::tree::StrongBranchingOptions::default());
         options.node.cg.stabilize = false;
         options.node.cg.bound_mode = mode;
         options.packing = Some(

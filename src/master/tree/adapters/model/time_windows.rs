@@ -442,3 +442,7 @@ pub(super) fn conflict_children<const D: usize>(
     }
     Ok(None)
 }
+
+#[cfg(all(test, feature = "multi-time-windows"))]
+#[path = "../../../../../tests/unit/master/tree/time_window_selection_tests.rs"]
+mod time_window_selection_tests;

@@ -1,6 +1,35 @@
 use super::*;
 
 #[test]
+fn exact_static_reduced_cost_sign_resolves_cancellation_without_ignoring_adverse_duals() {
+    let variable = MasterVariable {
+        id: 1,
+        cost: 1.,
+        bounds: Bounds {
+            lower: 0.,
+            upper: f64::INFINITY,
+        },
+        integer: false,
+        entries: vec![(0, 0.446428571428571), (1, 0.17857142857142852)],
+    };
+    let duals = [1.696000000000002, 1.3599999999999994];
+    let rounded = variable
+        .entries
+        .iter()
+        .fold(variable.cost, |c, &(r, a)| c - duals[r] * a);
+    assert!(rounded < 0.);
+    assert_eq!(
+        reduced_cost_nonnegative(&variable, 1., &duals, 0),
+        Some(true)
+    );
+    let adverse = [duals[0] + 1e-10, duals[1]];
+    assert_eq!(
+        reduced_cost_nonnegative(&variable, 1., &adverse, 0),
+        Some(false)
+    );
+}
+
+#[test]
 fn adverse_unbounded_static_duals_stay_unknown_while_pricing_can_continue() {
     let problem: Problem<2> = format::Model::from_json(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),

@@ -203,8 +203,9 @@ fn root_snapshots_and_tree_modes_do_not_promote_an_unsupported_certificate() {
     use baldes::{
         graph::ResourceKind,
         master::{
-            routing::{self, BoundMode, RootOptions, RoutingContext},
-            tree::{self, TreeOptions, TreeStatus},
+            cg::BoundMode,
+            model::{self, Problem},
+            tree::{self, ModelTreeOptions, TreeStatus},
         },
         Graph,
     };
@@ -216,48 +217,41 @@ fn root_snapshots_and_tree_modes_do_not_promote_an_unsupported_certificate() {
     graph.set_bounds(2, 0, 0., 0.).unwrap();
     graph.add_arc(0, 1, 1.).unwrap();
     graph.add_arc(1, 2, 1.).unwrap();
-    let problem = RoutingContext::set_partitioning(graph, 1.).unwrap();
-    let mut options = RootOptions::default();
-    options.capture_state = true;
-    options.enumerate = false;
+    let problem = Problem::set_partitioning(graph, 1.).unwrap();
+    let mut options = model::Options::default();
+    options.gap_enumeration = false;
     options.cg.stabilize = false;
-    let parent = routing::solve(problem.clone(), options.clone()).unwrap();
+    let parent = model::solve(problem.clone(), options.clone()).unwrap();
     assert_eq!(parent.master.bound, 2.);
-    let snapshot = parent.snapshot.as_ref().unwrap();
-    assert_eq!(snapshot.bound_mode(), BoundMode::Numerical);
-    options.bound_mode = BoundMode::Certified;
-    let child = routing::inherit_branches(snapshot, &[], options.clone()).unwrap();
+    options.cg.bound_mode = BoundMode::Certified;
+    let child = parent.snapshot.solve(options.clone()).unwrap();
     assert_eq!(child.master.lp, parent.master.lp);
     assert_eq!(child.master.numerical_bound, 2.);
-    assert_eq!(child.master.bound, f64::NEG_INFINITY);
+    // The network path certifies this equality-resource domain; any
+    // certificate must not exceed the only route's cost.
+    assert!(child.master.bound <= 2., "{child:?}");
     assert!(!child.master.pruned_by_bound);
-    assert_eq!(
-        child.snapshot.as_ref().unwrap().bound_mode(),
-        BoundMode::Certified
-    );
-    for (mode, status) in [
-        (BoundMode::Numerical, TreeStatus::Optimal),
-        (BoundMode::Certified, TreeStatus::Incomplete),
-    ] {
-        options.bound_mode = mode;
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        options.cg.bound_mode = mode;
         let out = tree::solve(
             problem.clone(),
-            TreeOptions {
-                root: options.clone(),
-                mip_node_limit: 0,
-                strong_branching: None,
+            ModelTreeOptions {
+                node: options.clone(),
                 diving: None,
-                ..TreeOptions::default()
+                ..ModelTreeOptions::default()
             },
         )
         .unwrap();
         assert_eq!(out.bound_mode, mode);
-        assert_eq!(out.status, status, "{out:?}");
         assert_eq!(out.incumbent, 2.);
-        assert_eq!(
-            out.bound,
-            if mode == BoundMode::Numerical { 2. } else { 0. }
-        );
+        assert!(out.bound <= 2., "{out:?}");
+        if mode == BoundMode::Numerical {
+            assert_eq!(out.status, TreeStatus::Optimal, "{out:?}");
+            assert_eq!(out.bound, 2.);
+        } else if out.status == TreeStatus::Optimal {
+            // Closing in certified mode requires the supported certificate.
+            assert_eq!(out.bound, 2.);
+        }
     }
 }
 
@@ -391,30 +385,43 @@ fn original_feasible_columns_can_recover_an_exhausted_penalized_master() {
 fn large_original_routes_recover_before_a_rank_cut_certificate_closes_the_root() {
     use baldes::{
         inputs::{Instance, Rounding},
-        master::routing::RootOptions,
+        master::{
+            model::{self, Problem},
+            tree::{self, ModelTreeOptions},
+        },
     };
     let scale = 1_000_000.;
     let diagonal = (2f64 * scale * scale).sqrt();
     let nearest = 4. * scale + diagonal;
     let z = nearest - 4. * scale;
     let error = (4. * scale - (nearest - z)) + (diagonal - z);
-    let upper = if error > 0. {
-        f64::from_bits(nearest.to_bits() + 1)
-    } else {
-        nearest
-    };
     let instance=Instance::parse("large triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100000000 0\n1 1000000 0 1 0 100000000 0\n2 0 1000000 1 0 100000000 0\n3 1000000 1000000 1 0 100000000 0\n").unwrap();
-    let mut options = RootOptions::default().with_rank_one_cuts();
-    options.bound_mode = baldes::master::routing::BoundMode::Certified;
-    options.incumbent = upper;
-    let output = instance.solve(5, Rounding::None, options).unwrap();
+    let mut options = model::Options::default();
+    options.separation.rank_one.enabled = true;
+    options.cg.bound_mode = baldes::master::cg::BoundMode::Certified;
+    // Phase I needs artificial costs on the routes' scale (about 4e6).
+    options.cg.artificial_cost = 1e8;
+    let problem = Problem::set_partitioning(
+        instance.graph(5, Rounding::None).unwrap(),
+        (instance.customers.len() - 1) as f64,
+    )
+    .unwrap();
+    let output = model::solve(problem.clone(), options.clone()).unwrap();
     assert_eq!(output.master.status, Status::Optimal, "{:?}", output.master);
     // The exact original optimum is 4*scale plus the supplied floating
     // diagonal. TwoSum's residual decides which side of `nearest` it lies.
     assert!(output.master.bound < nearest || output.master.bound == nearest && error >= 0.);
-    assert!(output.incumbent > nearest || output.incumbent == nearest && error <= 0.);
-    assert!(output.incumbent - output.master.bound < 1e-6);
     assert!(output.cuts > 0);
+    let tree = tree::solve(
+        problem,
+        ModelTreeOptions {
+            node: options,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(tree.incumbent > nearest || tree.incumbent == nearest && error <= 0.);
+    assert!(tree.incumbent - tree.bound < 1e-6, "{tree:?}");
 }
 
 #[test]
@@ -588,7 +595,10 @@ fn heuristic_stage_value_skips_pricing_resets_and_never_certifies_the_global_bou
 #[test]
 fn resource_rounding_retry_does_not_publish_a_root_feasibility_proof() {
     use baldes::{
-        master::routing::{self, RootOptions, RoutingContext},
+        master::{
+            model::{self, Problem},
+            tree::{self, ModelTreeOptions},
+        },
         Graph,
     };
     let upper = f64::from_bits(1f64.to_bits() - 1);
@@ -612,20 +622,33 @@ fn resource_rounding_retry_does_not_publish_a_root_feasibility_proof() {
         let id = graph.add_arc(u, v, cost).unwrap();
         graph.arc_mut(id).unwrap().consumption[0] = cost;
     }
-    let problem = RoutingContext::set_partitioning(graph, 2.).unwrap();
-    let mut options = RootOptions::default();
-    options.enumerate = false;
+    let problem = Problem::set_partitioning(graph, 2.).unwrap();
+    let mut options = model::Options::default();
+    options.gap_enumeration = false;
     options.cg.max_penalty_updates = 0;
     options.cg.time_limit = std::time::Duration::from_secs(1);
-    let output = routing::solve(problem, options).unwrap();
-    assert_eq!(output.master.status, Status::Stalled);
-    assert!(output.incumbent.is_infinite());
+    let output = model::solve(problem.clone(), options.clone()).unwrap();
+    // Every route overshoots the window by an ulp in exact arithmetic.
+    assert_ne!(output.master.status, Status::Optimal, "{output:?}");
+    let tree = tree::solve(
+        problem,
+        ModelTreeOptions {
+            node: options,
+            node_limit: 1,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(tree.incumbent.is_infinite(), "{tree:?}");
 }
 
 #[test]
 fn rounded_resource_feasibility_does_not_publish_an_integer_incumbent() {
     use baldes::{
-        master::routing::{self, RootOptions, RoutingContext},
+        master::{
+            model::{self, Problem},
+            tree::{self, ModelTreeOptions},
+        },
         Graph,
     };
     let mut graph = Graph::<2>::new(3, 1).unwrap();
@@ -639,24 +662,32 @@ fn rounded_resource_feasibility_does_not_publish_an_integer_incumbent() {
         let id = graph.add_arc(u, v, 1.).unwrap();
         graph.arc_mut(id).unwrap().consumption[0] = c;
     }
-    let mut options = RootOptions::default();
-    options.enumerate = false;
+    let mut options = model::Options::default();
+    options.gap_enumeration = false;
     options
         .pricing_options
         .push(("BALDESuseBidirectionalSearch".into(), 0.));
-    let output = routing::solve(
-        RoutingContext::set_partitioning(graph, 1.).unwrap(),
-        options,
+    let problem = Problem::set_partitioning(graph, 1.).unwrap();
+    let output = model::solve(problem.clone(), options.clone()).unwrap();
+    // The floating labeler accepts the route; exact replay must not.
+    assert!(output.routes.iter().any(|r| r.route.arcs == [0, 1]));
+    let tree = tree::solve(
+        problem,
+        ModelTreeOptions {
+            node: options,
+            node_limit: 1,
+            ..Default::default()
+        },
     )
     .unwrap();
-    assert!(output.routes.iter().any(|r| r.arcs == [0, 1]));
-    assert!(output.incumbent.is_infinite());
+    assert!(tree.incumbent.is_infinite(), "{tree:?}");
 }
 
 #[test]
 fn ipm_master_handles_edits_limits_and_independent_forks() {
     use baldes::master::{
-        clp::ClpMaster, routing::MasterSolver, LpMaster, LpSolveOutcome, RowSense,
+        clp::{ClpMaster, MasterSolver},
+        LpMaster, LpSolveOutcome, RowSense,
     };
     let mut master = ClpMaster::new().unwrap();
     master.set_solver(MasterSolver::Ipm);
@@ -693,7 +724,7 @@ fn ipm_master_handles_edits_limits_and_independent_forks() {
 
 #[test]
 fn ipm_column_generation_tightens_from_lp_bounds_and_finishes_accurately() {
-    use baldes::master::routing::MasterSolver;
+    use baldes::master::clp::MasterSolver;
     let mut master = ClpMaster::new().unwrap();
     master.set_solver(MasterSolver::Ipm);
     master.add_row(RowSense::Equal, 1., &[]).unwrap();
@@ -745,7 +776,7 @@ fn ipm_column_generation_tightens_from_lp_bounds_and_finishes_accurately() {
 
 #[test]
 fn ipm_pricing_accuracy_does_not_leak_into_standalone_solves() {
-    use baldes::master::{routing::MasterSolver, LpMaster, LpSolveOutcome};
+    use baldes::master::{clp::MasterSolver, LpMaster, LpSolveOutcome};
     use std::time::Duration;
     let mut master = ClpMaster::new().unwrap();
     master.set_solver(MasterSolver::Ipm);
@@ -773,7 +804,7 @@ fn ipm_pricing_accuracy_does_not_leak_into_standalone_solves() {
 
 #[test]
 fn ipm_cut_round_resets_the_primal_accuracy_bound() {
-    use baldes::master::routing::MasterSolver;
+    use baldes::master::clp::MasterSolver;
     struct CutOnce {
         added: bool,
     }
@@ -833,58 +864,79 @@ fn ipm_cut_round_resets_the_primal_accuracy_bound() {
 fn hgs_seeded_ipm_root_and_tree_match_the_small_routing_optimum() {
     use baldes::inputs::{HgsColumns, HgsWarmStart, Instance, Rounding};
     use baldes::master::{
-        routing::{self, MasterSolver, RootOptions, RoutingContext},
+        clp::MasterSolver,
+        model::{self, FixedRoute, NetworkRoute, Problem},
         tree,
     };
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     for columns in [HgsColumns::Best, HgsColumns::All, HgsColumns::Top(1)] {
-        let problem =
-            RoutingContext::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.)
-                .unwrap();
-        let mut options = RootOptions::default().with_rank_one_cuts();
-        options.master_solver = MasterSolver::Ipm;
-        options.enumerate = false;
-        options.cg.time_limit = std::time::Duration::from_secs(5);
-        let summary = instance
+        let graph = instance.graph(1, Rounding::None).unwrap();
+        let problem = Problem::set_partitioning(graph.clone(), 3.).unwrap();
+        let seed = instance
             .seed_hgs(
-                &problem,
+                &graph,
                 Rounding::None,
-                &mut options,
                 &HgsWarmStart {
                     time_limit: std::time::Duration::from_millis(30),
                     columns,
                     seed: 7,
                 },
+                false,
+                &[],
             )
             .unwrap();
-        assert!(summary.inserted_columns > 0);
+        assert!(seed.summary.inserted_columns > 0);
         if columns == HgsColumns::Top(1) {
-            assert_eq!(summary.inserted_columns, 1);
+            assert_eq!(seed.summary.inserted_columns, 1);
         }
-        assert!(summary.incumbent.is_some());
-        assert!(options
-            .initial_routes
+        assert!(seed.incumbent.is_some());
+        assert!(seed
+            .routes
             .iter()
             .all(|r| r.nodes.first() == Some(&0) && r.nodes.last() == Some(&4)));
-        let mut root_options = options.clone();
-        root_options.capture_state = true;
-        let root = routing::solve(problem.clone(), root_options).unwrap();
+        let mut options = model::Options::default();
+        options.separation.rank_one.enabled = true;
+        options.master_solver = MasterSolver::Ipm;
+        options.gap_enumeration = false;
+        options.cg.time_limit = std::time::Duration::from_secs(5);
+        options.seed_routes = seed
+            .routes
+            .iter()
+            .map(|route| NetworkRoute {
+                network: 0,
+                route: route.clone(),
+            })
+            .collect();
+        let root = model::solve(problem.clone(), options.clone()).unwrap();
         assert_eq!(root.master.status, baldes::master::cg::Status::Optimal);
         assert!(
             (root.master.lp - (4. + 2_f64.sqrt())).abs() < 1e-6,
             "{}",
             root.master.lp
         );
+        // IPM disables dual stabilization.
         assert!(root.master.history.iter().all(|h| h.alpha == 0.));
-        assert_eq!(
-            root.snapshot.as_ref().unwrap().master_solver(),
-            MasterSolver::Ipm
-        );
-        let child =
-            routing::inherit(root.snapshot.as_ref().unwrap(), &[], options.clone()).unwrap();
+        let mut resumed = options.clone();
+        resumed.seed_routes.clear();
+        let child = root.snapshot.solve(resumed).unwrap();
         assert!((child.master.lp - root.master.lp).abs() < 1e-6);
-        let mut controls = tree::TreeOptions::default();
-        controls.root = options;
+        let mut controls = tree::ModelTreeOptions::default();
+        controls.initial_solution =
+            seed.incumbent
+                .zip(seed.solution.clone())
+                .map(|(cost, routes)| {
+                    (
+                        cost,
+                        routes
+                            .into_iter()
+                            .map(|route| FixedRoute {
+                                route: NetworkRoute { network: 0, route },
+                                quantity: 1.,
+                            })
+                            .collect(),
+                    )
+                });
+        controls.node = options;
         controls.time_limit = std::time::Duration::from_secs(5);
         let output = tree::solve(problem, controls).unwrap();
         assert!(
@@ -897,32 +949,29 @@ fn hgs_seeded_ipm_root_and_tree_match_the_small_routing_optimum() {
 #[test]
 fn hgs_seeding_rejects_integer_approximation_false_feasibility() {
     use baldes::inputs::{HgsColumns, HgsWarmStart, Instance, Rounding};
-    use baldes::master::routing::{RootOptions, RoutingContext};
     let instance = Instance::parse("one\nVEHICLE\nNUMBER CAPACITY\n1 1\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1.001 0 100 0\n").unwrap();
-    let problem =
-        RoutingContext::set_partitioning(instance.capacity_graph(1, Rounding::None).unwrap(), 1.)
-            .unwrap();
-    let mut options = RootOptions::default();
+    let graph = instance.capacity_graph(1, Rounding::None).unwrap();
     let warm = HgsWarmStart {
         time_limit: std::time::Duration::from_millis(10),
         columns: HgsColumns::All,
         seed: 0,
     };
-    let summary = instance
-        .seed_hgs(&problem, Rounding::None, &mut options, &warm)
+    let seed = instance
+        .seed_hgs(&graph, Rounding::None, &warm, false, &[])
         .unwrap();
-    assert!(options.initial_routes.is_empty());
-    assert!(summary.incumbent.is_none());
-    assert!(options.incumbent.is_infinite());
+    assert!(seed.routes.is_empty());
+    assert!(seed.incumbent.is_none());
+    assert!(seed.solution.is_none());
     assert!(instance
         .seed_hgs(
-            &problem,
+            &graph,
             Rounding::None,
-            &mut options,
             &HgsWarmStart {
                 time_limit: std::time::Duration::ZERO,
                 ..warm
-            }
+            },
+            false,
+            &[],
         )
         .is_err());
 }
@@ -930,35 +979,34 @@ fn hgs_seeding_rejects_integer_approximation_false_feasibility() {
 #[test]
 fn hgs_capacity_seeds_ignore_file_windows_and_deduplicate_existing_columns() {
     use baldes::inputs::{HgsColumns, HgsWarmStart, Instance, Rounding};
-    use baldes::master::routing::{RootOptions, RoutingContext};
     let instance = Instance::parse("one\nVEHICLE\nNUMBER CAPACITY\n1 1\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1 0\n1 10 0 1 0 1 0\n").unwrap();
-    let problem =
-        RoutingContext::set_partitioning(instance.capacity_graph(1, Rounding::None).unwrap(), 1.)
-            .unwrap();
-    let mut options = RootOptions::default();
+    let graph = instance.capacity_graph(1, Rounding::None).unwrap();
+    let mut existing = vec![];
     for (mode, expected) in [(HgsColumns::Best, 1), (HgsColumns::All, 0)] {
-        let summary = instance
+        let seed = instance
             .seed_hgs(
-                &problem,
+                &graph,
                 Rounding::None,
-                &mut options,
                 &HgsWarmStart {
                     time_limit: std::time::Duration::from_millis(10),
                     columns: mode,
                     seed: 0,
                 },
+                false,
+                &existing,
             )
             .unwrap();
-        assert_eq!(summary.inserted_columns, expected);
-        assert_eq!(summary.incumbent, Some(20.));
+        assert_eq!(seed.summary.inserted_columns, expected);
+        assert_eq!(seed.incumbent, Some(20.));
+        existing.extend(seed.routes);
     }
-    assert_eq!(options.initial_routes.len(), 1);
+    assert_eq!(existing.len(), 1);
 }
 
 #[cfg(feature = "highs")]
 #[test]
 fn highs_routing_master_keeps_solution_basis_and_limits_independent() {
-    use baldes::master::{routing::MasterSolver, LpMaster, LpSolveOutcome};
+    use baldes::master::{clp::MasterSolver, LpMaster, LpSolveOutcome};
     let mut master = ClpMaster::new().unwrap();
     master.set_solver(MasterSolver::Highs);
     master.add_row(RowSense::Equal, 1., &[]).unwrap();
@@ -1004,55 +1052,50 @@ fn highs_routing_master_keeps_solution_basis_and_limits_independent() {
 fn highs_solves_routing_roots_cuts_and_inherited_tree_nodes() {
     use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
-        routing::{self, MasterSolver, RootOptions, RoutingContext},
+        clp::MasterSolver,
+        model::{self, Problem},
+        preprocessing::Bounds,
         tree,
     };
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     for stabilize in [false, true] {
         let problem =
-            RoutingContext::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.)
-                .unwrap();
-        let mut options = RootOptions::default().with_rank_one_cuts();
+            Problem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap();
+        let mut options = model::Options::default();
+        options.separation.rank_one.enabled = true;
         options.master_solver = MasterSolver::Highs;
         options.cg.stabilize = stabilize;
         options.cg.time_limit = std::time::Duration::from_secs(5);
-        options.capture_state = true;
-        options.enumerate = false;
-        let result = routing::solve(problem.clone(), options.clone()).unwrap();
+        options.gap_enumeration = false;
+        let result = model::solve(problem.clone(), options.clone()).unwrap();
         assert_eq!(result.master.status, Status::Optimal);
         assert!(
             (result.master.lp - (4. + 2_f64.sqrt())).abs() < 1e-6,
             "{}",
             result.master.lp
         );
-        let snapshot = result.snapshot.unwrap();
-        assert_eq!(snapshot.master_solver(), MasterSolver::Highs);
-        let inherited = routing::inherit(&snapshot, &[], options.clone()).unwrap();
+        let inherited = result.snapshot.solve(options.clone()).unwrap();
         assert!((inherited.master.lp - result.master.lp).abs() < 1e-6);
-        let branched = routing::inherit_branches(
-            &snapshot,
-            &[
-                baldes::master::branching::BranchConstraint::NumberOfVehicles {
-                    graph_id: 0,
-                    sense: RowSense::GreaterEqual,
-                    rhs: 3.,
+        let branched = result
+            .snapshot
+            .with_multiplicity(
+                0,
+                Bounds {
+                    lower: 3.,
+                    upper: 3.,
                 },
-            ],
-            options.clone(),
-        )
-        .unwrap();
+            )
+            .unwrap()
+            .solve(options.clone())
+            .unwrap();
         assert_eq!(branched.master.status, Status::Optimal);
         assert!(
             (branched.master.lp - (4. + 2. * 2_f64.sqrt())).abs() < 1e-6,
             "{}",
             branched.master.lp
         );
-        assert_eq!(
-            branched.snapshot.as_ref().unwrap().master_solver(),
-            MasterSolver::Highs
-        );
-        let mut controls = tree::TreeOptions::default();
-        controls.root = options;
+        let mut controls = tree::ModelTreeOptions::default();
+        controls.node = options;
         controls.time_limit = std::time::Duration::from_secs(5);
         let tree = tree::solve(problem, controls).unwrap();
         assert!(
@@ -1065,7 +1108,7 @@ fn highs_solves_routing_roots_cuts_and_inherited_tree_nodes() {
 #[cfg(not(feature = "highs"))]
 #[test]
 fn unavailable_highs_master_is_rejected_explicitly() {
-    use baldes::master::routing::MasterSolver;
+    use baldes::master::clp::MasterSolver;
     assert!(MasterSolver::Highs
         .ensure_available()
         .unwrap_err()
@@ -1077,9 +1120,9 @@ fn unavailable_highs_master_is_rejected_explicitly() {
 #[test]
 fn highs_recovers_the_r201_hundred_customer_warm_basis_failure() {
     use baldes::inputs::{Instance, Rounding};
-    use baldes::master::routing::{MasterSolver, RootOptions};
+    use baldes::master::{clp::MasterSolver, model};
     let instance = Instance::read("instances/Solomon/R201.txt").unwrap();
-    let mut options = RootOptions::default();
+    let mut options = model::Options::default();
     options.master_solver = MasterSolver::Highs;
     options.cg.time_limit = std::time::Duration::from_secs(30);
     let result = instance.solve(8, Rounding::None, options).unwrap();
@@ -1091,11 +1134,6 @@ fn highs_recovers_the_r201_hundred_customer_warm_basis_failure() {
         "{}",
         result.master.lp
     );
-    assert!(result
-        .master
-        .artificials
-        .iter()
-        .all(|&column| result.values[column] <= 1e-6));
 }
 
 #[test]

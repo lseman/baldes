@@ -38,7 +38,12 @@ fn routing_parallel_tree_is_optional_and_validates_worker_count() {
     let report: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
     assert_eq!(report["status"], "Optimal", "{report}");
-    assert!(report["parallel_batches"].as_u64().unwrap() > 0, "{report}");
+    // The network tree does not report batch counts; the threaded run must
+    // still process nodes and prove the optimum.
+    assert!(
+        report["tree_processed_nodes"].as_u64().unwrap() > 0,
+        "{report}"
+    );
     for (threads, message) in [
         ("0", "tree threads must be positive"),
         ("2", "--tree-threads requires --tree"),
@@ -477,7 +482,7 @@ fn help_and_invalid_instance_types() {
     ] {
         let output = command().args(args).output().unwrap();
         assert!(output.status.success());
-        assert!(String::from_utf8_lossy(&output.stdout).contains("baldes <solve|hgs|ce>"));
+        assert!(String::from_utf8_lossy(&output.stdout).contains("baldes <solve|hgs|ails-ii|ce>"));
     }
     for args in [
         vec![],
@@ -861,8 +866,11 @@ fn tree_branching_mode_is_explicit_and_validated() {
     );
     let report: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
-    assert!(report["branch_evaluations"].as_array().unwrap().is_empty());
-    assert_eq!(report["branch_history_ranked"], 0);
+    assert!(report["mapped_branch_evaluations"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert_eq!(report["mapped_history_ranked"], 0);
     std::fs::remove_file(json).unwrap();
     let output = command()
         .arg("solve")
@@ -1532,9 +1540,10 @@ fn robust_tree_resumes_consistent_cut_pricing_after_enumeration() {
             String::from_utf8_lossy(&result.stderr)
         );
         assert!(
-            stdout.contains(&format!("instance={instance} status=Optimal")),
+            stdout.contains(&format!("instance={instance} ")),
             "{stdout}"
         );
+        assert!(stdout.contains(" status=Optimal "), "{stdout}");
         assert!(
             stdout.contains(&format!("incumbent={optimum:.2}")),
             "{stdout}"

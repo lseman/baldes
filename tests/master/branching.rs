@@ -1,7 +1,4 @@
-use baldes::{
-    pricing::{restrictions::RyanFosterConstraint, Solver},
-    Graph,
-};
+use baldes::pricing::{restrictions::RyanFosterConstraint, Solver};
 
 fn solver() -> Solver<2> {
     let mut s = Solver::<2>::new(5, 1).unwrap();
@@ -81,167 +78,24 @@ fn ryan_foster_pricing_and_enumeration_obey_both_children() {
 }
 
 #[cfg(feature = "clp")]
-fn triangle_problem() -> baldes::master::routing::RoutingContext {
-    use baldes::{
-        inputs::{Instance, Rounding},
-        master::routing::RoutingContext,
-    };
+fn triangle_problem() -> baldes::master::model::Problem<2> {
+    use baldes::inputs::{Instance, Rounding};
     let instance=Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
-    RoutingContext::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap()
+    baldes::master::model::Problem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.)
+        .unwrap()
 }
 
+/// A snapshot with no priced column: a restriction applies as on a fresh model.
 #[cfg(feature = "clp")]
-#[test]
-fn typed_children_match_fresh_models_and_survive_snapshot_setup() {
-    use baldes::master::{
-        branching::BranchConstraint as B,
-        routing::{self, RootOptions},
-        RowSense,
-    };
-    for enumerate in [false, true] {
-        let problem = triangle_problem();
-        let mut options = RootOptions::default();
-        options.capture_state = true;
-        options.enumerate = enumerate;
-        options.cg.stabilize = false;
-        options.cg.multiplicity = 3.;
-        options.incumbent = 100.;
-        let parent = routing::solve(problem.clone(), options.clone()).unwrap();
-        let snapshot = parent.snapshot.as_ref().unwrap();
-        let count = snapshot.enumerated_routes();
-        for branch in [
-            B::RyanFoster(RyanFosterConstraint {
-                first: 1,
-                second: 2,
-                together: false,
-            }),
-            B::RyanFoster(RyanFosterConstraint {
-                first: 1,
-                second: 2,
-                together: true,
-            }),
-            B::NumberOfVehicles {
-                graph_id: 0,
-                sense: RowSense::GreaterEqual,
-                rhs: 2.,
-            },
-            B::PackingSetAssignment {
-                vertex: 1,
-                graph_id: 0,
-                assigned: true,
-            },
-        ] {
-            let child =
-                routing::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
-            let mut cold = problem.clone();
-            cold.branch(branch.clone()).unwrap();
-            let fresh = routing::solve(cold.clone(), options.clone()).unwrap();
-            assert!(
-                (child.master.bound - fresh.master.bound).abs() < 1e-6,
-                "{branch:?}: child={child:?} fresh={fresh:?}"
-            );
-            assert_eq!(snapshot.branch_depth(), 0);
-            assert_eq!(snapshot.enumerated_routes(), count);
-            assert_eq!(child.snapshot.as_ref().unwrap().branch_depth(), 1);
-            for (&tag, &x) in child.master.column_tags.iter().zip(&child.values) {
-                if tag >= 0 && x > 1e-6 && matches!(branch, B::RyanFoster(_)) {
-                    assert_eq!(
-                        branch.coefficient(&problem, &child.routes[tag as usize]),
-                        0.
-                    );
-                }
-            }
-        }
-        let mut contradictory = problem.clone();
-        contradictory
-            .branch(B::PackingSetAssignment {
-                vertex: 1,
-                graph_id: 0,
-                assigned: false,
-            })
-            .unwrap();
-        let forbidden = routing::solve(contradictory, options.clone()).unwrap();
-        assert!(
-            forbidden.preprocessing.infeasible
-                || forbidden.master.pruned_by_bound
-                || forbidden.master.artificials.iter().any(|&c| forbidden
-                    .values
-                    .get(c)
-                    .copied()
-                    .unwrap_or(0.)
-                    > 1e-6)
-        );
-    }
-}
-
-#[cfg(feature = "clp")]
-#[test]
-fn candidate_families_use_network_route_counts_and_pair_weights() {
-    use baldes::master::{
-        branching::{BranchConstraint as B, BranchingOptions},
-        routing::{self, RootOptions},
-        tree::candidates::candidates,
-    };
-    let p = triangle_problem();
-    let mut options = RootOptions::default();
-    options.enumerate = false;
-    options.cg.stabilize = false;
-    options.cg.multiplicity = 3.;
-    let out = routing::solve(p.clone(), options).unwrap();
-    let native = candidates(&p, &out, &BranchingOptions::default());
-    assert_eq!(native.len(), 1);
-    assert_eq!(native[0].value, 1.5);
-    assert!(matches!(
-        native[0].down,
-        B::NumberOfVehicles { rhs: 1., .. }
-    ));
-    let rf = candidates(
-        &p,
-        &out,
-        &BranchingOptions {
-            number_of_vehicles: false,
-            ..Default::default()
-        },
-    );
-    assert!(!rf.is_empty());
-    assert!(rf.iter().all(|c| matches!(c.down, B::RyanFoster(_))));
-    assert!(rf.iter().all(|c| (c.value - 0.5).abs() < 1e-6));
-    let mut custom = BranchingOptions::default();
-    custom.priorities.number_of_vehicles = 1.;
-    let reordered = candidates(&p, &out, &custom);
-    assert!(!reordered.is_empty());
-    assert!(reordered.iter().all(|c| matches!(c.down, B::RyanFoster(_))));
-    custom.priorities.ryan_foster = f64::NAN;
-    assert!(candidates(&p, &out, &custom).is_empty());
-    let arc = candidates(&p, &out, &BranchingOptions::arc_flow_only());
-    assert!(!arc.is_empty());
-    assert!(arc.iter().all(|c| matches!(c.down, B::ArcFlow { .. })));
-    let cluster = candidates(
-        &p,
-        &out,
-        &BranchingOptions {
-            clusters: Some(baldes::master::branching::ClusterBranchingOptions {
-                partition: Some(vec![vec![1], vec![2], vec![3]]),
-                ..Default::default()
-            }),
-            ..BranchingOptions::arc_flow_only()
-        },
-    );
-    assert!(cluster
-        .iter()
-        .any(|c| matches!(c.down, B::ClusterBoundary { .. })));
-    assert!(cluster
-        .iter()
-        .any(|c| matches!(c.down, B::ClusterPair { .. })));
-    for candidate in cluster {
-        assert!((candidate.value - candidate.value.round()).abs() > 1e-6);
-        let (down_sense, down_rhs) = candidate.down.row();
-        let (up_sense, up_rhs) = candidate.up.row();
-        assert_eq!(down_sense, baldes::master::RowSense::LessEqual);
-        assert_eq!(up_sense, baldes::master::RowSense::GreaterEqual);
-        assert_eq!(down_rhs, candidate.value.floor());
-        assert_eq!(up_rhs, candidate.value.ceil());
-    }
+fn cold(
+    problem: baldes::master::model::Problem<2>,
+    options: &baldes::master::model::Options,
+) -> baldes::master::model::NodeSnapshot<2> {
+    let mut cold = options.clone();
+    cold.cg.time_limit = std::time::Duration::ZERO;
+    baldes::master::model::solve(problem, cold)
+        .unwrap()
+        .snapshot
 }
 
 #[test]
@@ -432,242 +286,164 @@ fn accumulated_resource_windows_cover_schedules_and_restore_pricing() {
 #[cfg(feature = "clp")]
 #[cfg(feature = "clp")]
 #[test]
-fn aggregate_flow_candidates_count_weighted_arcs_and_children_match_fresh_masters() {
+fn typed_children_match_fresh_models_and_survive_snapshot_setup() {
     use baldes::master::{
-        branching::{AggregateVariable, BranchConstraint as B, BranchingOptions},
-        routing::{self, RootOptions},
-        tree::candidates::candidates,
-        RowSense,
+        cg::Status,
+        model::{self, EnumerationOptions, NodeSnapshot, Options, RyanFosterMember},
+        preprocessing::Bounds,
     };
-    assert!(AggregateVariable::new("", &[(0, 1.)]).is_err());
-    assert!(AggregateVariable::new("empty", &[]).is_err());
-    assert!(AggregateVariable::new("half", &[(0, 0.5)]).is_err());
-    assert!(AggregateVariable::new("cancelled", &[(0, 1.), (0, -1.)]).is_err());
-    let merged = AggregateVariable::new("merged", &[(3, 1.), (0, 2.), (3, 1.)]).unwrap();
-    assert_eq!(merged.arcs(), &[(0, 2.), (3, 2.)]);
-    // Exact accumulation preserves the integer expression even when ordinary
-    // left-to-right f64 addition drops the middle unit.
-    let cancellation_safe =
-        AggregateVariable::new("cancellation_safe", &[(8, 1e16), (8, 1.), (8, -1e16)]).unwrap();
-    assert_eq!(cancellation_safe.arcs(), &[(8, 1.)]);
-
-    let p = triangle_problem();
-    let mut options = RootOptions::default();
-    options.capture_state = true;
-    options.enumerate = false;
-    options.incumbent = 100.;
-    options.cg.stabilize = false;
-    options.cg.multiplicity = 3.;
-    let out = routing::solve(p.clone(), options.clone()).unwrap();
-    let flow = |tail: usize, head: usize| -> f64 {
-        out.route_values()
-            .iter()
-            .map(|(r, x)| {
-                r.arcs
-                    .iter()
-                    .filter(|&&id| {
-                        let arc = &p.model.networks[0].graph.arcs[p.arc_position(id).unwrap()];
-                        arc.tail == tail && arc.head == head
-                    })
-                    .count() as f64
-                    * x
-            })
-            .sum()
-    };
-    let edges = candidates(
-        &p,
-        &out,
-        &BranchingOptions {
-            edge_flow: true,
-            ..BranchingOptions::arc_flow_only()
-        },
-    );
-    // The full candidate list also carries the lower-priority arc fallback.
-    let edges: Vec<_> = edges
-        .into_iter()
-        .filter(|c| matches!(c.down, B::AggregateFlow { .. }))
-        .collect();
-    assert!(!edges.is_empty());
-    for candidate in &edges {
-        let B::AggregateFlow { name, arcs, .. } = &candidate.down else {
-            unreachable!()
+    #[derive(Clone, Copy, Debug)]
+    enum Branch {
+        Apart,
+        Together,
+        AtLeastTwoVehicles,
+        AssignedCustomer,
+    }
+    let restrict = |node: &NodeSnapshot<2>, branch| {
+        let pair = |together| {
+            node.with_ryan_foster(
+                &[RyanFosterMember {
+                    network: 0,
+                    first: 1,
+                    second: 2,
+                }],
+                together,
+            )
         };
-        let (u, v) = name
-            .strip_prefix("edge:")
-            .and_then(|e| e.split_once('-'))
-            .map(|(u, v)| (u.parse().unwrap(), v.parse().unwrap()))
-            .unwrap();
-        assert!((candidate.value - (flow(u, v) + flow(v, u))).abs() < 1e-9);
-        assert!(arcs.iter().all(|&(arc, c)| {
-            let arc = &p.model.networks[0].graph.arcs[arc];
-            c == 1. && arc.tail.min(arc.head) == u && arc.tail.max(arc.head) == v
-        }));
-    }
-    // A registered variable with doubled weights: twice the edge's value.
-    let B::AggregateFlow { arcs, .. } = &edges[0].down else {
-        unreachable!()
-    };
-    let ids: Vec<_> = arcs
-        .iter()
-        .map(|&(a, _)| (p.model.networks[0].graph.arcs[a].id, 2.))
-        .collect();
-    let registered = candidates(
-        &p,
-        &out,
-        &BranchingOptions {
-            aggregates: vec![AggregateVariable::new("double", &ids).unwrap()],
-            ..BranchingOptions::arc_flow_only()
-        },
-    );
-    if (2. * edges[0].value).fract().abs() > 1e-6 {
-        let double = registered
-            .iter()
-            .find(|c| matches!(&c.down, B::AggregateFlow { name, .. } if name == "double"))
-            .unwrap();
-        assert!((double.value - 2. * edges[0].value).abs() < 1e-9);
-    }
-
-    let snapshot = out.snapshot.as_ref().unwrap();
-    for candidate in edges.iter().take(2) {
-        for branch in [&candidate.down, &candidate.up] {
-            let child =
-                routing::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
-            let mut cold = p.clone();
-            cold.branch(branch.clone()).unwrap();
-            let fresh = routing::solve(cold, options.clone()).unwrap();
-            assert_eq!(child.master.status, fresh.master.status, "{branch:?}");
-            assert!(
-                (child.master.lp - fresh.master.lp).abs() < 1e-6,
-                "{branch:?}: child={} fresh={}",
-                child.master.lp,
-                fresh.master.lp
-            );
-            let (sense, rhs) = branch.row();
-            let activity: f64 = child
-                .route_values()
-                .iter()
-                .map(|(r, x)| branch.coefficient(&p, r) * x)
-                .sum();
-            assert!(
-                match sense {
-                    RowSense::LessEqual => activity <= rhs + 1e-6,
-                    RowSense::GreaterEqual => activity >= rhs - 1e-6,
-                    RowSense::Equal => (activity - rhs).abs() < 1e-6,
+        match branch {
+            Branch::Apart => pair(false),
+            Branch::Together => pair(true),
+            Branch::AtLeastTwoVehicles => node.with_multiplicity(
+                0,
+                Bounds {
+                    lower: 2.,
+                    upper: 3.,
                 },
-                "{branch:?} activity={activity}"
-            );
+            ),
+            // Customer 1 covers shared row 0.
+            Branch::AssignedCustomer => node.branch_assignment(0, 0, true),
         }
+        .unwrap()
+    };
+    for enumerate in [false, true] {
+        let problem = triangle_problem();
+        let mut options = Options::default();
+        options.cg.stabilize = false;
+        let parent = model::solve(problem.clone(), options.clone()).unwrap();
+        let snapshot = if enumerate {
+            parent
+                .snapshot
+                .enumerate(&EnumerationOptions::default())
+                .unwrap()
+        } else {
+            parent.snapshot.solve(options.clone()).unwrap().snapshot
+        };
+        let count = snapshot.enumeration_report().routes;
+        for branch in [
+            Branch::Apart,
+            Branch::Together,
+            Branch::AtLeastTwoVehicles,
+            Branch::AssignedCustomer,
+        ] {
+            let child = restrict(&snapshot, branch).solve(options.clone()).unwrap();
+            let fresh = restrict(&cold(problem.clone(), &options), branch)
+                .solve(options.clone())
+                .unwrap();
+            assert!(
+                (child.master.bound - fresh.master.bound).abs() < 1e-6,
+                "{branch:?}: child={child:?} fresh={fresh:?}"
+            );
+            assert_eq!(snapshot.enumeration_report().routes, count);
+            for (route, &x) in child.routes.iter().zip(&child.values) {
+                if x <= 1e-6 {
+                    continue;
+                }
+                let nodes = &route.route.nodes;
+                let (a, b) = (nodes.contains(&1), nodes.contains(&2));
+                match branch {
+                    Branch::Apart => assert!(!(a && b)),
+                    Branch::Together => assert_eq!(a, b),
+                    _ => {}
+                }
+            }
+        }
+        let forbidden = cold(problem.clone(), &options)
+            .branch_assignment(0, 0, false)
+            .unwrap()
+            .solve(options.clone())
+            .unwrap();
+        assert_eq!(forbidden.master.status, Status::Infeasible, "{forbidden:?}");
     }
 }
 
 #[cfg(feature = "clp")]
 #[test]
-fn aggregate_branches_match_fresh_and_inherited_masters() {
+fn resource_threshold_branches_match_fresh_and_inherited_masters() {
     use baldes::master::{
-        branching::BranchConstraint as B,
-        routing::{self, RootOptions},
-        RowSense,
+        cg::BoundMode,
+        model::{self, EnumerationOptions, Options, ResourceGroupMember},
     };
-    use baldes::pricing::restrictions::AccumulatedResourceBranch;
     for (enumerate, mode) in [
-        (false, routing::BoundMode::Numerical),
-        (true, routing::BoundMode::Numerical),
-        (false, routing::BoundMode::Certified),
+        (false, BoundMode::Numerical),
+        (true, BoundMode::Numerical),
+        (false, BoundMode::Certified),
     ] {
         let p = triangle_problem();
-        let arc = p.model.networks[0]
-            .graph
+        let graph = &p.networks[0].graph;
+        // Arrivals at vertex 1: the arcs its cover row charges.
+        let arrivals: Vec<i32> = graph
             .arcs
             .iter()
-            .find(|a| a.tail == 1 && a.head == p.model.networks[0].graph.sink)
-            .unwrap()
-            .id;
-        let mut options = RootOptions::default();
-        options.capture_state = true;
-        options.bound_mode = mode;
-        options.enumerate = enumerate;
-        options.incumbent = 100.;
+            .filter(|a| a.head == 1)
+            .map(|a| a.id)
+            .collect();
+        let mut options = Options::default();
+        options.cg.bound_mode = mode;
         options.cg.stabilize = false;
-        options.cg.multiplicity = 3.;
-        let parent = routing::solve(p.clone(), options.clone()).unwrap();
-        let snapshot = parent.snapshot.as_ref().unwrap();
-        for branch in [
-            B::ClusterBoundary {
-                vertices: vec![1, 2],
-                sense: RowSense::LessEqual,
-                rhs: 1.,
-            },
-            B::ClusterBoundary {
-                vertices: vec![1, 2],
-                sense: RowSense::GreaterEqual,
-                rhs: 2.,
-            },
-            B::ClusterPair {
-                first: vec![1],
-                second: vec![2, 3],
-                sense: RowSense::LessEqual,
-                rhs: 0.,
-            },
-            B::ClusterPair {
-                first: vec![
-                    p.model.networks[0].graph.source,
-                    p.model.networks[0].graph.sink,
-                ],
-                second: vec![1, 2],
-                sense: RowSense::GreaterEqual,
-                rhs: 2.,
-            },
-            B::AccumulatedResource(AccumulatedResourceBranch {
-                arc,
-                resource: 0,
-                threshold: 1.5,
-                upper: false,
-            }),
-            B::AccumulatedResource(AccumulatedResourceBranch {
-                arc,
-                resource: 0,
-                threshold: 1.5,
-                upper: true,
-            }),
-            B::AccumulatedResource(AccumulatedResourceBranch {
-                arc,
-                resource: 0,
-                threshold: -1.,
-                upper: false,
-            }),
-        ] {
-            let child =
-                routing::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
-            let mut cold = p.clone();
-            cold.branch(branch.clone()).unwrap();
-            let fresh = routing::solve(cold, options.clone()).unwrap();
-            assert_eq!(child.master.status, fresh.master.status, "{branch:?}");
+        let parent = model::solve(p.clone(), options.clone()).unwrap();
+        let snapshot = if enumerate {
+            parent
+                .snapshot
+                .enumerate(&EnumerationOptions::default())
+                .unwrap()
+        } else {
+            parent.snapshot.solve(options.clone()).unwrap().snapshot
+        };
+        for (threshold, upper) in [(1.5, false), (1.5, true), (-1., false)] {
+            // Vertex 1's cover row is shared row 0.
+            let branch = |node: &model::NodeSnapshot<2>| {
+                node.with_resource_group_branch(
+                    0,
+                    0,
+                    threshold,
+                    upper,
+                    &[ResourceGroupMember {
+                        network: 0,
+                        arcs: arrivals.clone(),
+                    }],
+                )
+                .unwrap()
+            };
+            let child = branch(&snapshot).solve(options.clone()).unwrap();
+            let fresh = branch(&cold(p.clone(), &options))
+                .solve(options.clone())
+                .unwrap();
+            assert_eq!(
+                child.master.status, fresh.master.status,
+                "threshold={threshold} upper={upper}"
+            );
             assert!(
-                (child.master.lp - fresh.master.lp).abs() < 1e-6,
-                "{branch:?}: child={} fresh={}",
+                child.master.lp == fresh.master.lp
+                    || (child.master.lp - fresh.master.lp).abs() < 1e-6,
+                "threshold={threshold} upper={upper}: child={} fresh={}",
                 child.master.lp,
                 fresh.master.lp
             );
-            let (sense, rhs) = branch.row();
-            let activity: f64 = child
-                .route_values()
-                .iter()
-                .map(|(r, x)| branch.coefficient(&p, r) * x)
-                .sum();
-            assert!(
-                match sense {
-                    RowSense::LessEqual => activity <= rhs + 1e-6,
-                    RowSense::GreaterEqual => activity >= rhs - 1e-6,
-                    RowSense::Equal => (activity - rhs).abs() < 1e-6,
-                },
-                "{branch:?} activity={activity}"
-            );
-            assert_eq!(snapshot.branch_depth(), 0);
-            assert_eq!(child.snapshot.as_ref().unwrap().branch_depth(), 1);
+            assert_eq!(snapshot.resource_group_branches().count(), 0);
+            assert_eq!(child.snapshot.resource_group_branches().count(), 1);
         }
     }
 }
-
 #[test]
 fn equality_bucket_jumps_cannot_invent_resource_consumption() {
     use baldes::graph::ResourceKind;

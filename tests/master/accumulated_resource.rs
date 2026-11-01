@@ -52,51 +52,8 @@ fn stored_threshold_membership_matches_adjacent_floats() {
             assert!(!down.satisfied_by(invalid));
             assert!(!up.satisfied_by(invalid));
         }
-        #[cfg(feature = "clp")]
-        {
-            use baldes::master::{branching::BranchConstraint, routing::RoutingContext};
-            let mut s = solver(ResourceKind::Disposable);
-            let target = s.graph.add_arc(0, 1, 1.).unwrap();
-            let parallel = s.graph.add_arc(0, 1, 2.).unwrap();
-            let back = s.graph.add_arc(1, 0, 0.).unwrap();
-            let end = s.graph.add_arc(1, 2, 0.).unwrap();
-            let p = RoutingContext::set_partitioning(s.graph, 1.).unwrap();
-            let profile = vec![0., 0., 0., 0., q];
-            let mut route = baldes::Route {
-                coupled_values: Vec::new(),
-                nodes: vec![0, 1, 0, 1, 2],
-                arcs: vec![target, back, target, end],
-                cost: 2.,
-                original_cost: 2.,
-                resources: profile.clone(),
-                resource_profile: vec![
-                    vec![0.; 5],
-                    profile.clone(),
-                    profile.clone(),
-                    profile.clone(),
-                    profile,
-                ],
-            };
-            for rule in [down, up] {
-                let branch = BranchConstraint::AccumulatedResource(AccumulatedResourceBranch {
-                    arc: target,
-                    ..rule
-                });
-                assert_eq!(
-                    branch.coefficient(&p, &route),
-                    if rule.satisfied_by(q) { 0. } else { 1. }
-                );
-                route.arcs = vec![parallel, back, parallel, end];
-                assert_eq!(branch.coefficient(&p, &route), 0.);
-                route.arcs = vec![target, back, target, end];
-            }
-            route.resource_profile.clear();
-            let branch = BranchConstraint::AccumulatedResource(AccumulatedResourceBranch {
-                arc: target,
-                ..down
-            });
-            assert_eq!(branch.coefficient(&p, &route), 1.);
-        }
+        // Route coefficients for this boundary are covered by the grouped
+        // branch unit test `single_arc_group_coefficients_match_...`.
     }
 }
 
@@ -177,74 +134,98 @@ fn windows_pricing_enumeration_and_forks_use_the_same_boundary() {
 }
 
 #[cfg(feature = "clp")]
+#[cfg(feature = "clp")]
+fn resource_branch(
+    node: &baldes::master::model::NodeSnapshot<5>,
+    arcs: Vec<i32>,
+    threshold: f64,
+    upper: bool,
+) -> baldes::master::model::NodeSnapshot<5> {
+    // The vertex-1 cover is shared row 0 of the one-network set partitioning.
+    node.with_resource_group_branch(
+        0,
+        4,
+        threshold,
+        upper,
+        &[baldes::master::model::ResourceGroupMember { network: 0, arcs }],
+    )
+    .unwrap()
+}
+
+#[cfg(feature = "clp")]
+fn cold(
+    problem: baldes::master::model::Problem<5>,
+    options: &baldes::master::model::Options,
+) -> baldes::master::model::NodeSnapshot<5> {
+    let mut cold = options.clone();
+    cold.cg.time_limit = std::time::Duration::ZERO;
+    baldes::master::model::solve(problem, cold)
+        .unwrap()
+        .snapshot
+}
+
+#[cfg(feature = "clp")]
 #[test]
 fn threshold_children_preserve_rows_bounds_and_restore_the_parent() {
     use baldes::master::{
-        branching::BranchConstraint,
-        routing::{self, RootOptions, RoutingContext},
+        branching::ACCUMULATED_RESOURCE_IN_PRICING,
+        model::{self, EnumerationOptions, Options, Problem},
     };
     let boundary = 1. - AccumulatedResourceBranch::THRESHOLD_OFFSET;
     let mut s = solver(ResourceKind::Disposable);
+    let mut arrivals = vec![];
     for (cost, q) in [(1., boundary - 0.5e-6), (2., boundary + 0.5e-6)] {
         let arc = s.graph.add_arc(0, 1, cost).unwrap();
         s.graph.arc_mut(arc).unwrap().consumption[4] = q;
+        arrivals.push(arc);
     }
-    let arc = s.graph.add_arc(1, 2, 0.).unwrap();
-    let problem = RoutingContext::set_partitioning(s.graph, 1.).unwrap();
+    s.graph.add_arc(1, 2, 0.).unwrap();
+    let problem = Problem::set_partitioning(s.graph, 1.).unwrap();
     for enumerate in [false, true] {
-        let mut options = RootOptions::default();
-        options.capture_state = true;
-        options.enumerate = enumerate;
-        options.incumbent = 10.;
+        let mut options = Options::default();
         options.cg.stabilize = false;
-        let parent = routing::solve(problem.clone(), options.clone()).unwrap();
-        let snapshot = parent.snapshot.as_ref().unwrap();
+        let parent = model::solve(problem.clone(), options.clone()).unwrap();
+        let snapshot = if enumerate {
+            let node = parent
+                .snapshot
+                .enumerate(&EnumerationOptions::default())
+                .unwrap();
+            assert!(node.enumeration_report().complete);
+            node
+        } else {
+            parent.snapshot.solve(options.clone()).unwrap().snapshot
+        };
         for upper in [false, true] {
-            let rule = AccumulatedResourceBranch {
-                arc,
-                resource: 4,
-                threshold: 1.,
+            // The resource on arrival at vertex 1, over both arcs covering it.
+            let child = resource_branch(&snapshot, arrivals.clone(), 1., upper)
+                .solve(options.clone())
+                .unwrap();
+            let fresh = resource_branch(
+                &cold(problem.clone(), &options),
+                arrivals.clone(),
+                1.,
                 upper,
-            };
-            let branch = BranchConstraint::AccumulatedResource(rule);
-            let child =
-                routing::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
-            let mut cold = problem.clone();
-            cold.branch(branch.clone()).unwrap();
-            let fresh = routing::solve(cold, options.clone()).unwrap();
+            )
+            .solve(options.clone())
+            .unwrap();
             assert_eq!(child.master.status, fresh.master.status);
-            // Pricing enforcement can wait at the new lower window on the
-            // cheap route. Master-only enforcement keeps the original earliest
-            // schedule, so the upper child uses the expensive route instead.
-            let expected = if upper
-                && !baldes::master::branching::enforcement::ACCUMULATED_RESOURCE_IN_PRICING
-            {
-                2.
-            } else {
-                1.
-            };
+            // The network model always enforces resource branches in pricing,
+            // so the upper child can wait at the new lower window on the
+            // cheap route; the `accumulated-resource-master` feature only
+            // affects the removed routing root.
+            let _ = ACCUMULATED_RESOURCE_IN_PRICING;
+            let expected = 1.;
             assert!(
                 (fresh.master.lp - expected).abs() < 1e-8,
                 "upper={upper}: {fresh:?}"
             );
-            if child.master.pruned_by_bound {
-                // The inherited incumbent can close the node before the new
-                // schedule is reoptimized. Its RMP objective is not the root LP.
-                assert!(child.master.bound <= fresh.master.lp + 1e-8);
-                assert!(child.master.bound >= parent.master.bound - 1e-8);
-                assert!((child.master.bound - child.incumbent).abs() < 1e-8);
-                assert!(child.incumbent <= fresh.master.lp + 1e-8);
-            } else {
-                assert!((child.master.lp - fresh.master.lp).abs() < 1e-8);
-            }
-            for (route, value) in child.route_values() {
-                if value > 1e-6 {
-                    assert_eq!(branch.coefficient(&problem, route), 0.);
-                }
-            }
-            assert_eq!(snapshot.branch_depth(), 0);
+            assert!(
+                (child.master.lp - fresh.master.lp).abs() < 1e-8,
+                "enumerate={enumerate} upper={upper}: {child:?}"
+            );
+            assert_eq!(snapshot.node_depth(), 0);
         }
-        let restored = routing::inherit_branches(snapshot, &[], options.clone()).unwrap();
+        let restored = snapshot.solve(options.clone()).unwrap();
         assert_eq!(restored.master.status, parent.master.status);
         assert!((restored.master.lp - parent.master.lp).abs() < 1e-8);
     }
@@ -252,65 +233,47 @@ fn threshold_children_preserve_rows_bounds_and_restore_the_parent() {
 
 #[cfg(feature = "clp")]
 #[test]
-fn accumulated_branch_enforcement_keeps_master_rows_in_both_build_modes() {
-    use baldes::master::{
-        branching::{enforcement::ACCUMULATED_RESOURCE_IN_PRICING, BranchConstraint},
-        routing::RoutingContext,
-    };
+fn accumulated_branch_registers_one_master_row_in_both_build_modes() {
+    use baldes::master::model::{self, Options, Problem};
     let mut s = solver(ResourceKind::Disposable);
     let arc = s.graph.add_arc(0, 1, 1.).unwrap();
     s.graph.add_arc(1, 2, 0.).unwrap();
-    let mut problem = RoutingContext::set_partitioning(s.graph, 1.).unwrap();
-    let old_rows = problem.model.rows.len();
-    let branch = AccumulatedResourceBranch {
-        arc,
-        resource: 4,
-        threshold: 1.,
-        upper: false,
-    };
-    problem
-        .branch(BranchConstraint::AccumulatedResource(branch))
-        .unwrap();
-    assert_eq!(problem.model.rows.len(), old_rows + 1);
-    let window = problem.model.networks[0]
-        .graph
-        .arcs
-        .iter()
-        .find(|a| a.id == arc)
-        .unwrap()
-        .bounds[4];
-    if ACCUMULATED_RESOURCE_IN_PRICING {
-        assert_eq!(window.unwrap().upper, branch.boundary());
-    } else {
-        assert_eq!(window, None);
-    }
+    let problem = Problem::set_partitioning(s.graph, 1.).unwrap();
+    let rows = problem.rows.len();
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    let parent = model::solve(problem, options.clone()).unwrap();
+    let child = resource_branch(&parent.snapshot, vec![arc], 1., false);
+    let branches: Vec<_> = child.resource_group_branches().collect();
+    assert_eq!(branches.len(), 1);
+    let (network, row, group) = branches[0];
+    assert_eq!((network, row), (0, rows));
+    assert_eq!(group.arcs(), [arc]);
+    assert_eq!(parent.snapshot.resource_group_branches().count(), 0);
+    // The cheap route's head resource (0 + 0) satisfies the lower side.
+    let solved = child.solve(options).unwrap();
+    assert!((solved.master.lp - parent.master.lp).abs() < 1e-8);
 }
 
 #[test]
 #[cfg(all(feature = "clp", feature = "accumulated-resource-master"))]
 fn impossible_resource_window_remains_a_master_only_resource_branch() {
-    use baldes::master::{branching::BranchConstraint, routing::RoutingContext};
+    use baldes::master::model::{self, Options, Problem};
     let mut s = solver(ResourceKind::Disposable);
     let arc = s.graph.add_arc(0, 1, 1.).unwrap();
     s.graph.add_arc(1, 2, 0.).unwrap();
-    let mut problem = RoutingContext::set_partitioning(s.graph, 1.).unwrap();
-    // Head upper bound is 3: the upper child excludes every use of this arc.
-    problem
-        .branch(BranchConstraint::AccumulatedResource(
-            AccumulatedResourceBranch {
-                arc,
-                resource: 4,
-                threshold: 4.,
-                upper: true,
-            },
-        ))
+    let problem = Problem::set_partitioning(s.graph, 1.).unwrap();
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    let parent = model::solve(problem, options.clone()).unwrap();
+    // Head upper bound is 3: the upper child excludes every use of this arc,
+    // and with it the only route covering vertex 1.
+    let child = resource_branch(&parent.snapshot, vec![arc], 4., true)
+        .solve(options)
         .unwrap();
-    assert!(problem.model.networks[0]
-        .graph
-        .arcs
-        .iter()
-        .find(|a| a.id == arc)
-        .unwrap()
-        .bounds[4]
-        .is_none());
+    assert_eq!(
+        child.master.status,
+        baldes::master::cg::Status::Infeasible,
+        "{child:?}"
+    );
 }

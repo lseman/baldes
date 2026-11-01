@@ -5,8 +5,10 @@ mod adapter;
 mod branching;
 mod diving;
 mod integer_objective;
+mod local_search;
 mod parallel;
 pub use diving::DivingOptions;
+pub use local_search::LocalSearchOptions;
 pub(super) mod proposals;
 mod time_windows;
 use crate::master::{tree::TreeStatus, LpMaster};
@@ -132,6 +134,8 @@ pub struct ModelTreeOptions {
     pub ryan_foster: Option<RyanFosterBranching>,
     /// Diving primal heuristic; disabled by default, as in the native solver.
     pub diving: Option<DivingOptions>,
+    /// Random incumbent partial-column fixing and child diving; disabled by default.
+    pub local_search: Option<LocalSearchOptions>,
     /// Restricted-master integer heuristic; disabled by default, as in native.
     pub restricted_master_mip: Option<RestrictedMasterMip>,
     /// Native `optimalityGapTolerance`: a node closes when its bound is within
@@ -151,6 +155,7 @@ pub struct ModelTreeOptions {
     /// Disabled by default; the retained native inactive-search gate is zero.
     pub share_inactive_columns: bool,
     /// Phased trials rank explicit mapped generators; trial values never prune.
+    /// Disabled by default, as native `ApplyStrongBranchingEvaluation = false`.
     pub mapped_strong_branching: Option<crate::master::tree::StrongBranchingOptions>,
     pub node_limit: usize,
     pub time_limit: Duration,
@@ -232,6 +237,7 @@ impl Default for ModelTreeOptions {
             clusters: vec![],
             ryan_foster: None,
             diving: None,
+            local_search: None,
             restricted_master_mip: None,
             absolute_gap: 1e-6,
             relative_gap: 1e-9,
@@ -239,7 +245,7 @@ impl Default for ModelTreeOptions {
             use_branching_history: true,
             threads: 1,
             share_inactive_columns: false,
-            mapped_strong_branching: Some(crate::master::tree::StrongBranchingOptions::default()),
+            mapped_strong_branching: None,
             node_limit: 10000,
             time_limit: Duration::from_secs(120),
             tolerance: 1e-6,
@@ -301,6 +307,12 @@ impl<const D: usize> crate::master::tree::Evaluation for Output<D> {
 }
 
 impl<const D: usize> NodeSnapshot<D> {
+    /// Bound used by the tree to prune and report an open node. A fork can
+    /// drop incumbent-justified warm bounds; the tree floor keeps
+    /// min(parent bound, incumbent), valid for every solution of the child.
+    pub(super) fn tree_bound(&self) -> f64 {
+        self.warm.bound.max(self.state.tree_bound_floor)
+    }
     // Replay rounded columns and fixed routes in the original graph and rows,
     // using exact sums and an upward objective bound.
     pub(super) fn integer_witness(&self, tolerance: f64) -> Result<Option<IntegerWitness>> {
@@ -317,8 +329,11 @@ impl<const D: usize> NodeSnapshot<D> {
             tolerance,
         )?;
         let retained = match &self.state.pricing_witness {
-            Some(witness) => validate_routes(&self.state, &witness.1, &witness.2)?
-                .map(|objective| (objective, witness.1.clone(), witness.2.clone())),
+            Some(witness) => {
+                let mut values = witness.2.clone();
+                validate_routes(&self.state, &witness.1, &mut values)?
+                    .map(|objective| (objective, witness.1.clone(), values))
+            }
             None => None,
         };
         Ok(match (current, retained) {
@@ -395,14 +410,14 @@ fn replay_rounded_witness<const D: usize>(
     } else {
         return Ok(None);
     }
-    Ok(validate_routes(state, &routes, &master_values)?
+    Ok(validate_routes(state, &routes, &mut master_values)?
         .map(|objective| (objective, routes, master_values)))
 }
 
 pub(super) fn validate_routes<const D: usize>(
     state: &State<D>,
     routes: &[FixedRoute],
-    master_values: &[(i32, f64)],
+    master_values: &mut [(i32, f64)],
 ) -> Result<Option<f64>> {
     if synchronization::witness(state, routes)?.is_none() {
         return Ok(None);
@@ -411,6 +426,18 @@ pub(super) fn validate_routes<const D: usize>(
     else {
         return Ok(None);
     };
+    // Theta variables only reflect the optimality cuts separated so far. An
+    // integer route set must pay its exact recourse: raise each anchor's
+    // Theta to at least its routes' exact excess, so the cut rows hold and the
+    // claimed objective bounds the true cost.
+    if let Some(theta) = separation::recourse_theta(state, routes)? {
+        for (id, excess) in theta {
+            match master_values.iter_mut().find(|(v, _)| *v == id) {
+                Some((_, value)) => *value = value.max(excess),
+                None => return Ok(None),
+            }
+        }
+    }
     if !master_variables::witness(state, master_values, &mut rows, &mut objective) {
         return Ok(None);
     }
@@ -578,6 +605,9 @@ fn solve_split<const D: usize>(
     if let Some(diving) = &options.diving {
         diving.validate()?;
     }
+    if let Some(local_search) = &options.local_search {
+        local_search.validate()?;
+    }
     if !options.absolute_gap.is_finite()
         || options.absolute_gap < 0.
         || !options.relative_gap.is_finite()
@@ -599,11 +629,12 @@ fn solve_split<const D: usize>(
     if options.integer_objective {
         integer_objective::validate(&start, &options)?;
     }
+    options.node.gap_mip = options.enumerated_mip.clone();
     if options.enumerated_mip.is_some() {
         if !cfg!(feature = "highs") {
             return Err(invalid("enumerated MIP requires the highs feature"));
         }
-        if options.node.enumeration.is_none() {
+        if !options.node.gap_enumeration && options.node.enumeration.is_none() {
             options.node.enumeration = Some(EnumerationOptions::default());
         }
     }
@@ -761,7 +792,40 @@ fn solve_split<const D: usize>(
             return Err(invalid("initial solution cost"));
         }
         result.incumbent = *cost;
-        result.routes = routes.clone();
+        // Rebuild each supplied route's visits from its arcs, so reported
+        // routes never carry caller node lists; unknown arcs are rejected.
+        // Original-model feasibility is validated after the root solve.
+        result.routes = routes
+            .iter()
+            .map(|fixed| {
+                let graph = match &start {
+                    Start::Fresh(problem, _) => problem
+                        .networks
+                        .iter()
+                        .find(|n| n.id == fixed.route.network)
+                        .map(|n| &n.graph),
+                    Start::Snapshot(node) => node
+                        .state
+                        .oracles
+                        .iter()
+                        .find(|o| o.network.id == fixed.route.network)
+                        .map(|o| &*o.network.graph),
+                }
+                .ok_or_else(|| invalid("initial solution network"))?;
+                let mut nodes = vec![graph.source as i32];
+                for id in &fixed.route.route.arcs {
+                    let arc = graph
+                        .arcs
+                        .iter()
+                        .find(|a| a.id == *id)
+                        .ok_or_else(|| invalid("initial solution arc"))?;
+                    nodes.push(arc.head as i32);
+                }
+                let mut replayed = fixed.clone();
+                replayed.route.route.nodes = nodes;
+                Ok(replayed)
+            })
+            .collect::<Result<Vec<_>>>()?;
     }
     if options.node_limit == 0 {
         result.status = TreeStatus::NodeLimit;
@@ -771,11 +835,12 @@ fn solve_split<const D: usize>(
         result.status = TreeStatus::TimeLimit;
         return Ok(result);
     }
-    let initial_incumbent = result.incumbent;
     let node_options = |remaining: Duration| {
         let mut node = options.node.clone();
         node.search_inactive_columns |= options.share_inactive_columns;
-        node.fixing_upper_bound = initial_incumbent.is_finite().then_some(initial_incumbent);
+        // Caller-supplied initial routes are validated against the prepared
+        // root before their objective authorizes any pricing exclusions.
+        node.fixing_upper_bound = None;
         node.cg.time_limit = node.cg.time_limit.min(remaining);
         node
     };
@@ -789,6 +854,27 @@ fn solve_split<const D: usize>(
             node.solve(configured)?
         }
     };
+    if options.initial_solution.is_some() {
+        let mut zero_master: Vec<_> = root
+            .snapshot
+            .state
+            .master_variables
+            .iter()
+            .map(|variable| (variable.id, 0.))
+            .collect();
+        let validated = validate_routes(&root.snapshot.state, &result.routes, &mut zero_master)?
+            .ok_or_else(|| {
+                invalid("initial tree solution is not feasible in the original model")
+            })?;
+        if validated > result.incumbent + 1e-6 + 1e-10 * validated.abs().max(result.incumbent.abs())
+        {
+            return Err(invalid(
+                "initial tree solution objective understates its replayed cost",
+            ));
+        }
+        result.incumbent = validated;
+        result.master_values = zero_master;
+    }
     let base_depth = root.snapshot.state.node_depth;
     let mut subtree_history = options
         .mapped_strong_branching
@@ -816,6 +902,12 @@ fn solve_split<const D: usize>(
             selected_nodes: &mut selected_nodes,
             unresolved: &mut unresolved,
             workers: workers.as_ref(),
+            local_search_rng: crate::rng::GnuRand::new(
+                options
+                    .local_search
+                    .as_ref()
+                    .map_or(1, |config| config.seed),
+            ),
         },
         &mut pending,
         Some(root),
@@ -848,7 +940,7 @@ fn solve_split<const D: usize>(
     let mut pending = pending.into_nodes();
     pending.retain(|node| {
         let keep =
-            !node.proven_infeasible() && !options.closes(node.node.warm.bound, result.incumbent);
+            !node.proven_infeasible() && !options.closes(node.node.tree_bound(), result.incumbent);
         if !keep {
             if let Some(history) = &mut subtree_history {
                 history.close(node.node.state.mapped_lineage);
@@ -859,7 +951,7 @@ fn solve_split<const D: usize>(
     result.open_nodes = pending.len() + usize::from(unresolved.is_some());
     result.bound = pending
         .iter()
-        .map(|node| node.node.warm.bound)
+        .map(|node| node.node.tree_bound())
         .chain(unresolved)
         .fold(result.incumbent, f64::min);
     if result.open_nodes == 0 {

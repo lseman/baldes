@@ -151,7 +151,7 @@ pub(super) fn correction<const D: usize>(
     let mut projected = None;
     for (index, variable) in state.master_variables.iter().enumerate() {
         for sign in [1., -1.] {
-            let reduced = variable
+            let mut reduced = variable
                 .entries
                 .iter()
                 .fold(sign * variable.cost, |c, &(r, a)| {
@@ -159,6 +159,17 @@ pub(super) fn correction<const D: usize>(
                 });
             if !reduced.is_finite() {
                 return None;
+            }
+            // Sequential subtraction can turn an exactly nonnegative reduced
+            // cost into a tiny negative value. On an unbounded component that
+            // would discard the whole pricing bound. Resolve that sign with
+            // exact products; genuinely adverse or unknown signs keep the
+            // usual domain compensation below.
+            if reduced < 0.
+                && reduced_cost_nonnegative(variable, sign, duals, state.shared_offset)
+                    == Some(true)
+            {
+                reduced = 0.;
             }
             let value = if reduced < 0. {
                 let cap = upper(variable, sign);
@@ -190,6 +201,20 @@ pub(super) fn correction<const D: usize>(
         }
     }
     Some((correction, gradient))
+}
+
+pub(super) fn reduced_cost_nonnegative(
+    variable: &MasterVariable,
+    sign: f64,
+    duals: &[f64],
+    offset: usize,
+) -> Option<bool> {
+    let mut exact = crate::master::numerics::ExactSum::default();
+    exact.add(sign * variable.cost)?;
+    for &(row, coefficient) in &variable.entries {
+        add_product(&mut exact, -*duals.get(offset + row)?, sign * coefficient)?;
+    }
+    Some(exact.sign() >= 0.)
 }
 
 impl<const D: usize> NodeSnapshot<D> {

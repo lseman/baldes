@@ -17,6 +17,10 @@ pub trait Controller<M> {
     fn pricing_complete(&self) -> bool {
         true
     }
+    /// Optionally repair pricing prices to respect static-variable dual
+    /// constraints. Pricing and bound evaluation use the same repaired point;
+    /// implementations must preserve the signs required by master row senses.
+    fn prepare_pricing_duals(&self, _duals: &mut [f64]) {}
     /// The last pricing batch supplies columns only and cannot justify a bound.
     fn pricing_columns_only(&self) -> bool {
         false
@@ -144,6 +148,10 @@ pub trait Controller<M> {
     /// False declines the optional handoff.
     /// An error must leave state unchanged. Mutable enumeration callbacks must
     /// opt in and implement `finish_enumeration_transaction` for rollback.
+    /// Original master variables survive replacement of route columns.
+    fn preserve_enumeration_column(&self, _column: &Column) -> bool {
+        false
+    }
     fn begin_enumeration_transaction(&mut self, _bound: f64) -> Result<bool> {
         Ok(false)
     }
@@ -151,6 +159,15 @@ pub trait Controller<M> {
     /// or restore the saved state on any failed preparation/model edit.
     /// Rollback must be infallible and must not retain invalidated route tags.
     fn finish_enumeration_transaction(&mut self, _commit: bool) {}
+    /// Optional incumbent search after the route universe is committed.
+    fn enumeration_installed(
+        &mut self,
+        _master: &M,
+        _loaded: &[Option<Column>],
+        _artificials: &[usize],
+    ) -> Result<()> {
+        Ok(())
+    }
     fn enumerated_universe(&mut self, _duals: &[f64], _bound: f64) -> Result<Option<Vec<Column>>> {
         Ok(None)
     }

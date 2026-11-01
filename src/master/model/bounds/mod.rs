@@ -11,6 +11,8 @@ mod interval;
 mod presence;
 mod resource;
 mod resource_groups;
+mod ryan_foster;
+mod walks;
 pub(super) use cutoff::{cutoff_plan, NetworkCutoff};
 
 /// Shared scalar-resource walk horizon for conservative envelope proofs.
@@ -218,8 +220,63 @@ fn network_minimum<const D: usize>(
         Some(None) => return Some(None),
         None => {}
     }
+    // Ryan–Foster rows restrict this node's paths; walks they exclude cannot
+    // lower the bound. Unavailable refinements keep the unrestricted walk.
+    if !oracle.ryan_foster_rows.is_empty() {
+        let constraints: Vec<_> = oracle.ryan_foster_rows.iter().map(|&(_, c)| c).collect();
+        let allowance = (*resource_work / 4).min(1_000_000);
+        let mut remaining = allowance;
+        let restricted = ryan_foster::minimum(
+            graph,
+            &weights,
+            &constraints,
+            |a| {
+                !reaches_sink[graph.arcs[a].head]
+                    || oracle
+                        .proved_zero_arcs
+                        .get(position(a))
+                        .copied()
+                        .unwrap_or(false)
+            },
+            &mut remaining,
+            deadline,
+        );
+        *resource_work -= allowance - remaining;
+        match restricted {
+            Some(Some(value)) => minimum = minimum.max(value),
+            Some(None) => return Some(None),
+            None => {}
+        }
+    }
     if !oracle.resource_groups.is_empty() {
         match resource_groups::minimum(graph, &weights, resource_work, deadline) {
+            Some(Some(value)) => minimum = minimum.max(value),
+            Some(None) => return Some(None),
+            None => {}
+        }
+    }
+    // Keep resource windows and registered penalties jointly on bounded walks.
+    // This is an independent directed proof, not numerical pricing evidence.
+    // Exhaustion retains the cheaper unrestricted certificate above.
+    if !oracle.resource_groups.is_empty()
+        || oracle
+            .nonlinear_rows
+            .iter()
+            .any(|&(_, row)| duals[offset + row] < 0.)
+    {
+        let allowance = (*resource_work / 4).min(100_000);
+        let mut remaining = allowance;
+        let restricted = walks::minimum(
+            oracle,
+            graph,
+            &weights,
+            offset,
+            duals,
+            &mut remaining,
+            deadline,
+        );
+        *resource_work -= allowance - remaining;
+        match restricted {
             Some(Some(value)) => minimum = minimum.max(value),
             Some(None) => return Some(None),
             None => {}
@@ -334,6 +391,16 @@ fn master_dual_base<const D: usize>(
             let mut reduced = sign * variable.cost;
             for &(row, a) in &variable.entries {
                 reduced = subtract_product(reduced, duals[state.shared_offset + row], sign * a)?;
+            }
+            if reduced < 0.
+                && super::master_variables::reduced_cost_nonnegative(
+                    variable,
+                    sign,
+                    duals,
+                    state.shared_offset,
+                ) == Some(true)
+            {
+                reduced = 0.;
             }
             if reduced < 0. {
                 let mut cap = super::master_variables::upper(variable, sign);

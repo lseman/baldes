@@ -2,8 +2,8 @@
 //! Root-tree branching on time-window selection counts.
 use baldes::graph::Window;
 use baldes::master::{
-    routing::{RootOptions, RoutingContext},
-    tree::{self, TreeOptions, TreeStatus},
+    model::{Options, Problem},
+    tree::{self, ModelTreeOptions, TreeStatus},
 };
 use baldes::Graph;
 use std::time::Duration;
@@ -138,15 +138,15 @@ fn exhaustive(inst: &Instance, vehicles: usize) -> f64 {
         .fold(f64::INFINITY, f64::min)
 }
 
-fn options(selection: bool) -> TreeOptions {
-    let mut root = RootOptions::default();
-    root.cg.stabilize = false;
-    let mut options = TreeOptions {
-        root,
+fn options(selection: bool) -> ModelTreeOptions {
+    let mut node = Options::default();
+    node.cg.stabilize = false;
+    let mut options = ModelTreeOptions {
+        node,
         time_limit: Duration::from_secs(30),
         ..Default::default()
     };
-    options.branching.time_window_selection = selection.then_some(0);
+    options.time_window_selection = selection.then_some(0);
     options
 }
 
@@ -164,7 +164,7 @@ fn window_selection_branching_matches_exhaustive_optima_in_input_arc_ids() {
         let g = graph(&inst);
         let input_arcs: std::collections::HashSet<_> = g.arcs.iter().map(|a| a.id).collect();
         for selection in [false, true] {
-            let problem = RoutingContext::set_partitioning(g.clone(), vehicles as f64).unwrap();
+            let problem = Problem::set_partitioning(g.clone(), vehicles as f64).unwrap();
             let output = tree::solve(problem, options(selection)).unwrap();
             assert_eq!(
                 output.status,
@@ -178,10 +178,15 @@ fn window_selection_branching_matches_exhaustive_optima_in_input_arc_ids() {
             let mut covered = vec![0; inst.n + 2];
             for route in &output.routes {
                 assert!(
-                    route.arcs.iter().all(|id| input_arcs.contains(id)),
+                    route
+                        .route
+                        .route
+                        .arcs
+                        .iter()
+                        .all(|id| input_arcs.contains(id)),
                     "{route:?}"
                 );
-                for &v in &route.nodes[1..route.nodes.len() - 1] {
+                for &v in &route.route.route.nodes[1..route.route.route.nodes.len() - 1] {
                     covered[v as usize] += 1;
                 }
             }
@@ -197,120 +202,8 @@ fn window_selection_branching_matches_exhaustive_optima_in_input_arc_ids() {
 #[test]
 fn window_selection_requires_a_disposable_resource() {
     let inst = instance(4, 1);
-    let problem = RoutingContext::set_partitioning(graph(&inst), 2.).unwrap();
+    let problem = Problem::set_partitioning(graph(&inst), 2.).unwrap();
     let mut controls = options(true);
-    controls.branching.time_window_selection = Some(3);
+    controls.time_window_selection = Some(3);
     assert!(tree::solve(problem, controls).is_err());
-}
-
-#[test]
-fn split_trees_branch_on_summed_arc_flows_then_window_counts() {
-    use baldes::master::branching::{BranchingOptions, WindowGroup};
-    use baldes::master::tree::{candidates::candidates, BranchConstraint};
-    use baldes::master::RowSense;
-    let (mut fractional_windows, mut summed_arcs) = (0, 0);
-    for seed in 0..40 {
-        let inst = instance(6, seed);
-        if !exhaustive(&inst, 3).is_finite() {
-            continue;
-        }
-        let mut g = graph(&inst);
-        let split = g.split_time_window_arcs(0).unwrap();
-        let problem = RoutingContext::set_partitioning(g, 3.).unwrap();
-        let mut root = RootOptions::default();
-        root.cg.stabilize = false;
-        root.enumerate = false;
-        let result = baldes::master::routing::solve(problem.clone(), root).unwrap();
-        let values = result.route_values();
-        let flow = |ids: &[i32]| -> f64 {
-            values
-                .iter()
-                .map(|(r, x)| x * r.arcs.iter().filter(|a| ids.contains(a)).count() as f64)
-                .sum()
-        };
-        let mut options = BranchingOptions::arc_flow_only();
-        options.time_window_selection = Some(0);
-        options.window_arcs = Some(split.clone());
-        // Default order: arc flows summed over each input arc's copies.
-        let copied: std::collections::HashSet<i32> = split
-            .arcs
-            .iter()
-            .filter(|a| {
-                split
-                    .arcs
-                    .iter()
-                    .filter(|b| b.original == a.original)
-                    .count()
-                    > 1
-            })
-            .map(|a| a.arc)
-            .collect();
-        for c in candidates(&problem, &result, &options) {
-            match &c.down {
-                BranchConstraint::ArcFlow { arc, .. } => {
-                    assert!(
-                        !copied.contains(&problem.model.networks[0].graph.arcs[*arc].id),
-                        "seed {seed}: copy {arc}"
-                    )
-                }
-                BranchConstraint::WindowFlow {
-                    group: WindowGroup::Arc { original },
-                    ..
-                } => {
-                    let ids: Vec<_> = split
-                        .arcs
-                        .iter()
-                        .filter(|a| a.original == *original)
-                        .map(|a| a.arc)
-                        .collect();
-                    assert!((c.value - flow(&ids)).abs() < 1e-9);
-                    summed_arcs += 1;
-                }
-                other => panic!("unexpected family {other:?}"),
-            }
-        }
-        // Window counts, with their family moved first.
-        options.priorities.time_window_selection = 20.;
-        let found = candidates(&problem, &result, &options);
-        for ((vertex, window), ids) in split.selections() {
-            let value = flow(&ids);
-            if (value - value.round()).abs() <= 1e-6 {
-                continue;
-            }
-            fractional_windows += 1;
-            let c = found
-                .iter()
-                .find(|c| matches!(c.down, BranchConstraint::WindowFlow {
-                    group: WindowGroup::Selection { vertex: v, window: w }, .. } if v == vertex && w == window))
-                .unwrap_or_else(|| panic!("seed {seed}: no candidate ({vertex}, {window})"));
-            assert!((c.value - value).abs() < 1e-9);
-            assert!(
-                matches!(&c.down, BranchConstraint::WindowFlow { sense: RowSense::LessEqual, rhs, arcs, .. }
-                if *rhs == value.floor() && arcs.len() == ids.len())
-            );
-            let others = split
-                .selections()
-                .into_iter()
-                .filter(|&((v, w), _)| v == vertex && w != window)
-                .map(|(_, ids)| ids.len())
-                .sum::<usize>();
-            if value.ceil() == 1. {
-                // Right child of Li et al.: only this window remains for the customer.
-                assert!(
-                    matches!(&c.up, BranchConstraint::WindowFlow { sense: RowSense::LessEqual, rhs, arcs, .. }
-                    if *rhs == 0. && arcs.len() == others)
-                );
-            } else {
-                assert!(
-                    matches!(&c.up, BranchConstraint::WindowFlow { sense: RowSense::GreaterEqual, rhs, .. }
-                    if *rhs == value.ceil())
-                );
-            }
-        }
-    }
-    assert!(
-        fractional_windows > 0,
-        "no fractional window count at any root"
-    );
-    assert!(summed_arcs > 0, "no fractional summed arc flow at any root");
 }

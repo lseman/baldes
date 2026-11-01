@@ -178,6 +178,8 @@ pub struct Options {
     /// this node's branch. Used only for objective-dependent pricing restrictions,
     /// never as a node-local witness or a published primal solution.
     pub fixing_upper_bound: Option<f64>,
+    /// Integer solve immediately after a retained gap pool is installed.
+    pub gap_mip: Option<crate::master::solvers::mip::MipOptions>,
     pub preprocessing: PreprocessingOptions,
     /// LP backend of the restricted master. IPM disables dual stabilization.
     pub master_solver: crate::master::clp::MasterSolver,
@@ -214,6 +216,7 @@ impl Default for Options {
             enumeration: None,
             gap_enumeration: true,
             fixing_upper_bound: None,
+            gap_mip: None,
             preprocessing: PreprocessingOptions::default(),
             master_solver: crate::master::clp::MasterSolver::Clp,
             master_threads: 0,
@@ -321,9 +324,15 @@ struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pricing_gap: (f64, f64),
     previous_fixing_gap: f64,
     gap_enumeration: bool,
+    /// Tree-only lower bound for an unsolved child: min(parent bound, tree
+    /// incumbent). Never read by column generation or warm starts.
+    tree_bound_floor: f64,
     fixing_bound: Option<f64>,
+    fixing_cutoffs: Option<Vec<Option<f64>>>,
     gap_checkpoint: Option<Box<gap_enumeration::GapCheckpoint<D>>>,
     enumerated_routes: usize,
+    gap_pool_cutoff: Option<f64>,
+    gap_mip: Option<crate::master::solvers::mip::MipOptions>,
     fixing_calls: usize,
     objective_fixed: bool,
     /// Directed original-domain phase-I proof for this model or a restriction.

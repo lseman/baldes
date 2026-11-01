@@ -594,7 +594,9 @@ impl ProximalState {
     pub fn observe(&mut self, dual: &[f64], bound: f64, exact: bool) {
         // Serious steps require a completed pricing pass. An auxiliary LP
         // objective is never a bound for the original column universe.
-        if exact && bound.is_finite() && bound > self.bound {
+        let improved = !self.bound.is_finite()
+            || bound - (bound.abs().max(self.bound.abs()) * 1e-10 + 1e-6) > self.bound;
+        if exact && bound.is_finite() && improved {
             self.center.clear();
             self.center.extend_from_slice(dual);
             self.bound = bound;

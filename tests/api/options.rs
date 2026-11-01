@@ -63,11 +63,21 @@ fn unregistered_options_are_rejected_without_changing_supported_values() {
         assert_eq!(Options::support(name).is_ok(), enabled);
         assert_eq!(options.get(name).is_ok(), enabled);
     }
-    #[cfg(feature = "clp")]
+    // The gap-pool MIP reads these route limits directly from the options.
+    #[cfg(all(feature = "clp", feature = "highs"))]
     {
-        let policy = baldes::master::routing::EnumerationMipPolicy::from_options(&options).unwrap();
-        assert_eq!(policy.normal_route_limit, 10_000);
-        assert_eq!(policy.end_of_node_route_limit, 10_000);
+        assert_eq!(
+            options.get("BALDESmaxNumOfEnumSolutionsForMIP").unwrap(),
+            10_000.
+        );
+        // Raw default 0; the end-of-node threshold is raised to the normal
+        // limit when applied (native ControlParameters::postTreatment).
+        assert_eq!(
+            options
+                .get("BALDESmaxNumOfEnumSolsForEndOfNodeMIP")
+                .unwrap(),
+            0.
+        );
     }
 }
 
@@ -167,21 +177,20 @@ fn label_dominance_strategy_rejects_partial_dominance_and_keeps_ordinary_dominan
 #[test]
 fn capacity_option_controls_separation_in_fresh_and_inherited_nodes() {
     use baldes::inputs::{Instance, Rounding};
-    use baldes::master::routing::{self, CapacityCutConfig, RootOptions};
+    use baldes::master::model::{separation::CapacityCutConfig, Options as ModelOptions};
     let instance = Instance::parse("option-test\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
-    let mut options =
-        RootOptions::default().with_capacity_cuts(CapacityCutConfig::new(vec![0., 1., 1., 1.], 2.));
-    options.enumerate = false;
-    options.capture_state = true;
+    let mut options = ModelOptions::default();
+    options.separation.capacity = Some(CapacityCutConfig::new(vec![0., 1., 1., 1.], 2.));
+    options.gap_enumeration = false;
     options
         .pricing_options
         .push(("RCSPuseCapacityCuts".into(), 0.));
     let parent = instance.solve(8, Rounding::None, options.clone()).unwrap();
     assert_eq!(parent.cuts, 0);
-    let snapshot = parent.snapshot.as_ref().unwrap();
+    let snapshot = &parent.snapshot;
     options.pricing_options.clear();
     // An omitted child override preserves the parent's disabled separator.
-    let disabled = routing::inherit_branches(snapshot, &[], options.clone()).unwrap();
+    let disabled = snapshot.solve(options.clone()).unwrap();
     assert_eq!(disabled.cuts, 0);
     assert!((disabled.master.lp - parent.master.lp).abs() < 1e-8);
     options
@@ -190,7 +199,7 @@ fn capacity_option_controls_separation_in_fresh_and_inherited_nodes() {
     options
         .pricing_options
         .push(("BALDEScapCutsMaxNumPerRound".into(), 1.));
-    let enabled = routing::inherit_branches(snapshot, &[], options.clone()).unwrap();
+    let enabled = snapshot.solve(options.clone()).unwrap();
     let fresh = instance.solve(8, Rounding::None, options).unwrap();
     assert!(enabled.cuts > 0);
     assert!(enabled.master.lp > parent.master.lp + 0.1);
@@ -201,12 +210,12 @@ fn capacity_option_controls_separation_in_fresh_and_inherited_nodes() {
 #[test]
 fn capacity_per_round_option_caps_the_number_of_generated_rows() {
     use baldes::inputs::{Instance, Rounding};
-    use baldes::master::routing::RootOptions;
+    use baldes::master::model::Options as ModelOptions;
     // Two distant odd customer groups each need their own capacity cut.
     let instance = Instance::parse("two-triangles\nVEHICLE\nNUMBER CAPACITY\n6 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1000 0\n1 10 10 1 0 1000 0\n2 11 10 1 0 1000 0\n3 10 11 1 0 1000 0\n4 -10 -10 1 0 1000 0\n5 -11 -10 1 0 1000 0\n6 -10 -11 1 0 1000 0\n").unwrap();
-    let mut options = RootOptions::default()
-        .with_capacity_cuts(instance.capacity_cut_config(Rounding::None, true));
-    options.enumerate = false;
+    let mut options = ModelOptions::default();
+    options.separation.capacity = Some(instance.capacity_cut_config(Rounding::None, true));
+    options.gap_enumeration = false;
     options.cg.stabilize = false;
     options.cg.max_cut_rounds = 1;
     let full = instance.solve(8, Rounding::None, options.clone()).unwrap();

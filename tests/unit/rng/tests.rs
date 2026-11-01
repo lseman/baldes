@@ -118,3 +118,14 @@ fn shuffle_handles_empty_singleton_odd_and_even_lengths() {
         assert_eq!(values, (0..n).collect::<Vec<_>>());
     }
 }
+
+#[test]
+fn isolated_gnu_rand_matches_native_default_sequence() {
+    let expected = [1804289383, 846930886, 1681692777, 1714636915, 1957747793];
+    for seed in [0, 1] {
+        let mut rng = super::GnuRand::new(seed);
+        for value in expected {
+            assert_eq!(rng.next(), value);
+        }
+    }
+}

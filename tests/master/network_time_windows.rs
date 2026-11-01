@@ -3,8 +3,8 @@
 use baldes::{
     graph::{Graph, Window},
     master::{
+        formulation::Row,
         model::{self, Network, Problem, SynchronizedService, SynchronizedServiceMember},
-        routing::Row,
         tree::TreeStatus,
         RowSense,
     },

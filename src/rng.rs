@@ -129,3 +129,41 @@ impl Xoroshiro128Plus {
 #[cfg(test)]
 #[path = "../tests/unit/rng/tests.rs"]
 mod tests;
+
+/// Isolated GNU libc `rand()` sequence used by recovered master heuristics.
+/// This preserves native draws without mutating the process-global C RNG.
+#[derive(Clone, Debug)]
+pub(crate) struct GnuRand {
+    state: [u32; 31],
+    cursor: usize,
+}
+impl GnuRand {
+    pub(crate) fn new(seed: u32) -> Self {
+        let seed = if seed == 0 { 1 } else { seed };
+        let mut history = [0u32; 344];
+        history[0] = seed;
+        let mut word = i64::from(seed as i32);
+        for slot in history.iter_mut().take(31).skip(1) {
+            word = 16807 * (word % 127773) - 2836 * (word / 127773);
+            if word < 0 {
+                word += 2147483647;
+            }
+            *slot = word as u32;
+        }
+        for index in 31..34 {
+            history[index] = history[index - 31];
+        }
+        for index in 34..344 {
+            history[index] = history[index - 31].wrapping_add(history[index - 3]);
+        }
+        let mut state = [0; 31];
+        state.copy_from_slice(&history[313..344]);
+        Self { state, cursor: 0 }
+    }
+    pub(crate) fn next(&mut self) -> u32 {
+        let value = self.state[self.cursor].wrapping_add(self.state[(self.cursor + 28) % 31]);
+        self.state[self.cursor] = value;
+        self.cursor = (self.cursor + 1) % 31;
+        value >> 1
+    }
+}
