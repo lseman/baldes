@@ -1,5 +1,6 @@
 //! Refresh schedules in place, preserving physical-path caps and stable tags.
 use super::*;
+use std::borrow::Cow;
 
 pub(in crate::master::model) fn refresh<const D: usize>(
     node: &mut NodeSnapshot<D>,
@@ -65,16 +66,7 @@ pub(in crate::master::model) fn refresh<const D: usize>(
             fixed.route.route.resource_profile = canonical.resource_profile;
             let new_entries =
                 super::super::entries(new_oracle, &fixed.route.route, node.state.shared_offset)?;
-            let old: BTreeMap<_, _> = old_entries.into_iter().collect();
-            let new: BTreeMap<_, _> = new_entries.into_iter().collect();
-            for row in old
-                .keys()
-                .chain(new.keys())
-                .copied()
-                .collect::<HashSet<_>>()
-            {
-                let before = old.get(&row).copied().unwrap_or(0.);
-                let after = new.get(&row).copied().unwrap_or(0.);
+            for (row, before, after) in merged_coefficients(&old_entries, &new_entries) {
                 let value = rhs
                     .get_mut(row)
                     .ok_or_else(|| invalid("fixed route row refresh index"))?;
@@ -188,11 +180,14 @@ pub(in crate::master::model) fn refresh<const D: usize>(
             .find(|o| o.network.id == route.network)
             .unwrap();
         let updated = super::super::retirement::active_entries(state, oracle, &route.route)?;
-        let mut coefficients: BTreeMap<_, _> =
-            metadata.entries.iter().map(|&(r, _)| (r, 0.)).collect();
-        coefficients.extend(updated.iter().copied());
-        for (row, value) in coefficients {
-            node.master.set_coefficient(row, column, value)?;
+        let previous = ordered_coefficients(&metadata.entries);
+        let ordered = matches!(previous, Cow::Borrowed(_));
+        for (row, before, value) in merged_coefficients(&previous, &updated) {
+            // Unordered/duplicate metadata gets the original full-write behavior;
+            // otherwise unchanged coefficients already have the desired value.
+            if !ordered || before != value || row >= node.master.rhs.len() {
+                node.master.set_coefficient(row, column, value)?;
+            }
         }
         if let Some(&upper) = state.route_upper_bounds.get(&tag) {
             if upper < node.master.upper[column] {
@@ -219,6 +214,57 @@ pub(in crate::master::model) fn refresh<const D: usize>(
         metadata.identity = format!("{}:{}", route.network, route.route.identity());
     }
     Ok(fixed_impossible)
+}
+
+/// Preserve last-entry semantics for legacy unordered/duplicate metadata.
+/// Ordinary route replay already produces sorted, unique rows and borrows here.
+fn ordered_coefficients(entries: &[(usize, f64)]) -> Cow<'_, [(usize, f64)]> {
+    if entries.windows(2).all(|pair| pair[0].0 < pair[1].0) {
+        return Cow::Borrowed(entries);
+    }
+    let mut ordered = entries.to_vec();
+    ordered.sort_by_key(|&(row, _)| row);
+    ordered.dedup_by(|later, earlier| {
+        if later.0 == earlier.0 {
+            earlier.1 = later.1;
+            true
+        } else {
+            false
+        }
+    });
+    Cow::Owned(ordered)
+}
+
+/// Merge sorted, unique sparse rows without allocating temporary trees or sets.
+fn merged_coefficients<'a>(
+    before: &'a [(usize, f64)],
+    after: &'a [(usize, f64)],
+) -> impl Iterator<Item = (usize, f64, f64)> + 'a {
+    let (mut left, mut right) = (0, 0);
+    std::iter::from_fn(move || match (before.get(left), after.get(right)) {
+        (Some(&(row, value)), Some(&(next_row, _))) if row < next_row => {
+            left += 1;
+            Some((row, value, 0.))
+        }
+        (Some(&(row, _)), Some(&(next_row, value))) if row > next_row => {
+            right += 1;
+            Some((next_row, 0., value))
+        }
+        (Some(&(row, previous)), Some(&(_, value))) => {
+            left += 1;
+            right += 1;
+            Some((row, previous, value))
+        }
+        (Some(&(row, value)), None) => {
+            left += 1;
+            Some((row, value, 0.))
+        }
+        (None, Some(&(row, value))) => {
+            right += 1;
+            Some((row, 0., value))
+        }
+        (None, None) => None,
+    })
 }
 
 #[cfg(test)]

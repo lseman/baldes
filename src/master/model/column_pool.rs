@@ -1,5 +1,6 @@
 //! Solver-owned physical paths; no donor LP rows, tags or proof state transfer.
 use super::*;
+use std::borrow::Cow;
 
 #[derive(Default)]
 pub(super) struct Pool {
@@ -53,6 +54,7 @@ impl Pool {
         let mut tags = node.state.tags.clone();
         // Existing columns stay in place; publish only validated additions.
         let mut pooled = Vec::new();
+        let mut cap_updates = Vec::new();
         let mut present: HashSet<_> = node
             .warm
             .columns
@@ -61,11 +63,11 @@ impl Pool {
             .chain(&node.warm.generated_pool)
             .filter_map(|c| usize::try_from(c.tag).ok())
             .collect();
-        let mut identities = HashMap::new();
+        // `tags` is the maintained identity index, including the first tag
+        // when schedule refresh coalesces registry entries. Only physical-path
+        // caps need aggregation here; do not format every registered schedule.
         let mut path_caps = HashMap::new();
         for (tag, route) in original_registry.iter().enumerate() {
-            let identity = (route.network, route.route.identity());
-            identities.entry(identity).or_insert(tag);
             let path = (route.network, route.route.arcs.as_slice());
             let cap = enumeration::route_upper(&node.state, tag).unwrap_or(f64::INFINITY);
             path_caps
@@ -98,7 +100,9 @@ impl Pool {
             }
             let path = (seed.network, seed.route.arcs.as_slice());
             let identity_key = (seed.network, seed.route.identity());
-            let existing = identities.get(&identity_key).copied();
+            let existing = tags
+                .get(&identity_key)
+                .and_then(|&tag| usize::try_from(tag).ok());
             let path_cap = path_caps.get(&path).copied().unwrap_or(f64::INFINITY);
             if path_cap == 0. {
                 continue;
@@ -121,15 +125,15 @@ impl Pool {
             let domain = match domains.entry(seed.network) {
                 std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
                 std::collections::hash_map::Entry::Vacant(entry) => {
-                    entry.insert(resource_groups::domain_graph(oracle)?.into_owned())
+                    entry.insert(resource_groups::domain_graph(oracle)?)
                 }
             };
             let route = if let Some(tag) = existing {
-                registry[tag].route.clone()
+                Cow::Borrowed(&registry[tag].route)
             } else if compatible_schedule(oracle, &seed.route) {
-                seed.route.clone()
+                Cow::Borrowed(&seed.route)
             } else if let Some(route) = domain.elementary_route(&seed.route.arcs).ok().flatten() {
-                route
+                Cow::Owned(route)
             } else {
                 continue;
             };
@@ -145,19 +149,24 @@ impl Pool {
             if !cost.is_finite() {
                 return Err(invalid("inactive shared route cost overflow"));
             }
-            let identity = route.identity();
-            let resolved = identities.get(&(seed.network, identity.clone())).copied();
+            let (identity, resolved) = match &route {
+                // Neither borrowed route changed its schedule during replay.
+                Cow::Borrowed(_) => (identity_key.1, existing),
+                Cow::Owned(route) => {
+                    let identity = route.identity();
+                    let resolved = tags
+                        .get(&(seed.network, identity.clone()))
+                        .and_then(|&tag| usize::try_from(tag).ok());
+                    (identity, resolved)
+                }
+            };
             if resolved.is_some_and(|tag| present.contains(&tag)) {
                 continue;
             }
             let tag = match resolved {
                 Some(tag) => {
                     if path_cap.is_finite() && path_cap < oracle.multiplicity_upper() {
-                        node.state
-                            .route_upper_bounds
-                            .entry(tag)
-                            .and_modify(|cap| *cap = cap.min(path_cap))
-                            .or_insert(path_cap);
+                        cap_updates.push((tag, path_cap));
                     }
                     tag
                 }
@@ -165,7 +174,7 @@ impl Pool {
                     let tag = registry.len();
                     let signed =
                         i32::try_from(tag).map_err(|_| invalid("shared route tag overflow"))?;
-                    let mut route = route;
+                    let mut route = route.into_owned();
                     route.cost = cost;
                     route.original_cost = cost;
                     Arc::make_mut(&mut registry).push(Arc::new(NetworkRoute {
@@ -173,13 +182,12 @@ impl Pool {
                         route,
                     }));
                     Arc::make_mut(&mut tags).insert((seed.network, identity.clone()), signed);
-                    identities.insert((seed.network, identity.clone()), tag);
                     path_caps
                         .entry(path)
                         .and_modify(|cap| *cap = cap.min(path_cap))
                         .or_insert(path_cap);
                     if path_cap.is_finite() && path_cap < oracle.multiplicity_upper() {
-                        node.state.route_upper_bounds.insert(tag, path_cap);
+                        cap_updates.push((tag, path_cap));
                     }
                     tag
                 }
@@ -197,6 +205,15 @@ impl Pool {
         }
         node.state.routes = registry;
         node.state.tags = tags;
+        // No fallible replay remains. Publish caps together with the routes
+        // they describe, so a failed transfer cannot leave a cap on a reused tag.
+        for (tag, upper) in cap_updates {
+            node.state
+                .route_upper_bounds
+                .entry(tag)
+                .and_modify(|cap| *cap = cap.min(upper))
+                .or_insert(upper);
+        }
         node.warm.generated_pool.extend(pooled);
         Ok(added)
     }

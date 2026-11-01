@@ -361,6 +361,7 @@ struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     // Node forks share registry metadata until a child appends or replays a
     // route. Route objects themselves remain independently copy-on-write.
     routes: Arc<Vec<Arc<NetworkRoute>>>,
+    // Maintained schedule-identity index; coalesced schedules retain the first tag.
     tags: Arc<HashMap<(i32, String), i32>>,
     correction: Option<f64>,
     gradient: Option<Vec<f64>>,

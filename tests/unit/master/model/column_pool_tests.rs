@@ -639,3 +639,126 @@ fn repeated_seeding_preserves_existing_pool_storage_and_column_buffers() {
         assert_eq!(actual.identity.as_ptr(), identity);
     }
 }
+
+#[test]
+fn failed_pool_seed_rolls_back_caps_for_new_and_existing_alias_tags() {
+    for pre_registered in [false, true] {
+        let mut coefficients = vec![0.; 10];
+        coefficients[4] = f64::MAX;
+        let mut node = compact()
+            .with_row(
+                Row {
+                    sense: RowSense::LessEqual,
+                    rhs: 10.,
+                },
+                &[RowCoefficients {
+                    network: 7,
+                    arcs: coefficients,
+                    per_route: f64::MAX,
+                }],
+            )
+            .unwrap();
+        let source = node.state.routes[0].clone();
+        node.state.route_upper_bounds.insert(0, 0.25);
+        let mut alias = source.as_ref().clone();
+        for point in alias.route.resource_profile.iter_mut().skip(1) {
+            point[0] += 1.;
+        }
+        alias.route.resources[0] += 1.;
+        let alias = Arc::new(alias);
+        let alias_tag = node.state.routes.len();
+        if pre_registered {
+            Arc::make_mut(&mut node.state.tags)
+                .insert((alias.network, alias.route.identity()), alias_tag as i32);
+            Arc::make_mut(&mut node.state.routes).push(alias.clone());
+        }
+        let donor = root().snapshot;
+        let bad = donor
+            .state
+            .routes
+            .iter()
+            .find(|r| r.network == 7 && r.route.arcs.contains(&4))
+            .unwrap()
+            .clone();
+        let prefix = Pool {
+            identities: HashSet::new(),
+            routes: vec![alias.clone()],
+        };
+        let mut control = node.fork().unwrap();
+        assert_eq!(
+            prefix
+                .seed(&mut control, Instant::now() + Duration::from_secs(10))
+                .unwrap(),
+            1
+        );
+        assert_eq!(control.state.route_upper_bounds[&alias_tag], 0.25);
+        assert_eq!(
+            control.state.routes.len(),
+            node.state.routes.len() + usize::from(!pre_registered)
+        );
+
+        let routes = node.state.routes.clone();
+        let tags = node.state.tags.clone();
+        let caps = node.state.route_upper_bounds.clone();
+        let pool = Pool {
+            identities: HashSet::new(),
+            routes: vec![alias, bad],
+        };
+        assert!(pool
+            .seed(&mut node, Instant::now() + Duration::from_secs(10))
+            .is_err());
+        assert!(Arc::ptr_eq(&node.state.routes, &routes));
+        assert!(Arc::ptr_eq(&node.state.tags, &tags));
+        assert_eq!(node.state.route_upper_bounds, caps);
+        assert!(node.warm.generated_pool.is_empty());
+
+        // A failed speculative route must not cap the next unrelated use of its tag.
+        let unrelated = donor
+            .state
+            .routes
+            .iter()
+            .find(|r| {
+                !(r.network == source.network && r.route.arcs == source.route.arcs)
+                    && !(r.network == 7 && r.route.arcs.contains(&4))
+                    && !node
+                        .state
+                        .tags
+                        .contains_key(&(r.network, r.route.identity()))
+            })
+            .unwrap()
+            .clone();
+        let next_tag = node.state.routes.len();
+        let next = Pool {
+            identities: HashSet::new(),
+            routes: vec![unrelated],
+        };
+        assert_eq!(
+            next.seed(&mut node, Instant::now() + Duration::from_secs(10))
+                .unwrap(),
+            1
+        );
+        assert!(!node.state.route_upper_bounds.contains_key(&next_tag));
+    }
+}
+
+#[test]
+fn seeding_uses_the_first_tag_when_registry_schedules_coalesce() {
+    let mut node = compact();
+    let route = node.state.routes[0].clone();
+    Arc::make_mut(&mut node.state.routes).push(route.clone());
+    assert_eq!(node.state.tags[&(route.network, route.route.identity())], 0);
+    let routes = node.state.routes.clone();
+    let tags = node.state.tags.clone();
+    let pool = Pool {
+        identities: HashSet::new(),
+        routes: vec![route],
+    };
+    assert_eq!(
+        pool.seed(&mut node, Instant::now() + Duration::from_secs(10))
+            .unwrap(),
+        0
+    );
+    assert!(node.warm.generated_pool.is_empty());
+    assert!(Arc::ptr_eq(&node.state.routes, &routes));
+    assert!(Arc::ptr_eq(&node.state.tags, &tags));
+}

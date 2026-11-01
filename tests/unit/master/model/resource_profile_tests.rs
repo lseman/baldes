@@ -1,4 +1,5 @@
 use super::*;
+use crate::master::LpMaster;
 
 fn root() -> NodeSnapshot<2> {
     let problem = format::Model::from_json(include_str!(concat!(
@@ -18,8 +19,13 @@ fn root() -> NodeSnapshot<2> {
 fn unchanged_profile_refresh_preserves_shared_registries() {
     let parent = root();
     let mut child = parent.fork().unwrap();
+    assert!(child.master.solved());
     let touched = child.state.oracles.iter().map(|o| o.network.id).collect();
     assert!(!refresh(&mut child, &parent.state, &touched).unwrap());
+    assert!(
+        child.master.solved(),
+        "unchanged coefficients must not invalidate the solved LP"
+    );
     assert!(Arc::ptr_eq(&child.state.routes, &parent.state.routes));
     assert!(Arc::ptr_eq(&child.state.tags, &parent.state.tags));
 }
@@ -67,4 +73,53 @@ fn synchronized_profile_refresh_detaches_once_and_preserves_parent_tags() {
     assert!(!refresh(&mut child, &sibling.state, &touched).unwrap());
     assert!(Arc::ptr_eq(&child.state.routes, &sibling.state.routes));
     assert!(Arc::ptr_eq(&child.state.tags, &sibling.state.tags));
+}
+
+#[test]
+fn sparse_refresh_merge_matches_full_row_replacement_with_legacy_metadata() {
+    let cases = [
+        (vec![], vec![]),
+        (vec![], vec![(0, 2.), (5, 3.)]),
+        (vec![(0, 2.), (5, 3.)], vec![]),
+        (
+            vec![(0, 2.), (2, 3.), (7, 4.)],
+            vec![(0, 2.), (3, 8.), (7, 9.)],
+        ),
+        (
+            vec![(5, 1.), (0, 2.), (5, 7.), (0, 3.)],
+            vec![(0, 4.), (2, 9.), (5, 7.)],
+        ),
+        (vec![(0, -0.), (2, 4.)], vec![(0, 0.), (2, 4.)]),
+    ];
+    for (before, after) in cases {
+        let ordered = ordered_coefficients(&before);
+        let stable = before.windows(2).all(|pair| pair[0].0 < pair[1].0);
+        assert_eq!(matches!(ordered, Cow::Borrowed(_)), stable);
+        let previous: BTreeMap<_, _> = before.iter().copied().collect();
+        assert_eq!(
+            ordered.as_ref(),
+            previous.iter().map(|(&r, &v)| (r, v)).collect::<Vec<_>>()
+        );
+        let expected: BTreeMap<_, _> = before
+            .iter()
+            .map(|&(row, _)| (row, 0.))
+            .chain(after.iter().copied())
+            .collect();
+        let mut actual = previous.clone();
+        let pairs: Vec<_> = merged_coefficients(&ordered, &after).collect();
+        assert_eq!(pairs.len(), expected.len());
+        for (row, old, new) in pairs {
+            assert_eq!(old, previous.get(&row).copied().unwrap_or(0.));
+            assert_eq!(new, expected[&row]);
+            if !stable || old != new {
+                actual.insert(row, new);
+            }
+        }
+        actual.retain(|_, value| *value != 0.);
+        let expected: BTreeMap<_, _> = expected
+            .into_iter()
+            .filter(|&(_, value)| value != 0.)
+            .collect();
+        assert_eq!(actual, expected);
+    }
 }
