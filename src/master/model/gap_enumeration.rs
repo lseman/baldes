@@ -204,7 +204,7 @@ pub(super) fn universe<const D: usize>(
             }
             None => gap,
         };
-        let offset = adapter::cache_duals(state, index, duals)?;
+        let offset = pricing::cache_duals(state, index, duals)?;
         let cutoff = ceiling - offset;
         let remaining = state.deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
@@ -292,6 +292,10 @@ pub(super) fn regenerate<const D: usize>(
 ) -> Result<Vec<cg::Column>> {
     let gap = upper(state) - bound;
     let mut retained = vec![];
+    // Each oracle's graph is unchanged throughout this replay. Prepare its NG
+    // transitions lazily once, rather than rebuilding them for every column.
+    let mut ng_by_network: Vec<Option<crate::graph::ng::PreparedNg>> =
+        (0..state.oracles.len()).map(|_| None).collect();
     for cached in pool {
         let Some(route) = usize::try_from(cached.tag)
             .ok()
@@ -315,7 +319,10 @@ pub(super) fn regenerate<const D: usize>(
         }
         let oracle = &state.oracles[index];
         let graph = &oracle.solver.graph;
-        let ng = crate::graph::ng::PreparedNg::new(graph)?;
+        if ng_by_network[index].is_none() {
+            ng_by_network[index] = Some(crate::graph::ng::PreparedNg::new(graph)?);
+        }
+        let ng = ng_by_network[index].as_ref().unwrap();
         let route = &route.route;
         if oracle.solver.ryan_foster.iter().any(|rule| {
             !rule.satisfied_by(route.nodes.iter().map(|&v| v as usize))
@@ -355,8 +362,8 @@ pub(super) fn regenerate<const D: usize>(
         }
     }
     // Admissible cached paths also use the enumeration coefficient contract.
-    for (index, _, arcs) in &retained {
-        Arc::make_mut(&mut state.oracles[*index].enumerated).insert(arcs.clone());
+    for (index, _, arcs) in &mut retained {
+        Arc::make_mut(&mut state.oracles[*index].enumerated).insert(std::mem::take(arcs));
     }
     let mut columns = vec![];
     for (index, tag, _) in retained {

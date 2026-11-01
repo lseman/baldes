@@ -17,23 +17,24 @@ containing that network use the same master framework. See the
 | `src/enumeration/` | Route-domain proofs and bounded path collection |
 | `src/cuts/` | Cut definitions, registration, separation and coefficient replay |
 | `src/master/model/` | Canonical shared rows/networks, registrations, original variables and snapshots |
-| `src/master/routing/` | Customer/fleet registration, routing cut hooks, witnesses and certificates |
+| `src/master/model/controller.rs` | Column-generation callbacks, separation handoffs and pricing checkpoints |
+| `src/master/model/pricing.rs` | Network pricing preparation, route collection and bound admission |
 | `src/master/formulation/` | Shared restricted-master construction and dynamic row insertion |
 | `src/master/cg/` | Column-generation lifecycle, artificial columns, pools, restarts and handoffs |
 | `src/master/pricing/` | Scheduling and feedback aggregation across enabled network oracles |
-| `src/master/preprocessing/` | Propagation, conservation rows and model/routing preprocessing adapters |
+| `src/master/preprocessing/` | Propagation, conservation rows and model preprocessing adapters |
 | `src/master/tree/` | Shared lifecycle, frontier, policies, history, strong branching and adapters |
 | `src/master/stabilization/` | Smoothing, proximal stabilization and curvature rules |
 | `src/master/solvers/` | Clp, HiGHS, Gurobi and shared integer-copy controls |
-| `src/extensions/` | HGS, IPM, EVRP, p-step, robust routing and column elimination |
+| `src/extensions/` | HGS, AILS-II, IPM, EVRP, p-step, robust/stochastic routing and column elimination |
 | `src/inputs/` | Instance parsing and graph construction |
 | `src/bin/baldes/` | `main.rs`, unified `cli.rs`, and distinct CE/p-step commands |
-| `src/api/` | Public low-level interface helpers |
 | `python/pybaldes/` | Python data/results and unified `solve.py` entry point |
 | `python/rust/src/frontend/` | One `_solve` transport and private routing/network input compilers |
 
 `master::model::Problem` owns shared rows and a network collection.
-`RoutingContext` holds that model with routing metadata. The physical source
+Customer/fleet inputs compile into that model through `inputs/root.rs` and
+`bin/baldes/cli/routing.rs`; they use the same network solve path. The physical source
 owners for tree and preprocessing algorithms are `master/tree` and
 `master/preprocessing`; their model-specific files live under those owners.
 
@@ -50,11 +51,13 @@ not private attachment names such as `tree_adapter` or `flow_adapter`.
 | LP/pricing iteration or recovery handoff | `master/cg/driver.rs`, `master/cg/feasibility.rs` |
 | Initial/cut/branch artificial columns | `master/cg/rows.rs` |
 | Network visitation / admission | `master/pricing/mod.rs`, `master/pricing/scheduling.rs` |
+| Model-to-CG callbacks / pricing checkpoints | `master/model/controller.rs` |
+| Network costs / generated-column collection | `master/model/pricing.rs` |
 | Raw objective pricing / cost cache | `pricing/variable_costs.rs` |
 | Propagation or flow rows | `master/preprocessing/`, including shared `flow/mod.rs` |
 | Node dispatch / budgets | `master/tree/driver.rs` |
 | Open-node priority / overflow | `master/tree/frontier.rs` |
-| Routing/model/imported tree interpretation | `master/tree/adapters/` |
+| Model/imported tree interpretation | `master/tree/adapters/` |
 | CLI parsing and result output | `bin/baldes/cli.rs` |
 | Python scalar/array normalization | `python/pybaldes/solve.py` |
 

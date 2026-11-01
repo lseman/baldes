@@ -1,6 +1,45 @@
 use super::*;
 
 #[test]
+fn reused_registry_clone_replaces_route_cache_and_keeps_cut_memory_independent() {
+    let mut graph = Graph::<2>::new(4, 0).unwrap();
+    for v in 0..3 {
+        graph.add_arc(v, v + 1, 1.).unwrap();
+    }
+    let mut source = CutRegistry::default();
+    source.add_strong_k_path_cut(4, &[1, 2], 1, -1.).unwrap();
+    source.pricing_order = vec![0];
+    source.round_duals = true;
+    source.separation_phase = 4;
+    let route = source.route(&graph, &[1, 2]).unwrap();
+
+    let mut other_graph = Graph::<2>::new(4, 0).unwrap();
+    for (id, tail, head) in [(10, 0, 2), (11, 2, 1), (12, 1, 3)] {
+        other_graph.add_arc_with_id(id, tail, head, 1.).unwrap();
+    }
+    let mut copy = source.clone();
+    copy.ends.get_mut().1.clear();
+    copy.route(&other_graph, &[2, 1]).unwrap();
+    copy.add_strong_k_path_cut(4, &[1], 1, 0.).unwrap();
+    copy.retired.insert(0);
+    copy.clone_from(&source);
+
+    assert_eq!(copy.cuts, source.cuts);
+    assert_eq!(copy.retired, source.retired);
+    assert_eq!(copy.pricing_order, source.pricing_order);
+    assert!(copy.round_duals);
+    assert_eq!(copy.separation_phase, 4);
+    assert_eq!(copy.route(&graph, &[1, 2]).unwrap(), route);
+    copy.cuts[0].memory.fill(false);
+    copy.cuts[0].weights.fill(0);
+    copy.ends.get_mut().1.clear();
+    assert!(source.cuts[0].memory.iter().any(|&v| v));
+    assert!(source.cuts[0].weights.iter().any(|&v| v != 0));
+    assert!(!source.ends.borrow().1.is_empty());
+    assert_eq!(source.route(&graph, &[1, 2]).unwrap(), route);
+}
+
+#[test]
 fn build_memory_policy_and_generated_cut_pricing_agree() {
     let node = cfg!(feature = "rank-one-node-memory");
     let mut options = Options::default();

@@ -3,9 +3,11 @@
 //! Arc entries refer to shared rows. Each network also receives its own
 //! multiplicity rows. Additive rows and assignment branches survive node forks.
 //! Complete all-network enumeration can feed an optional HiGHS integer copy.
-mod adapter;
+mod controller;
+use controller::ColumnGenerationController;
 mod feasibility;
 mod fixing;
+mod pricing;
 pub use crate::master::pricing::NetworkPricingSchedule;
 use crate::master::pricing::Scheduler;
 #[cfg(test)]
@@ -405,19 +407,6 @@ impl<const D: usize> Default for CheckpointStore<D> {
         }
     }
 }
-
-struct Coordinator<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }>(
-    Rc<RefCell<State<D>>>,
-    bool,
-    bool,
-    Option<f64>,
-    Option<EnumerationOptions>,
-    Option<(Vec<NetworkRoute>, Vec<(i32, usize)>, Instant)>,
-    Vec<usize>,
-    bool,
-    bool,
-    CheckpointStore<D>,
-);
 
 fn entries_base<const D: usize>(
     oracle: &Oracle<D>,

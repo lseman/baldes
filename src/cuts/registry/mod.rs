@@ -1,6 +1,5 @@
 //! Cut registry, graph adapters, memory policies and route coefficients.
-//! Ported from `native/adapters/RankOneApiAdapter.h` and
-//! `src/api/NativeCutCoefficient.h`.
+//! Installs cut descriptors and replays coefficients with graph-local memory.
 use super::{knapsack, kpath, rank_one::separation};
 use crate::core::options::Options;
 use crate::graph::Graph;
@@ -238,7 +237,7 @@ pub fn memory_policy(options: &Options) -> Result<MemoryPolicy> {
 }
 
 /// Separator adapter plus the registry it fills.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct CutRegistry {
     pub cuts: Vec<RankOneCut>,
     pub knapsack_cuts: Vec<knapsack::ResourceKnapsackCut>,
@@ -258,6 +257,8 @@ pub struct CutRegistry {
         std::collections::HashMap<(usize, usize), (usize, usize, i32)>,
     )>,
 }
+
+mod cloning;
 
 fn physical_arcs<'a, const D: usize>(
     g: &'a Graph<D>,

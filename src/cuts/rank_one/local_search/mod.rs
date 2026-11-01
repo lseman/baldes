@@ -13,6 +13,7 @@ fn compute_state_bitmap<const COVERING: bool>(
     row_multipliers: &[i32],
     columns: &[ColumnInfo],
     column_indices: &[i32],
+    active: &mut Vec<(usize, u32)>,
 ) {
     let n = column_indices.len();
     let nbytes = n / 8 + (n & 7 != 0) as usize;
@@ -26,12 +27,14 @@ fn compute_state_bitmap<const COVERING: bool>(
     }
     // Cuts use only a few rows. Select their nonzero multipliers once rather
     // than scanning the entire row universe for every column after each swap.
-    let active: Vec<_> = row_multipliers
-        .iter()
-        .enumerate()
-        .filter(|(_, multiplier)| **multiplier != 0)
-        .map(|(row, &multiplier)| (row, multiplier as u32))
-        .collect();
+    active.clear();
+    active.extend(
+        row_multipliers
+            .iter()
+            .enumerate()
+            .filter(|(_, multiplier)| **multiplier != 0)
+            .map(|(row, &multiplier)| (row, multiplier as u32)),
+    );
     for k in 0..n {
         let col = &columns[column_indices[k] as usize];
         let count = if COVERING {
@@ -40,7 +43,7 @@ fn compute_state_bitmap<const COVERING: bool>(
             &col.packing_set_count
         };
         let mut state: u32 = 0;
-        for &(row, multiplier) in &active {
+        for &(row, multiplier) in active.iter() {
             state = state.wrapping_add((count[row] as u32).wrapping_mul(multiplier));
         }
         bitmaps[state as i32 as usize][k >> 6] |= 1u64 << (k & 63);
@@ -71,6 +74,8 @@ mod bitset;
 mod construction;
 mod gain;
 mod search;
+mod workspace;
+use workspace::SearchWorkspace;
 
 #[cfg(test)]
 #[path = "../../../../tests/unit/cuts/rank_one/local_search/tests.rs"]

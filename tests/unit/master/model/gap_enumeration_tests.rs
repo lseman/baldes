@@ -100,7 +100,7 @@ fn retained_gap_pricing_uses_registered_pool_without_whole_domain_enumeration() 
     assert!(state.universe.is_none());
     assert!(!state.enumeration_report.complete);
     let tolerance = state.scheduler.tolerance;
-    let retained = adapter::NetworkAdapter { state, tolerance }
+    let retained = pricing::NetworkPricingAdapter { state, tolerance }
         .retained(0, &duals)
         .unwrap()
         .unwrap();
@@ -271,18 +271,18 @@ fn cg_post_install_handoff_retains_a_validated_original_incumbent() {
         state,
     } = output.snapshot;
     let state = Rc::new(RefCell::new(state));
-    let mut controller = Coordinator(
-        state.clone(),
-        false,
-        false,
-        None,
-        None,
-        None,
-        vec![],
-        false,
-        true,
-        CheckpointStore::default(),
-    );
+    let mut controller = ColumnGenerationController {
+        state: state.clone(),
+        request_initial_enumeration: false,
+        search_inactive_columns: false,
+        artificial_penalty: None,
+        enumeration_options: None,
+        enumeration_checkpoint: None,
+        removed_columns: vec![],
+        trust_preprocessing_infeasibility: false,
+        allow_objective_fixing: true,
+        checkpoints: CheckpointStore::default(),
+    };
     controller
         .enumeration_installed(&master, &warm.columns, &warm.artificials)
         .unwrap();
@@ -348,7 +348,7 @@ fn fixing_preparation_refreshes_raw_duals_with_a_retained_pool() {
     finish(state, true);
     let coverage = state.gap_pool_cutoff;
     duals[state.shared_offset] = 0.25;
-    adapter::cache_duals(state, 0, &duals).unwrap();
+    pricing::cache_duals(state, 0, &duals).unwrap();
     assert_eq!(state.oracles[0].costs[0], 0.75);
     assert!(state.oracles[0].solver.enumeration.is_some());
     assert_eq!(state.gap_pool_cutoff, coverage);
@@ -368,4 +368,75 @@ fn fixing_only_mode_commits_without_requiring_an_enumerated_universe() {
     assert_eq!(state.previous_fixing_gap, 12.);
     assert!(state.gap_pool_cutoff.is_none());
     assert!(state.oracles[0].solver.enumeration.is_none());
+}
+
+#[test]
+fn regeneration_keeps_ng_transitions_network_local_and_refreshes_between_calls() {
+    let mut graph = Graph::<2>::new(4, 0).unwrap();
+    for (tail, head) in [(0, 1), (1, 2), (2, 1), (1, 3)] {
+        graph.add_arc(tail, head, 1.).unwrap();
+    }
+    let mut networks = Vec::new();
+    for (id, memory) in [(0, vec![1, 2]), (7, vec![2])] {
+        let mut graph = graph.clone();
+        graph.set_ng(2, &memory).unwrap();
+        networks.push(Network {
+            id,
+            graph,
+            multiplicity: Window::new(0., 1.).unwrap(),
+            arc_entries: vec![vec![]; 4],
+            route_entries: vec![],
+            activity_entries: vec![],
+        });
+    }
+    let (master, mut state, _) = solve::prepare_with_seed_routes(
+        Problem {
+            rows: vec![],
+            networks,
+        },
+        vec![],
+        Options::default(),
+        &[],
+        &[],
+        &[],
+    )
+    .unwrap();
+    state.tree_incumbent = 100.;
+    let route = |cycle: bool| Route {
+        coupled_values: vec![],
+        nodes: if cycle {
+            vec![0, 1, 2, 1, 3]
+        } else {
+            vec![0, 1, 3]
+        },
+        arcs: if cycle { vec![0, 1, 2, 3] } else { vec![0, 3] },
+        cost: if cycle { 4. } else { 2. },
+        original_cost: if cycle { 4. } else { 2. },
+        resources: vec![],
+        resource_profile: vec![vec![]; if cycle { 5 } else { 3 }],
+    };
+    let tags: Vec<_> = [(0, true), (7, true), (0, false), (7, false)]
+        .into_iter()
+        .map(|(id, cycle)| register(&mut state, id, route(cycle)).unwrap())
+        .collect();
+    let duals = vec![0.; master.rhs.len()];
+    let pool: Vec<_> = tags
+        .iter()
+        .chain(&tags)
+        .map(|&tag| column(&state, tag, &duals).unwrap())
+        .collect();
+    let accepted = |state: &mut State<2>| {
+        regenerate(state, &pool, &duals, 0.)
+            .unwrap()
+            .into_iter()
+            .map(|c| c.tag)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(accepted(&mut state), [tags[1], tags[2], tags[3]].repeat(2));
+    state.oracles[0].solver.graph.set_ng(2, &[2]).unwrap();
+    state.oracles[1].solver.graph.set_ng(2, &[1, 2]).unwrap();
+    assert_eq!(accepted(&mut state), [tags[0], tags[2], tags[3]].repeat(2));
+    state.oracles[0].solver.forbidden_arcs.resize(4, false);
+    state.oracles[0].solver.forbidden_arcs[1] = true;
+    assert_eq!(accepted(&mut state), [tags[2], tags[3]].repeat(2));
 }

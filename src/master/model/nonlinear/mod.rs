@@ -68,12 +68,13 @@ pub(super) fn deterministic_entries<const D: usize>(
     // must publish one summed coefficient, as pricing applies the row dual to
     // every kernel. Keep integer accumulation exact before converting to LP.
     let mut sums = std::collections::BTreeMap::<usize, i64>::new();
+    let enumerated = !oracle.nonlinear_rows.is_empty() && oracle.is_enumerated(route);
     for &(cut, row) in &oracle.nonlinear_rows {
         let coefficient = i64::from(oracle.solver.cuts.route_coefficient(
             &oracle.solver.graph,
             cut,
             &physical,
-            oracle.is_enumerated(route),
+            enumerated,
         )?);
         let sum = sums.entry(row).or_default();
         *sum = sum

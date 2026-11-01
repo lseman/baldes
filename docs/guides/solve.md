@@ -68,15 +68,15 @@ fn main() -> baldes::Result<()> {
 }
 ```
 
-`Problem::routing(graph, vehicles)` produces a `RoutingContext` with routing
-registration metadata. `master::routing::solve` runs its root relaxation;
-`tree::solve(context, TreeOptions::default())` uses the same tree driver.
+`Problem::set_partitioning(graph, vehicles)` registers customer-cover rows and
+network multiplicity. `master::model::solve` runs its root relaxation;
+`tree::solve(problem, ModelTreeOptions::default())` uses the same tree driver.
 See [network models](../solver/models.md), [routing tree](../solver/tree.md)
 and [architecture](architecture.md) for the registration-specific contracts.
 
 This is a breaking modernization. The old routing/network command aliases,
 separate Python solve functions, native solve exports, and Rust `master::root`
-and `master::mp` paths are removed. Use `master::routing`, `master::model`,
+and `master::mp` paths are removed. Use `master::model`,
 and the common master construction and search modules.
 
 Master construction, dynamic-row insertion, artificial columns, pricing, and

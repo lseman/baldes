@@ -34,14 +34,20 @@ pub(super) fn sync_rhs<const D: usize>(state: &mut State<D>, master: &ClpMaster)
     state.rhs = rhs;
 }
 
-pub(super) fn duals<const D: usize>(state: &State<D>, values: &[f64]) -> Vec<f64> {
+pub(super) fn duals<'a, const D: usize>(
+    state: &State<D>,
+    values: &'a [f64],
+) -> std::borrow::Cow<'a, [f64]> {
+    if state.retired_rows.is_empty() {
+        return std::borrow::Cow::Borrowed(values);
+    }
     let mut values = values.to_vec();
     for &row in &state.retired_rows {
         if let Some(value) = values.get_mut(row) {
             *value = 0.;
         }
     }
-    values
+    std::borrow::Cow::Owned(values)
 }
 
 fn retained_quantity<const D: usize>(oracle: &Oracle<D>) -> f64 {

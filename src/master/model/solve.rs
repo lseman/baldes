@@ -655,17 +655,17 @@ fn execute_node_cg<const D: usize>(
     );
     let request_initial_enumeration = options.enumeration.is_some() && previous.is_none();
     let state = Rc::new(RefCell::new(state));
-    let mut controller = Coordinator(
-        state.clone(),
+    let mut controller = ColumnGenerationController {
+        state: state.clone(),
         request_initial_enumeration,
-        options.search_inactive_columns,
-        None,
-        options.enumeration.clone(),
-        None,
-        Vec::new(),
-        !options.preprocessing.integer_domains,
-        options.cg.bound_mode == cg::BoundMode::Numerical,
-        CheckpointStore {
+        search_inactive_columns: options.search_inactive_columns,
+        artificial_penalty: None,
+        enumeration_options: options.enumeration.clone(),
+        enumeration_checkpoint: None,
+        removed_columns: Vec::new(),
+        trust_preprocessing_infeasibility: !options.preprocessing.integer_domains,
+        allow_objective_fixing: options.cg.bound_mode == cg::BoundMode::Numerical,
+        checkpoints: CheckpointStore {
             prior_cg: None,
             rollback: None,
             auto_rank_one: capture_auto_rank_one.then(|| AutoRankOneCapture {
@@ -674,7 +674,7 @@ fn execute_node_cg<const D: usize>(
                 node_elapsed: std::time::Duration::ZERO,
             }),
         },
-    );
+    };
     let log_context = options.cg.log_interval.is_some().then(|| {
         let mut context = format!(
             "  Master: {:?} | Node depth: {} | Stabilization: {} | Bound mode: {}",
@@ -713,7 +713,7 @@ fn execute_node_cg<const D: usize>(
                 .deadline
                 .saturating_duration_since(Instant::now()),
         );
-        controller.9.prior_cg = previous.clone();
+        controller.checkpoints.prior_cg = previous.clone();
         let optimized = cg::optimize_with_log_context(
             &mut master,
             &schedule,
@@ -753,7 +753,7 @@ fn execute_node_cg<const D: usize>(
         // transfer stages every model/registry change on private copies. On a
         // backend failure the checkpoint is still valid for ordinary pricing.
         let (routes, counts, deadline) = controller
-            .5
+            .enumeration_checkpoint
             .take()
             .ok_or_else(|| invalid("missing enumeration checkpoint"))?;
         if let Err(error) = enumeration::install_collected(
@@ -828,7 +828,7 @@ fn execute_node_cg<const D: usize>(
     if preprocessing_proof || result.feasibility.iter().any(|r| r.certified_infeasible) {
         state.borrow_mut().phase_one_infeasible = true;
     }
-    let auto_rank_one = controller.9.auto_rank_one.take();
+    let auto_rank_one = controller.checkpoints.auto_rank_one.take();
     drop(controller);
     let state = Rc::try_unwrap(state)
         .map_err(|_| invalid("network state still borrowed"))?
@@ -869,7 +869,7 @@ fn execute_node_cg<const D: usize>(
             duals: if preprocessing_proof {
                 vec![0.; master.rhs.len()]
             } else {
-                retirement::duals(&state, &master.duals())
+                retirement::duals(&state, &master.duals()).into_owned()
             },
             oracle_calls: state
                 .oracles

@@ -85,7 +85,7 @@ pub(super) fn apply<const D: usize>(
         if budget.is_zero() {
             continue;
         }
-        let offset = adapter::cache_duals(&mut staged, index, duals)?;
+        let offset = pricing::cache_duals(&mut staged, index, duals)?;
         let margin = 1e-6 * (1. + incumbent.abs() + bound.abs());
         let Some(ceiling) = pricing_ceiling(incumbent, other_contributions, margin, offset) else {
             continue;

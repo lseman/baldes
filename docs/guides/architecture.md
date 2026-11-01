@@ -38,11 +38,11 @@ network oracles; `pricing` implements an oracle. A scheduling change belongs in
 the coordinator, and a change to route extension or dominance belongs in the
 oracle/labeling layer. Both benefit one-network and many-network solves.
 
-## Why routing and model adapters remain
+## How routing inputs use the network model
 
-`master::model::Problem` stores the model. `master::routing::RoutingContext`
-registers customer-cover rows, fleet semantics and routing metadata around that
-same model. It does not define another graph/rows representation.
+`master::model::Problem` stores the model. `Problem::set_partitioning` registers
+customer-cover rows and network multiplicity. Routing input compilation supplies
+the instance-specific cut configuration to the same model solver.
 
 Routing and explicit network inputs can supply different cuts, branch families,
 preprocessing rules and proof contracts. For example, routing hooks configure
@@ -52,7 +52,7 @@ registration. They do not depend on whether a collection contains one network
 or several. Encoding a routing problem manually as a network model does not
 implicitly install all routing-specific hooks.
 
-The routing, model and imported-column tree adapters share selection, budgets,
+The model and imported-column tree adapters share selection, budgets,
 frontier storage and evaluation dispatch. Imported sources have their own
 column transport and completeness contracts; `model/imported/multiple` groups
 external sources and is not another tree or multi-pricing engine.
@@ -66,7 +66,7 @@ external sources and is not another tree or multi-pricing engine.
 | Python instance, path, pricing network, array or model | `pybaldes.solve(problem, **options)` |
 | Python model constructors | `Instance`, `PricingNetwork`, `NetworkProblem` |
 | Rust explicit network root | `master::model::solve` |
-| Rust routing registration/root | `master::routing::RoutingContext`, `master::routing::solve` |
+| Rust routing registration/root | `master::model::Problem::set_partitioning`, `inputs::Instance::solve` |
 | Rust integer search for either registration | `master::tree::solve` |
 | Low-level resource-constrained path pricing | `pricing::Solver` / Python `Solver` |
 

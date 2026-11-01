@@ -114,18 +114,18 @@ fn controller_runs_fixing_only_for_numerical_non_enumerating_solves() {
         let output = fixture();
         let NodeSnapshot { master, state, .. } = output.snapshot;
         let state = Rc::new(RefCell::new(state));
-        let mut controller = Coordinator(
-            state.clone(),
-            false,
-            false,
-            None,
-            enumeration.then(EnumerationOptions::default),
-            None,
-            Vec::new(),
-            false,
-            numerical,
-            super::CheckpointStore::default(),
-        );
+        let mut controller = ColumnGenerationController {
+            state: state.clone(),
+            request_initial_enumeration: false,
+            search_inactive_columns: false,
+            artificial_penalty: None,
+            enumeration_options: enumeration.then(EnumerationOptions::default),
+            enumeration_checkpoint: None,
+            removed_columns: Vec::new(),
+            trust_preprocessing_infeasibility: false,
+            allow_objective_fixing: numerical,
+            checkpoints: super::CheckpointStore::default(),
+        };
         let duals = vec![0.; master.rhs.len()];
         controller.fix_pricing(&master, &duals).unwrap();
         assert_eq!(state.borrow().previous_fixing_gap < 1e12, expected);

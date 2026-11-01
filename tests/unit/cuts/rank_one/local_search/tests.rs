@@ -20,15 +20,30 @@ fn sparse_state_support_tracks_changed_rows_across_zero_multipliers() {
         .collect();
     let indices: Vec<i32> = (0..129).rev().collect();
     let mut bitmaps = vec![];
+    let mut active = vec![];
     for (row, weight, constant) in [(0, 2, 1), (63, 3, 1), (0, 0, 0)] {
         let mut multipliers = vec![0; 128];
         multipliers[row] = weight;
         multipliers[127] = constant;
         for covering in [false, true] {
             if covering {
-                compute_state_bitmap::<true>(&mut bitmaps, 4, &multipliers, &columns, &indices);
+                compute_state_bitmap::<true>(
+                    &mut bitmaps,
+                    4,
+                    &multipliers,
+                    &columns,
+                    &indices,
+                    &mut active,
+                );
             } else {
-                compute_state_bitmap::<false>(&mut bitmaps, 4, &multipliers, &columns, &indices);
+                compute_state_bitmap::<false>(
+                    &mut bitmaps,
+                    4,
+                    &multipliers,
+                    &columns,
+                    &indices,
+                    &mut active,
+                );
             }
             for (state, bitmap) in bitmaps.iter().enumerate() {
                 for position in 0..192 {
@@ -64,12 +79,20 @@ fn reused_state_bitmaps_clear_old_assignments_and_truncated_words() {
         })
         .collect();
     let mut bitmaps = vec![vec![u64::MAX; 4]; 5];
+    let mut active = vec![];
     for n in [129, 65, 1, 0, 129] {
         let indices: Vec<i32> = (0..n).collect();
         for multipliers in [[1, 2], [2, 1], [0, 0]] {
             for covering in [false, true] {
                 if covering {
-                    compute_state_bitmap::<true>(&mut bitmaps, 2, &multipliers, &columns, &indices);
+                    compute_state_bitmap::<true>(
+                        &mut bitmaps,
+                        2,
+                        &multipliers,
+                        &columns,
+                        &indices,
+                        &mut active,
+                    );
                 } else {
                     compute_state_bitmap::<false>(
                         &mut bitmaps,
@@ -77,6 +100,7 @@ fn reused_state_bitmaps_clear_old_assignments_and_truncated_words() {
                         &multipliers,
                         &columns,
                         &indices,
+                        &mut active,
                     );
                 }
                 assert_eq!(bitmaps.len(), 3);

@@ -187,7 +187,7 @@ pub(super) fn run<const D: usize>(
         // objective exclusions. Rebuild private labels in the original domain;
         // hard arc/branch restrictions survive this cache restoration.
         current.state.oracles[index].solver.restore_arcs();
-        super::super::adapter::cache_duals(&mut current.state, index, &duals)?;
+        super::super::pricing::cache_duals(&mut current.state, index, &duals)?;
         let oracle = &mut current.state.oracles[index];
         // Complete retained domains can bypass ordinary dual preparation.
         // Greedy pricing uses only its shifted variable objective, including

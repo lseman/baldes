@@ -53,6 +53,7 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                 denominator,
                 rhs,
                 max_state,
+                &mut SearchWorkspace::default(),
             );
             let mut key = rows.clone();
             key.sort();

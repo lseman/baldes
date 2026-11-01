@@ -69,6 +69,7 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
         denominator: i32,
         rhs: f64,
         max_state: i32,
+        workspace: &mut SearchWorkspace,
     ) -> f64 {
         let max_rhs = Self::divide(max_state, denominator);
         let n = self.column_indices.len();
@@ -77,41 +78,28 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
         let row_count = self.num_rows.max(0) as usize;
         let max_multiplier = *multipliers.iter().max().unwrap();
         let max_change = self.max_count * max_multiplier;
-        let mut increases: Vec<Vec<(i32, i32)>> = vec![vec![]; (max_change + 1) as usize];
-        for d in 1..=max_change {
-            for s in 0..=max_state - d {
-                let (a, b) = (
-                    Self::divide(s, denominator),
-                    Self::divide(d + s, denominator),
-                );
-                if a < b {
-                    increases[d as usize].push((s, b - a));
-                }
-            }
-        }
-        let mut decreases: Vec<Vec<(i32, i32)>> = vec![vec![]; (max_change + 1) as usize];
-        for d in 1..=max_change {
-            for s in d..=max_state {
-                let (a, b) = (
-                    Self::divide(s, denominator),
-                    Self::divide(s - d, denominator),
-                );
-                if a > b {
-                    decreases[d as usize].push((s, a - b));
-                }
-            }
-        }
-        let mut row_multipliers = vec![0i32; self.num_rows as usize];
+        workspace.prepare::<COVERING>(max_state, max_change, denominator, row_count, nwords);
+        let SearchWorkspace {
+            increases,
+            decreases,
+            row_multipliers,
+            states,
+            increased,
+            decreased,
+            in_cut,
+            active_rows,
+            ..
+        } = workspace;
         for (i, &r) in rows.iter().enumerate() {
             row_multipliers[r as usize] = multipliers[i];
         }
-        let mut states = vec![];
         compute_state_bitmap::<COVERING>(
-            &mut states,
+            states,
             max_state,
-            &row_multipliers,
+            row_multipliers,
             columns,
             &self.column_indices,
+            active_rows,
         );
         let byte_sum = |byte: usize, word: u64, j: usize| {
             self.byte_value_sums[byte][((word >> (8 * j)) & 0xff) as usize]
@@ -134,23 +122,20 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
             }
         }
         let use_neighbours = !COVERING && parent.packing_distances_defined;
-        let mut increased = vec![vec![0u64; nwords]; (max_rhs.max(0) + 1) as usize];
-        let mut decreased = increased.clone();
         loop {
-            let in_cut: Vec<usize> = (0..self.num_rows as usize)
-                .filter(|&r| row_multipliers[r] > 0)
-                .collect();
+            in_cut.clear();
+            in_cut.extend((0..self.num_rows as usize).filter(|&r| row_multipliers[r] > 0));
             if in_cut.is_empty() {
                 break;
             }
             let mut best = 0.0f64;
             let (mut best_in, mut best_out) = (-1i32, -1i32);
-            for &row_out in &in_cut {
+            for &row_out in in_cut.iter() {
                 let m_out = row_multipliers[row_out];
                 let mut mask: Bits = [0; 16];
                 if use_neighbours {
                     mask = [u64::MAX; 16];
-                    for &r in &in_cut {
+                    for &r in in_cut.iter() {
                         if r != row_out {
                             for (m, n) in mask.iter_mut().zip(&parent.neighbours_208[r]) {
                                 *m &= n;
@@ -187,22 +172,22 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                                 super::bitset::accumulate(
                                     bits,
                                     &changes[(c * step) as usize],
-                                    &states,
+                                    states,
                                     target,
                                 );
                             }
                         };
                     if delta > 0 {
-                        accumulate(row_out, row_in, delta, &decreases, &mut decreased);
-                        accumulate(row_in, row_out, delta, &increases, &mut increased);
+                        accumulate(row_out, row_in, delta, decreases, decreased);
+                        accumulate(row_in, row_out, delta, increases, increased);
                     } else {
-                        accumulate(row_out, row_in, -delta, &increases, &mut increased);
-                        accumulate(row_in, row_out, -delta, &decreases, &mut decreased);
+                        accumulate(row_out, row_in, -delta, increases, increased);
+                        accumulate(row_in, row_out, -delta, decreases, decreased);
                     }
                     let gain = super::gain::score(
                         &self.byte_value_sums,
-                        &increased,
-                        &decreased,
+                        increased,
+                        decreased,
                         nbytes,
                         max_rhs,
                     );
@@ -224,11 +209,12 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
             }
             row_multipliers.swap(best_out as usize, best_in as usize);
             compute_state_bitmap::<COVERING>(
-                &mut states,
+                states,
                 max_state,
-                &row_multipliers,
+                row_multipliers,
                 columns,
                 &self.column_indices,
+                active_rows,
             );
             lhs = lhs + best;
         }
@@ -286,7 +272,8 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                 });
                 let results: Vec<_> = starts
                     .into_par_iter()
-                    .map(|mut rows| {
+                    .with_min_len(4)
+                    .map_init(SearchWorkspace::default, |workspace, mut rows| {
                         let mut multipliers = numerators[..num_rows_cut as usize].to_vec();
                         let violation = self.run_local_search(
                             parent,
@@ -296,6 +283,7 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                             denominator,
                             rhs,
                             max_state,
+                            workspace,
                         );
                         (rows, multipliers, violation)
                     })
@@ -324,6 +312,7 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
         // which stay fixed across restarts of this class. Initialize lazily
         // so a search with no starts still performs no bound calculation.
         let mut max_state = None;
+        let mut workspace = SearchWorkspace::default();
         for _ in 0..self.num_iterations {
             let mut rows = self.build_start(parent, columns, numerators, denominator);
             let mut multipliers: Vec<i32> = numerators[..num_rows_cut as usize].to_vec();
@@ -337,6 +326,7 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                 denominator,
                 rhs,
                 max_state,
+                &mut workspace,
             );
             self.insert_result(
                 parent,
