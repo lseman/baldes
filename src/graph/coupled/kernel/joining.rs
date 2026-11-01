@@ -957,6 +957,7 @@ impl CoupledKernel {
 
 impl<const D: usize> Graph<D> {
     /// Replay exported recorder coordinates against every retained physical split.
+    #[cfg(feature = "clp")]
     pub(crate) fn recorded_paired_path_matching(
         &self,
         arcs: &[usize],

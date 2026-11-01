@@ -9,7 +9,6 @@ pub(crate) enum Stop {
     OverflowOnly,
     TimeLimit,
     NodeLimit,
-    Incomplete,
     Requested,
 }
 

@@ -217,6 +217,7 @@ pub struct WarmStart {
 }
 
 impl WarmStart {
+    #[cfg(feature = "clp")]
     pub(crate) fn empty(bound_mode: BoundMode) -> Self {
         Self {
             bound: f64::NEG_INFINITY,
@@ -337,6 +338,7 @@ impl Options {
 
 impl Options {
     /// Retain reusable controls while moving the owned continuation into a run.
+    #[cfg(feature = "clp")]
     pub(crate) fn take_continuation(&mut self) -> Self {
         let warm_start = self.warm_start.take();
         let known = std::mem::take(&mut self.known);
@@ -385,6 +387,7 @@ pub use controller::{Controller, NoController};
 mod driver;
 mod setup;
 pub use driver::optimize;
+#[cfg(feature = "clp")]
 pub(crate) use driver::optimize_with_log_context;
 mod enumeration;
 mod feasibility;

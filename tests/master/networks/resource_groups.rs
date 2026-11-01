@@ -397,14 +397,14 @@ fn shared_group_fixed_copies_and_infeasible_descendants_are_isolated() {
         .with_resource_group_branch(0, 4, 1.5, true, &members)
         .unwrap();
     optimal(&upper.solve(options()).unwrap(), 4.);
-    let incompatible = fixed
+    let _incompatible = fixed
         .with_resource_group_branch(0, 4, 1.5, true, &members)
         .unwrap()
         .enumerate(&EnumerationOptions::default())
         .unwrap();
     #[cfg(feature = "highs")]
     assert_eq!(
-        incompatible
+        _incompatible
             .solve_enumerated_mip(&Default::default())
             .unwrap()
             .unwrap()
@@ -412,14 +412,14 @@ fn shared_group_fixed_copies_and_infeasible_descendants_are_isolated() {
             .status,
         baldes::master::solvers::mip::MipStatus::Infeasible
     );
-    let impossible = lower
+    let _impossible = lower
         .with_resource_group_branch(0, 4, 3., true, &members)
         .unwrap()
         .enumerate(&EnumerationOptions::default())
         .unwrap();
     #[cfg(feature = "highs")]
     assert_eq!(
-        impossible
+        _impossible
             .solve_enumerated_mip(&Default::default())
             .unwrap()
             .unwrap()
@@ -974,14 +974,14 @@ fn rounded_compatible_profiles_cannot_hide_an_exact_fixed_resource_contradiction
                 .enumerate(&EnumerationOptions::default())
                 .unwrap()
         };
-        let child = source
+        let _child = source
             .with_resource_group_branch(0, 4, 1e16 + 4., true, &members)
             .unwrap()
             .enumerate(&EnumerationOptions::default())
             .unwrap();
         #[cfg(feature = "highs")]
         assert_eq!(
-            child
+            _child
                 .solve_enumerated_mip(&Default::default())
                 .unwrap()
                 .unwrap()

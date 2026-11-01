@@ -106,6 +106,7 @@ impl BucketGraph {
 
     /// Give this grid its own lineage, so tree workers never observe each
     /// other's step decreases.
+    #[cfg(any(feature = "clp", test))]
     pub(crate) fn detach_step_versions(&mut self) {
         self.versions = Arc::new(StepVersions {
             next: AtomicI32::new(self.versions.next.load(Ordering::Relaxed)),

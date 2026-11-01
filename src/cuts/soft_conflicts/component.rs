@@ -80,6 +80,7 @@ impl Eq for Class {}
 
 impl PresenceRow {
     /// Replay an ordered physical-event stream without assuming monotonicity.
+    #[cfg(feature = "clp")]
     pub(crate) fn coefficient_for_events(
         &self,
         events: impl IntoIterator<Item = usize>,
@@ -98,6 +99,7 @@ impl PresenceRow {
         self.coefficient(&state)
     }
 
+    #[cfg(feature = "clp")]
     pub(crate) fn replay_work(&self, events: usize) -> Option<usize> {
         if let Some(class) = &self.component {
             events

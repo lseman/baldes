@@ -195,12 +195,6 @@ impl AccumulatedResourceGroupBranch {
             violation
         }
     }
-    pub(crate) fn same_split(&self, other: &Self) -> bool {
-        self.packing_row == other.packing_row
-            && self.arcs == other.arcs
-            && self.resource == other.resource
-            && self.boundary() == other.boundary()
-    }
 }
 
 #[cfg(test)]

@@ -1,5 +1,4 @@
 use baldes::enumeration::{Controls, Enumeration};
-use baldes::inputs::{Instance, Rounding};
 use baldes::pricing::Solver;
 
 #[test]

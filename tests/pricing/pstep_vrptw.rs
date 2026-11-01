@@ -1,4 +1,5 @@
 use baldes::extensions::pstep::*;
+#[cfg(feature = "clp")]
 use baldes::master::{LpMaster, RowSense};
 use baldes::Result;
 
@@ -159,9 +160,11 @@ fn vrptw_cg_matches_full_pool_and_independent_route_lp() -> Result<()> {
         let mut lp = pool.into_master(ClpMaster::new()?)?;
         assert!(lp.solve());
         assert!((lp.objective() - 4.0).abs() < 1e-7);
-        let mut methods = vec![PricingMethod::Enumeration];
-        #[cfg(feature = "cuda")]
-        methods.push(PricingMethod::Cuda);
+        let methods = [
+            PricingMethod::Enumeration,
+            #[cfg(feature = "cuda")]
+            PricingMethod::Cuda,
+        ];
         for method in methods {
             let result = problem.solve_column_generation(
                 ClpMaster::new()?,
@@ -302,9 +305,11 @@ fn cvrp_column_generation_still_matches_full_pool() -> Result<()> {
         })?;
         let mut lp = pool.into_master(ClpMaster::new()?)?;
         assert!(lp.solve());
-        let mut methods = vec![PricingMethod::Enumeration];
-        #[cfg(feature = "cuda")]
-        methods.push(PricingMethod::Cuda);
+        let methods = [
+            PricingMethod::Enumeration,
+            #[cfg(feature = "cuda")]
+            PricingMethod::Cuda,
+        ];
         for method in methods {
             let result = problem.solve_column_generation(
                 ClpMaster::new()?,

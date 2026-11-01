@@ -8,6 +8,7 @@ mod paired;
 use crate::core::rounding::{add_down, add_up, multiply_down};
 use std::time::Instant;
 
+#[cfg(any(feature = "clp", test))]
 const DEFAULT_CERTIFICATE_WORK: usize = 1_000_000;
 
 fn debit(work: &mut usize, amount: usize, deadline: Option<Instant>) -> Option<()> {
@@ -21,6 +22,7 @@ fn debit(work: &mut usize, amount: usize, deadline: Option<Instant>) -> Option<(
 /// Outward image of the accepted encoded arguments, sharing the caller's proof
 /// budget. `None` is unknown or unavailable, never a global emptiness proof.
 /// Route feasibility callers must separately prove full argument acceptance.
+#[cfg(feature = "clp")]
 pub(super) fn encoded_image(
     function: &crate::graph::coupled::EncodedFunction,
     argument: bounds::Range,
@@ -121,6 +123,7 @@ impl CoupledKernel {
 
     /// A rigorously feasible/infeasible path and an outward objective interval.
     /// Arithmetic failure or a boundary-straddling interval remains unknown.
+    #[cfg(any(feature = "clp", test))]
     pub(crate) fn certify(&self, arcs: &[usize]) -> Option<(bool, [f64; 2])> {
         let mut work = DEFAULT_CERTIFICATE_WORK;
         self.certify_with_budget(arcs, &mut work, None)

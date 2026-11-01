@@ -1089,9 +1089,7 @@ fn solve_split<const D: usize>(
     )?;
     match stop {
         crate::master::tree::Stop::Exhausted => result.status = TreeStatus::Optimal,
-        crate::master::tree::Stop::OverflowOnly | crate::master::tree::Stop::Incomplete => {
-            result.status = TreeStatus::Incomplete
-        }
+        crate::master::tree::Stop::OverflowOnly => result.status = TreeStatus::Incomplete,
         crate::master::tree::Stop::NodeLimit => result.status = TreeStatus::NodeLimit,
         crate::master::tree::Stop::TimeLimit => result.status = TreeStatus::TimeLimit,
         crate::master::tree::Stop::Requested => {}

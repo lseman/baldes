@@ -133,10 +133,12 @@ mod tests;
 /// Isolated GNU libc `rand()` sequence used by recovered master heuristics.
 /// This preserves native draws without mutating the process-global C RNG.
 #[derive(Clone, Debug)]
+#[cfg(any(feature = "clp", test))]
 pub(crate) struct GnuRand {
     state: [u32; 31],
     cursor: usize,
 }
+#[cfg(any(feature = "clp", test))]
 impl GnuRand {
     pub(crate) fn new(seed: u32) -> Self {
         let seed = if seed == 0 { 1 } else { seed };

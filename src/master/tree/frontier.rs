@@ -455,6 +455,7 @@ impl<N: NodeInfo, E: Evaluation> TreeFrontier<N, E> {
             } => primary.len() + overflow.len(),
         }
     }
+    #[cfg(test)]
     pub(crate) fn iter(&self) -> impl Iterator<Item = &QueuedNode<N, E>> {
         let (primary, overflow) = match self {
             Self::BestBound {

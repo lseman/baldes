@@ -36,6 +36,7 @@ impl<T, P: Priority<T>> Frontier<T, P> {
     pub fn len(&self) -> usize {
         self.nodes.len()
     }
+    #[cfg(test)]
     pub fn iter(&self) -> std::slice::Iter<'_, T> {
         self.nodes.iter()
     }

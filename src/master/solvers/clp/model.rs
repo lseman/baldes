@@ -211,6 +211,7 @@ impl ClpMaster {
     /// Reuse a preceding solve when deleting its trailing rows/columns gives
     /// this exact ordered matrix and costs. Bounds remain those of this model.
     /// Returns false without changing either model when they do not match.
+    #[cfg(test)]
     pub(crate) fn continue_from(&mut self, previous: &Self) -> Result<bool> {
         let rows = self.rhs.len();
         let columns = self.costs.len();

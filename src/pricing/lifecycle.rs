@@ -3,6 +3,7 @@ use super::*;
 
 impl<const D: usize> Solver<D> {
     /// Geometry of the objective used by the most recent functor search.
+    #[cfg(any(feature = "clp", test))]
     pub(crate) fn pricing_engine(&self) -> Option<&LabelingEngine<D>> {
         self.raw_pricing
             .as_ref()

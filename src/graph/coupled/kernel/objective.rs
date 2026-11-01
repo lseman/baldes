@@ -123,6 +123,7 @@ impl<const D: usize> Graph<D> {
 mod tests;
 
 impl CoupledKernel {
+    #[cfg(feature = "clp")]
     pub(crate) fn paired_associated_costs(&self) -> &[(usize, f64)] {
         &self.paired_associated_costs
     }
@@ -131,6 +132,7 @@ impl CoupledKernel {
 impl<const D: usize> Graph<D> {
     /// Retain original associated-variable coefficients without modifying the
     /// paired machine program's unit resource charge.
+    #[cfg(feature = "clp")]
     pub(crate) fn set_paired_associated_costs(&mut self, costs: &[(usize, f64)]) -> Result<()> {
         let kernel = self
             .coupled
@@ -161,6 +163,7 @@ impl<const D: usize> Graph<D> {
 }
 
 impl CoupledKernel {
+    #[cfg(feature = "clp")]
     pub(crate) fn owner_registration_bound_is_unsupported([lower, upper]: [f64; 2]) -> bool {
         let active = upper == f64::INFINITY || upper - (1e-10 * upper.abs() + 1e-6) > 0.;
         active && lower - (1e-10 * lower.abs().max(1e-6) + 1e-6) > 1e-6

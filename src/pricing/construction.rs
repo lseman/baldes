@@ -68,6 +68,7 @@ impl<const D: usize> Solver<D> {
         }
     }
     /// Separate this fork's step versions from the tree it was taken from.
+    #[cfg(feature = "clp")]
     pub(crate) fn detach_step_versions(&mut self) {
         if let Some(engine) = &mut self.engine {
             engine.grid.detach_step_versions();

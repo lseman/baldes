@@ -86,7 +86,7 @@ impl Model for Hooks {
             let entry = entry.unwrap();
             frontier.push_evaluated(entry.node, entry.parent_branch_order, None)?;
             return Ok(Decision::Stop {
-                reason: Stop::Incomplete,
+                reason: Stop::Requested,
                 restore_ready: true,
             });
         }
@@ -132,7 +132,7 @@ fn interrupted_batch_restores_current_and_ready_nodes_for_open_bound_accounting(
     }
     assert_eq!(
         run(&mut hooks, &mut frontier, None).unwrap(),
-        Stop::Incomplete
+        Stop::Requested
     );
     assert_eq!(hooks.evaluated, vec![0, 1]);
     assert_eq!(frontier.len(), 2);

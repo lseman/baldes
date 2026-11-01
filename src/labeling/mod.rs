@@ -101,6 +101,7 @@ pub struct Route {
 impl Route {
     /// Match a selected paired value against the retained split joins.
     /// Full physical/scalar/other-resource feasibility is checked separately.
+    #[cfg(feature = "clp")]
     pub(crate) fn selected_values_match<const D: usize>(
         &self,
         graph: &Graph<D>,
@@ -128,6 +129,7 @@ impl Route {
         Ok(graph.coupled_paired_values(positions)? == self.coupled_values)
     }
 
+    #[cfg(feature = "clp")]
     pub(crate) fn coupled_cost<const D: usize>(
         &self,
         graph: &Graph<D>,
@@ -155,6 +157,7 @@ impl Route {
         graph.coupled_route_cost(positions)
     }
 
+    #[cfg(any(feature = "clp", test))]
     pub(crate) fn identity(&self) -> String {
         use std::fmt::Write;
         let capacity =

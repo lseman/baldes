@@ -1,3 +1,5 @@
+#![cfg(feature = "clp")]
+
 use baldes::extensions::stochastic::{Demand, Policy, Problem};
 
 fn problem() -> Problem {

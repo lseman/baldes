@@ -1,26 +1,9 @@
 //! Variable-cost caching and route bound correction.
 use super::*;
 impl<const D: usize> Solver<D> {
-    /// Install a cached arc objective while retaining the actual raw arc
-    /// objective. Base graph costs and model variable associations are intact.
-    pub(crate) fn cache_arc_costs(&mut self, raw: &[f64], cached: &[f64]) -> Result<()> {
-        if raw.len() != self.graph.arcs.len()
-            || cached.len() != raw.len()
-            || raw.iter().chain(cached).any(|v| !v.is_finite())
-        {
-            return Err(invalid("arc pricing cache domain"));
-        }
-        for (arc, &cost) in self.graph.arcs.iter_mut().zip(cached) {
-            arc.reduced_cost = cost;
-        }
-        self.variable_costs.clear();
-        let raw_costs = self.raw_arc_costs.get_or_insert_with(Vec::new);
-        raw_costs.clear();
-        raw_costs.extend_from_slice(raw);
-        Ok(())
-    }
     /// MP retains a one-to-one raw physical variable representation, while its
     /// cached heuristic objective may be rounded in original-variable space.
+    #[cfg(any(feature = "clp", test))]
     pub(crate) fn cache_physical_costs(&mut self, raw: &[f64], cached: &[f64]) -> Result<()> {
         if cached.len() != self.graph.arcs.len()
             || cached.iter().any(|c| !c.is_finite())

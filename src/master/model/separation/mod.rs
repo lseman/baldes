@@ -167,8 +167,6 @@ pub(super) struct CutState {
     pub(super) resolved_memory_type: Option<crate::cuts::MemoryType>,
     /// Whether this node's cut generation stopped at the lowest priority due to tailing off.
     pub(super) stopped_by_tailing_off: bool,
-    /// Vertices with a unit cover row, in row order.
-    customers: Vec<usize>,
     /// Per network (oracle order): its vertex of each packing row. Several
     /// networks share rank-one cuts over the same packing rows.
     network_customers: Vec<Vec<usize>>,
@@ -396,15 +394,6 @@ pub(super) fn remap_rows<const D: usize>(
         keep
     });
     Ok(())
-}
-
-/// Vertices covered by a unit equality row through every arc entering them,
-/// in row order, or None when the network rows are not a vertex partition.
-fn partition_customers<const D: usize>(
-    rows: &[Row],
-    network: &OracleNetwork<D>,
-) -> Option<Vec<usize>> {
-    partition_rows(rows, network).map(|pairs| pairs.into_iter().map(|(_, v)| v).collect())
 }
 
 /// The network's (packing row, vertex) pairs in row order.
@@ -671,7 +660,6 @@ pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -
             options: separation.rank_one.clone(),
             resolved_memory_type: None,
             stopped_by_tailing_off: false,
-            customers,
             lead_maps,
             network_customers,
             rows: vec![],

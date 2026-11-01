@@ -301,9 +301,12 @@ fn continuation_rejects_a_different_model_without_mutation() {
 
 #[test]
 fn per_model_column_infinity_default_survives_clones_and_solver_switches() {
-    let mut solvers = vec![MasterSolver::Clp, MasterSolver::Ipm];
-    #[cfg(feature = "highs")]
-    solvers.push(MasterSolver::Highs);
+    let solvers = [
+        MasterSolver::Clp,
+        MasterSolver::Ipm,
+        #[cfg(feature = "highs")]
+        MasterSolver::Highs,
+    ];
     for solver in solvers {
         let mut parent = ClpMaster::new().unwrap();
         parent.set_column_default_upper(f64::MAX).unwrap();

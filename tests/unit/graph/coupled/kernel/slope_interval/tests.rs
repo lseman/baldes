@@ -262,7 +262,7 @@ fn parallel_prefixes(
         .unwrap();
     let kernel = graph.coupled_kernel().unwrap();
     let root = kernel.root(true);
-    let mut prefix = |arc: usize| {
+    let prefix = |arc: usize| {
         let mut state = kernel.extend(&root, arc, true).unwrap().unwrap().0;
         state
             .account_extension(&root, costs[arc], costs[arc])
@@ -411,7 +411,7 @@ fn phase_i_raw_fronts_dominate_by_domain_coverage() {
     let mut kernel = graph.coupled_kernel().unwrap().clone();
     kernel.suppress_costs();
     let root = kernel.root(true);
-    let mut prefix = |arc| {
+    let prefix = |arc| {
         let mut state = kernel.extend(&root, arc, true).unwrap().unwrap().0;
         state.account_extension(&root, 0., 0.).unwrap();
         state

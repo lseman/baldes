@@ -3,12 +3,9 @@ use super::imported_multiple_tests::{bounds, column, fixture};
 use super::*;
 use baldes::master::tree::ModelTreeOptions;
 use baldes::master::tree::TreeStatus;
-use model::{
-    imported::{
-        self, Column, ColumnBatch, ImportOptions, ImportOracleReply, ImportPricing,
-        ImportPricingKind, ImportPricingMinimum,
-    },
-    MasterVariable,
+use model::imported::{
+    self, Column, ColumnBatch, ImportOptions, ImportOracleReply, ImportPricing, ImportPricingKind,
+    ImportPricingMinimum,
 };
 use std::time::Duration;
 fn configured(mode: BoundMode) -> ModelTreeOptions {

@@ -1,8 +1,15 @@
 //! Mean-demand HGS proposals, independently checked against stochastic recourse.
+#[cfg(any(feature = "clp", test))]
 use super::{Policy, Problem};
-use crate::extensions::hgs::driver::{run_hgs_collecting_routes, HgsOptions, HgsResult};
+#[cfg(any(feature = "clp", test))]
+use crate::extensions::hgs::driver::HgsResult;
+#[cfg(feature = "clp")]
+use crate::extensions::hgs::driver::{run_hgs_collecting_routes, HgsOptions};
+#[cfg(feature = "clp")]
 use crate::inputs::{Customer, Instance, Rounding};
+#[cfg(feature = "clp")]
 use crate::{invalid, Result};
+#[cfg(any(feature = "clp", test))]
 use std::collections::BTreeSet;
 use std::time::Duration;
 
@@ -28,12 +35,15 @@ pub struct HgsWarmStartSummary {
 }
 
 /// Internal validated HGS plan; no separate stochastic search implementation.
+#[cfg(any(feature = "clp", test))]
 pub(super) struct SeedSolution {
     pub routes: Vec<Vec<usize>>,
     pub total_cost: f64,
 }
 
+#[cfg(any(feature = "clp", test))]
 impl Problem {
+    #[cfg(feature = "clp")]
     pub(super) fn hgs_seed(
         &self,
         policy: Policy,
@@ -107,6 +117,7 @@ impl Problem {
         Ok(self.validate_hgs_result(policy, vehicles, found))
     }
 
+    #[cfg(any(feature = "clp", test))]
     fn validate_hgs_result(
         &self,
         policy: Policy,

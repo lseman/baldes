@@ -96,6 +96,7 @@ pub(super) fn infeasible<const D: usize>(
 /// unknown certificates keep it in the relaxation. Coupled objective costs are
 /// bounded separately by the caller and are never added to these arc weights.
 /// Exhaustion returns unknown, never the minimum of a partially visited domain.
+#[cfg(test)]
 pub(super) fn dag_minimum<const D: usize>(
     graph: &Graph<D>,
     weights: &[f64],
