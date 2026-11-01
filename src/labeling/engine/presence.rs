@@ -16,6 +16,19 @@ impl<const D: usize> LabelingEngine<D> {
         self.full_ready = false;
         Ok(())
     }
+    pub(crate) fn presence_inputs(&self) -> &[PricingInput] {
+        self.cuts.presence.inputs()
+    }
+
+    /// Reprice the retained shape, invalidating all objective-dependent labels.
+    pub(crate) fn set_presence_duals(&mut self, g: &Graph<D>, duals: &[f64]) -> Result<()> {
+        self.cuts.presence.validate_duals(g.arcs.len(), duals)?;
+        self.cuts.presence.assign_duals(duals);
+        self.coupled_completion = std::array::from_fn(|_| Default::default());
+        self.half_ready = false;
+        self.full_ready = false;
+        Ok(())
+    }
 }
 
 impl<const D: usize> Context<'_, D> {

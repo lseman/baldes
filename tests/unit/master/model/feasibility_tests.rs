@@ -188,7 +188,7 @@ fn without_route_columns(root: &Output<2>) -> (ClpMaster, cg::WarmStart) {
         .iter()
         .filter_map(|&(r, c)| Some((r, map[c]?)))
         .collect();
-    (master, warm)
+    (master, warm.into_owned())
 }
 
 #[test]

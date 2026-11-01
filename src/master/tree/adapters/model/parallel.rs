@@ -8,7 +8,7 @@ use rayon::prelude::*;
 
 pub(super) struct SnapshotTransfer<const D: usize> {
     master: MasterTransfer,
-    warm: cg::WarmStart,
+    warm: RetainedWarmStart,
     state: State<D>,
 }
 

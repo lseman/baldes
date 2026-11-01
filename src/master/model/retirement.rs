@@ -272,6 +272,22 @@ pub(super) fn apply<const D: usize>(
     options: &mut cg::Options,
     work_limit: usize,
 ) -> Result<()> {
+    apply_to_metadata(
+        master,
+        state,
+        &mut options.known,
+        options.warm_start.as_mut(),
+        work_limit,
+    )
+}
+
+pub(super) fn apply_to_metadata<const D: usize, W: WarmMetadata>(
+    master: &mut ClpMaster,
+    state: &mut State<D>,
+    known: &mut [cg::Column],
+    warm: Option<&mut W>,
+    work_limit: usize,
+) -> Result<()> {
     state.preprocessing.retired_rows = state.retired_rows.iter().copied().collect();
     state.preprocessing.retired_rows.sort_unstable();
     if state.preprocessing.skipped.is_some()
@@ -354,22 +370,24 @@ pub(super) fn apply<const D: usize>(
             }
         }
         if !oracle.presence_rows.is_empty() {
-            let mut inputs = oracle.solver.presence_rows().to_vec();
+            let mut prices: Vec<_> = oracle
+                .solver
+                .presence_rows()
+                .iter()
+                .map(|r| r.dual)
+                .collect();
             for &(input, row) in &oracle.presence_rows {
                 if removed.contains(&(state.shared_offset + row)) {
-                    inputs[input].dual = 0.;
+                    prices[input] = 0.;
                 }
             }
-            oracle.solver.set_presence_rows(inputs)?;
+            oracle.solver.set_presence_duals(&prices)?;
         }
     }
     // Artificial columns are identified by ownership metadata, never by cost.
-    let artificials: HashSet<_> = options
-        .warm_start
-        .as_ref()
-        .map_or_else(HashSet::new, |warm| {
-            warm.artificials.iter().copied().collect()
-        });
+    let artificials: HashSet<_> = warm.as_ref().map_or_else(HashSet::new, |warm| {
+        warm.artificials().iter().copied().collect()
+    });
     for column in 0..master.costs.len() {
         let coefficients = master.column_entries(column)?;
         if artificials.contains(&column) && coefficients.iter().any(|(r, _)| removed.contains(r)) {
@@ -387,19 +405,20 @@ pub(super) fn apply<const D: usize>(
             role.active = false;
         }
     }
-    for column in &mut options.known {
+    for column in known {
         project(state, &mut column.entries);
     }
-    if let Some(warm) = &mut options.warm_start {
-        for column in warm
-            .columns
-            .iter_mut()
-            .flatten()
-            .chain(warm.generated_pool.iter_mut())
-        {
-            project(state, &mut column.entries);
-        }
-        warm.stabilization = None;
+    if let Some(warm) = warm {
+        warm.edit_columns(
+            |column| {
+                column
+                    .entries
+                    .iter()
+                    .any(|(row, _)| state.retired_rows.contains(row))
+            },
+            |column| project(state, &mut column.entries),
+        );
+        warm.clear_stabilization();
         warm.clear_proximal();
     }
     state.gradient = None;

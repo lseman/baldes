@@ -31,6 +31,8 @@ mod enumeration;
 pub mod format;
 mod gap_enumeration;
 pub mod imported;
+mod warm_start;
+use warm_start::{RetainedWarmStart, WarmMetadata};
 mod lifecycle;
 mod nonlinear;
 mod presence_rows;
@@ -334,6 +336,10 @@ struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     grouped_variable_boxes: HashMap<i32, grouped_boxes::PreparedBox>,
     original_variable_costs: Arc<Vec<OriginalVariableCosts>>,
     pricing_master: Option<(f64, f64)>,
+    /// Reusable per-solve scratch; forks start with empty work buffers.
+    pricing_duals: Vec<f64>,
+    pricing_rhs: Vec<f64>,
+    pricing_order_scratch: Vec<usize>,
     pricing_gap: (f64, f64),
     previous_fixing_gap: f64,
     gap_enumeration: bool,

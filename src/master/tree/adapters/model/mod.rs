@@ -1012,8 +1012,7 @@ fn solve_split<const D: usize>(
         Start::Snapshot(mut node) => {
             node.state.mapped_lineage = 0;
             if options.greedy {
-                let mut prepared = configured.clone();
-                prepared.cg.known = node.warm.columns.iter().filter_map(Clone::clone).collect();
+                let prepared = configured.clone();
                 greedy::run(
                     &node.master,
                     &node.state,

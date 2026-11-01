@@ -182,3 +182,43 @@ fn installing_owned_presence_invalidates_only_the_childs_retained_universe() {
             < 1e-12
     );
 }
+
+#[test]
+fn dual_only_updates_are_atomic_and_match_full_replacement() {
+    for bidirectional in [false, true] {
+        let (g, events) = fixtures(false);
+        let mut fast = owned_solver(g.clone(), bidirectional);
+        let rows = input(&g, &events, Mode::PairCount, 0.7);
+        fast.set_presence_rows(rows.clone()).unwrap();
+        fast.cache_variable_costs(&g.arcs.iter().map(|a| a.cost).collect::<Vec<_>>())
+            .unwrap();
+        fast.price_functor_phase(0, 150).unwrap();
+        let descriptor = fast.presence_rows()[0].arc_events.as_ptr();
+        for bad in [vec![], vec![f64::NAN, -0.2], vec![f64::MAX, -0.2]] {
+            assert!(fast.set_presence_duals(&bad).is_err());
+            assert_eq!(fast.presence_rows(), rows);
+            assert_eq!(fast.presence_rows()[0].arc_events.as_ptr(), descriptor);
+        }
+        let mut full = owned_solver(g.clone(), bidirectional);
+        for dual in [0.7, -0.625, 0.125, 0.125] {
+            fast.set_presence_duals(&[dual, -0.2]).unwrap();
+            assert_eq!(fast.presence_rows()[0].arc_events.as_ptr(), descriptor);
+            full.set_presence_rows(input(&g, &events, Mode::PairCount, dual))
+                .unwrap();
+            let expected = full
+                .price_phase(0, 150, false)
+                .unwrap()
+                .minimum_reduced_cost;
+            let actual = fast
+                .price_phase(0, 150, false)
+                .unwrap()
+                .minimum_reduced_cost;
+            assert!((actual - expected).abs() < 1e-10);
+            let raw = fast
+                .price_functor_phase(0, 150)
+                .unwrap()
+                .minimum_reduced_cost;
+            assert!((raw - expected).abs() < 1e-10);
+        }
+    }
+}

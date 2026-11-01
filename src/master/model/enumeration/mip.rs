@@ -11,7 +11,7 @@ use super::*;
 fn integer_encoding_error<const D: usize>(
     state: &State<D>,
     master: &ClpMaster,
-    columns: &[Option<cg::Column>],
+    columns: &[Option<super::super::warm_start::RetainedColumn>],
     deadline: Instant,
 ) -> Result<f64> {
     use crate::master::numerics::ExactSum;
@@ -346,7 +346,7 @@ impl<const D: usize> NodeSnapshot<D> {
                     identity: format!("{}:{}", route.network, route.route.identity()),
                 };
                 master.add_column(metadata.cost, &metadata.entries)?;
-                columns.push(Some(metadata));
+                columns.push(Some(metadata.into()));
             }
             for (column, metadata) in columns.iter().enumerate() {
                 if let Some(metadata) = metadata {

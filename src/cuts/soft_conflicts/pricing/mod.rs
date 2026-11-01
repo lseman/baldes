@@ -35,6 +35,21 @@ impl PresencePricing {
     }
 
     pub(crate) fn validate_engine(&self, arcs: usize) -> Result<()> {
+        self.validate_dual_values(arcs, self.rows.iter().map(|row| row.dual))
+    }
+
+    pub(crate) fn validate_duals(&self, arcs: usize, duals: &[f64]) -> Result<()> {
+        self.validate_dual_values(arcs, duals.iter().copied())
+    }
+
+    fn validate_dual_values(
+        &self,
+        arcs: usize,
+        duals: impl ExactSizeIterator<Item = f64>,
+    ) -> Result<()> {
+        if duals.len() != self.rows.len() {
+            return Err(invalid("presence pricing dual count"));
+        }
         if !self.active() {
             return Ok(());
         }
@@ -42,13 +57,16 @@ impl PresencePricing {
             return Err(invalid("presence pricing graph arc count"));
         }
         let mut total = 0.;
-        for input in &self.rows {
+        for (input, dual) in self.rows.iter().zip(duals) {
+            if !dual.is_finite() {
+                return Err(invalid("soft-conflict pricing mapping or dual"));
+            }
             let maximum = u64::try_from(input.row.maximum_coefficient())
                 .map_err(|_| invalid("presence pricing coefficient range"))?;
             if maximum > (1_u64 << 53) {
                 return Err(invalid("presence pricing coefficient range"));
             }
-            let term = crate::core::rounding::multiply_down(-input.dual.abs(), maximum as f64)
+            let term = crate::core::rounding::multiply_down(-dual.abs(), maximum as f64)
                 .map(|n| -n)
                 .ok_or_else(|| invalid("presence pricing numerical range"))?;
             total = crate::core::rounding::add_up(total, term)
@@ -60,6 +78,14 @@ impl PresencePricing {
             return Err(invalid("presence pricing numerical range"));
         }
         Ok(())
+    }
+
+    /// The caller validates the entire price vector before changing any cache.
+    pub(crate) fn assign_duals(&mut self, duals: &[f64]) {
+        debug_assert_eq!(duals.len(), self.rows.len());
+        for (row, &dual) in self.rows.iter_mut().zip(duals) {
+            row.dual = dual;
+        }
     }
 
     pub(crate) fn inputs(&self) -> &[PricingInput] {

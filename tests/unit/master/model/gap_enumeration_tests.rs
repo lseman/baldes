@@ -284,7 +284,11 @@ fn cg_post_install_handoff_retains_a_validated_original_incumbent() {
         checkpoints: CheckpointStore::default(),
     };
     controller
-        .enumeration_installed(&master, &warm.columns, &warm.artificials)
+        .enumeration_installed(
+            &master,
+            &warm.clone().into_owned().columns,
+            &warm.artificials,
+        )
         .unwrap();
     assert_eq!(state.borrow().pricing_witness.as_ref().unwrap().0, 1.);
     for column in warm

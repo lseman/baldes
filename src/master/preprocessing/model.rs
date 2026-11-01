@@ -273,17 +273,15 @@ impl<const D: usize> NodeSnapshot<D> {
             &mut vec![],
             Some(&mut node.warm),
         )?;
-        let mut cg = cg::Options::default();
-        cg.warm_start = Some(node.warm);
         if options.enabled {
-            super::retirement::apply(
+            super::retirement::apply_to_metadata(
                 &mut node.master,
                 &mut node.state,
-                &mut cg,
+                &mut [],
+                Some(&mut node.warm),
                 options.work_limit,
             )?;
         }
-        node.warm = cg.warm_start.take().unwrap();
         Ok(node)
     }
 }

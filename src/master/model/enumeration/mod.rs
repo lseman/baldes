@@ -68,9 +68,9 @@ impl<const D: usize> NodeSnapshot<D> {
             .checked_add(options.time_limit)
             .ok_or_else(|| invalid("enumeration time limit"))?;
         let mut cg = cg::Options::default();
-        cg.warm_start = Some(node.warm);
+        cg.warm_start = Some(node.warm.into_owned());
         transfer(&mut node.master, &mut node.state, &mut cg, options)?;
-        node.warm = cg.warm_start.unwrap();
+        node.warm = cg.warm_start.unwrap().into();
         Ok(node)
     }
 }

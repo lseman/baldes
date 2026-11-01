@@ -106,7 +106,7 @@ impl<const D: usize> NodeSnapshot<D> {
             return Err(incomplete("cutoff enumeration TimeLimit"));
         }
         let mut cg = cg::Options::default();
-        cg.warm_start = Some(node.warm);
+        cg.warm_start = Some(node.warm.into_owned());
         node.state.enumeration_report.attempts += 1;
         install_collected_with(
             &mut node.master,
@@ -122,7 +122,7 @@ impl<const D: usize> NodeSnapshot<D> {
             },
             Instant::now,
         )?;
-        node.warm = cg.warm_start.unwrap();
+        node.warm = cg.warm_start.unwrap().into();
         if !node.state.enumeration_report.complete
             || node.state.enumeration_report.failure.is_some()
         {

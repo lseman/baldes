@@ -40,7 +40,7 @@ fn backend_failure_after_private_insertion_preserves_checkpoint_and_retry() {
     let tags = node.state.tags.clone();
     let caps = node.state.route_upper_bounds.clone();
     let mut configured = cg::Options {
-        warm_start: Some(node.warm.clone()),
+        warm_start: Some(node.warm.clone().into_owned()),
         ..Default::default()
     };
     let mut inserted = 0;

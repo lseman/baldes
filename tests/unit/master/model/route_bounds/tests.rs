@@ -249,8 +249,8 @@ fn physical_path_aliases_cannot_restore_an_independent_column_cap() {
         tag: tag as i32,
         identity: format!("alias:{tag}"),
     };
-    node.warm.columns.push(Some(metadata.clone()));
-    node.warm.generated_pool.push(metadata);
+    node.warm.columns.push(Some(metadata.clone().into()));
+    node.warm.generated_pool.push(metadata.into());
     Arc::make_mut(&mut node.state.routes).push(alias);
     let complete = node.enumerate(&EnumerationOptions::default()).unwrap();
     assert_eq!(complete.master.upper[column], 0.);

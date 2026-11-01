@@ -149,9 +149,9 @@ fn load<const D: usize>(node: &mut NodeSnapshot<D>, routes: &[FixedRoute]) -> Re
             let column = node.master.add_column(metadata.cost, &metadata.entries)?;
             debug_assert_eq!(column, node.warm.columns.len());
             node.master.set_upper(column, cap.min(f64::MAX))?;
-            node.warm.columns.push(Some(metadata.clone()));
+            node.warm.columns.push(Some(metadata.clone().into()));
             node.warm.generated_pool.retain(|known| known.tag != tag);
-            node.warm.generated_pool.push(metadata);
+            node.warm.generated_pool.push(metadata.into());
         }
         if fixed.quantity > cap {
             return Ok(false);

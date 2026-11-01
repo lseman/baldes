@@ -10,7 +10,7 @@ use std::time::Duration;
 pub(super) fn recover<const D: usize>(
     original: &Rc<RefCell<State<D>>>,
     master: &ClpMaster,
-    warm: &cg::WarmStart,
+    warm: &impl WarmMetadata,
     remaining: Duration,
     iterations: usize,
     tolerance: f64,
@@ -130,10 +130,10 @@ pub(super) fn recover<const D: usize>(
     let mut private = master.try_clone()?;
     private.objective_offset = 0.;
     let old_artificial: HashSet<_> = warm
-        .artificials
+        .artificials()
         .iter()
         .copied()
-        .chain(warm.cut_artificials.iter().map(|&(_, c)| c))
+        .chain(warm.cut_artificials().iter().map(|&(_, c)| c))
         .collect();
     for column in 0..private.costs.len() {
         private.set_cost(column, 0.)?;
@@ -158,7 +158,7 @@ pub(super) fn recover<const D: usize>(
         }
     }
     let mut recovered_tags = vec![];
-    let mut seen: HashSet<_> = warm.columns.iter().flatten().map(|c| c.tag).collect();
+    let mut seen = warm.loaded_tags();
     // Known but currently inactive routes remain part of a complete universe.
     // A capped route has its semantic cap restored when inserted here.
     for _ in 0..iterations {

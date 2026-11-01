@@ -214,6 +214,9 @@ pub(super) fn prepare_with_seed_routes<const D: usize>(
         grouped_variable_boxes: HashMap::new(),
         original_variable_costs: options.original_variable_costs.clone(),
         pricing_master: None,
+        pricing_duals: vec![],
+        pricing_rhs: vec![],
+        pricing_order_scratch: vec![],
         pricing_gap: (options.cg.gap_absolute, options.cg.gap_relative),
         previous_fixing_gap: 1e12,
         gap_enumeration: options.gap_enumeration,
@@ -878,7 +881,7 @@ fn execute_node_cg<const D: usize>(
                 .collect(),
             snapshot: NodeSnapshot {
                 master,
-                warm: result.warm_start.clone(),
+                warm: result.warm_start.clone().into(),
                 state,
             },
             master: result,

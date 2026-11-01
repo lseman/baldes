@@ -55,3 +55,19 @@ fn borrowed_merge_buffer_preserves_tolerant_comparator_candidate_order() {
         assert_eq!(actual, expected, "candidate count {n}");
     }
 }
+
+#[test]
+fn reused_stable_sort_scratch_handles_dirty_and_varying_lengths() {
+    let mut scratch = Vec::with_capacity(1024);
+    let pointer = scratch.as_ptr();
+    for n in [300, 17, 0, 1, 128, 700, 8] {
+        scratch.clear();
+        scratch.extend([(-999, usize::MAX); 30]);
+        let mut actual: Vec<_> = (0..n).map(|i| (((i * 7919) % 13) as i32, i)).collect();
+        let mut expected = actual.clone();
+        expected.sort_by_key(|v| v.0);
+        super::stable_sort_with_buffer(&mut actual, &mut scratch, |a, b| a.0 < b.0);
+        assert_eq!(actual, expected);
+        assert_eq!(scratch.as_ptr(), pointer);
+    }
+}

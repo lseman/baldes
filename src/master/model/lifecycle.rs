@@ -28,7 +28,7 @@ pub struct Assignment {
 /// Solving, branching and fixing fork this state; the parent remains reusable.
 pub struct NodeSnapshot<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub(super) master: ClpMaster,
-    pub(super) warm: cg::WarmStart,
+    pub(super) warm: RetainedWarmStart,
     pub(super) state: State<D>,
 }
 
@@ -56,6 +56,9 @@ impl<const D: usize> State<D> {
             grouped_variable_boxes: self.grouped_variable_boxes.clone(),
             original_variable_costs: self.original_variable_costs.clone(),
             pricing_master: None,
+            pricing_duals: vec![],
+            pricing_rhs: vec![],
+            pricing_order_scratch: vec![],
             pricing_gap: self.pricing_gap,
             previous_fixing_gap: self.previous_fixing_gap,
             gap_enumeration: self.gap_enumeration,
@@ -219,7 +222,7 @@ impl<const D: usize> NodeSnapshot<D> {
             oracle.solver.restore_node_state()?;
         }
         self.state.deadline = deadline;
-        options.cg.warm_start = Some(self.warm);
+        options.cg.warm_start = Some(self.warm.into_owned());
         run(self.master, self.state, options)
     }
 

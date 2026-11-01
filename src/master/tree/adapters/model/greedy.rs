@@ -100,7 +100,7 @@ fn snapshot<const D: usize>(
     NodeSnapshot {
         master,
         state,
-        warm,
+        warm: warm.into(),
     }
 }
 
@@ -110,16 +110,21 @@ pub(super) fn run<const D: usize>(
     master: &ClpMaster,
     state: &State<D>,
     configured: &Options,
-    warm: Option<&cg::WarmStart>,
+    warm: Option<&RetainedWarmStart>,
     options: &ModelTreeOptions,
     result: &mut ModelTreeOutput,
     deadline: Instant,
 ) -> Result<()> {
     let mut config = configured.clone();
-    let mut current = snapshot(master.try_clone()?, state.fork_state(), &mut config);
-    if let Some(warm) = warm {
-        current.warm = warm.clone();
-    }
+    let mut current = if let Some(warm) = warm {
+        NodeSnapshot {
+            master: master.try_clone()?,
+            state: state.fork_state(),
+            warm: warm.clone(),
+        }
+    } else {
+        snapshot(master.try_clone()?, state.fork_state(), &mut config)
+    };
     current.state.deadline = deadline;
     let shifted = (0..state.oracles.len())
         .map(|i| costs(&current, i))
@@ -198,11 +203,16 @@ pub(super) fn run<const D: usize>(
         for cut in &mut oracle.solver.cuts.knapsack_cuts {
             cut.dual = 0.;
         }
-        let mut presence = oracle.solver.presence_rows().to_vec();
-        for row in &mut presence {
-            row.dual = 0.;
+        if oracle
+            .solver
+            .presence_rows()
+            .iter()
+            .any(|row| row.dual != 0.)
+        {
+            oracle
+                .solver
+                .set_presence_duals(&vec![0.; oracle.solver.presence_rows().len()])?;
         }
-        oracle.solver.set_presence_rows(presence)?;
         oracle
             .solver
             .cache_physical_costs(&shifted[index].arcs, &shifted[index].arcs)?;
@@ -276,14 +286,17 @@ pub(super) fn run<const D: usize>(
                 let cost = route.route.original_cost;
                 let column = current.master.add_column(cost, &coefficients)?;
                 debug_assert_eq!(column, current.warm.columns.len());
-                current.warm.columns.push(Some(cg::Column {
-                    cost,
-                    reduced_cost: 0.,
-                    entries: coefficients,
-                    acceptable: true,
-                    tag,
-                    identity: format!("{network}:{identity}"),
-                }));
+                current.warm.columns.push(Some(
+                    cg::Column {
+                        cost,
+                        reduced_cost: 0.,
+                        entries: coefficients,
+                        acceptable: true,
+                        tag,
+                        identity: format!("{network}:{identity}"),
+                    }
+                    .into(),
+                ));
             }
         }
         let mut child = current.fork()?;

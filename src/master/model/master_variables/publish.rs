@@ -4,12 +4,12 @@ use super::*;
 /// Canonical component upper caps enforce bounds straddling zero. A positive
 /// original lower bound or negative original upper bound additionally needs an
 /// original-variable row. Metadata and warm artificials must see the same row.
-pub(in crate::master::model) fn bounds<const D: usize>(
+pub(in crate::master::model) fn bounds<const D: usize, W: WarmMetadata>(
     master: &mut ClpMaster,
     state: &mut State<D>,
     previous: &[Bounds],
     known: &mut Vec<cg::Column>,
-    mut warm: Option<&mut cg::WarmStart>,
+    mut warm: Option<&mut W>,
 ) -> Result<()> {
     let mut inferred = vec![];
     for (index, (variable, old)) in state.master_variables.iter().zip(previous).enumerate() {
@@ -41,15 +41,13 @@ pub(in crate::master::model) fn bounds<const D: usize>(
             update(metadata);
         }
         if let Some(warm) = warm.as_deref_mut() {
-            for metadata in warm.columns.iter_mut().flatten() {
-                update(metadata);
-            }
-            for metadata in &mut warm.generated_pool {
-                update(metadata);
-            }
-            warm.stabilization = None;
+            warm.edit_columns(
+                |metadata| decode(metadata.tag).is_some_and(|(v, _)| v == index),
+                update,
+            );
+            warm.clear_stabilization();
             let penalty = warm
-                .artificials
+                .artificials()
                 .iter()
                 .map(|&c| master.costs[c])
                 .fold(2.76_f64, f64::max);
@@ -59,8 +57,7 @@ pub(in crate::master::model) fn bounds<const D: usize>(
                 -1.
             };
             let column = master.add_column(penalty, &[(physical, sign)])?;
-            warm.columns.push(None);
-            warm.artificials.push(column);
+            warm.push_artificial(column);
         }
     }
     retirement::sync_rhs(state, master);

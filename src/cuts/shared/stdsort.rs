@@ -150,17 +150,26 @@ pub fn sort<T: Clone, F: Fn(&T, &T) -> bool>(v: &mut [T], less: F) {
 /// Equivalent elements under a tolerant comparator end where this algorithm
 /// leaves them.
 pub fn stable_sort<T: Clone, F: Fn(&T, &T) -> bool>(v: &mut [T], less: F) {
+    stable_sort_with_buffer(v, &mut Vec::new(), less);
+}
+
+/// The same stable ordering with caller-owned merge storage.
+pub(crate) fn stable_sort_with_buffer<T: Clone, F: Fn(&T, &T) -> bool>(
+    v: &mut [T],
+    buffer: &mut Vec<T>,
+    less: F,
+) {
     let len = v.len();
     if len < 2 {
         return;
     }
     let half = (len + 1) / 2;
-    let mut buffer: Vec<T> = v[..half].to_vec();
     let (left, right) = v.split_at_mut(half);
-    merge_sort_with_buffer(left, &mut buffer, &less);
-    merge_sort_with_buffer(right, &mut buffer, &less);
-    merge_adaptive(v, half, &mut buffer, &less);
+    merge_sort_with_buffer(left, buffer, &less);
+    merge_sort_with_buffer(right, buffer, &less);
+    merge_adaptive(v, half, buffer, &less);
 }
+
 fn merge_sort_with_buffer<T: Clone, F: Fn(&T, &T) -> bool>(
     v: &mut [T],
     buffer: &mut Vec<T>,
@@ -246,13 +255,15 @@ fn move_merge<T: Clone, F: Fn(&T, &T) -> bool>(
 fn merge_adaptive<T: Clone, F: Fn(&T, &T) -> bool>(
     v: &mut [T],
     middle: usize,
-    _buffer: &mut Vec<T>,
+    buffer: &mut Vec<T>,
     less: &F,
 ) {
     let len1 = middle;
     let len2 = v.len() - middle;
     if len1 <= len2 {
-        let left: Vec<T> = v[..middle].to_vec();
+        buffer.clear();
+        buffer.extend_from_slice(&v[..middle]);
+        let left = buffer.as_slice();
         // __move_merge_adaptive(buffer, buffer_end, middle, last, first)
         let (mut i, mut j, mut out) = (0, middle, 0);
         while i < left.len() && j < v.len() {
@@ -270,7 +281,9 @@ fn merge_adaptive<T: Clone, F: Fn(&T, &T) -> bool>(
             out += 1;
         }
     } else {
-        let right: Vec<T> = v[middle..].to_vec();
+        buffer.clear();
+        buffer.extend_from_slice(&v[middle..]);
+        let right = buffer.as_slice();
         // __move_merge_adaptive_backward(first, middle, buffer, buffer_end, last)
         let mut result = v.len();
         let mut l1 = middle; // one past the last of the first range

@@ -3,8 +3,6 @@ use super::*;
 
 impl<const D: usize> State<D> {
     pub(super) fn price(&mut self, phase: usize, duals: &[f64]) -> Result<cg::Answer> {
-        let projected = retirement::duals(self, duals);
-        let duals = projected.as_ref();
         for &(network, resource, bounds) in &self.preprocessing.paired_owner_bounds {
             if self
                 .oracles
@@ -50,7 +48,24 @@ impl<const D: usize> State<D> {
         self.correction = None;
         self.gradient = None;
         self.scheduler.complete = false;
-        let rhs = retirement::physical_rhs(self);
+        let mut projected = std::mem::take(&mut self.pricing_duals);
+        let duals = if self.retired_rows.is_empty() {
+            duals
+        } else {
+            projected.clear();
+            projected.extend_from_slice(duals);
+            for &row in &self.retired_rows {
+                if let Some(value) = projected.get_mut(row) {
+                    *value = 0.;
+                }
+            }
+            &projected
+        };
+        let mut rhs = std::mem::take(&mut self.pricing_rhs);
+        rhs.clone_from(&self.rhs);
+        for &row in &self.retired_rows {
+            rhs[row] = 0.;
+        }
         let context = crate::master::pricing::Context {
             phase,
             duals,
@@ -72,8 +87,11 @@ impl<const D: usize> State<D> {
             context,
         );
         self.scheduler = scheduler;
+        let unpriced = result.is_ok() && self.has_unpriced_paired_terms(duals);
+        self.pricing_duals = projected;
+        self.pricing_rhs = rhs;
         let mut batch = result?;
-        if self.has_unpriced_paired_terms(duals) {
+        if unpriced {
             // The raw operator completed, but its unit-charge minimum is not
             // a lower bound for the associated owner expression. Keep the raw
             // completion signal (also used to request explicit enumeration)
@@ -87,6 +105,7 @@ impl<const D: usize> State<D> {
     }
 }
 
+/// Adapter calls receive the round's already-projected physical duals.
 pub(super) struct NetworkPricingAdapter<'a, const D: usize> {
     pub(super) state: &'a mut State<D>,
     pub(super) tolerance: f64,
@@ -108,8 +127,6 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkPricingAdapt
         admission: bool,
     ) -> Result<crate::master::pricing::Request> {
         use crate::master::pricing::{Envelopes, Request};
-        let projected = retirement::duals(self.state, duals);
-        let duals = projected.as_ref();
         let oracle = &mut self.state.oracles[index];
         if self.state.universe.is_some()
             || self.state.gap_pool_cutoff.is_some()
@@ -149,29 +166,40 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkPricingAdapt
             // rounding. Keep k-path rows in registry order, as the routing
             // adapter does. Exact pricing uses separate raw cut inputs.
             let registry = &mut oracle.solver.cuts;
-            let mut order: Vec<usize> = (0..registry.cuts.len())
-                .filter(|&index| {
-                    !registry.retired.contains(&index)
-                        && !registry.cuts[index].visit_once
-                        && registry.cuts[index].dual.abs() > 1e-6
-                })
-                .collect();
-            crate::cuts::shared::stdsort::stable_sort(&mut order, |&a, &b| {
-                let (va, vb) = (-registry.cuts[a].dual, -registry.cuts[b].dual);
-                va > vb + 1e-6 || (!(vb - 1e-6 > va) && a < b)
-            });
+            let mut order = std::mem::take(&mut registry.pricing_order);
+            order.clear();
+            order.extend((0..registry.cuts.len()).filter(|&index| {
+                !registry.retired.contains(&index)
+                    && !registry.cuts[index].visit_once
+                    && registry.cuts[index].dual.abs() > 1e-6
+            }));
+            crate::cuts::shared::stdsort::stable_sort_with_buffer(
+                &mut order,
+                &mut self.state.pricing_order_scratch,
+                |&a, &b| {
+                    let (va, vb) = (-registry.cuts[a].dual, -registry.cuts[b].dual);
+                    va > vb + 1e-6 || (!(vb - 1e-6 > va) && a < b)
+                },
+            );
             registry.pricing_order = order;
             registry.round_duals = true;
         }
         for &(cut, row) in &oracle.knapsack_rows {
             oracle.solver.cuts.knapsack_cuts[cut].dual = duals[self.state.shared_offset + row];
         }
-        if !oracle.presence_rows.is_empty() {
-            let mut inputs = oracle.solver.presence_rows().to_vec();
+        if oracle.presence_rows.iter().any(|&(input, row)| {
+            oracle.solver.presence_rows()[input].dual != duals[self.state.shared_offset + row]
+        }) {
+            let mut prices: Vec<_> = oracle
+                .solver
+                .presence_rows()
+                .iter()
+                .map(|r| r.dual)
+                .collect();
             for &(input, row) in &oracle.presence_rows {
-                inputs[input].dual = duals[self.state.shared_offset + row];
+                prices[input] = duals[self.state.shared_offset + row];
             }
-            oracle.solver.set_presence_rows(inputs)?;
+            oracle.solver.set_presence_duals(&prices)?;
         }
         let cached = self
             .state
@@ -603,7 +631,8 @@ pub(super) fn cache_duals<const D: usize>(
     let retained = state.oracles[index].solver.enumeration.take();
     let coverage = state.gap_pool_cutoff.take();
     let universe = state.universe.take();
-    let prepared = NetworkPricingAdapter { state, tolerance }.prepare(index, 0, duals, false);
+    let projected = retirement::duals(state, duals);
+    let prepared = NetworkPricingAdapter { state, tolerance }.prepare(index, 0, &projected, false);
     state.oracles[index].solver.enumeration = retained;
     state.gap_pool_cutoff = coverage;
     state.universe = universe;

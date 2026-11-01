@@ -52,6 +52,53 @@ impl<const D: usize> Solver<D> {
         Ok(())
     }
 
+    /// Update only row prices. Descriptor/event buffers stay in place. Invalid
+    /// counts, nonfinite prices or unsafe numerical ranges leave state unchanged.
+    /// Changed prices invalidate fixing, enumeration and labels as a full row
+    /// replacement does; an aligned raw workspace can retain its grid.
+    pub fn set_presence_duals(&mut self, duals: &[f64]) -> Result<()> {
+        self.presence_pricing
+            .validate_duals(self.graph.arcs.len(), duals)?;
+        if self
+            .presence_pricing
+            .inputs()
+            .iter()
+            .zip(duals)
+            .all(|(row, &dual)| row.dual == dual)
+        {
+            return Ok(());
+        }
+        let mut raw = self.raw_pricing.take();
+        if let Some(cache) = &mut raw {
+            if cache.solver.graph.same_topology(&self.graph)
+                && cache.solver.presence_pricing.inputs() == self.presence_pricing.inputs()
+            {
+                if let Some(engine) = &mut cache.solver.engine {
+                    if engine.presence_inputs() == self.presence_pricing.inputs() {
+                        engine.set_presence_duals(&cache.solver.graph, duals)?;
+                    } else {
+                        // Repair an out-of-date engine shape through the fully
+                        // validated replacement path, rather than repricing it.
+                        let mut rows = self.presence_pricing.inputs().to_vec();
+                        for (row, &dual) in rows.iter_mut().zip(duals) {
+                            row.dual = dual;
+                        }
+                        engine.load_presence(&cache.solver.graph, rows)?;
+                    }
+                    engine.release_raw_labels();
+                }
+                cache.solver.presence_pricing.assign_duals(duals);
+            } else {
+                raw = None;
+            }
+        }
+        self.presence_pricing.assign_duals(duals);
+        self.restore_arcs();
+        self.raw_pricing = raw;
+        self.round = controller::RoundState::default();
+        Ok(())
+    }
+
     #[cfg(feature = "clp")]
     pub(crate) fn presence_route_coefficients(&self, arcs: &[usize]) -> Result<Vec<usize>> {
         self.presence_pricing.route_coefficients(arcs)

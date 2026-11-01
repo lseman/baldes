@@ -192,14 +192,17 @@ impl Pool {
                     tag
                 }
             };
-            pooled.push(cg::Column {
-                cost,
-                reduced_cost: 0.,
-                entries: coefficients,
-                acceptable: true,
-                tag: i32::try_from(tag).map_err(|_| invalid("shared route tag overflow"))?,
-                identity: format!("{}:{identity}", seed.network),
-            });
+            pooled.push(
+                cg::Column {
+                    cost,
+                    reduced_cost: 0.,
+                    entries: coefficients,
+                    acceptable: true,
+                    tag: i32::try_from(tag).map_err(|_| invalid("shared route tag overflow"))?,
+                    identity: format!("{}:{identity}", seed.network),
+                }
+                .into(),
+            );
             present.insert(tag);
             added += 1;
         }

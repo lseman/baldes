@@ -403,7 +403,7 @@ impl<const D: usize> cg::Controller<ClpMaster> for ColumnGenerationController<D>
         );
         let snapshot = NodeSnapshot {
             master: master.try_clone()?,
-            warm,
+            warm: warm.into(),
             state: state.snapshot_for_checkpoint(),
         };
         drop(state);

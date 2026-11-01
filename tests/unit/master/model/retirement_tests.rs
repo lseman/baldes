@@ -267,3 +267,30 @@ fn clearing_the_last_coefficient_reoptimizes_old_positive_column_activity() {
     assert_eq!(master.values[column], 2.);
     assert_eq!(master.objective, -2.);
 }
+
+#[test]
+fn pricing_projects_retired_duals_once_and_reuses_round_buffers() {
+    let output = fixture();
+    let mut state = output.snapshot.state;
+    state.deadline = Instant::now() + std::time::Duration::from_secs(30);
+    let row = state.shared_offset;
+    state.retired_rows.insert(row);
+    let mut duals = vec![0.; state.rhs.len()];
+    duals[row] = 12345.;
+    state.price(0, &duals).unwrap();
+    assert_eq!(duals[row], 12345.);
+    assert_eq!(state.pricing_duals[row], 0.);
+    assert_eq!(state.pricing_rhs[row], 0.);
+    let projected = state.pricing_duals.as_ptr();
+    let rhs = state.pricing_rhs.as_ptr();
+    let costs = state.oracles[0].costs.clone();
+    duals[row] = 0.;
+    state.price(0, &duals).unwrap();
+    assert_eq!(state.oracles[0].costs, costs);
+    assert_eq!(state.pricing_duals.as_ptr(), projected);
+    assert_eq!(state.pricing_rhs.as_ptr(), rhs);
+    let child = state.fork_state();
+    assert!(child.pricing_duals.is_empty());
+    assert!(child.pricing_rhs.is_empty());
+    assert!(child.pricing_order_scratch.is_empty());
+}
