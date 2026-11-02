@@ -73,3 +73,34 @@ fn primal_recovery_shares_the_iteration_budget_and_restores_native_limits() {
         ClpSolveOutcome::DualInfeasible
     );
 }
+
+#[test]
+fn limited_lp_objective_requires_fresh_backend_completion() {
+    for pivots in 1..5 {
+        let mut master = augmented();
+        // Distinct cache marker: an actual interrupted solve must not expose it.
+        master.objective = 123.;
+        let (outcome, objective) = master
+            .solve_limited_with_objective(pivots, Duration::from_secs(10))
+            .unwrap();
+        assert_eq!(outcome, ClpSolveOutcome::Stopped);
+        assert_eq!(objective, None);
+        assert!(!master.solved);
+        assert!(master.simplex_iterations <= pivots);
+    }
+    let mut master = augmented();
+    let (outcome, objective) = master
+        .solve_limited_with_objective(100, Duration::from_secs(10))
+        .unwrap();
+    assert_eq!(outcome, ClpSolveOutcome::Optimal);
+    assert_eq!(objective, Some(2_f64.powi(41)));
+    for (pivots, time) in [(0, Duration::from_secs(10)), (100, Duration::ZERO)] {
+        let (outcome, objective) = master.solve_limited_with_objective(pivots, time).unwrap();
+        assert_eq!(outcome, ClpSolveOutcome::Stopped);
+        assert_eq!(
+            objective, None,
+            "the previous optimal LP is not a new observation"
+        );
+        assert!(!master.solved);
+    }
+}

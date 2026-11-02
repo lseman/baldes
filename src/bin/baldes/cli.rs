@@ -12,6 +12,39 @@ use baldes::master::model::{
 use networks::{solve_networks, NETWORK_HELP};
 use routing::{solve_routing, ROUTING_HELP};
 
+enum SolveStart {
+    Problem(model::Problem),
+    Snapshot(model::NodeSnapshot),
+}
+
+enum SolveMode {
+    Root(model::Options),
+    Tree(baldes::master::tree::ModelTreeOptions),
+}
+
+/// Execute either frontend's prepared network model through one solver path.
+fn solve_prepared(
+    start: SolveStart,
+    mode: SolveMode,
+    started: std::time::Instant,
+) -> Result<SolveResult, String> {
+    match (start, mode) {
+        (SolveStart::Problem(problem), SolveMode::Root(options)) => model::solve(problem, options)
+            .map(|output| SolveResult::root(&output, started.elapsed().as_secs_f64())),
+        (SolveStart::Problem(problem), SolveMode::Tree(options)) => {
+            baldes::master::tree::solve(problem, options)
+                .map(|output| SolveResult::tree(&output, started.elapsed().as_secs_f64()))
+        }
+        (SolveStart::Snapshot(node), SolveMode::Root(options)) => node
+            .solve(options)
+            .map(|output| SolveResult::root(&output, started.elapsed().as_secs_f64())),
+        (SolveStart::Snapshot(node), SolveMode::Tree(options)) => node
+            .solve_tree(options)
+            .map(|output| SolveResult::tree(&output, started.elapsed().as_secs_f64())),
+    }
+    .map_err(|e| e.to_string())
+}
+
 pub(super) fn run() -> Result<(), String> {
     let mut args = std::env::args().skip(1);
     let command = args.next().ok_or(ROUTING_HELP)?;

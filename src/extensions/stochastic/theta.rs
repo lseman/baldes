@@ -232,8 +232,13 @@ impl Problem {
         }
         let (problem, recourse) = self.theta_cut_model(policy, vehicles, ng)?;
         node.separation.route_recourse = Some(recourse);
-        if options.mapped_variables.is_empty() {
-            options.mapped_variables = problem.arc_flow_variables(1.);
+        if options.branching_registry.mapped_variables.is_empty() {
+            options.branching_registry.register_batch(
+                problem
+                    .arc_flow_variables(1.)
+                    .into_iter()
+                    .map(crate::master::model::BranchingRegistration::Mapped),
+            )?;
         }
         crate::master::tree::solve(problem, options)
     }

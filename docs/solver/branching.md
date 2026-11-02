@@ -25,9 +25,10 @@ an applicable family it orders candidates by closeness of the fractional part
 to 0.5, with stable ties. Phased strong branching then evaluates candidates
 when enabled. These are adapter priorities, not a combined ranking across all
 families. Families in the same integer priority group can contribute together.
-Rust callers can set `BranchingOptions::priorities`; its defaults are vehicle
-count 11, resource/cluster 10, assignment 3, Ryan–Foster 2, aggregate flow 1.5
-and arc flow 1.
+Rust callers can register `BranchingRegistration::Priorities`; its defaults are
+vehicle count 11, resource 10, assignment 3, master variable 1.5, arc 1, and
+window 1.5. Explicit families carry their own priorities; cluster defaults to
+10 and the routing adapter registers Ryan–Foster at 2.
 These are Baldes adapter settings; reference model interfaces also register
 priorities explicitly. Every supplied priority must be finite.
 
@@ -37,8 +38,27 @@ cargo run --release --features clp --bin baldes -- \
   --branching ryan-foster --time 60
 ```
 
-Rust configures the family flags through `TreeOptions::branching`, whose type
-is `BranchingOptions`. Arc flow remains the fallback when all flags are false.
+Rust callers can register all branching families and their settings through
+`BranchingRegistry::register` or `register_batch`, using
+`BranchingRegistration` variants. A batch is applied atomically. For example:
+
+```rust,ignore
+use baldes::master::model::{BranchingRegistration, NetworkClusterBranching};
+use baldes::master::tree::ModelTreeOptions;
+
+let mut options = ModelTreeOptions::default();
+let mut clusters = NetworkClusterBranching::new(0);
+clusters.priority = 10.0;
+options.branching_registry.register(BranchingRegistration::Cluster(clusters))?;
+```
+
+The same interface accepts mapped variables, route counts, component classes
+and generators, packing and Ryan–Foster families, direction and selection
+metadata, priorities, policy, and strong-branching settings. The registry is
+the branching configuration used by candidate generation and selection; the
+tree prepares network-dependent families and its lookup tables before solving.
+Use its read-only accessors, such as `policy()`, `priorities()`,
+`strong_branching()`, and `family_order()`, to inspect the configuration.
 
 ## Number of vehicles
 
@@ -141,7 +161,7 @@ set used fractionally by the single network is branched as its aggregate flow.
 
 ## Strong branching and diving
 
-Strong branching is enabled by default. Its three phases retain up to 100
+When strong branching is enabled, its three phases retain up to 100
 restricted-LP candidates, price three survivors heuristically, then evaluate
 one with exact pricing. An intermediate restricted-LP or heuristic phase is
 skipped when all remaining candidates fit in the next phase. Terminal phases
@@ -160,7 +180,7 @@ subtrees do not enter this average. The default keeps parent estimates.
 budgets. Strong branching is off by default, matching the native
 `ApplyStrongBranchingEvaluation = false`; enable it with `--strong-branching`.
 
-For JSON models using `--network-branching phased`, multiplicity candidates
+For JSON models with a `phased` policy registration, multiplicity candidates
 keep network registration order within each priority. Priced trials that still
 use artificial variables receive a ranking estimate of `1e12`; their finite
 penalty objective does not determine candidate selection. These estimates do
@@ -168,7 +188,7 @@ not certify a child bound. Between product-score phases, equivalent scored
 child estimates retain one candidate before the next phase's quota is applied.
 Distinct child estimates remain separate even when their product scores agree.
 These trials are off by default (native `ApplyStrongBranchingEvaluation =
-false`); enable them with `--mapped-strong-branching`.
+false`); enable them with a `strong-branching` registration.
 
 Strong round-up diving uses isolated route-fixing trials and depth,
 discrepancy, node, and time limits. Disable it with `--no-diving`.
@@ -191,7 +211,7 @@ Branch duals therefore use the existing arc-cost pricing path, without extra
 label resources. Arc-flow candidates remain available because cluster
 variables alone do not ensure an integral directed solution.
 
-`ClusterBranchingOptions::partition` accepts a partition of every customer
+`NetworkClusterBranching::partition` accepts a partition of every customer
 exactly once. Otherwise a deterministic customer MST is cut at edges strictly
 above `mean + theta * standard_deviation`; `theta` defaults to 1. Distances use
 the cheaper physical arc in either direction. This matches geometric distances

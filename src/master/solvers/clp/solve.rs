@@ -49,8 +49,19 @@ impl ClpMaster {
         iterations: usize,
         time_limit: Duration,
     ) -> Result<ClpSolveOutcome> {
+        self.solve_limited_with_objective(iterations, time_limit)
+            .map(|(outcome, _)| outcome)
+    }
+
+    /// Fresh optimal LP objective from this call, independent of a later
+    /// elapsed-time stop. This is a restricted LP value, never a pricing proof.
+    pub(crate) fn solve_limited_with_objective(
+        &mut self,
+        iterations: usize,
+        time_limit: Duration,
+    ) -> Result<(ClpSolveOutcome, Option<f64>)> {
         if matches!(self.solver, MasterSolver::Highs | MasterSolver::Gurobi) {
-            return Ok(match self.solve_native(iterations, time_limit)? {
+            let outcome = match self.solve_native(iterations, time_limit)? {
                 LpSolveOutcome::Optimal => ClpSolveOutcome::Optimal,
                 LpSolveOutcome::PrimalInfeasible => ClpSolveOutcome::PrimalInfeasible,
                 LpSolveOutcome::DualInfeasible => ClpSolveOutcome::DualInfeasible,
@@ -58,17 +69,25 @@ impl ClpMaster {
                 | LpSolveOutcome::IterationLimit
                 | LpSolveOutcome::Stopped => ClpSolveOutcome::Stopped,
                 _ => ClpSolveOutcome::Failed,
-            });
+            };
+            return Ok((
+                outcome,
+                (outcome == ClpSolveOutcome::Optimal).then_some(self.objective),
+            ));
         }
         if self.solver == MasterSolver::Ipm {
-            return self.solve_ipm(iterations.min(500), time_limit, None);
+            let outcome = self.solve_ipm(iterations.min(500), time_limit, None)?;
+            return Ok((
+                outcome,
+                (outcome == ClpSolveOutcome::Optimal).then_some(self.objective),
+            ));
         }
         let iterations = i32::try_from(iterations).map_err(|_| invalid("Clp iteration limit"))?;
         let started = Instant::now();
         if iterations == 0 || time_limit.is_zero() {
             self.status = 3;
             self.solved = false;
-            return Ok(ClpSolveOutcome::Stopped);
+            return Ok((ClpSolveOutcome::Stopped, None));
         }
         self.ensure_backend()?;
         // SAFETY: The native scope guard restores this owned model's limits
@@ -84,20 +103,23 @@ impl ClpMaster {
         if failed {
             self.status = 4;
             self.solved = false;
-            return Ok(ClpSolveOutcome::Failed);
+            return Ok((ClpSolveOutcome::Failed, None));
         }
-        self.read_solution();
+        let objective = self.read_solution().then_some(self.objective);
         if started.elapsed() >= time_limit {
             self.status = 3;
             self.solved = false;
         }
-        Ok(match self.status {
-            0 => ClpSolveOutcome::Optimal,
-            1 => ClpSolveOutcome::PrimalInfeasible,
-            2 => ClpSolveOutcome::DualInfeasible,
-            3 => ClpSolveOutcome::Stopped,
-            _ => ClpSolveOutcome::Failed,
-        })
+        Ok((
+            match self.status {
+                0 => ClpSolveOutcome::Optimal,
+                1 => ClpSolveOutcome::PrimalInfeasible,
+                2 => ClpSolveOutcome::DualInfeasible,
+                3 => ClpSolveOutcome::Stopped,
+                _ => ClpSolveOutcome::Failed,
+            },
+            objective,
+        ))
     }
 
     pub(super) fn solve_native(

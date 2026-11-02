@@ -1,0 +1,393 @@
+{
+  "binary_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "scope": "Direct original lFracPart/uFracPart getter calls with controlled generator full activity; no solver execution.",
+  "lower_getter_elf": "0x1ab1e0",
+  "upper_getter_elf": "0x1ab100",
+  "cases": [
+    {
+      "value": 0.0,
+      "lower_distance": 0.0,
+      "upper_distance": 0.0,
+      "lower_bits": "0000000000000000",
+      "upper_bits": "0000000000000000"
+    },
+    {
+      "value": 0.25,
+      "lower_distance": 0.25,
+      "upper_distance": 0.75,
+      "lower_bits": "3fd0000000000000",
+      "upper_bits": "3fe8000000000000"
+    },
+    {
+      "value": -0.25,
+      "lower_distance": 0.75,
+      "upper_distance": 0.25,
+      "lower_bits": "3fe8000000000000",
+      "upper_bits": "3fd0000000000000"
+    },
+    {
+      "value": 1.0,
+      "lower_distance": 0.0,
+      "upper_distance": 0.0,
+      "lower_bits": "0000000000000000",
+      "upper_bits": "0000000000000000"
+    },
+    {
+      "value": -1.0,
+      "lower_distance": 0.0,
+      "upper_distance": 0.0,
+      "lower_bits": "0000000000000000",
+      "upper_bits": "0000000000000000"
+    },
+    {
+      "value": 1.0000005,
+      "lower_distance": 0.0,
+      "upper_distance": 0.0,
+      "lower_bits": "0000000000000000",
+      "upper_bits": "0000000000000000"
+    },
+    {
+      "value": 0.9999995,
+      "lower_distance": 0.0,
+      "upper_distance": 0.0,
+      "lower_bits": "0000000000000000",
+      "upper_bits": "0000000000000000"
+    },
+    {
+      "value": -0.9999995,
+      "lower_distance": 0.0,
+      "upper_distance": 0.0,
+      "lower_bits": "0000000000000000",
+      "upper_bits": "0000000000000000"
+    },
+    {
+      "value": -1.0000005,
+      "lower_distance": 0.0,
+      "upper_distance": 0.0,
+      "lower_bits": "0000000000000000",
+      "upper_bits": "0000000000000000"
+    },
+    {
+      "value": -2e-06,
+      "lower_distance": 0.999998,
+      "upper_distance": 2e-06,
+      "lower_bits": "3feffffbce4217d3",
+      "upper_bits": "3ec0c6f7a0b5ed8d"
+    },
+    {
+      "value": -1e-06,
+      "lower_distance": 0.0,
+      "upper_distance": 0.0,
+      "lower_bits": "0000000000000000",
+      "upper_bits": "0000000000000000"
+    },
+    {
+      "value": 1e-06,
+      "lower_distance": 0.0,
+      "upper_distance": 0.0,
+      "lower_bits": "0000000000000000",
+      "upper_bits": "0000000000000000"
+    },
+    {
+      "value": 2e-06,
+      "lower_distance": 2e-06,
+      "upper_distance": 0.999998,
+      "lower_bits": "3ec0c6f7a0b5ed8d",
+      "upper_bits": "3feffffbce4217d3"
+    },
+    {
+      "value": 0.999998,
+      "lower_distance": 0.999998,
+      "upper_distance": 1.999999999946489e-06,
+      "lower_bits": "3feffffbce4217d3",
+      "upper_bits": "3ec0c6f7a0b40000"
+    },
+    {
+      "value": 0.999999,
+      "lower_distance": -1.0000000000287557e-06,
+      "upper_distance": 1.0000000000287557e-06,
+      "lower_bits": "beb0c6f7a0b80000",
+      "upper_bits": "3eb0c6f7a0b80000"
+    },
+    {
+      "value": 1.000001,
+      "lower_distance": 0.0,
+      "upper_distance": 0.0,
+      "lower_bits": "0000000000000000",
+      "upper_bits": "0000000000000000"
+    },
+    {
+      "value": 1.000002,
+      "lower_distance": 2.0000000000575113e-06,
+      "upper_distance": 0.9999979999999999,
+      "lower_bits": "3ec0c6f7a0b80000",
+      "upper_bits": "3feffffbce4217d2"
+    },
+    {
+      "value": 1.25,
+      "lower_distance": 0.25,
+      "upper_distance": 0.75,
+      "lower_bits": "3fd0000000000000",
+      "upper_bits": "3fe8000000000000"
+    },
+    {
+      "value": -1.000002,
+      "lower_distance": 0.9999979999999999,
+      "upper_distance": 2.0000000000575113e-06,
+      "lower_bits": "3feffffbce4217d2",
+      "upper_bits": "3ec0c6f7a0b80000"
+    },
+    {
+      "value": -1.000001,
+      "lower_distance": 0.9999990000000001,
+      "upper_distance": 0.0,
+      "lower_bits": "3feffffde7210bea",
+      "upper_bits": "0000000000000000"
+    },
+    {
+      "value": -0.999999,
+      "lower_distance": 1.0000000000287557e-06,
+      "upper_distance": 0.999999,
+      "lower_bits": "3eb0c6f7a0b80000",
+      "upper_bits": "3feffffde7210be9"
+    },
+    {
+      "value": -0.999998,
+      "lower_distance": 1.999999999946489e-06,
+      "upper_distance": 0.999998,
+      "lower_bits": "3ec0c6f7a0b40000",
+      "upper_bits": "3feffffbce4217d3"
+    },
+    {
+      "value": -0.75,
+      "lower_distance": 0.25,
+      "upper_distance": 0.75,
+      "lower_bits": "3fd0000000000000",
+      "upper_bits": "3fe8000000000000"
+    },
+    {
+      "value": 9.999998,
+      "lower_distance": 0.9999979999999997,
+      "upper_distance": 2.000000000279556e-06,
+      "lower_bits": "3feffffbce4217d0",
+      "upper_bits": "3ec0c6f7a0c00000"
+    },
+    {
+      "value": 9.999999,
+      "lower_distance": 0.0,
+      "upper_distance": 0.0,
+      "lower_bits": "0000000000000000",
+      "upper_bits": "0000000000000000"
+    },
+    {
+      "value": 10.000001,
+      "lower_distance": 0.0,
+      "upper_distance": 0.0,
+      "lower_bits": "0000000000000000",
+      "upper_bits": "0000000000000000"
+    },
+    {
+      "value": 10.000002,
+      "lower_distance": 2.000000000279556e-06,
+      "upper_distance": 0.9999979999999997,
+      "lower_bits": "3ec0c6f7a0c00000",
+      "upper_bits": "3feffffbce4217d0"
+    },
+    {
+      "value": 10.25,
+      "lower_distance": 0.25,
+      "upper_distance": 0.75,
+      "lower_bits": "3fd0000000000000",
+      "upper_bits": "3fe8000000000000"
+    },
+    {
+      "value": -10.000002,
+      "lower_distance": 0.9999979999999997,
+      "upper_distance": 2.000000000279556e-06,
+      "lower_bits": "3feffffbce4217d0",
+      "upper_bits": "3ec0c6f7a0c00000"
+    },
+    {
+      "value": -10.000001,
+      "lower_distance": 0.9999990000000007,
+      "upper_distance": 0.0,
+      "lower_bits": "3feffffde7210bf0",
+      "upper_bits": "0000000000000000"
+    },
+    {
+      "value": -9.999999,
+      "lower_distance": 0.0,
+      "upper_distance": 0.9999990000000007,
+      "lower_bits": "0000000000000000",
+      "upper_bits": "3feffffde7210bf0"
+    },
+    {
+      "value": -9.999998,
+      "lower_distance": 2.000000000279556e-06,
+      "upper_distance": 0.9999979999999997,
+      "lower_bits": "3ec0c6f7a0c00000",
+      "upper_bits": "3feffffbce4217d0"
+    },
+    {
+      "value": -9.75,
+      "lower_distance": 0.25,
+      "upper_distance": 0.75,
+      "lower_bits": "3fd0000000000000",
+      "upper_bits": "3fe8000000000000"
+    },
+    {
+      "value": 9999.999998,
+      "lower_distance": -2.0000006770715117e-06,
+      "upper_distance": 2.0000006770715117e-06,
+      "lower_bits": "bec0c6f800000000",
+      "upper_bits": "3ec0c6f800000000"
+    },
+    {
+      "value": 9999.999999,
+      "lower_distance": -1.0000003385357559e-06,
+      "upper_distance": 1.0000003385357559e-06,
+      "lower_bits": "beb0c6f800000000",
+      "upper_bits": "3eb0c6f800000000"
+    },
+    {
+      "value": 10000.000001,
+      "lower_distance": 1.0000003385357559e-06,
+      "upper_distance": -1.0000003385357559e-06,
+      "lower_bits": "3eb0c6f800000000",
+      "upper_bits": "beb0c6f800000000"
+    },
+    {
+      "value": 10000.000002,
+      "lower_distance": 2.0000006770715117e-06,
+      "upper_distance": -2.0000006770715117e-06,
+      "lower_bits": "3ec0c6f800000000",
+      "upper_bits": "bec0c6f800000000"
+    },
+    {
+      "value": 10000.25,
+      "lower_distance": 0.25,
+      "upper_distance": 0.75,
+      "lower_bits": "3fd0000000000000",
+      "upper_bits": "3fe8000000000000"
+    },
+    {
+      "value": -10000.000002,
+      "lower_distance": 0.9999979999993229,
+      "upper_distance": 2.0000006770715117e-06,
+      "lower_bits": "3feffffbce420000",
+      "upper_bits": "3ec0c6f800000000"
+    },
+    {
+      "value": -10000.000001,
+      "lower_distance": 0.9999989999996615,
+      "upper_distance": 1.0000003385357559e-06,
+      "lower_bits": "3feffffde7210000",
+      "upper_bits": "3eb0c6f800000000"
+    },
+    {
+      "value": -9999.999999,
+      "lower_distance": 1.0000003385357559e-06,
+      "upper_distance": 0.9999989999996615,
+      "lower_bits": "3eb0c6f800000000",
+      "upper_bits": "3feffffde7210000"
+    },
+    {
+      "value": -9999.999998,
+      "lower_distance": 2.0000006770715117e-06,
+      "upper_distance": 0.9999979999993229,
+      "lower_bits": "3ec0c6f800000000",
+      "upper_bits": "3feffffbce420000"
+    },
+    {
+      "value": -9999.75,
+      "lower_distance": 0.25,
+      "upper_distance": 0.75,
+      "lower_bits": "3fd0000000000000",
+      "upper_bits": "3fe8000000000000"
+    },
+    {
+      "value": 9999999999.999998,
+      "lower_distance": -1.0000019073486328,
+      "upper_distance": -0.9999980926513672,
+      "lower_bits": "bff0000200000000",
+      "upper_bits": "bfeffffc00000000"
+    },
+    {
+      "value": 10000000000.000002,
+      "lower_distance": -0.9999980926513672,
+      "upper_distance": -1.0000019073486328,
+      "lower_bits": "bfeffffc00000000",
+      "upper_bits": "bff0000200000000"
+    },
+    {
+      "value": 10000000000.25,
+      "lower_distance": -0.75,
+      "upper_distance": -0.25,
+      "lower_bits": "bfe8000000000000",
+      "upper_bits": "bfd0000000000000"
+    },
+    {
+      "value": -10000000000.000002,
+      "lower_distance": 0.9999980926513672,
+      "upper_distance": 1.9073486328125e-06,
+      "lower_bits": "3feffffc00000000",
+      "upper_bits": "3ec0000000000000"
+    },
+    {
+      "value": -9999999999.999998,
+      "lower_distance": 1.0000019073486328,
+      "upper_distance": 0.9999980926513672,
+      "lower_bits": "3ff0000200000000",
+      "upper_bits": "3feffffc00000000"
+    },
+    {
+      "value": -9999999999.75,
+      "lower_distance": 1.25,
+      "upper_distance": 0.75,
+      "lower_bits": "3ff4000000000000",
+      "upper_bits": "3fe8000000000000"
+    },
+    {
+      "value": 1000000000000.0,
+      "lower_distance": -100.0,
+      "upper_distance": -100.0,
+      "lower_bits": "c059000000000000",
+      "upper_bits": "c059000000000000"
+    },
+    {
+      "value": 1000000000000.25,
+      "lower_distance": -99.75,
+      "upper_distance": -99.25,
+      "lower_bits": "c058f00000000000",
+      "upper_bits": "c058d00000000000"
+    },
+    {
+      "value": -1000000000000.0,
+      "lower_distance": 100.0,
+      "upper_distance": 99.0,
+      "lower_bits": "4059000000000000",
+      "upper_bits": "4058c00000000000"
+    },
+    {
+      "value": -999999999999.75,
+      "lower_distance": 100.25,
+      "upper_distance": 99.75,
+      "lower_bits": "4059100000000000",
+      "upper_bits": "4058f00000000000"
+    },
+    {
+      "value": 4503599627370496.0,
+      "lower_distance": -450360.0,
+      "upper_distance": -450360.0,
+      "lower_bits": "c11b7ce000000000",
+      "upper_bits": "c11b7ce000000000"
+    },
+    {
+      "value": -4503599627370496.0,
+      "lower_distance": 450360.0,
+      "upper_distance": 450359.0,
+      "lower_bits": "411b7ce000000000",
+      "upper_bits": "411b7cdc00000000"
+    }
+  ]
+}

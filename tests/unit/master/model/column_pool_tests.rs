@@ -468,7 +468,7 @@ fn optional_tree_pool_keeps_original_numerical_and_certified_optima() {
         options.node.cg.stabilize = false;
         options.node.cg.bound_mode = mode;
         options.share_inactive_columns = true;
-        options.branching = NetworkBranchingPolicy::Phased;
+        options.branching_registry.branching = NetworkBranchingPolicy::Phased;
         let result = node.solve_tree(options).unwrap();
         assert_eq!(result.status, crate::master::tree::TreeStatus::Optimal);
         assert_eq!(result.incumbent, 2.);

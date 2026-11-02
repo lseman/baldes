@@ -1,7 +1,11 @@
 //! Explicit conjunction-defined whole-column cardinality restrictions.
+mod branching;
+mod history;
 use super::*;
 use crate::cuts::soft_conflicts::PresenceRow;
 pub use crate::cuts::soft_conflicts::{ComponentBound, ComponentSense, ComponentSequence};
+pub(super) use branching::{inherit_branch_rows, record_count_bounds, BranchRow};
+pub(super) use history::{covering_split_bounds, split_bounds};
 mod generator;
 pub use generator::{
     ComponentClassGenerator, ComponentGeneratorCoordinate, ComponentPriorityRule,
@@ -15,7 +19,7 @@ pub(super) fn generated_proposals<const D: usize>(
     tolerance: f64,
     deadline: Option<Instant>,
 ) -> Result<Vec<model_strong::Proposal>> {
-    generator::collect(output, generators, quota, tolerance, deadline)
+    generator::collect_admission(output, generators, quota, tolerance, deadline)
 }
 
 /// Sparse integer coordinate on original physical arcs. `None` omits the
@@ -87,13 +91,70 @@ impl ComponentClassBranching {
                 .get(&bound.coordinate)
                 .ok_or_else(|| invalid("unregistered component coordinate"))?;
         }
+        if sequence.bounds.is_empty() {
+            // A universal class never reads coordinate values. Retain input
+            // validation, then track only completion of the physical route.
+            if self
+                .coordinates
+                .iter()
+                .flat_map(|coordinate| coordinate.arc_values.iter().flatten())
+                .any(|value| value.unsigned_abs() > (1_u64 << 53))
+            {
+                return Err(invalid("component class coordinate or threshold"));
+            }
+            let arc_events = graph
+                .arcs
+                .iter()
+                .map(|arc| {
+                    if arc.head == graph.sink {
+                        vec![0]
+                    } else {
+                        vec![]
+                    }
+                })
+                .collect();
+            return Ok(PresenceCoefficients {
+                network: self.network,
+                row: PresenceRow::component_class(0, sequence, vec![])?,
+                arc_events,
+            });
+        }
+        if sequence
+            .bounds
+            .iter()
+            .any(|bound| !bound.threshold.is_finite())
+        {
+            return Err(invalid("component class coordinate or threshold"));
+        }
+        // Membership reads only predicate coordinates. Keep every definition
+        // validated, but project execution state and event IDs together.
+        let mut projection = vec![usize::MAX; self.coordinates.len()];
+        for bound in &sequence.bounds {
+            projection[bound.coordinate] = 0;
+        }
+        let mut used = 0;
+        for coordinate in &mut projection {
+            if *coordinate != usize::MAX {
+                *coordinate = used;
+                used += 1;
+            }
+        }
+        for bound in &mut sequence.bounds {
+            bound.coordinate = projection[bound.coordinate];
+        }
         let mut emissions = vec![];
         let mut arc_events = vec![vec![]; graph.arcs.len()];
-        for (coordinate, c) in self.coordinates.iter().enumerate() {
+        for (index, c) in self.coordinates.iter().enumerate() {
+            let coordinate = projection[index];
             for (arc, value) in c.arc_values.iter().enumerate() {
                 if let Some(value) = value {
-                    arc_events[arc].push(emissions.len());
-                    emissions.push((coordinate, *value));
+                    if value.unsigned_abs() > (1_u64 << 53) {
+                        return Err(invalid("component class coordinate or threshold"));
+                    }
+                    if coordinate != usize::MAX {
+                        arc_events[arc].push(emissions.len());
+                        emissions.push((coordinate, *value));
+                    }
                 }
             }
         }
@@ -103,7 +164,7 @@ impl ComponentClassBranching {
                 events.push(terminal);
             }
         }
-        let row = PresenceRow::component_class(self.coordinates.len(), sequence, emissions)?;
+        let row = PresenceRow::component_class(used, sequence, emissions)?;
         Ok(PresenceCoefficients {
             network: self.network,
             row,
@@ -111,14 +172,13 @@ impl ComponentClassBranching {
         })
     }
 
-    pub(super) fn proposal<const D: usize>(
+    fn activity<'a, const D: usize>(
         &self,
-        output: &Output<D>,
-        tolerance: f64,
-    ) -> Result<Option<model_strong::Proposal>> {
-        let c = self.coefficients(&output.snapshot)?;
-        let oracle = output
-            .snapshot
+        node: &NodeSnapshot<D>,
+        routes: impl IntoIterator<Item = (&'a NetworkRoute, f64)>,
+    ) -> Result<f64> {
+        let c = self.coefficients(node)?;
+        let oracle = node
             .state
             .oracles
             .iter()
@@ -133,13 +193,7 @@ impl ComponentClassBranching {
             }],
         )?;
         let mut value = 0.;
-        for (route, quantity) in output
-            .routes
-            .iter()
-            .zip(&output.values)
-            .map(|(r, &q)| (r, q))
-            .chain(output.fixed_routes.iter().map(|r| (&r.route, r.quantity)))
-        {
+        for (route, quantity) in routes {
             if route.network != self.network {
                 continue;
             }
@@ -157,10 +211,35 @@ impl ComponentClassBranching {
                 .collect::<Result<Vec<_>>>()?;
             value += quantity * pricing.route_coefficients(&arcs)?[0] as f64;
         }
+        Ok(value)
+    }
+
+    pub(super) fn proposal<const D: usize>(
+        &self,
+        output: &Output<D>,
+        tolerance: f64,
+    ) -> Result<Option<model_strong::Proposal>> {
+        let value = self.activity(
+            &output.snapshot,
+            output
+                .routes
+                .iter()
+                .zip(&output.values)
+                .map(|(route, &quantity)| (route, quantity))
+                .chain(
+                    output
+                        .fixed_routes
+                        .iter()
+                        .map(|fixed| (&fixed.route, fixed.quantity)),
+                ),
+        )?;
         let fraction = (value - value.round()).abs();
         let threshold = self.minimum_fractionality;
-        if fraction <= tolerance
-            || !(threshold < fraction - (fraction.abs().max(threshold.abs()) * 1e-10 + 1e-6))
+        let Some(_) = split_bounds(value, !self.sequence.bounds.is_empty()) else {
+            return Ok(None);
+        };
+        if !(fraction > tolerance
+            && threshold < fraction - (fraction.abs().max(threshold.abs()) * 1e-10 + 1e-6))
         {
             return Ok(None);
         }
@@ -175,8 +254,12 @@ impl ComponentClassBranching {
             priority: self.priority,
             value,
             restriction: model_strong::Restriction::Component(self.clone()),
-            history_eligible: true,
+            // The native scheduler excludes component generators from generic
+            // pseudocost history; inherited class sequences remain separate.
+            history_eligible: false,
             fresh: true,
+            origin: None,
+            component_admission: None,
         }))
     }
 }
@@ -220,6 +303,9 @@ impl<const D: usize> NodeSnapshot<D> {
         for oracle in &mut node.state.oracles {
             oracle.solver.enumeration_preserve_arc_paths = true;
         }
+        if class.sequence.bounds.is_empty() {
+            record_count_bounds(&mut node, class.network, bounds);
+        }
         if bounds.lower.is_finite() || bounds.upper.is_finite() {
             node.state.component_branches.push(class.clone());
         }
@@ -230,3 +316,5 @@ impl<const D: usize> NodeSnapshot<D> {
 #[cfg(test)]
 #[path = "../../../tests/unit/master/model/component_tests.rs"]
 mod tests;
+
+pub(super) use generator::ComponentPublication;

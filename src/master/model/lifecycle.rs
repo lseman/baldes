@@ -24,6 +24,54 @@ pub struct Assignment {
     pub value: f64,
 }
 
+fn appended_row_value<const D: usize>(
+    oracle: &Oracle<D>,
+    route: &Route,
+    offset: usize,
+    shared: usize,
+    physical: usize,
+    coefficient: Option<&RowCoefficients>,
+) -> Result<f64> {
+    // Rich replay retains its validation and coefficient staging. Plain retained
+    // columns already validated every older row; only this association is new.
+    if offset.checked_add(shared) != Some(physical)
+        || !oracle.nonlinear_rows.is_empty()
+        || !oracle.knapsack_rows.is_empty()
+        || !oracle.presence_rows.is_empty()
+        || !oracle.activity_rows.is_empty()
+        || !oracle.resource_groups.is_empty()
+        || !oracle.ryan_foster_rows.is_empty()
+    {
+        return Ok(entries(oracle, route, offset)?
+            .into_iter()
+            .find(|&(row, _)| row == physical)
+            .map_or(0., |(_, value)| value));
+    }
+    let mut value = 0.;
+    if let Some(c) = coefficient {
+        if c.per_route != 0. {
+            value += c.per_route;
+        }
+    }
+    for id in &route.arcs {
+        let index = *oracle
+            .index
+            .get(id)
+            .ok_or_else(|| invalid("unknown network route arc"))?;
+        if let Some(c) = coefficient {
+            let contribution = c.arcs[index];
+            if contribution != 0. {
+                value += contribution;
+            }
+        }
+    }
+    if !value.is_finite() {
+        return Err(invalid("network route coefficient overflow"));
+    }
+    // Full replay drops zero coefficients; its caller supplies positive zero.
+    Ok(if value == 0. { 0. } else { value })
+}
+
 /// Owned master, route registry and independent pricing states for every network.
 /// Solving, branching and fixing fork this state; the parent remains reusable.
 pub struct NodeSnapshot<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
@@ -47,11 +95,16 @@ impl<const D: usize> State<D> {
     pub(super) fn fork_state(&self) -> Self {
         State {
             component_branches: self.component_branches.clone(),
+            component_count_bounds: self.component_count_bounds.clone(),
+            component_local_rows: self.component_local_rows.clone(),
+            component_branch_exclusions: self.component_branch_exclusions.clone(),
             pricing_witness: self.pricing_witness.clone(),
             tree_incumbent: self.tree_incumbent,
             integer_primal_termination: self.integer_primal_termination,
             witness_tolerance: self.witness_tolerance,
             box_pricing_admission: self.box_pricing_admission,
+            ordinary_artificial_cost: self.ordinary_artificial_cost,
+            cut_artificial_bases: self.cut_artificial_bases.clone(),
             variable_boxes: self.variable_boxes.clone(),
             grouped_variable_boxes: self.grouped_variable_boxes.clone(),
             original_variable_costs: self.original_variable_costs.clone(),
@@ -75,6 +128,7 @@ impl<const D: usize> State<D> {
             mapped_subtree_size: self.mapped_subtree_size,
             mapped_subtree_priority: self.mapped_subtree_priority,
             mapped_lineage: self.mapped_lineage,
+            branch_history_origin: self.branch_history_origin.clone(),
             node_depth: self.node_depth,
             scheduler: self.scheduler.fresh(),
             synchronized_services: self.synchronized_services.clone(),
@@ -181,6 +235,56 @@ impl<const D: usize> NodeSnapshot<D> {
         self.state.node_depth
     }
 
+    /// Start a new tree-node or trial evaluation with its original ordinary
+    /// artificial costs. Same-node resumes and generic CG continuation do not
+    /// call this method. Known separated-row artificials use 1.2 times their
+    /// retained creation cost; columns without creation metadata stay unchanged.
+    pub(crate) fn reset_evaluation_artificials(&mut self) -> Result<()> {
+        let cost = self.state.ordinary_artificial_cost;
+        let separated: HashSet<_> = self
+            .warm
+            .cut_artificials
+            .iter()
+            .map(|&(_, column)| column)
+            .collect();
+        let mut changed = false;
+        for &column in &self.warm.artificials {
+            let cost = if separated.contains(&column) {
+                let Some(base) = self.state.cut_artificial_bases.get(&column) else {
+                    continue;
+                };
+                let setup_cost = 1.2 * base;
+                if !setup_cost.is_finite() || setup_cost < 0. {
+                    return Err(invalid("retained cut artificial setup cost"));
+                }
+                setup_cost
+            } else {
+                cost
+            };
+            let previous = *self
+                .master
+                .costs
+                .get(column)
+                .ok_or_else(|| invalid("retained ordinary artificial column"))?;
+            if previous != cost {
+                self.master.set_cost(column, cost)?;
+                changed = true;
+            }
+        }
+        if changed {
+            // The old bound still applies to the zero-artificial original
+            // domain, but it cannot certify convergence of this cheaper LP.
+            // Preserve only its selected proof channel as a tree floor.
+            self.state.tree_bound_floor = self.state.tree_bound_floor.max(self.warm.bound);
+            self.warm.bound = f64::NEG_INFINITY;
+            self.warm.numerical_bound = f64::NEG_INFINITY;
+            self.warm.certified_bound = f64::NEG_INFINITY;
+            self.warm.stabilization = None;
+            self.warm.clear_proximal();
+        }
+        Ok(())
+    }
+
     /// Resume this node with a new time/iteration budget and no external registry.
     pub fn solve(&self, mut options: Options) -> Result<Output<D>> {
         let deadline = self.resume_deadline(&mut options)?;
@@ -218,6 +322,11 @@ impl<const D: usize> NodeSnapshot<D> {
     }
 
     fn solve_forked_at(mut self, mut options: Options, deadline: Instant) -> Result<Output<D>> {
+        // A retained tree floor belongs to the snapshot's selected proof
+        // channel. In particular, a numerical floor is not a certificate.
+        if self.warm.bound_mode != options.cg.bound_mode {
+            self.state.tree_bound_floor = f64::NEG_INFINITY;
+        }
         for oracle in &mut self.state.oracles {
             oracle.solver.restore_node_state()?;
         }
@@ -230,13 +339,38 @@ impl<const D: usize> NodeSnapshot<D> {
     /// Omitted networks have zero coefficients. The caller supplies a valid cut
     /// or branch restriction; this method does not infer cut validity.
     pub fn with_row(&self, row: Row, coefficients: &[RowCoefficients]) -> Result<Self> {
-        self.with_row_class(row, coefficients, cg::CurvatureRowClass::Ordinary)
+        self.with_row_class(
+            row,
+            coefficients,
+            cg::CurvatureRowClass::Ordinary,
+            None,
+            &[],
+        )
     }
 
     /// Append a valid dynamic cut row, excluding it from automatic curvature
     /// distance measurements while retaining its ordinary pricing coefficients.
     pub fn with_dynamic_row(&self, row: Row, coefficients: &[RowCoefficients]) -> Result<Self> {
-        self.with_row_class(row, coefficients, cg::CurvatureRowClass::Dynamic)
+        self.with_row_class(row, coefficients, cg::CurvatureRowClass::Dynamic, None, &[])
+    }
+
+    /// Install a full-coordinate witness row with an independently established
+    /// residual RHS. Activity descriptors must be present before coefficients
+    /// and artificial columns are installed.
+    pub(super) fn with_residual_activity_row(
+        &self,
+        row: Row,
+        linear: &[RowCoefficients],
+        activities: &[AccumulatedActivityCoefficients],
+        residual_rhs: f64,
+    ) -> Result<Self> {
+        self.with_row_class(
+            row,
+            linear,
+            cg::CurvatureRowClass::Ordinary,
+            Some(residual_rhs),
+            activities,
+        )
     }
 
     fn with_row_class(
@@ -244,8 +378,10 @@ impl<const D: usize> NodeSnapshot<D> {
         row: Row,
         coefficients: &[RowCoefficients],
         class: cg::CurvatureRowClass,
+        residual_rhs: Option<f64>,
+        activities: &[AccumulatedActivityCoefficients],
     ) -> Result<Self> {
-        if !row.rhs.is_finite() {
+        if !row.rhs.is_finite() || residual_rhs.is_some_and(|rhs| !rhs.is_finite()) {
             return Err(invalid("network row RHS"));
         }
         let mut seen = HashSet::new();
@@ -267,6 +403,7 @@ impl<const D: usize> NodeSnapshot<D> {
         let mut node = self.fork()?;
         let shared = node.state.shared_rows.len();
         let physical = node.master.rhs.len();
+        activity_rows::install(&mut node.state, shared, activities)?;
         for oracle in &mut node.state.oracles {
             if let Some(c) = coefficients.iter().find(|c| c.network == oracle.network.id) {
                 if c.arcs.iter().any(|&value| value != 0.) {
@@ -291,15 +428,24 @@ impl<const D: usize> NodeSnapshot<D> {
                 .iter()
                 .find(|o| o.network.id == route.network)
                 .unwrap();
-            Ok(entries(oracle, &route.route, node.state.shared_offset)?
-                .into_iter()
-                .find(|&(r, _)| r == physical)
-                .map_or(0., |(_, v)| v))
+            appended_row_value(
+                oracle,
+                &route.route,
+                node.state.shared_offset,
+                shared,
+                physical,
+                coefficients.iter().find(|c| c.network == route.network),
+            )
         };
-        let mut rhs = row.rhs;
-        for fixed in &node.state.fixed_routes {
-            rhs -= fixed.quantity * route_value(&fixed.route)?;
-        }
+        let rhs = if let Some(rhs) = residual_rhs {
+            rhs
+        } else {
+            let mut rhs = row.rhs;
+            for fixed in &node.state.fixed_routes {
+                rhs -= fixed.quantity * route_value(&fixed.route)?;
+            }
+            rhs
+        };
         if !rhs.is_finite() {
             return Err(invalid("fixed network row overflow"));
         }
@@ -338,12 +484,7 @@ impl<const D: usize> NodeSnapshot<D> {
         // not a dual point for this child. Keep valid inherited lower bounds.
         node.warm.stabilization = None;
         node.warm.clear_proximal();
-        let penalty = node
-            .warm
-            .artificials
-            .iter()
-            .map(|&c| node.master.costs[c])
-            .fold(2.76_f64, f64::max);
+        let penalty = node.state.ordinary_artificial_cost;
         for (_, column) in
             cg::append_artificials(&mut node.master, physical..physical + 1, penalty)?
         {
@@ -715,3 +856,11 @@ pub(super) fn install_seed_routes<const D: usize>(
 #[cfg(test)]
 #[path = "../../../tests/unit/master/model/curvature_lifecycle_tests.rs"]
 mod curvature_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/unit/master/model/artificial_lifecycle_tests.rs"]
+mod artificial_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/unit/master/model/appended_row_tests.rs"]
+mod appended_row_tests;

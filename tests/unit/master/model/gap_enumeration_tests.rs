@@ -272,6 +272,7 @@ fn cg_post_install_handoff_retains_a_validated_original_incumbent() {
     } = output.snapshot;
     let state = Rc::new(RefCell::new(state));
     let mut controller = ColumnGenerationController {
+        objective_cutoff: f64::INFINITY,
         state: state.clone(),
         request_initial_enumeration: false,
         search_inactive_columns: false,

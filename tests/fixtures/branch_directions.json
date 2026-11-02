@@ -1,0 +1,30 @@
+[
+  {
+    "kind": "direction",
+    "config": {
+      "name": "ESA_7_1",
+      "direction": "lower-first"
+    }
+  },
+  {
+    "kind": "direction",
+    "config": {
+      "name": "ESA_7_2",
+      "direction": "lower-first"
+    }
+  },
+  {
+    "kind": "direction",
+    "config": {
+      "name": "ESA_42_1",
+      "direction": "lower-first"
+    }
+  },
+  {
+    "kind": "direction",
+    "config": {
+      "name": "ESA_42_2",
+      "direction": "lower-first"
+    }
+  }
+]

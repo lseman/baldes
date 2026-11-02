@@ -522,7 +522,9 @@ fn assignment_tree_matches_exhaustive_integer_covers() {
     opts.node = options();
     // Native `ApplyStrongBranchingEvaluation` defaults to false; this
     // trajectory is the plain route-count split without strong trials.
-    opts.mapped_strong_branching = None;
+    opts.branching_registry
+        .register(::baldes::master::model::BranchingRegistration::StrongBranching(None))
+        .unwrap();
     let tree = baldes::master::tree::solve(triangle(), opts.clone()).unwrap();
     // Independently enumerate the nine binary route choices. No optimum uses
     // repeated copies because every route covers a unit-demand customer.
@@ -1229,16 +1231,35 @@ fn native_half_incident_mapping_matches_physical_pricing_entries() {
             let mut options = baldes::master::tree::ModelTreeOptions::default();
             options.node.cg.stabilize = false;
             options.node.cg.bound_mode = mode;
-            options.branching = baldes::master::tree::NetworkBranchingPolicy::ResourceFirst;
-            options.mapped_variables = serde_json::from_str(include_str!(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/tests/fixtures/multi_network_native_half_arc_mappings.json"
-            )))
-            .unwrap();
+            options
+                .branching_registry
+                .register(::baldes::master::model::BranchingRegistration::Policy(
+                    baldes::master::tree::NetworkBranchingPolicy::ResourceFirst,
+                ))
+                .unwrap();
+            options
+                .branching_registry
+                .register_batch(
+                    (serde_json::from_str::<Vec<baldes::master::model::MappedBranchVariable>>(
+                        include_str!(concat!(
+                            env!("CARGO_MANIFEST_DIR"),
+                            "/tests/fixtures/multi_network_native_half_arc_mappings.json"
+                        )),
+                    )
+                    .unwrap())
+                    .into_iter()
+                    .map(::baldes::master::model::BranchingRegistration::Mapped),
+                )
+                .unwrap();
             // The pinned native run enabled ApplyStrongBranchingEvaluation.
             let mut strong = baldes::master::tree::StrongBranchingOptions::default();
             strong.phases[1].candidates = phase_two_candidates;
-            options.mapped_strong_branching = Some(strong);
+            options
+                .branching_registry
+                .register(
+                    ::baldes::master::model::BranchingRegistration::StrongBranching(Some(strong)),
+                )
+                .unwrap();
             let result = baldes::master::tree::solve(problem, options).unwrap();
             assert_eq!(result.status, baldes::master::tree::TreeStatus::Optimal);
             assert_eq!(result.incumbent, 2.);
@@ -1266,7 +1287,10 @@ fn native_plain_integral_child_closes_before_extra_pricing_phases() {
         options.node.cg.bound_mode = mode;
         // The pinned native run used the default `ApplyStrongBranchingEvaluation
         // = false`; strong trials would evaluate the route-count split.
-        options.mapped_strong_branching = None;
+        options
+            .branching_registry
+            .register(::baldes::master::model::BranchingRegistration::StrongBranching(None))
+            .unwrap();
         let result = baldes::master::tree::solve(problem, options).unwrap();
         assert_eq!(result.status, baldes::master::tree::TreeStatus::Optimal);
         assert_eq!(result.incumbent, 2.);
@@ -1293,17 +1317,30 @@ fn native_packing_registration_branches_without_manual_expression_mappings() {
         .problem::<2>()
         .unwrap();
         let mut options = baldes::master::tree::ModelTreeOptions::default();
-        options.mapped_strong_branching =
-            Some(baldes::master::tree::StrongBranchingOptions::default());
+        options
+            .branching_registry
+            .register(
+                ::baldes::master::model::BranchingRegistration::StrongBranching(Some(
+                    baldes::master::tree::StrongBranchingOptions::default(),
+                )),
+            )
+            .unwrap();
         options.node.cg.stabilize = false;
         options.node.cg.bound_mode = mode;
-        options.packing = Some(
+        if let Some(value) = Some(
             serde_json::from_str(include_str!(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/tests/fixtures/multi_network_native_packing.json"
             )))
             .unwrap(),
-        );
+        ) {
+            options
+                .branching_registry
+                .register(::baldes::master::model::BranchingRegistration::Packing(
+                    value,
+                ))
+                .unwrap();
+        }
         let result = baldes::master::tree::solve(problem, options).unwrap();
         assert_eq!(result.status, baldes::master::tree::TreeStatus::Optimal);
         assert_eq!(result.incumbent, 2.);
@@ -1330,14 +1367,24 @@ fn native_packing_separator_is_bypassed_without_strong_branching() {
         let mut options = baldes::master::tree::ModelTreeOptions::default();
         options.node.cg.stabilize = false;
         options.node.cg.bound_mode = mode;
-        options.packing = Some(
+        if let Some(value) = Some(
             serde_json::from_str(include_str!(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/tests/fixtures/multi_network_native_packing.json"
             )))
             .unwrap(),
-        );
-        options.mapped_strong_branching = None;
+        ) {
+            options
+                .branching_registry
+                .register(::baldes::master::model::BranchingRegistration::Packing(
+                    value,
+                ))
+                .unwrap();
+        }
+        options
+            .branching_registry
+            .register(::baldes::master::model::BranchingRegistration::StrongBranching(None))
+            .unwrap();
         let result = baldes::master::tree::solve(problem, options).unwrap();
         assert_eq!(result.status, baldes::master::tree::TreeStatus::Optimal);
         assert_eq!(result.incumbent, 2.);
@@ -1374,13 +1421,20 @@ fn native_packing_registration_survives_window_splitting_and_restores_input_arcs
     let mut options = baldes::master::tree::ModelTreeOptions::default();
     options.node.cg.stabilize = false;
     options.time_window_selection = Some(0);
-    options.packing = Some(
+    if let Some(value) = Some(
         serde_json::from_str(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/multi_network_native_packing.json"
         )))
         .unwrap(),
-    );
+    ) {
+        options
+            .branching_registry
+            .register(::baldes::master::model::BranchingRegistration::Packing(
+                value,
+            ))
+            .unwrap();
+    }
     let result = baldes::master::tree::solve(problem, options).unwrap();
     assert_eq!(result.status, baldes::master::tree::TreeStatus::Optimal);
     assert_eq!(result.incumbent, 2.);
@@ -1408,13 +1462,20 @@ fn native_packing_registration_can_start_from_a_saved_root_snapshot() {
     let mut options = baldes::master::tree::ModelTreeOptions::default();
     options.node.cg.stabilize = false;
     let output = model::solve(problem, options.node.clone()).unwrap();
-    options.packing = Some(
+    if let Some(value) = Some(
         serde_json::from_str(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/multi_network_native_packing.json"
         )))
         .unwrap(),
-    );
+    ) {
+        options
+            .branching_registry
+            .register(::baldes::master::model::BranchingRegistration::Packing(
+                value,
+            ))
+            .unwrap();
+    }
     let result = output.snapshot.solve_tree(options).unwrap();
     assert_eq!(result.status, baldes::master::tree::TreeStatus::Optimal);
     assert_eq!(result.incumbent, 2.);

@@ -106,8 +106,9 @@ pub(super) fn evaluate<const D: usize>(
     let results: Vec<Result<OutputTransfer<D>>> = workers.install(|| {
         jobs.into_par_iter()
             .map(|job| {
-                job.restore()?
-                    .solve_forked(options.clone())
+                let mut node = job.restore()?;
+                node.reset_evaluation_artificials()?;
+                node.solve_forked(options.clone())
                     .and_then(Output::into_transfer)
             })
             .collect()

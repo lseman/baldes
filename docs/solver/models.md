@@ -247,31 +247,43 @@ shared rows and original multiplicities with exact sums; objectives round upward
 Fixed routes are included in this replay. A rounded labeling resource profile
 alone never authorizes an incumbent or fixed route.
 
-`ModelTreeOptions::branching` selects the family and child order.
+`ModelTreeOptions::branching_registry` holds the family and child order.
 `NetworkBranchingPolicy::MultiplicityFirst` is the default: it tries fractional
 network route counts first and visits upper children first, following the
 observed public native controls. `ResourceFirst` preserves the resource and
 assignment order above, with lower children first.
 It does not change disjunctions or proof bounds, and does not promise the same
 LP basis, generated columns or total node count as another backend. Select it
-with `--network-branching multiplicity-first`, JSON solve option
-`"network_branching": "multiplicity-first"`, or Python
-`solve(..., tree=True, network_branching="multiplicity-first")`.
+with a `policy` entry in `branching_registrations` whose `config` is
+`"multiplicity-first"`.
+
+The inferred route-count family uses a minimum distance of 0.02 from the
+nearest integer, with the comparison tolerance applied as well. This candidate
+admission threshold is separate from the tree's integrality tolerance. A valid
+count disjunction can still be used by the generic fallback when the registered
+candidate list is exhausted. Registered component classes and generators keep
+their priorities under the presets, alongside mapped variables and packing
+families.
+
+Interrupted child solves retain the valid inherited tree bound even when their
+current pricing call establishes no new bound. An inherited floor is discarded
+when switching proof modes, so a numerical estimate cannot enter the certified
+channel through snapshot reuse.
 
 ### Registered branching families
 
-These JSON solve options (tree only) add generators. Each one has a priority:
+These JSON entries in `branching_registrations` (tree only) add generators. Each one has a priority:
 higher priorities are searched first, and within a priority the most
 fractional candidate is preferred. They all take part in strong branching and
 branching history.
 
-- `"clusters": [{"network": 0, "partition": null, "theta": 1.0, "priority": 10}]`:
+- `{"kind": "cluster", "config": {"network": 0, "partition": null, "theta": 1.0, "priority": 10}}`:
   cluster boundaries (traversals entering a vertex group) and cluster pairs
   (traversals between two groups) from Silva, Uchoa and Subramanian (2024).
   Without `partition`, customers are grouped by cutting minimum-spanning-tree
   edges longer than `mean + theta * std`. The source and sink form the depot
   group.
-- `"ryan_foster": {"priority": 2, "sets": [...]}`: packing-set Ryan–Foster.
+- `{"kind": "ryan-foster", "config": {"priority": 2, "sets": [...]}}`: packing-set Ryan–Foster.
   `sets` uses the `packing` vertex format; when it is empty, the `packing`
   registration is used, and a single network otherwise uses each customer
   vertex as its own set. Candidates are pairs whose LP co-occurrence lies
@@ -279,12 +291,12 @@ branching history.
   The together child is the upper child. A branch is a `<= 0` row whose
   column coefficient is one for violating paths, and pricing excludes those
   paths, as in the native solver; columns are not capped.
-- `"branching_expressions": [{"name": "y", "priority": 3, "terms":
-  [{"network": 0, "id": 4, "coefficient": 1.0}, {"id": 9, "coefficient": 2.0}]}]`:
+- `{"kind": "expression", "config": {"name": "y", "priority": 3, "terms":
+  [{"network": 0, "id": 4, "coefficient": 1.0}, {"id": 9, "coefficient": 2.0}]}}`:
   a linear expression over original pricing variables (`network` and `id`)
   and master variables (`id` only), branched on as one integer variable.
   The expression must be integer on every integer solution.
-- `"aggregate_variable_branching": [{"id": 4, "priority": 2, "networks": []}]`:
+- `{"kind": "aggregate-variable", "config": {"id": 4, "priority": 2, "networks": []}}`:
   an original variable ID summed over every network that registers it (or the
   listed networks), named `AGG_<id>`.
 
@@ -1050,14 +1062,14 @@ static-master coefficients still require integers.
 ```python
 result = problem.solve(
     tree=True,
-    mapped_variables=({
+    branching_registrations=({"kind": "mapped", "config": {
         "name": "total-route-count",
         "priority": 1.,
         "networks": [
             {"network": 7, "per_route": 1.},
             {"network": 42, "per_route": 1.},
         ],
-    },),
+    }},),
 )
 ```
 
@@ -1083,10 +1095,54 @@ estimates and history rank candidates; estimates do not become proof bounds.
 Trial solutions that pass original-model integer witness validation can improve
 the global incumbent, including solutions found in restricted-master trials.
 Their objective is recomputed from original route and master-variable costs.
-Trials run only with `mapped_strong_branching=True` (Rust: a `Some` value in
-`ModelTreeOptions::mapped_strong_branching`). The default is off, matching the
+Pseudocost history caps an observation at the incumbent available through that
+trial before computing its gain per fractional distance. The diagnostic trace
+keeps the raw LP estimate; neither value supplies a proof bound.
+Trials run only with a `strong-branching` registration (Rust:
+`BranchingRegistration::StrongBranching(Some(...))`). The default is off, matching the
 native `ApplyStrongBranchingEvaluation = false`; candidates are then selected by
-priority/fractionality alone.
+their registered family policy.
+
+Rust callers and network solve-options JSON can supply `selection` registrations,
+keyed by mapped or cluster generator name. Each entry separates `family`, `rule`,
+`variable_priority`, and `default_factor` from the mapped variable's family-level
+`priority`. Rules are `first-found`, `highest-priority`, `most-fractional`,
+`least-fractional`, `fraction-weighted-priority`, `closest-to-upper`, and
+`closest-to-lower`. Equal primary keys prefer the smaller default factor, then
+registration order. Members of one family must share a family level and rule.
+Original integer pricing-variable registration supplies this metadata
+automatically; an original variable's priority is no longer its family level.
+Explicit mapped registrations without metadata retain their existing policy.
+
+Registered scalar aggregates use their own admission precision: the signed
+fractional part must lie in `[1e-8, 1 - 1e-8]`, independently of ordinary mapped
+variable admission and the tree tolerance. Negative fractional sums are omitted
+by this family. `register_with_pricing` installs this metadata automatically;
+Rust and solve-options JSON expose per-generator thresholds through
+an `aggregate-admission` entry with `config` containing `name` and `threshold`.
+Thresholds must be finite
+and in `(0, 0.5]`. This controls candidate admission and does not change the
+registered expression's integrality contract or branch rows.
+
+Aggregates compiled from pricing-variable registrations use a separate
+candidate projection. Strong branching materializes eligible integer originals
+from fractional active LP columns, filtering each column before route values
+are combined. Projection follows pricing-variable registration order; cost
+compilation and reported variables retain their canonical order. Continuous
+originals remain in the child expression, and fixed route copies remain in its
+full activity. They are not appended to the residual candidate projection.
+Without strong branching, generated columns do not supply aggregate candidates.
+`register_with_pricing` installs this projection with the child mapping; the
+`aggregate` method alone constructs only the child expression.
+
+`{"kind": "paths-per-network", "config": {"network": 42, "priority": 2.0}}` registers an explicit
+path-count family, independently of the inferred route-count preset. Rust uses
+`PathsPerNetworkBranching`. The `paths:42` generator keeps its configured
+priority under every preset and participates in history. This registration
+requires an open source-to-sink network without a direct source-to-sink arc,
+incoming source arcs, or outgoing sink arcs. Each complete route then has one
+source departure and one sink arrival; fixed route copies remain in its count.
+Other path domains are rejected during registration.
 Branch scores use the numerical parent bound even in certified mode. Their
 continuous-objective cutoff is the parent incumbent minus half
 `network_scoring_gap_tolerance` (default `1e-6`), matching the native absolute-gap
@@ -1096,8 +1152,8 @@ tree's stopping tolerance. Rust uses `scoring_gap_tolerance` in
 Trial witnesses update the tree incumbent after the evaluation pass returns;
 they do not replace the parent cutoff during the same pass.
 Results expose `strong_branching_trials`, `mapped_history_ranked` and
-`mapped_branch_evaluations`. The CLI accepts `--mapped-variables FILE` and
-`--mapped-strong-branching`/`--no-mapped-strong-branching`; see
+`mapped_branch_evaluations`. Supply `mapped` and `strong-branching` entries
+through `--branching-registrations FILE`; see
 [`mapped_variables.json`](../../examples/networks/mapped_variables.json).
 
 Recovered explicit proximal defaults are available through
@@ -1123,23 +1179,27 @@ not an LP-pricing convergence claim. Retained witnesses survive later master
 changes and are revalidated before publication. Root LP solves keep this behavior
 disabled by default; Rust `Options.integer_primal_termination` enables it explicitly.
 
-`network_branching="phased"` admits original resource-group, assignment,
+A `policy` registration with `config="phased"` admits original resource-group, assignment,
 integer master-variable, route-count, arc and time-window proposals into the same
 phased evaluator as registered aggregates. Family priorities can be supplied in
-`network_branch_priorities`; defaults are the routing adapter preset, rather
+`priorities` registrations; defaults are the routing adapter preset, rather
 than a claim that all native models register the same priorities. Route-count
 generators do not enter retained native-style ranking history. Rust callers can
 also select completed-subtree estimates through `StrongBranchingOptions`.
 Named generators can select `upper-first` or `lower-first` through
-`network_branch_directions`, for example `{"count42": "lower-first"}` for a
+`direction` registrations, for example `{"kind": "direction", "config":
+{"name": "count42", "direction": "lower-first"}}` for a
 registered aggregate called `count42`, or `{"ESA_7_1": "lower-first"}` for a
 registered packing assignment. The Rust field is
-`ModelTreeOptions.branch_directions`; CLI reads the same JSON map with
-`--network-branch-directions FILE`, and Python accepts the map as a keyword.
+`BranchingRegistration::Direction`; CLI and Python accept
+the same registration entries.
 Directions require `phased` branching (also selected by packing
 registration) and a tree solve. A name can remain dormant until its generator
-becomes fractional. Direction controls both trial construction and committed
-child admission; it does not override the frontier's depth/bound comparisons.
+becomes fractional. Direction controls initial trial construction and admission
+without trials. Priced strong phases subsequently evaluate the child with the
+larger preceding LP estimate first, preserving the existing order for tolerant
+ties. The selected pair retains its last trial order on admission.
+It does not override the frontier's depth/bound comparisons.
 Phased proposals default to upper first. Recorded side zero always
 means the lower branch and side one the upper branch, regardless of execution
 order; their history distances and proof outputs remain attached to those sides.
@@ -1150,10 +1210,21 @@ replace an independently published proof bound.
 Trials use independent children. Surviving candidates keep their private LP,
 columns and pricing workspaces between phases. Each priced phase restores the
 full parent schedule before applying its own pricing floor, so a heuristic
-slice cannot remove the later exact phase. Selected children can reuse completed exact
+slice cannot remove the later exact phase. A `pricing_phase_floor` beyond the
+available schedule keeps its last stage. Exact-treatment validation still
+requires a requested floor of zero. Selected children can reuse completed exact
 pricing results and their ordinary bound provenance, including the selected
 certificate channel in certified mode. Restricted-master, heuristic and
 incomplete trials contribute ranking estimates and validated feasible solutions.
+Attempted nonexact trials can enter history even at pricing floor zero. Exact
+treatment also records finite iteration-limited observations. An iteration-limited
+trial's finite penalty LP can rank the branch despite unresolved artificials;
+neither its treatment label nor its history entry supplies a proof bound.
+Timed-out priced trials instead record the unavailable-value sentinel `1e12`,
+including a zero-iteration sibling. Restricted-master screens retain a fresh
+optimal LP objective when the backend completed before the deadline check;
+stopped screens without a fresh optimal result record the sentinel. A retained
+objective from an earlier solve does not qualify as a fresh observation.
 Selected children retain those LP columns, basis and pricing workspaces even
 when the local pass stops before exact completion. Their full pricing schedules
 are restored, and ordinary tree treatment performs a fresh pricing scan.
@@ -1162,19 +1233,39 @@ trial survive even when its final status is incomplete. Each channel remains
 independent; heuristic and restricted-LP objectives cannot replace inherited
 proof bounds. Partial estimates never become proof bounds or completed child
 outputs. Discarded candidates remain isolated.
-Phased trials follow their generator's direction, including mapped and
+Phased trials start in their generator's direction, including mapped and
 packing-assignment proposals. An exact infeasible trial is retained only with an
 original-domain phase-one proof. Its closed state participates in native queue
 ordering and outer selection budgets, but it is neither re-priced nor counted
 as unresolved work. A solver status or positive artificial penalty alone does
 not authorize this closure. If the outer treatment budget is exhausted before phased
 branching starts, the current node stays unresolved without running trials.
-A candidate admitted before the strong-pass deadline attempts both sides. If
+A candidate admitted before the strong-pass deadline attempts both sides unless
+the exact phase's partial-score comparison has already excluded it from winning.
+That comparison skips evaluation work only; it never prunes the child domains.
+If
 that deadline expires during its first side, the sibling receives zero remaining
 time and retains its inherited proof bounds. This attempt still counts in trial
 and exact-processed statistics, while no LP iterations or pricing calls are
-invented. A zero-iteration output preserves the preceding LP estimate, or the
-unknown-value sentinel for a fresh side.
+invented. A timed-out priced attempt uses the unavailable-value sentinel for
+ranking and history while preserving independently published proof bounds.
+
+`StrongPhase` exposes independent `exact` treatment, cut-round bounds and
+`reduced_cost_fixing`. The standard three-stage setup disables separation and
+fixing/enumeration for its restricted and heuristic screens, and enables them
+for its exact stage. `exact=None` retains inference from the pricing floor and
+restricted-master flag for custom phases. This treatment flag cannot turn an
+unfinished or heuristic pricing result into a proof. The ordinary node's
+minimum cut rounds govern exact treatment; a nonexact phase supplies its own
+minimum. `cg::Options.min_cut_rounds` delays tailing off while successful cuts
+remain available and does not repeat empty separation passes. Custom
+`StrongPhase` literals can use `..StrongPhase::default()` for the added controls.
+Strong branching uses the tree deadline by default. Rust callers can impose
+additional pass and child limits with `time_limit` and `trial_time_limit`;
+both default to `Duration::MAX`.
+`partial_score_conservativeness` scales gains only for children not yet processed
+in the current exact phase. The comparison keeps its fixed normalization gap;
+the default factor is one.
 
 Set `network_share_inactive_columns=true` in JSON/Python, or pass
 `--tree --network-share-inactive-columns`, to share generated physical paths
@@ -1222,8 +1313,8 @@ source constraints. Leave the option false for the default source-domain
 contract. Ambiguous source boundaries and nonfinite machine operations remain
 uncertified. See the retained proof-scope counterexamples.
 
-Packing-assignment branching can be registered with `packing` in solve
-options, or `--packing FILE` for JSON model input to `baldes solve`. For example:
+Packing-assignment branching uses a `packing` entry in `branching_registrations`.
+For example, its `config` can be:
 
 ```json
 {"priority": 1000, "networks": [
@@ -1250,7 +1341,7 @@ and from the native binary. This does not promise identical symmetric branch
 IDs or universal search trajectories. Explicit mappings may coexist, with
 names distinct from the generated `ESA_<network>_<group>` names.
 
-With `mapped_strong_branching=False` (the default; CLI `--no-mapped-strong-branching`),
+Without a `strong-branching` registration (the default),
 the packing separator is bypassed; ordinary count/original-activity
 branching continues. Explicit `mapped_variables` retain their separate
 rank-without-trials behavior.

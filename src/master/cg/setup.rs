@@ -9,6 +9,9 @@ pub(super) fn validate_options(options: &Options) -> Result<()> {
     {
         return Err(invalid("column generation options"));
     }
+    if options.min_cut_rounds > options.max_cut_rounds {
+        return Err(invalid("minimum cut rounds exceed maximum cut rounds"));
+    }
     Ok(())
 }
 

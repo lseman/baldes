@@ -2,6 +2,12 @@
 use super::*;
 
 pub(super) fn validate_options(options: &Options) -> Result<()> {
+    if options
+        .objective_cutoff
+        .is_some_and(|cutoff| !cutoff.is_finite())
+    {
+        return Err(invalid("objective cutoff must be finite"));
+    }
     if options.gap_mip.is_some() && !cfg!(feature = "highs") {
         return Err(invalid("gap enumeration MIP requires the highs feature"));
     }
@@ -205,11 +211,16 @@ pub(super) fn prepare_with_seed_routes<const D: usize>(
     let master_only = oracles.is_empty();
     let mut state = State {
         component_branches: vec![],
+        component_count_bounds: HashMap::new(),
+        component_local_rows: Arc::new(vec![]),
+        component_branch_exclusions: Arc::new(vec![]),
         pricing_witness: None,
         tree_incumbent: options.fixing_upper_bound.unwrap_or(f64::INFINITY),
         integer_primal_termination: options.integer_primal_termination,
         witness_tolerance: options.cg.tolerance,
         box_pricing_admission: false,
+        ordinary_artificial_cost: options.cg.artificial_cost,
+        cut_artificial_bases: HashMap::new(),
         variable_boxes: HashMap::new(),
         grouped_variable_boxes: HashMap::new(),
         original_variable_costs: options.original_variable_costs.clone(),
@@ -233,6 +244,7 @@ pub(super) fn prepare_with_seed_routes<const D: usize>(
         mapped_subtree_size: 1e12,
         mapped_subtree_priority: 1e12,
         mapped_lineage: 0,
+        branch_history_origin: None,
         node_depth: 0,
         scheduler: Scheduler::new(
             options.network_pricing_schedule,
@@ -660,6 +672,7 @@ fn execute_node_cg<const D: usize>(
     let state = Rc::new(RefCell::new(state));
     let mut controller = ColumnGenerationController {
         state: state.clone(),
+        objective_cutoff: options.objective_cutoff.unwrap_or(f64::INFINITY),
         request_initial_enumeration,
         search_inactive_columns: options.search_inactive_columns,
         artificial_penalty: None,
@@ -667,7 +680,8 @@ fn execute_node_cg<const D: usize>(
         enumeration_checkpoint: None,
         removed_columns: Vec::new(),
         trust_preprocessing_infeasibility: !options.preprocessing.integer_domains,
-        allow_objective_fixing: options.cg.bound_mode == cg::BoundMode::Numerical,
+        allow_objective_fixing: options.reduced_cost_fixing
+            && options.cg.bound_mode == cg::BoundMode::Numerical,
         checkpoints: CheckpointStore {
             prior_cg: None,
             rollback: None,
@@ -815,6 +829,7 @@ fn execute_node_cg<const D: usize>(
         result.lp = master.objective;
     }
     if result.status == cg::Status::Optimal
+        && !result.pruned_by_bound
         && (!result.bound.is_finite()
             || !cg::gap_smaller_than_tolerance(result.bound, result.lp, gap.0, gap.1))
     {

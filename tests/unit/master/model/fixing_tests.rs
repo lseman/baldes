@@ -115,6 +115,7 @@ fn controller_runs_fixing_only_for_numerical_non_enumerating_solves() {
         let NodeSnapshot { master, state, .. } = output.snapshot;
         let state = Rc::new(RefCell::new(state));
         let mut controller = ColumnGenerationController {
+            objective_cutoff: f64::INFINITY,
             state: state.clone(),
             request_initial_enumeration: false,
             search_inactive_columns: false,

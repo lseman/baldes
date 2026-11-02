@@ -179,7 +179,7 @@ All options to `solve` are keyword-only.
 | `tree` | `False` | Solve a root LP or search a shared-master integer tree |
 | `network_pricing_schedule` | `"full-sweep"` | `full-sweep`, `cyclic`, `sorted`, `promising-first`, `unvisited-first` |
 | `network_unpromising_limit` | `1` | Positive queue batch budget |
-| `network_branching` | `"multiplicity-first"` | `multiplicity-first`, `resource-first` or `phased` branching policy |
+| `branching_registrations` | `()` | Ordered branching families, policy and selection settings |
 | `stabilize` | `True` | Dual smoothing when no explicit proximal configuration replaces it |
 | `proximal` | `None` | Explicit proximal bands and optional multi-point policy |
 | `bound_mode` | `"numerical"` | Numerical or certified lower bounds |
@@ -221,12 +221,24 @@ contract. Root and tree APIs have different option sets from routing
 | `network_scoring_gap_tolerance` | `1e-6` | Absolute branch-score gap tolerance |
 | `network_search_inactive_columns` | `False` | Reprice retained inactive columns before another oracle call |
 | `network_share_inactive_columns` | `False` | Reprice columns shared by tree nodes/trials |
-| `network_branch_priorities` | `None` | Named branch-family priority mapping |
-| `network_branch_directions` | `None` | Named generator directions for phased branching |
-| `mapped_variables` | `()` | Registered original aggregate branch variables |
-| `packing` | `None` | Packing-assignment registration |
 | `variable_boxes` / `original_variable_boxes` | `()` | Verified variable envelopes |
-| `mapped_strong_branching` | `False` | Evaluate admitted branch proposals in trials (native default off) |
+
+Branching uses a single ordered list. Each entry has a `kind` and a `config`:
+
+```python
+result = problem.solve(
+    tree=True,
+    branching_registrations=[
+        {"kind": "policy", "config": "phased"},
+        {"kind": "strong-branching", "config": {}},
+        {"kind": "direction", "config": {"name": "count42", "direction": "upper-first"}},
+    ],
+)
+```
+
+An empty strong-branching configuration selects the default phases. See
+[branching family registration](../solver/branch-family-registration.md) for
+family ordering and selection metadata.
 
 These controls configure the shared lifecycle's model registration. Network
 count does not select another engine. Routing-specific Python keywords belong

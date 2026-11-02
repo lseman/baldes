@@ -494,7 +494,22 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     // any static-variable dual feasibility repair.
                     smoothing.pricing.copy_from_slice(&current);
                 }
-                let mut answer = price(phase_walk.stage, &current)?;
+                let mut answer = match price(phase_walk.stage, &current) {
+                    Ok(answer) => answer,
+                    Err(error)
+                        if error.kind == crate::core::error::ErrorKind::Runtime
+                            && error.message.contains("time limit")
+                            && !controller.pricing_timeout_requires_rollback() =>
+                    {
+                        // The incomplete call supplies no pricing bound. Keep
+                        // only earlier bounds and the current restricted master.
+                        // Owners with a rollback point recover it outside CG.
+                        out.pricing_calls += 1;
+                        out.status = Status::TimeLimit;
+                        return finish(out, loaded, cut_artificials, pool, smoothing);
+                    }
+                    Err(error) => return Err(error),
+                };
                 // One exact key per returned column is reused for the pool,
                 // improvement test and insertion instead of reformatting it.
                 let keys: Vec<_> = answer.columns.iter().map(Column::signature).collect();
@@ -560,7 +575,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     ipm_accuracy.lower = ipm_accuracy.lower.max(pass_bound);
                     out.numerical_bound = out.numerical_bound.max(pass_bound);
                     if options.bound_mode == BoundMode::Certified {
-                        let incumbent = controller.incumbent();
+                        let incumbent = controller.objective_cutoff();
                         // Certify a closing pricing pass, or when the current
                         // master point suggests the incumbent gap can close.
                         // A numerical bound only schedules this attempt; it
@@ -658,11 +673,11 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     .is_some_and(|values| values.iter().any(|v| v.abs() > 1e-6));
                 let activity_due = phase_walk.penalty_updates < options.max_penalty_updates
                     && !(phase_walk.stage > 0
-                        && controller.incumbent().is_finite()
+                        && controller.objective_cutoff().is_finite()
                         && pass_bound.is_finite()
                         && gap_smaller_than_tolerance(
                             pass_bound,
-                            controller.incumbent(),
+                            controller.objective_cutoff(),
                             options.gap_absolute,
                             options.gap_relative,
                         ));
@@ -687,11 +702,11 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             penalties = fresh == 0
                 && due
                 && !(phase_walk.stage > 0
-                    && controller.incumbent().is_finite()
+                    && controller.objective_cutoff().is_finite()
                     && pass_bound.is_finite()
                     && gap_smaller_than_tolerance(
                         pass_bound,
-                        controller.incumbent(),
+                        controller.objective_cutoff(),
                         options.gap_absolute,
                         options.gap_relative,
                     ));
@@ -775,14 +790,18 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
         // An exact bound can close the incumbent gap even without a fresh
         // column. Stop before strict-improvement enumeration discards every
         // real route and replaces this feasible master with artificials.
+        // With positive artificials, the finite-penalty model is a relaxation
+        // of the original zero-artificial subset. Its completed exact bound
+        // may close that subset's gap after phase zero. Optimal here records
+        // pruned_by_bound; it does not assert original LP primal convergence.
         if !converged
-            && !positive
+            && (!positive || (exact && phase_walk.stage == 0))
             && (out.bound_mode == BoundMode::Certified || fresh > 0 || exact)
-            && controller.incumbent().is_finite()
+            && controller.objective_cutoff().is_finite()
             && out.bound.is_finite()
             && gap_smaller_than_tolerance(
                 out.bound,
-                controller.incumbent(),
+                controller.objective_cutoff(),
                 options.gap_absolute,
                 options.gap_relative,
             )
@@ -799,7 +818,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             // Fixing/enumeration can retain only routes capable of improving
             // the incumbent. A bound on that restricted problem may exceed
             // the incumbent; the original problem's global bound cannot.
-            out.bound = out.bound.min(controller.incumbent());
+            out.bound = out.bound.min(controller.objective_cutoff());
             match out.bound_mode {
                 BoundMode::Numerical => out.numerical_bound = out.bound,
                 BoundMode::Certified => out.certified_bound = out.bound,
@@ -957,7 +976,9 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 } else {
                     tailing = 0;
                 }
-                if tailing >= options.tailing_off_counter {
+                if tailing >= options.tailing_off_counter
+                    && out.cut_rounds >= options.min_cut_rounds
+                {
                     stop_cuts = true;
                 }
             }
@@ -1033,6 +1054,11 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                         out.column_tags.push(-1);
                         loaded.push(None);
                         cut_artificials.push((row, column));
+                        controller.cut_artificial_added(
+                            row,
+                            column,
+                            options.cut_artificial_cost,
+                        )?;
                     }
                 }
                 let removed = controller.take_removed_columns();

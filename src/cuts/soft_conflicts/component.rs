@@ -73,6 +73,46 @@ pub(super) struct Class {
     sequence: ComponentSequence,
     /// Last event activates the class only once a physical terminal arc occurs.
     emissions: Vec<(usize, i64)>,
+    /// Immutable grouped-event ranges, shared by pricing-state/row clones.
+    coordinate_events: Option<std::sync::Arc<[CoordinateEvents]>>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct CoordinateEvents {
+    coordinate: usize,
+    start: usize,
+    end: usize,
+}
+
+fn coordinate_events(
+    sequence: &ComponentSequence,
+    emissions: &[(usize, i64)],
+) -> Option<std::sync::Arc<[CoordinateEvents]>> {
+    if sequence.bounds.is_empty() || emissions.windows(2).any(|pair| pair[0].0 > pair[1].0) {
+        return None;
+    }
+    let mut ranges = Vec::new();
+    let mut start = 0;
+    while start < emissions.len() {
+        let coordinate = emissions[start].0;
+        let mut end = start + 1;
+        while end < emissions.len() && emissions[end].0 == coordinate {
+            end += 1;
+        }
+        if sequence
+            .bounds
+            .iter()
+            .any(|bound| bound.coordinate == coordinate)
+        {
+            ranges.push(CoordinateEvents {
+                coordinate,
+                start,
+                end,
+            });
+        }
+        start = end;
+    }
+    Some(ranges.into())
 }
 
 // All validated thresholds are finite, so structural equality is reflexive.
@@ -135,6 +175,7 @@ impl PresenceRow {
         {
             return Err(invalid("component class coordinate or threshold"));
         }
+        let coordinate_events = coordinate_events(&sequence, &emissions);
         Ok(Self {
             events: emissions.len() + 1,
             pairs: vec![],
@@ -143,6 +184,7 @@ impl PresenceRow {
                 coordinates,
                 sequence,
                 emissions,
+                coordinate_events,
             }),
         })
     }
@@ -162,12 +204,32 @@ impl Class {
             return Ok(0);
         }
         Ok(usize::from(self.sequence.satisfied_by(|coordinate| {
-            self.emissions
-                .iter()
-                .enumerate()
-                .any(|(event, &(c, _))| c == coordinate && present(event))
+            self.coordinate_present(state, coordinate)
                 .then_some(state.values[coordinate] as f64)
         })))
+    }
+
+    fn coordinate_present(&self, state: &PresenceState, coordinate: usize) -> bool {
+        let Some(ranges) = &self.coordinate_events else {
+            return self.emissions.iter().enumerate().any(|(event, &(c, _))| {
+                c == coordinate && state.words[event / 64] & (1 << (event % 64)) != 0
+            });
+        };
+        let Ok(index) = ranges.binary_search_by_key(&coordinate, |range| range.coordinate) else {
+            return false;
+        };
+        let range = ranges[index];
+        let first = range.start / 64;
+        let last = (range.end - 1) / 64;
+        let left = u64::MAX << (range.start % 64);
+        let right = u64::MAX >> (63 - ((range.end - 1) % 64));
+        if first == last {
+            state.words[first] & left & right != 0
+        } else {
+            state.words[first] & left != 0
+                || state.words[first + 1..last].iter().any(|&word| word != 0)
+                || state.words[last] & right != 0
+        }
     }
 
     pub(super) fn advance(&self, state: &mut PresenceState, event: usize) -> Result<()> {
@@ -200,3 +262,7 @@ impl Class {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/cuts/soft_conflicts/component_event_tests.rs"]
+mod event_tests;

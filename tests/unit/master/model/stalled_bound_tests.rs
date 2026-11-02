@@ -200,3 +200,85 @@ fn uncertified_stalled_bound_does_not_close_a_certified_tree() {
     assert_eq!(result.bound, f64::NEG_INFINITY);
     assert!(result.open_nodes > 0);
 }
+
+#[test]
+fn interrupted_fork_retains_inherited_tree_floor_after_dropping_warm_bounds() {
+    for mode in [cg::BoundMode::Numerical, cg::BoundMode::Certified] {
+        let mut node_options = options();
+        node_options.cg.bound_mode = mode;
+        let mut root = floor_fixture(node_options.clone());
+        let established = root.master.bound;
+        assert_eq!(established, 2.);
+        // The tree stores the parent floor separately before queuing a child.
+        // Incumbent-dependent pricing exclusions are discarded by the next fork,
+        // along with the warm bounds that relied on them; the floor remains valid.
+        root.snapshot.state.tree_bound_floor = established;
+        root.snapshot.state.objective_fixed = true;
+        let fork = root.snapshot.fork().unwrap();
+        assert_eq!(fork.warm.bound, f64::NEG_INFINITY);
+        assert_eq!(fork.tree_bound(), established);
+
+        for overall in [Duration::ZERO, Duration::from_secs(1)] {
+            node_options.cg.time_limit = Duration::ZERO;
+            let result = root
+                .snapshot
+                .solve_tree(ModelTreeOptions {
+                    node: node_options.clone(),
+                    time_limit: overall,
+                    ..Default::default()
+                })
+                .unwrap();
+            assert_eq!(result.status, TreeStatus::TimeLimit);
+            assert_eq!(result.bound, established);
+            assert_eq!(result.open_nodes, 1);
+            assert_eq!(result.incumbent, f64::INFINITY);
+        }
+    }
+}
+
+fn floor_fixture(node_options: Options) -> Output<2> {
+    let mut graph = Graph::<2>::new(3, 1).unwrap();
+    for vertex in 0..3 {
+        graph.set_bounds(vertex, 0, 0., 10.).unwrap();
+    }
+    graph.add_arc(0, 1, 1.).unwrap();
+    graph.add_arc(1, 2, 1.).unwrap();
+    let problem = Problem::set_partitioning(graph, 1.).unwrap();
+    let root = solve_with_master_variables(problem, vec![], node_options).unwrap();
+    assert_eq!(root.master.status, cg::Status::Optimal);
+    root
+}
+
+#[test]
+fn changed_bound_mode_does_not_promote_an_inherited_floor() {
+    for (from, to) in [
+        (cg::BoundMode::Numerical, cg::BoundMode::Certified),
+        (cg::BoundMode::Certified, cg::BoundMode::Numerical),
+    ] {
+        let mut node_options = options();
+        node_options.cg.bound_mode = from;
+        let mut root = floor_fixture(node_options.clone());
+        root.snapshot.state.tree_bound_floor = root.master.bound;
+        root.snapshot.state.objective_fixed = true;
+        node_options.cg.bound_mode = to;
+        node_options.cg.time_limit = Duration::ZERO;
+        // Node solves and tree solves must both discard untyped inherited
+        // floors when switching the selected numerical/certified proof channel.
+        let child = root.snapshot.solve(node_options.clone()).unwrap();
+        assert_eq!(child.snapshot.tree_bound(), f64::NEG_INFINITY);
+        for overall in [Duration::ZERO, Duration::from_secs(1)] {
+            let result = root
+                .snapshot
+                .solve_tree(ModelTreeOptions {
+                    node: node_options.clone(),
+                    time_limit: overall,
+                    ..Default::default()
+                })
+                .unwrap();
+            assert_eq!(result.status, TreeStatus::TimeLimit);
+            assert_eq!(result.bound, f64::NEG_INFINITY);
+            assert_eq!(result.incumbent, f64::INFINITY);
+            assert!(result.open_nodes > 0);
+        }
+    }
+}

@@ -131,6 +131,182 @@ fn variable() -> OriginalPricingVariable {
     }
 }
 
+#[test]
+fn original_registration_retains_explicit_selection_metadata() {
+    let (_, registry) = compile_pricing_variables(alternatives(), &[variable()]).unwrap();
+    let mut tree = ModelTreeOptions::default();
+    tree.branching_registry.branch_selection.insert(
+        "X_7_0".into(),
+        BranchSelection {
+            family: "custom-original".into(),
+            rule: BranchSelectionRule::HighestPriority,
+            variable_priority: 9.,
+            default_factor: -2.,
+        },
+    );
+    registry.configure_tree(&mut tree).unwrap();
+    let metadata = &tree.branching_registry.branch_selection["X_7_0"];
+    assert_eq!(metadata.family, "custom-original");
+    assert_eq!(metadata.rule, BranchSelectionRule::HighestPriority);
+    assert_eq!(metadata.variable_priority, 9.);
+    assert_eq!(metadata.default_factor, -2.);
+}
+
+#[test]
+fn scalar_aggregate_registration_retains_its_own_admission_control() {
+    let (_, registry) = compile_pricing_variables(alternatives(), &[variable()]).unwrap();
+    let aggregate = AggregateVariableBranching {
+        id: 0,
+        priority: 2.,
+        networks: vec![],
+    };
+    let mut tree = ModelTreeOptions::default();
+    registry.configure_tree(&mut tree).unwrap();
+    registry
+        .compile_branching(&mut tree.branching_registry, &[], &[aggregate.clone()])
+        .unwrap();
+    assert_eq!(tree.branching_registry.aggregate_admission["AGG_0"], 1e-8);
+    assert!(!tree
+        .branching_registry
+        .aggregate_admission
+        .contains_key("X_7_0"));
+
+    let mut custom = ModelTreeOptions::default();
+    custom
+        .branching_registry
+        .aggregate_admission
+        .insert("AGG_0".into(), 0.02);
+    registry
+        .compile_branching(&mut custom.branching_registry, &[], &[aggregate.clone()])
+        .unwrap();
+    assert_eq!(custom.branching_registry.aggregate_admission["AGG_0"], 0.02);
+
+    let mut invalid = ModelTreeOptions::default();
+    invalid
+        .branching_registry
+        .aggregate_admission
+        .insert("AGG_0".into(), f64::NAN);
+    assert!(registry
+        .compile_branching(&mut invalid.branching_registry, &[], &[aggregate])
+        .is_err());
+    assert!(invalid.branching_registry.mapped_variables.is_empty());
+    assert!(invalid.branching_registry.aggregate_admission["AGG_0"].is_nan());
+    assert!(invalid.branching_registry.aggregate_projection.is_empty());
+}
+
+#[test]
+fn pricing_batch_accepts_admission_after_aggregate_and_rolls_back_on_failure() {
+    let (_, pricing) = compile_pricing_variables(alternatives(), &[variable()]).unwrap();
+    let aggregate = AggregateVariableBranching {
+        id: 0,
+        priority: 2.,
+        networks: vec![],
+    };
+    let mut registry = BranchingRegistry::default();
+    registry
+        .register_batch_with_pricing(
+            &pricing,
+            [
+                BranchingRegistration::AggregateVariable(aggregate.clone()),
+                BranchingRegistration::AggregateAdmission {
+                    name: "AGG_0".into(),
+                    threshold: 0.2,
+                },
+            ],
+        )
+        .unwrap();
+    assert_eq!(registry.aggregate_admission["AGG_0"], 0.2);
+    assert_eq!(registry.mapped_variables.len(), 1);
+    let before = registry.construction_order().to_vec();
+    assert!(registry
+        .register_batch_with_pricing(
+            &pricing,
+            [
+                BranchingRegistration::Policy(NetworkBranchingPolicy::Phased),
+                BranchingRegistration::AggregateVariable(aggregate),
+            ]
+        )
+        .is_err());
+    assert_eq!(registry.policy(), NetworkBranchingPolicy::MultiplicityFirst);
+    assert_eq!(registry.construction_order(), before);
+    assert_eq!(registry.mapped_variables.len(), 1);
+}
+
+#[test]
+fn registered_aggregate_projects_eligible_originals_but_keeps_every_child_member() {
+    let mut problem = alternatives();
+    let base = problem.networks[0].clone();
+    problem.networks.clear();
+    for id in [7, 8, 9] {
+        let row = problem.rows.len();
+        problem.rows.push(Row {
+            sense: RowSense::Equal,
+            rhs: 0.25,
+        });
+        let mut network = base.clone();
+        network.id = id;
+        network.route_entries = vec![(row, 1.)];
+        problem.networks.push(network);
+    }
+    let definitions: Vec<_> = [9, 7, 8]
+        .into_iter()
+        .map(|network| {
+            let mut v = variable();
+            v.network = network;
+            v.integer = network != 8;
+            v.cost = 0.;
+            v
+        })
+        .collect();
+    let (problem, registry) = compile_pricing_variables(problem, &definitions).unwrap();
+    assert_eq!(
+        registry
+            .variables
+            .iter()
+            .map(|v| v.network)
+            .collect::<Vec<_>>(),
+        [7, 8, 9]
+    );
+    assert_eq!(registry.registration_order[&(9, 0)], 0);
+    assert_eq!(registry.registration_order[&(7, 0)], 1);
+    let output = solve(problem, options()).unwrap();
+    let mut tree = ModelTreeOptions::default();
+    registry
+        .compile_branching(
+            &mut tree.branching_registry,
+            &[],
+            &[AggregateVariableBranching {
+                id: 0,
+                priority: 2.,
+                networks: vec![],
+            }],
+        )
+        .unwrap();
+    assert_eq!(
+        tree.branching_registry.mapped_variables[0].networks.len(),
+        3
+    );
+    assert_eq!(
+        tree.branching_registry.mapped_variables[0].value(&output),
+        Some(0.75)
+    );
+    assert_eq!(
+        tree.branching_registry.aggregate_projection["AGG_0"].value(&output, true),
+        Some(0.5)
+    );
+    assert!(super::super::model_strong::mapped_proposals(&output, &tree)
+        .unwrap()
+        .is_empty());
+    tree.branching_registry
+        .aggregate_admission
+        .insert("AGG_0".into(), 0.3);
+    tree.branching_registry.strong_branching = Some(Default::default());
+    let proposals = super::super::model_strong::mapped_proposals(&output, &tree).unwrap();
+    assert_eq!(proposals.len(), 1);
+    assert!(proposals[0].fresh);
+    assert_eq!(proposals[0].value, 0.75);
+}
+
 fn options() -> Options {
     let mut options = Options::default();
     options.cg.stabilize = false;
@@ -158,10 +334,15 @@ fn alternative_aliases_keep_one_original_activity_and_finite_optimum() {
     );
     let mut tree = ModelTreeOptions::default();
     registry.configure_tree(&mut tree).unwrap();
-    assert_eq!(tree.mapped_variables.len(), 1);
-    let before = tree.mapped_variables.len();
+    assert_eq!(tree.branching_registry.mapped_variables.len(), 1);
+    assert_eq!(tree.branching_registry.mapped_variables[0].priority, 1.);
+    let selection = &tree.branching_registry.branch_selection["X_7_0"];
+    assert_eq!(selection.variable_priority, 3.);
+    assert_eq!(selection.default_factor, 3.);
+    assert_eq!(selection.rule, BranchSelectionRule::MostFractional);
+    let before = tree.branching_registry.mapped_variables.len();
     assert!(registry.configure_tree(&mut tree).is_err());
-    assert_eq!(tree.mapped_variables.len(), before);
+    assert_eq!(tree.branching_registry.mapped_variables.len(), before);
 }
 
 #[test]
@@ -379,11 +560,11 @@ fn branching_expressions_and_aggregates_compile_to_mapped_variables() {
         }],
     };
     assert!(registry
-        .configure_expressions(&mut tree, &[duplicate], &[])
+        .compile_branching(&mut tree.branching_registry, &[duplicate], &[])
         .is_err());
     registry
-        .configure_expressions(
-            &mut tree,
+        .compile_branching(
+            &mut tree.branching_registry,
             &[],
             &[AggregateVariableBranching {
                 id: 0,
@@ -392,5 +573,9 @@ fn branching_expressions_and_aggregates_compile_to_mapped_variables() {
             }],
         )
         .unwrap();
-    assert!(tree.mapped_variables.iter().any(|v| v.name == "AGG_0"));
+    assert!(tree
+        .branching_registry
+        .mapped_variables
+        .iter()
+        .any(|v| v.name == "AGG_0"));
 }

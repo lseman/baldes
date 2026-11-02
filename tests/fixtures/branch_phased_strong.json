@@ -1,0 +1,10 @@
+[
+  {
+    "kind": "policy",
+    "config": "phased"
+  },
+  {
+    "kind": "strong-branching",
+    "config": {}
+  }
+]

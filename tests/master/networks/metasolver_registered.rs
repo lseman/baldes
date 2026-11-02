@@ -76,9 +76,20 @@ fn registered_mixed_networks_match_reference_roots_trees_and_singular_collection
                     configured.node = options;
                     // Mirror the reference's `ApplyStrongBranchingEvaluation`.
                     if case["strong_branching"] == true {
-                        configured.branching = baldes::master::tree::NetworkBranchingPolicy::Phased;
-                        configured.mapped_strong_branching =
-                            Some(baldes::master::tree::StrongBranchingOptions::default());
+                        configured
+                            .branching_registry
+                            .register(::baldes::master::model::BranchingRegistration::Policy(
+                                baldes::master::tree::NetworkBranchingPolicy::Phased,
+                            ))
+                            .unwrap();
+                        configured
+                            .branching_registry
+                            .register(
+                                ::baldes::master::model::BranchingRegistration::StrongBranching(
+                                    Some(baldes::master::tree::StrongBranchingOptions::default()),
+                                ),
+                            )
+                            .unwrap();
                     }
                     let output =
                         baldes::master::tree::solve(parse(&case["model"]), configured.clone())

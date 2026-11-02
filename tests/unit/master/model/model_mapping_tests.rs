@@ -1,5 +1,239 @@
 use super::*;
 
+#[test]
+fn aggregate_admission_matches_original_separator_fixtures() {
+    // Actual GenAggrSubProbVar separator at ELF 0x1a83a0, reference SHA256
+    // 103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6.
+    // See internal/branching-goal-20261101/registration/aggregate-admission.cpp.
+    let fixtures: Vec<(f64, bool)> =
+        serde_json::from_str(include_str!("aggregate_admission_fixtures.json")).unwrap();
+    for (value, expected) in fixtures {
+        assert_eq!(aggregate_fractional(value, 1e-8), expected, "{value}");
+    }
+    for value in [
+        f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        9_007_199_254_740_992.,
+    ] {
+        assert!(!aggregate_fractional(value, 1e-8));
+    }
+}
+
+#[test]
+fn aggregate_admission_validates_names_and_progressing_fractional_thresholds() {
+    let v = variable();
+    for threshold in [1e-8, 0.02, 0.5] {
+        validate_aggregate_admission([&v], &BTreeMap::from([(v.name.clone(), threshold)])).unwrap();
+    }
+    for threshold in [0., -1., 0.500001, f64::NAN, f64::INFINITY] {
+        assert!(
+            validate_aggregate_admission([&v], &BTreeMap::from([(v.name.clone(), threshold)]))
+                .is_err()
+        );
+        assert!(!aggregate_fractional(0.5, threshold));
+    }
+    assert!(
+        validate_aggregate_admission([&v], &BTreeMap::from([("missing".into(), 1e-8)])).is_err()
+    );
+    assert!(aggregate_fractional(0.5, 0.5));
+    assert!(!aggregate_fractional(0.49, 0.5));
+}
+
+#[test]
+fn aggregate_metadata_selects_raw_fraction_admission_without_changing_ordinary_mappings() {
+    let mut output = solve(triangle(), options()).unwrap();
+    let tag = output
+        .routes
+        .iter()
+        .position(|route| route.network == 42)
+        .unwrap();
+    for (value, ordinary, aggregate) in [
+        (5e-7_f64, false, true),
+        (0.5, true, true),
+        (-0.5, true, false),
+    ] {
+        output.values.fill(0.);
+        output.values[tag] = value.abs();
+        let mapping = MappedBranchVariable {
+            name: "aggregate".into(),
+            priority: 1.,
+            masters: vec![],
+            networks: vec![MappedNetworkVariable {
+                network: 42,
+                arcs: vec![],
+                activities: vec![],
+                per_route: value.signum(),
+            }],
+        };
+        let candidates = |admission: &BTreeMap<String, f64>| {
+            super::super::model_strong::mapped_proposals(
+                &output,
+                &ModelTreeOptions {
+                    tolerance: 0.1,
+
+                    branching_registry: {
+                        let mut __branch_registry =
+                            crate::master::model::BranchingRegistry::default();
+                        __branch_registry.mapped_variables = vec![mapping.clone()];
+                        __branch_registry.aggregate_admission = admission.clone();
+                        __branch_registry
+                    },
+                    ..Default::default()
+                },
+            )
+            .unwrap()
+        };
+        assert_eq!(!candidates(&BTreeMap::new()).is_empty(), ordinary);
+        let admission = BTreeMap::from([(mapping.name.clone(), 1e-8)]);
+        assert_eq!(!candidates(&admission).is_empty(), aggregate);
+    }
+}
+
+#[test]
+fn mapped_display_name_does_not_select_the_path_count_family_direction() {
+    let output = solve(triangle(), options()).unwrap();
+    let mapping = MappedBranchVariable {
+        name: "paths:display-only".into(),
+        priority: 1.,
+        masters: vec![],
+        networks: vec![MappedNetworkVariable {
+            network: 42,
+            arcs: vec![],
+            activities: vec![],
+            per_route: 1.,
+        }],
+    };
+    let mut controls = ModelTreeOptions::default();
+    controls.branching_registry.branching = NetworkBranchingPolicy::ResourceFirst;
+    controls.branching_registry.mapped_variables = vec![mapping];
+    let proposals = super::super::model_strong::mapped_proposals(&output, &controls).unwrap();
+    let selected = super::super::model_strong::choose_proposals(
+        &output,
+        &controls,
+        &mut super::super::model_strong::History::default(),
+        2.,
+        Instant::now() + std::time::Duration::from_secs(10),
+        proposals,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(selected.direction, None);
+}
+
+#[test]
+fn family_selection_rules_match_binary_comparator_fixtures() {
+    // Actual comparator at ELF 0x1a5260 in SHA256 103caf4a9c58d6141e935848294bff166
+    // 77f400323466dc23cd4b9e5c15889d6. The audit's rules-probe.cpp uses its original
+    // fraction/directed-fraction routines, not rewritten numeric getters.
+    let fixtures: Vec<(usize, f64, f64, u8, u8)> =
+        serde_json::from_str(include_str!("branch_selection_fixtures.json")).unwrap();
+    let rules = [
+        BranchSelectionRule::FirstFound,
+        BranchSelectionRule::HighestPriority,
+        BranchSelectionRule::MostFractional,
+        BranchSelectionRule::LeastFractional,
+        BranchSelectionRule::FractionWeightedPriority,
+        BranchSelectionRule::ClosestToUpper,
+        BranchSelectionRule::ClosestToLower,
+    ];
+    for (rule, x, y, ab, ba) in fixtures {
+        let a = BranchSelection {
+            rule: rules[rule - 1],
+            variable_priority: 100.,
+            default_factor: 100.,
+            ..BranchSelection::default()
+        };
+        let b = BranchSelection {
+            rule: a.rule,
+            ..BranchSelection::default()
+        };
+        assert_eq!(
+            selection_before(&a, x, 0, &b, y, 1),
+            ab != 0,
+            "{rule}: {x}, {y}"
+        );
+        assert_eq!(
+            selection_before(&b, y, 1, &a, x, 0),
+            ba != 0,
+            "{rule}: {y}, {x}"
+        );
+    }
+}
+
+#[test]
+fn mapped_family_selection_separates_family_and_variable_priorities() {
+    let mut a = variable();
+    a.name = "a".into();
+    a.priority = 1.;
+    let mut b = a.clone();
+    b.name = "b".into();
+    let metadata = BTreeMap::from([
+        (
+            a.name.clone(),
+            BranchSelection {
+                family: "original".into(),
+                variable_priority: 100.,
+                default_factor: 100.,
+                ..BranchSelection::default()
+            },
+        ),
+        (
+            b.name.clone(),
+            BranchSelection {
+                family: "original".into(),
+                ..BranchSelection::default()
+            },
+        ),
+    ]);
+    validate_selection(&[a.clone(), b.clone()], &metadata).unwrap();
+    let ranked = rank_candidates_with_selection([(&a, 0.1), (&b, 0.5)].into_iter(), &metadata);
+    assert_eq!(ranked[0].0.name, "b");
+    let ranked = rank_candidates_with_selection([(&a, 0.5), (&b, 0.5)].into_iter(), &metadata);
+    assert_eq!(ranked[0].0.name, "b");
+    b.priority = 2.;
+    assert!(validate_selection(&[a.clone(), b.clone()], &metadata).is_err());
+    b.priority = 1.;
+    let mut unknown = metadata.clone();
+    unknown.insert("missing".into(), BranchSelection::default());
+    assert!(validate_selection(&[a.clone(), b.clone()], &unknown).is_err());
+    let mut invalid = metadata;
+    invalid.get_mut("b").unwrap().default_factor = f64::NAN;
+    assert!(validate_selection(&[a, b], &invalid).is_err());
+}
+
+#[test]
+fn differing_family_rules_skip_primary_keys() {
+    let a = BranchSelection {
+        rule: BranchSelectionRule::HighestPriority,
+        variable_priority: 100.,
+        default_factor: 2.,
+        ..BranchSelection::default()
+    };
+    let b = BranchSelection::default();
+    assert!(!selection_before(&a, 0.5, 0, &b, 0.1, 1));
+    assert!(selection_before(&b, 0.1, 1, &a, 0.5, 0));
+}
+
+#[test]
+fn mixed_selection_metadata_keeps_unregistered_mapping_comparison() {
+    let mut a = variable();
+    a.name = "a".into();
+    let mut b = a.clone();
+    b.name = "b".into();
+    let metadata = BTreeMap::from([(
+        a.name.clone(),
+        BranchSelection {
+            rule: BranchSelectionRule::HighestPriority,
+            variable_priority: 100.,
+            default_factor: -10.,
+            ..BranchSelection::default()
+        },
+    )]);
+    let ranked = rank_candidates_with_selection([(&a, 0.1), (&b, 0.5)].into_iter(), &metadata);
+    assert_eq!(ranked[0].0.name, "b");
+}
+
 fn triangle() -> Problem<2> {
     format::Model::from_json(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -15,6 +249,246 @@ fn options() -> Options {
     options.cg.stabilize = false;
     options.cg.artificial_cost = 100.;
     options
+}
+
+#[test]
+fn fixed_activity_uses_only_fixed_routes_in_full_expression_coordinates() {
+    let mut output = solve(triangle(), options()).unwrap();
+    let route = output
+        .routes
+        .iter()
+        .find(|r| r.network == 42)
+        .unwrap()
+        .clone();
+    output.snapshot.state.fixed_routes = vec![FixedRoute {
+        route,
+        quantity: 2.,
+    }];
+    output.values.fill(123.);
+    let mapping = MappedBranchVariable {
+        name: "fixed-offset".into(),
+        priority: 1.,
+        networks: vec![MappedNetworkVariable {
+            network: 42,
+            arcs: vec![],
+            activities: vec![],
+            per_route: 3.,
+        }],
+        masters: vec![],
+    };
+    assert_eq!(mapping.fixed_activity(&output), Some(6.));
+    output.snapshot.state.fixed_routes.clear();
+    assert_eq!(mapping.fixed_activity(&output), Some(0.));
+    let mut static_mapping = mapping;
+    static_mapping.masters.push((99, 1.));
+    assert_eq!(static_mapping.fixed_activity(&output), None);
+}
+
+#[test]
+fn fixed_activity_declines_nonrepresentable_products_and_totals() {
+    let mut output = solve(triangle(), options()).unwrap();
+    let route = output
+        .routes
+        .iter()
+        .find(|r| r.network == 42)
+        .unwrap()
+        .clone();
+    let mut mapping = MappedBranchVariable {
+        name: "fixed-offset".into(),
+        priority: 1.,
+        networks: vec![MappedNetworkVariable {
+            network: 42,
+            arcs: vec![],
+            activities: vec![],
+            per_route: 3.,
+        }],
+        masters: vec![],
+    };
+    output.snapshot.state.fixed_routes = vec![FixedRoute {
+        route: route.clone(),
+        quantity: 4_503_599_627_370_497.,
+    }];
+    assert_eq!(mapping.fixed_activity(&output), None);
+    mapping.networks[0].per_route = 1.;
+    output.snapshot.state.fixed_routes = vec![
+        FixedRoute {
+            route: route.clone(),
+            quantity: 9_007_199_254_740_992.,
+        },
+        FixedRoute {
+            route,
+            quantity: 1.,
+        },
+    ];
+    assert_eq!(mapping.fixed_activity(&output), None);
+}
+
+#[test]
+fn residual_aggregate_row_avoids_sequential_fixed_cancellation() {
+    let mut output = solve(triangle(), options()).unwrap();
+    let positive = output
+        .routes
+        .iter()
+        .find(|r| r.network == 42)
+        .unwrap()
+        .clone();
+    let negative = output
+        .routes
+        .iter()
+        .find(|r| r.network == 7)
+        .unwrap()
+        .clone();
+    let large = 9_007_199_254_740_992.;
+    output.snapshot.state.fixed_routes = vec![
+        FixedRoute {
+            route: positive.clone(),
+            quantity: large,
+        },
+        FixedRoute {
+            route: positive,
+            quantity: 1.,
+        },
+        FixedRoute {
+            route: negative,
+            quantity: large,
+        },
+    ];
+    let mapping = MappedBranchVariable {
+        name: "fixed-cancellation".into(),
+        priority: 1.,
+        networks: vec![
+            MappedNetworkVariable {
+                network: 42,
+                arcs: vec![],
+                activities: vec![],
+                per_route: 2.,
+            },
+            MappedNetworkVariable {
+                network: 7,
+                arcs: vec![],
+                activities: vec![],
+                per_route: -2.,
+            },
+        ],
+        masters: vec![],
+    };
+    let fixed = mapping.fixed_activity(&output).unwrap();
+    assert_eq!(fixed, 2.);
+    assert_ne!(((3. - 2. * large) - 2.) + 2. * large, 1.);
+    let physical = output.snapshot.master.rhs.len();
+    let child = mapping
+        .apply_residual(
+            &output.snapshot,
+            Bounds {
+                lower: f64::NEG_INFINITY,
+                upper: 1.,
+            },
+            fixed,
+        )
+        .unwrap();
+    assert_eq!(child.master.rhs[physical], 1.);
+    assert_eq!(child.state.rhs[physical], 1.);
+    assert_eq!(child.state.shared_rows.last().unwrap().rhs, 3.);
+}
+
+#[test]
+fn residual_aggregate_activity_is_installed_before_column_coefficients() {
+    use crate::graph::coupled::CoupledResource;
+    let mut graph = Graph::<2>::new(2, 0).unwrap();
+    graph.elementary = true;
+    graph.add_arc(0, 1, -1.).unwrap();
+    graph
+        .set_coupled_resources(&[CoupledResource::CustomResource {
+            increments: vec![2.],
+            weights: vec![1.],
+            forward_bound: None,
+            backward_bound: None,
+        }])
+        .unwrap();
+    graph.suppress_coupled_costs();
+    let mut output = solve(
+        Problem {
+            rows: vec![],
+            networks: vec![Network {
+                id: 42,
+                graph,
+                multiplicity: Window::new(0., 1.).unwrap(),
+                arc_entries: vec![vec![]],
+                route_entries: vec![],
+                activity_entries: vec![],
+            }],
+        },
+        options(),
+    )
+    .unwrap();
+    output.snapshot.state.fixed_routes.push(FixedRoute {
+        route: output.routes[0].clone(),
+        quantity: 1.,
+    });
+    let mapping = MappedBranchVariable {
+        name: "fixed-activity".into(),
+        priority: 1.,
+        masters: vec![],
+        networks: vec![MappedNetworkVariable {
+            network: 42,
+            arcs: vec![],
+            activities: vec![(0, 1.)],
+            per_route: 0.,
+        }],
+    };
+    let fixed = mapping.fixed_activity(&output).unwrap();
+    assert_eq!(fixed, 2.);
+    let physical = output.snapshot.master.rhs.len();
+    let child = mapping
+        .apply_residual(
+            &output.snapshot,
+            Bounds {
+                lower: f64::NEG_INFINITY,
+                upper: 1.,
+            },
+            fixed,
+        )
+        .unwrap();
+    assert_eq!(child.master.rhs[physical], 1.);
+    assert_eq!(child.state.shared_rows.last().unwrap().rhs, 1. + fixed);
+    let shared = child.state.shared_rows.len() - 1;
+    assert!(child.state.oracles[0]
+        .activity_rows
+        .iter()
+        .any(|e| e.row == shared));
+    assert!(child
+        .warm
+        .columns
+        .iter()
+        .flatten()
+        .filter(|c| c.tag >= 0)
+        .all(|c| c.entries.iter().any(|&(r, a)| r == physical && a == fixed)));
+}
+
+#[test]
+fn residual_aggregate_declines_unrepresentable_full_coordinate_endpoint() {
+    let output = solve(triangle(), options()).unwrap();
+    let mapping = MappedBranchVariable {
+        name: "fixed-endpoint".into(),
+        priority: 1.,
+        masters: vec![],
+        networks: vec![MappedNetworkVariable {
+            network: 42,
+            arcs: vec![],
+            activities: vec![],
+            per_route: 1.,
+        }],
+    };
+    assert!(mapping
+        .apply_residual(
+            &output.snapshot,
+            Bounds {
+                lower: f64::NEG_INFINITY,
+                upper: 1.
+            },
+            9_007_199_254_740_992.
+        )
+        .is_err());
 }
 
 fn variable() -> MappedBranchVariable {
@@ -76,9 +550,19 @@ fn mapped_activity_preserves_fractional_and_product_residuals_after_cancellation
     mapping.masters.reverse();
     assert_eq!(mapping.value(&output), Some(0.5));
     assert_eq!(
-        super::super::model_strong::mapped_proposals(&output, &[mapping.clone()], 1e-6)
-            .unwrap()
-            .len(),
+        super::super::model_strong::mapped_proposals(
+            &output,
+            &ModelTreeOptions {
+                branching_registry: {
+                    let mut __branch_registry = crate::master::model::BranchingRegistry::default();
+                    __branch_registry.mapped_variables = vec![mapping.clone()];
+                    __branch_registry
+                },
+                ..Default::default()
+            },
+        )
+        .unwrap()
+        .len(),
         1
     );
 
@@ -183,8 +667,13 @@ fn malformed_mappings_are_rejected_even_with_zero_tree_budget() {
             _ => mapping.priority = f64::NAN,
         }
         let tree = ModelTreeOptions {
-            mapped_variables: vec![mapping],
             node_limit: 0,
+
+            branching_registry: {
+                let mut __branch_registry = crate::master::model::BranchingRegistry::default();
+                __branch_registry.mapped_variables = vec![mapping];
+                __branch_registry
+            },
             ..Default::default()
         };
         assert!(crate::master::tree::solve(triangle(), tree).is_err());
@@ -204,8 +693,13 @@ fn malformed_mappings_are_rejected_even_with_zero_tree_budget() {
     assert!(crate::master::tree::solve(
         (triangle(), vec![continuous]),
         ModelTreeOptions {
-            mapped_variables: vec![mapping],
             node_limit: 0,
+
+            branching_registry: {
+                let mut __branch_registry = crate::master::model::BranchingRegistry::default();
+                __branch_registry.mapped_variables = vec![mapping];
+                __branch_registry
+            },
             ..Default::default()
         }
     )
@@ -216,7 +710,7 @@ fn malformed_mappings_are_rejected_even_with_zero_tree_budget() {
 fn registered_variable_tree_preserves_original_integer_optimum_and_json_mapping() {
     let mut mapping = variable();
     mapping.masters.clear();
-    let json = serde_json::json!({"tree": true, "mapped_variables": [mapping]});
+    let json = serde_json::json!({"tree": true, "branching_registrations": [{"kind":"mapped", "config":mapping}]});
     let configured = format::SolveOptions::from_json(&json.to_string()).unwrap();
     let mut tree = configured.tree_options().unwrap();
     tree.node = options();

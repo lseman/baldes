@@ -34,8 +34,8 @@ fn dives_follow_the_native_depth_limit_and_frequency() {
 fn root_tree(diving: Option<DivingOptions>) -> ModelTreeOutput {
     let problem = rc101(25);
     let mut configured = ModelTreeOptions::default();
-    configured.mapped_variables = problem.arc_flow_variables(1.);
-    configured.mapped_strong_branching = None;
+    configured.branching_registry.mapped_variables = problem.arc_flow_variables(1.);
+    configured.branching_registry.strong_branching = None;
     configured.node_limit = 1;
     configured.diving = diving;
     crate::master::tree::solve(problem, configured).unwrap()
@@ -76,7 +76,7 @@ fn diving_tree_reaches_the_default_optimum() {
     let solve = |diving: Option<DivingOptions>| {
         let problem = rc101(25);
         let mut configured = ModelTreeOptions::default();
-        configured.mapped_variables = problem.arc_flow_variables(1.);
+        configured.branching_registry.mapped_variables = problem.arc_flow_variables(1.);
         configured.node_limit = 2000;
         configured.diving = diving;
         crate::master::tree::solve(problem, configured).unwrap()

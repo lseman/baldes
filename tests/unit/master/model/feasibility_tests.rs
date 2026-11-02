@@ -12,6 +12,9 @@ fn triangle() -> Problem<2> {
 }
 fn options() -> Options {
     let mut options = Options::default();
+    // Keep recovery fixtures below their expensive route costs, independently
+    // of the production default, so they exercise the phase-I path.
+    options.cg.artificial_cost = 2.76;
     options.cg.stabilize = false;
     options.cg.max_penalty_updates = 0;
     options
@@ -155,10 +158,10 @@ fn mapped_total_route_count_tree_closes_infeasible_lower_child_with_and_without_
     for strong in [true, false] {
         let mut controls = ModelTreeOptions::default();
         controls.node = options();
-        controls.mapped_variables = vec![total()];
-        controls.branching = NetworkBranchingPolicy::ResourceFirst;
+        controls.branching_registry.mapped_variables = vec![total()];
+        controls.branching_registry.branching = NetworkBranchingPolicy::ResourceFirst;
         if !strong {
-            controls.mapped_strong_branching = None;
+            controls.branching_registry.strong_branching = None;
         }
         let output = crate::master::tree::solve(triangle(), controls).unwrap();
         assert_eq!(output.status, crate::master::tree::TreeStatus::Optimal);

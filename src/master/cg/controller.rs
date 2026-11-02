@@ -22,6 +22,11 @@ pub trait Controller<M> {
     fn pricing_complete(&self) -> bool {
         true
     }
+    /// An interrupted pricing call requires owner-managed checkpoint recovery
+    /// before its master and column state can be published as resumable.
+    fn pricing_timeout_requires_rollback(&self) -> bool {
+        false
+    }
     /// Optionally repair pricing prices to respect static-variable dual
     /// constraints. Pricing and bound evaluation use the same repaired point;
     /// implementations must preserve the signs required by master row senses.
@@ -106,6 +111,11 @@ pub trait Controller<M> {
     }
     fn incumbent(&self) -> f64 {
         f64::INFINITY
+    }
+    /// Feasible original-model objective used solely for bound-based pruning.
+    /// It may belong to another branch and does not supply a local primal.
+    fn objective_cutoff(&self) -> f64 {
+        self.incumbent()
     }
     /// Enabled cut families and their current master-row counts for progress
     /// logging. Keep names and order stable during a solve; omit disabled families.
@@ -216,6 +226,16 @@ pub trait Controller<M> {
                 Some(column)
             })
             .collect())
+    }
+    /// Observe a newly created separated-row artificial at its creation cost.
+    /// The default leaves generic column-generation continuation unchanged.
+    fn cut_artificial_added(
+        &mut self,
+        _row: usize,
+        _column: usize,
+        _creation_cost: f64,
+    ) -> Result<()> {
+        Ok(())
     }
     fn remap_columns(&mut self, _map: &[Option<usize>]) -> Result<()> {
         Ok(())

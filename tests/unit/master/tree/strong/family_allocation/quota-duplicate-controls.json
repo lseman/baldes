@@ -1,0 +1,98 @@
+[
+  {
+    "history_seed": true,
+    "duplicate_fresh_names": false,
+    "observed": {
+      "quota": 0,
+      "count": -1,
+      "cutoff": 10,
+      "calls": [
+        {
+          "family": 0,
+          "quota": 4,
+          "created": 4
+        },
+        {
+          "family": 1,
+          "quota": 4,
+          "created": 4
+        }
+      ],
+      "selected": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ]
+      ]
+    }
+  },
+  {
+    "history_seed": false,
+    "duplicate_fresh_names": true,
+    "observed": {
+      "quota": 0,
+      "count": -1,
+      "cutoff": 10,
+      "calls": [
+        {
+          "family": 0,
+          "quota": 4,
+          "created": 4
+        },
+        {
+          "family": 1,
+          "quota": 4,
+          "created": 4
+        }
+      ],
+      "selected": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ]
+      ]
+    }
+  },
+  {
+    "history_seed": true,
+    "duplicate_fresh_names": true,
+    "observed": {
+      "quota": 3,
+      "count": -1,
+      "cutoff": 10,
+      "calls": [
+        {
+          "family": 0,
+          "quota": 4,
+          "created": 4
+        },
+        {
+          "family": 1,
+          "quota": 4,
+          "created": 4
+        }
+      ],
+      "selected": []
+    }
+  }
+]

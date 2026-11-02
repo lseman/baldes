@@ -198,6 +198,8 @@ impl RyanFosterBranching {
                 restriction: Restriction::RyanFoster { members },
                 history_eligible: true,
                 fresh: true,
+                origin: Some(super::model_strong::ProducerFamily::PackingRyanFoster),
+                component_admission: None,
             });
         }
         Ok(proposals)

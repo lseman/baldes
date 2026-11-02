@@ -1,5 +1,6 @@
-//! Load synthetic paper-style JSON; validate by default, solve only with --solve.
+//! Load stochastic JSON; validate by default, solve only with --solve.
 use baldes::extensions::stochastic::{Demand, HgsWarmStart, Policy, Problem, SolveOptions};
+use baldes::master::tree::{DivingOptions, LocalSearchOptions, StrongBranchingOptions};
 use serde::Deserialize;
 use std::{
     error::Error,
@@ -34,7 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let total_started = Instant::now();
     let mut args = std::env::args().skip(1);
     let path = args.next().ok_or(
-        "usage: stochastic_instance INSTANCE.json [--solve] [--seconds N] [--policy p1|p3] [--json] [--ng-size N] [--dynamic-ng-mode -1|0|1] [--hgs-seconds N] [--hgs-seed N] [--recourse-cuts] [--rank-one-cuts] [--rank-one-cut-limit N] [--log-cg] [--no-load-completion-bound] [--completion-subset-size 0..6]",
+        "usage: stochastic_instance INSTANCE.json [--solve] [--seconds N] [--policy p1|p3] [--json] [--ng-size N] [--dynamic-ng-mode -1|0|1] [--hgs-seconds N] [--hgs-seed N] [--tree-threads N] [--strong-branching] [--strong-seconds N] [--strong-trial-seconds N] [--diving] [--local-search] [--greedy] [--heuristic-seconds N] [--heuristic-depth N] [--local-search-fixed-ratio R] [--recourse-cuts] [--rank-one-cuts] [--rank-one-cut-limit N] [--log-cg] [--no-load-completion-bound] [--completion-subset-size 0..6]",
     )?;
     let mut solve = false;
     let mut json = false;
@@ -43,6 +44,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut seconds = 30.0_f64;
     let mut hgs_seconds = None;
     let mut hgs_seed = 0;
+    let mut diving = false;
+    let mut local_search = false;
+    let mut greedy = false;
+    let mut heuristic_seconds = 2.0_f64;
+    let mut heuristic_depth = 0_usize;
+    let mut local_search_fixed_ratio = 0.8_f64;
+    let mut strong_branching = false;
+    let mut strong_seconds = 10.0_f64;
+    let mut strong_trial_seconds = 1.0_f64;
+    let mut tree_threads = 1_usize;
     let mut rank_one_cut_limit = None;
     let mut log_cg = false;
     let mut load_completion_bound = true;
@@ -68,6 +79,37 @@ fn main() -> Result<(), Box<dyn Error>> {
                 hgs_seconds = Some(args.next().ok_or("missing HGS seconds")?.parse::<f64>()?)
             }
             "--hgs-seed" => hgs_seed = args.next().ok_or("missing HGS seed")?.parse()?,
+            "--diving" => diving = true,
+            "--local-search" => local_search = true,
+            "--greedy" => greedy = true,
+            "--tree-threads" => {
+                tree_threads = args.next().ok_or("missing tree threads")?.parse()?;
+            }
+            "--strong-branching" => strong_branching = true,
+            "--strong-seconds" => {
+                strong_seconds = args
+                    .next()
+                    .ok_or("missing strong-branching seconds")?
+                    .parse()?;
+            }
+            "--strong-trial-seconds" => {
+                strong_trial_seconds = args
+                    .next()
+                    .ok_or("missing strong-branching trial seconds")?
+                    .parse()?;
+            }
+            "--heuristic-seconds" => {
+                heuristic_seconds = args.next().ok_or("missing heuristic seconds")?.parse()?;
+            }
+            "--heuristic-depth" => {
+                heuristic_depth = args.next().ok_or("missing heuristic depth")?.parse()?;
+            }
+            "--local-search-fixed-ratio" => {
+                local_search_fixed_ratio = args
+                    .next()
+                    .ok_or("missing local-search fixed ratio")?
+                    .parse()?;
+            }
             // Compatibility alias: every solve now uses Theta recourse cuts.
             "--recourse-cuts" => {}
             "--rank-one-cuts" => {}
@@ -103,6 +145,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     let time_limit = Duration::try_from_secs_f64(seconds)?;
+    if tree_threads == 0 {
+        return Err("tree threads must be positive".into());
+    }
+    let strong_time_limit = Duration::try_from_secs_f64(strong_seconds)?;
+    let strong_trial_time_limit = Duration::try_from_secs_f64(strong_trial_seconds)?;
+    if strong_time_limit.is_zero() || strong_trial_time_limit.is_zero() {
+        return Err("strong-branching budgets must be positive".into());
+    }
+    if !heuristic_seconds.is_finite() || heuristic_seconds <= 0. {
+        return Err("heuristic seconds must be positive and finite".into());
+    }
+    let local_search_depth = i32::try_from(heuristic_depth)?;
+    if !local_search_fixed_ratio.is_finite() || !(0. ..=1.).contains(&local_search_fixed_ratio) {
+        return Err("local-search fixed ratio must be finite and in [0, 1]".into());
+    }
     let hgs_warm_start = hgs_seconds
         .map(|seconds| -> Result<_, Box<dyn Error>> {
             let time_limit = Duration::try_from_secs_f64(seconds)?;
@@ -117,7 +174,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .transpose()?;
     let input: Input = serde_json::from_slice(&std::fs::read(path)?)?;
     if input.schema != "baldes.stochastic.generated.v1"
-        || input.provenance.original_benchmark_instance
         || input.provenance.failure_penalty_applied != 0.
         || input.depot != 0
         || input.vehicles == 0
@@ -153,8 +209,42 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Network-model branch-cut-and-price; recourse enters by Theta cuts.
         let mut tree = baldes::master::tree::ModelTreeOptions {
             time_limit,
+            threads: tree_threads,
             ..Default::default()
         };
+        tree.greedy = greedy;
+        if strong_branching {
+            tree.branching_registry
+                .register(
+                    ::baldes::master::model::BranchingRegistration::StrongBranching(Some(
+                        StrongBranchingOptions {
+                            time_limit: strong_time_limit,
+                            trial_time_limit: strong_trial_time_limit,
+                            ..Default::default()
+                        },
+                    )),
+                )
+                .unwrap();
+        }
+        if diving {
+            tree.diving = Some(DivingOptions {
+                depth_limit: heuristic_depth,
+                frequency: 1,
+                time_limit: heuristic_seconds,
+                ..Default::default()
+            });
+        }
+        if local_search {
+            tree.local_search = Some(LocalSearchOptions {
+                depth_limit: local_search_depth,
+                fixed_column_ratio: local_search_fixed_ratio,
+                dive: DivingOptions {
+                    time_limit: heuristic_seconds,
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+        }
         tree.node.cg.time_limit = time_limit;
         let dynamic_ng_mode = dynamic_ng_mode.unwrap_or(-1);
         let pricing = &mut tree.node.pricing_options;
@@ -189,7 +279,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 },
             )
             .map_err(|error| error.message)?;
-        let hgs_summary = result.hgs_warm_start;
+        let hgs_summary = result.hgs_warm_start.map(|s| {
+            serde_json::json!({
+                "accepted_columns": s.accepted_columns, "rejected_columns": s.rejected_columns,
+                "accepted_plan": s.accepted_plan, "initial_objective": s.initial_objective,
+                "proposal_objective": s.proposal_objective, "reversed_routes": s.reversed_routes,
+                "elapsed_seconds": s.elapsed_seconds,
+            })
+        });
         let answer = result.tree;
         let solve_seconds = solve_started.elapsed().as_secs_f64();
         let objective = answer.incumbent.is_finite().then_some(answer.incumbent);
@@ -214,18 +311,23 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "lower_bound": lower_bound, "gap": gap, "routes": routes,
                 "nodes": answer.nodes, "pricing_calls": answer.pricing_calls,
                 "strong_branching_trials": answer.strong_branching_trials,
+                "strong_branching": strong_branching,
+                "strong_seconds": strong_seconds, "strong_trial_seconds": strong_trial_seconds,
+                "processed_nodes": answer.processed_nodes,
+                "tree_threads": tree_threads, "parallel_batches": answer.parallel_batches,
+                "mapped_history_ranked": answer.mapped_history_ranked,
+                "diving": diving, "local_search": local_search, "greedy": greedy,
+                "heuristic_seconds": heuristic_seconds, "heuristic_depth": heuristic_depth,
+                "local_search_fixed_ratio": local_search_fixed_ratio,
+                "diving_nodes": answer.diving_nodes, "greedy_nodes": answer.greedy_nodes,
+                "restricted_mip_calls": answer.restricted_mip_calls,
                 "ng_size": ng_size, "dynamic_ng_mode": dynamic_ng_mode,
                 "rank_one_cuts": rank_one_cuts,
                 "rank_one_cut_limit": rank_one_cut_limit,
                 "capacity_cuts": true,
                 "load_completion_bound": load_completion_bound,
                 "completion_subset_size": completion_subset_size,
-                "hgs_warm_start": hgs_summary.map(|s| serde_json::json!({
-                    "accepted_columns": s.accepted_columns, "rejected_columns": s.rejected_columns,
-                    "accepted_plan": s.accepted_plan, "initial_objective": s.initial_objective,
-                    "proposal_objective": s.proposal_objective, "reversed_routes": s.reversed_routes,
-                    "elapsed_seconds": s.elapsed_seconds,
-                })),
+                "hgs_warm_start": hgs_summary,
                 "time_limit_seconds": seconds, "build_seconds": build_seconds,
                 "solve_seconds": solve_seconds, "total_seconds": total_started.elapsed().as_secs_f64(),
             })
@@ -238,11 +340,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     } else {
         println!(
-            "Validated {}: {} customers, {} vehicles, capacity {}, NEW synthetic data",
+            "Validated {}: {} customers, {} vehicles, capacity {}, original benchmark: {}",
             input.instance_id,
             problem.demands().len(),
             input.vehicles,
-            input.capacity
+            input.capacity,
+            input.provenance.original_benchmark_instance
         );
     }
     Ok(())

@@ -1,7 +1,9 @@
 //! Explicit original-variable mappings across pricing networks and master IDs.
 //! These are model registrations, never inferred from display names or route tags.
 use super::*;
+mod batch;
 use crate::master::preprocessing::Bounds;
+pub(super) use batch::{values, values_except};
 
 /// Integer contribution of one network to an original aggregate variable.
 /// Arc IDs belong to this network; omitted arcs have zero coefficient.
@@ -36,6 +38,196 @@ pub struct MappedBranchVariable {
     pub networks: Vec<MappedNetworkVariable>,
     #[serde(default)]
     pub masters: Vec<(i32, f64)>,
+}
+
+/// Candidate selection within a registered branching family.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum BranchSelectionRule {
+    FirstFound,
+    HighestPriority,
+    #[default]
+    MostFractional,
+    LeastFractional,
+    FractionWeightedPriority,
+    ClosestToUpper,
+    ClosestToLower,
+}
+
+/// Separate family selection from an original variable's priority. The mapped
+/// variable's `priority` remains the family level; equal primary keys prefer a
+/// smaller `default_factor`, then the earlier registration.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct BranchSelection {
+    pub family: String,
+    pub rule: BranchSelectionRule,
+    pub variable_priority: f64,
+    pub default_factor: f64,
+}
+
+impl Default for BranchSelection {
+    fn default() -> Self {
+        Self {
+            family: "mapped".into(),
+            rule: BranchSelectionRule::MostFractional,
+            variable_priority: 1.,
+            default_factor: 1.,
+        }
+    }
+}
+
+pub(crate) fn validate_selection(
+    variables: &[MappedBranchVariable],
+    selection: &BTreeMap<String, BranchSelection>,
+) -> Result<()> {
+    let variables: HashMap<_, _> = variables.iter().map(|v| (v.name.as_str(), v)).collect();
+    let mut families = HashMap::new();
+    for (name, metadata) in selection {
+        let variable = variables
+            .get(name.as_str())
+            .ok_or_else(|| invalid("unknown branching selection variable"))?;
+        if metadata.family.trim().is_empty()
+            || !metadata.variable_priority.is_finite()
+            || !metadata.default_factor.is_finite()
+        {
+            return Err(invalid(
+                "branching selection requires a family and finite factors",
+            ));
+        }
+        if let Some((priority, rule)) =
+            families.insert(metadata.family.as_str(), (variable.priority, metadata.rule))
+        {
+            if priority != variable.priority || rule != metadata.rule {
+                return Err(invalid(
+                    "one branching family requires a single level and selection rule",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Validate aggregate-family admission controls independently of selection keys.
+pub(crate) fn validate_aggregate_admission<'a>(
+    variables: impl IntoIterator<Item = &'a MappedBranchVariable>,
+    admission: &BTreeMap<String, f64>,
+) -> Result<()> {
+    if admission.is_empty() {
+        return Ok(());
+    }
+    let names: HashSet<_> = variables.into_iter().map(|v| v.name.as_str()).collect();
+    if admission.iter().any(|(name, &threshold)| {
+        !names.contains(name.as_str()) || !valid_aggregate_threshold(threshold)
+    }) {
+        return Err(invalid(
+            "aggregate admission requires known mapped variables and finite thresholds in (0, 0.5]",
+        ));
+    }
+    Ok(())
+}
+
+pub(super) fn valid_aggregate_threshold(threshold: f64) -> bool {
+    threshold.is_finite() && threshold > 0. && threshold <= 0.5
+}
+
+/// Aggregate families admit the signed fractional part between inclusive
+/// parameter bounds. This is independent of ordinary variable admission and
+/// the tree tolerance; negative noninteger sums are omitted by this family.
+pub(crate) fn aggregate_fractional(value: f64, threshold: f64) -> bool {
+    if !value.is_finite()
+        || value.abs() >= 9_007_199_254_740_992.
+        || !valid_aggregate_threshold(threshold)
+    {
+        return false;
+    }
+    let fraction = value.fract();
+    fraction >= threshold && fraction <= 1. - threshold
+}
+
+fn selection_exceeds(a: f64, b: f64) -> bool {
+    a - (1e-6 + a.abs().max(b.abs()) * 1e-10) > b
+}
+
+fn snap_fraction(value: f64) -> f64 {
+    if value.abs() <= 1e-6 {
+        0.
+    } else {
+        value
+    }
+}
+
+// Directed distances use the same tolerant integer endpoints as the generator,
+// including negative activities and values close to an integer.
+fn directed_fractions(value: f64) -> (f64, f64) {
+    let offset = value * 1e-10;
+    let mut upper = (value - offset - 1e-6).ceil();
+    if upper >= value + 1. {
+        upper -= 1.;
+    }
+    upper = snap_fraction(upper);
+    let mut lower = (value + offset + 1e-6).floor();
+    if value - 1. + offset + 1e-6 > lower {
+        lower += 1.;
+    }
+    lower = snap_fraction(lower);
+    (snap_fraction(value - lower), snap_fraction(upper - value))
+}
+
+/// Compare candidate metadata after distinct families' levels have tied.
+/// Different family rules go directly to the common default factor.
+pub(crate) fn selection_before(
+    a: &BranchSelection,
+    a_value: f64,
+    a_order: usize,
+    b: &BranchSelection,
+    b_value: f64,
+    b_order: usize,
+) -> bool {
+    if a.rule == b.rule {
+        use BranchSelectionRule::*;
+        if a.rule == FirstFound {
+            return a_order < b_order;
+        }
+        let fraction = |value: f64| {
+            let (lower, upper) = directed_fractions(value);
+            lower.min(upper)
+        };
+        let (a_key, b_key, descending) = match a.rule {
+            FirstFound => unreachable!(),
+            HighestPriority => (a.variable_priority, b.variable_priority, true),
+            MostFractional => (fraction(a_value), fraction(b_value), true),
+            LeastFractional => (fraction(a_value), fraction(b_value), false),
+            FractionWeightedPriority => (
+                a.variable_priority * fraction(a_value),
+                b.variable_priority * fraction(b_value),
+                true,
+            ),
+            ClosestToUpper => (
+                directed_fractions(a_value).1,
+                directed_fractions(b_value).1,
+                false,
+            ),
+            ClosestToLower => (
+                directed_fractions(a_value).0,
+                directed_fractions(b_value).0,
+                false,
+            ),
+        };
+        if selection_exceeds(a_key, b_key) {
+            return descending;
+        }
+        if selection_exceeds(b_key, a_key) {
+            return !descending;
+        }
+    }
+    if selection_exceeds(a.default_factor, b.default_factor) {
+        return false;
+    }
+    if selection_exceeds(b.default_factor, a.default_factor) {
+        return true;
+    }
+    a_order < b_order
 }
 
 fn integer_coefficient(value: f64) -> bool {
@@ -351,6 +543,41 @@ impl MappedBranchVariable {
         node: &NodeSnapshot<D>,
         bounds: Bounds,
     ) -> Result<NodeSnapshot<D>> {
+        self.apply_coordinates(node, bounds, None)
+    }
+
+    /// Install residual aggregate bounds while retaining full-coordinate rows
+    /// for witness replay. The fixed offset must be exact and previously checked
+    /// against this expression; static-master offsets are unsupported.
+    pub(super) fn apply_residual<const D: usize>(
+        &self,
+        node: &NodeSnapshot<D>,
+        residual: Bounds,
+        fixed_activity: f64,
+    ) -> Result<NodeSnapshot<D>> {
+        if !self.masters.is_empty() || !fixed_activity.is_finite() {
+            return Err(invalid("unsupported aggregate fixed offset"));
+        }
+        let translate = |endpoint: f64| -> Result<f64> {
+            if endpoint.is_infinite() {
+                Ok(endpoint)
+            } else {
+                exact_coefficient([endpoint, fixed_activity].into_iter())
+            }
+        };
+        let full = Bounds {
+            lower: translate(residual.lower)?,
+            upper: translate(residual.upper)?,
+        };
+        self.apply_coordinates(node, full, Some(residual))
+    }
+
+    fn apply_coordinates<const D: usize>(
+        &self,
+        node: &NodeSnapshot<D>,
+        bounds: Bounds,
+        residual: Option<Bounds>,
+    ) -> Result<NodeSnapshot<D>> {
         self.validate::<D>(
             node.state
                 .oracles
@@ -358,7 +585,9 @@ impl MappedBranchVariable {
                 .map(|o| (o.network.id, o.network.graph.as_ref())),
             &node.state.master_variables,
         )?;
-        if !master_variables::valid_bounds(bounds) {
+        if !master_variables::valid_bounds(bounds)
+            || residual.is_some_and(|bounds| !master_variables::valid_bounds(bounds))
+        {
             return Err(invalid("ordered mapped variable bounds required"));
         }
         let coefficients = self.coefficients(node)?;
@@ -376,8 +605,10 @@ impl MappedBranchVariable {
             })
             .collect();
         let mut child = node.fork()?;
-        let append = |node: &NodeSnapshot<D>, row| {
-            if activities.is_empty() {
+        let append = |node: &NodeSnapshot<D>, row, residual_rhs| {
+            if let Some(rhs) = residual_rhs {
+                node.with_residual_activity_row(row, &coefficients, &activities, rhs)
+            } else if activities.is_empty() {
                 node.with_master_row(row, &coefficients, &self.masters)
             } else {
                 node.with_accumulated_activity_master_row(
@@ -395,17 +626,102 @@ impl MappedBranchVariable {
                     sense: RowSense::Equal,
                     rhs: bounds.lower,
                 },
+                residual.map(|bounds| bounds.lower),
             );
         }
-        for (sense, rhs) in [
-            (RowSense::GreaterEqual, bounds.lower),
-            (RowSense::LessEqual, bounds.upper),
+        for (sense, rhs, residual_rhs) in [
+            (
+                RowSense::GreaterEqual,
+                bounds.lower,
+                residual.map(|b| b.lower),
+            ),
+            (RowSense::LessEqual, bounds.upper, residual.map(|b| b.upper)),
         ] {
             if rhs.is_finite() {
-                child = append(&child, Row { sense, rhs })?;
+                child = append(&child, Row { sense, rhs }, residual_rhs)?;
             }
         }
         Ok(child)
+    }
+
+    /// Exact fixed-route offset for translating a residual aggregate row into
+    /// the full coordinates accepted by `apply`. Static-master offsets are not
+    /// represented by this helper. Callers must also verify the applied row's
+    /// residual RHS because row installation subtracts fixed copies in order.
+    pub(super) fn fixed_activity<const D: usize>(&self, output: &Output<D>) -> Option<f64> {
+        if !self.masters.is_empty() {
+            return None;
+        }
+        let mut sum = crate::master::numerics::ExactSum::default();
+        let mut source_work = 1_000_000;
+        for fixed in &output.snapshot.state.fixed_routes {
+            let quantity = fixed.quantity;
+            if !quantity.is_finite() || quantity.fract() != 0. {
+                return None;
+            }
+            let route = &fixed.route;
+            let Some(c) = self.networks.iter().find(|c| c.network == route.network) else {
+                continue;
+            };
+            let mut activities = vec![];
+            if !c.activities.is_empty() {
+                let oracle = output
+                    .snapshot
+                    .state
+                    .oracles
+                    .iter()
+                    .find(|o| o.network.id == c.network)?;
+                let path: Vec<_> = route
+                    .route
+                    .arcs
+                    .iter()
+                    .map(|id| oracle.index.get(id).copied())
+                    .collect::<Option<_>>()?;
+                for &(resource, factor) in &c.activities {
+                    let activity =
+                        activity_rows::column_value(oracle, &route.route, &path, resource).ok()?;
+                    if activity_rows::paired(&oracle.network.graph, resource) {
+                        let proof = activity_rows::certificate_value(
+                            oracle,
+                            &route.route,
+                            resource,
+                            &mut source_work,
+                            output.snapshot.state.deadline,
+                        )?;
+                        if proof != [activity, activity] {
+                            return None;
+                        }
+                    }
+                    let product = activity * factor;
+                    if !product.is_finite() || activity.mul_add(factor, -product) != 0. {
+                        return None;
+                    }
+                    activities.push(product);
+                }
+            }
+            let coefficient =
+                exact_coefficient(
+                    std::iter::once(c.per_route)
+                        .chain(
+                            route.route.arcs.iter().map(|id| {
+                                c.arcs.iter().find(|(a, _)| a == id).map_or(0., |(_, a)| *a)
+                            }),
+                        )
+                        .chain(activities),
+                )
+                .ok()?;
+            if coefficient.fract() != 0. || coefficient.abs() > 9_007_199_254_740_992. {
+                return None;
+            }
+            let product = quantity * coefficient;
+            if !product.is_finite() || quantity.mul_add(coefficient, -product) != 0. {
+                return None;
+            }
+            sum.add(product)?;
+        }
+        let fixed = sum.upper()?;
+        sum.add(-fixed)?;
+        (sum.sign() == 0.).then_some(fixed)
     }
 
     pub(super) fn value<const D: usize>(&self, output: &Output<D>) -> Option<f64> {
@@ -537,6 +853,52 @@ pub(super) fn rank_candidates<'a>(
         ranked.insert(at, candidate);
     }
     ranked
+}
+
+/// Rank mapped families with independent variable priorities and selection keys.
+/// A red-black insertion order preserves the tolerant comparison over chains.
+pub(crate) fn rank_candidates_with_selection<'a>(
+    candidates: impl Iterator<Item = (&'a MappedBranchVariable, f64)>,
+    selection: &BTreeMap<String, BranchSelection>,
+) -> Vec<(&'a MappedBranchVariable, f64)> {
+    if selection.is_empty() {
+        return rank_candidates(candidates);
+    }
+    let candidates: Vec<_> = candidates.collect();
+    let mut set = crate::cuts::shared::rbtree::CandidateSet::new();
+    for index in 0..candidates.len() {
+        set.insert_by(index, |a, b| {
+            let (av, ax) = candidates[a];
+            let (bv, bx) = candidates[b];
+            let am = selection.get(&av.name);
+            let bm = selection.get(&bv.name);
+            let same_family = am.zip(bm).is_some_and(|(a, b)| a.family == b.family);
+            if !same_family {
+                if selection_exceeds(av.priority, bv.priority) {
+                    return true;
+                }
+                if selection_exceeds(bv.priority, av.priority) {
+                    return false;
+                }
+            }
+            if let (Some(am), Some(bm)) = (am, bm) {
+                return selection_before(am, ax, a, bm, bx, b);
+            }
+            let af = (ax - ax.round()).abs();
+            let bf = (bx - bx.round()).abs();
+            if selection_exceeds(af, bf) {
+                return true;
+            }
+            if selection_exceeds(bf, af) {
+                return false;
+            }
+            a < b
+        });
+    }
+    set.ordered()
+        .into_iter()
+        .map(|(_, index)| candidates[index])
+        .collect()
 }
 
 pub(super) fn children<const D: usize>(

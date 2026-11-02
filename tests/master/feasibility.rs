@@ -430,9 +430,10 @@ fn feasibility_infeasibility_closes_tree_nodes_in_both_bound_modes() {
             fractional_infeasible_problem(),
             ModelTreeOptions {
                 node: options(mode),
-                mapped_strong_branching: None,
                 diving: None,
                 time_limit: Duration::from_secs(10),
+
+                branching_registry: ::baldes::master::model::BranchingRegistry::default(),
                 ..Default::default()
             },
         )

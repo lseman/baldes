@@ -28,10 +28,16 @@ impl SubtreeHistory {
         }
     }
     pub fn split(&mut self, parent: usize) -> [usize; 2] {
+        let children = self.split_many(parent, 2);
+        [children.start, children.start + 1]
+    }
+    /// Register every child before any of them can close the parent.
+    pub fn split_many(&mut self, parent: usize, count: usize) -> std::ops::Range<usize> {
+        assert!(count >= 1, "an exhausted group has no child lineage");
         let first = self.entries.len();
         let depth = self.entries[parent].depth + 1;
-        self.entries[parent].pending = 2;
-        for _ in 0..2 {
+        self.entries[parent].pending = count;
+        for _ in 0..count {
             self.entries.push(Entry {
                 parent: Some(parent),
                 depth,
@@ -40,7 +46,7 @@ impl SubtreeHistory {
                 closed: false,
             });
         }
-        [first, first + 1]
+        first..self.entries.len()
     }
     pub fn close(&mut self, mut node: usize) {
         loop {

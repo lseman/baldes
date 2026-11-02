@@ -4,7 +4,6 @@
 use super::*;
 mod integration;
 mod ordering;
-pub(super) use integration::collect;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ComponentVariableKind {
@@ -535,3 +534,7 @@ impl ComponentClassGenerator {
 #[cfg(test)]
 #[path = "../../../../tests/unit/master/model/component_generator_tests.rs"]
 mod tests;
+
+pub(in crate::master::model) use integration::ComponentPublication;
+
+pub(super) use integration::collect_admission;

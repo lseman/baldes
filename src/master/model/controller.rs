@@ -6,6 +6,7 @@ pub(super) struct ColumnGenerationController<
     const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS },
 > {
     pub(super) state: Rc<RefCell<State<D>>>,
+    pub(super) objective_cutoff: f64,
     pub(super) request_initial_enumeration: bool,
     pub(super) search_inactive_columns: bool,
     pub(super) artificial_penalty: Option<f64>,
@@ -18,6 +19,30 @@ pub(super) struct ColumnGenerationController<
 }
 
 impl<const D: usize> cg::Controller<ClpMaster> for ColumnGenerationController<D> {
+    fn cut_artificial_added(
+        &mut self,
+        _row: usize,
+        column: usize,
+        creation_cost: f64,
+    ) -> Result<()> {
+        if !creation_cost.is_finite() || creation_cost < 0. || !(1.2 * creation_cost).is_finite() {
+            return Err(invalid("cut artificial creation cost"));
+        }
+        self.state
+            .borrow_mut()
+            .cut_artificial_bases
+            .insert(column, creation_cost);
+        Ok(())
+    }
+    fn remap_columns(&mut self, map: &[Option<usize>]) -> Result<()> {
+        let mut state = self.state.borrow_mut();
+        state.cut_artificial_bases = state
+            .cut_artificial_bases
+            .iter()
+            .filter_map(|(&old, &base)| Some((*map.get(old)?.as_ref()?, base)))
+            .collect();
+        Ok(())
+    }
     fn proven_infeasible(&self) -> bool {
         self.trust_preprocessing_infeasibility
             && self.state.borrow().preprocessing.propagation.infeasible
@@ -65,6 +90,19 @@ impl<const D: usize> cg::Controller<ClpMaster> for ColumnGenerationController<D>
                 .pricing_witness
                 .as_ref()
                 .map_or(f64::INFINITY, |w| w.0)
+        } else {
+            f64::INFINITY
+        }
+    }
+    fn objective_cutoff(&self) -> f64 {
+        let state = self.state.borrow();
+        if state.integer_primal_termination {
+            self.objective_cutoff.min(state.tree_incumbent).min(
+                state
+                    .pricing_witness
+                    .as_ref()
+                    .map_or(f64::INFINITY, |w| w.0),
+            )
         } else {
             f64::INFINITY
         }
@@ -428,6 +466,13 @@ impl<const D: usize> cg::Controller<ClpMaster> for ColumnGenerationController<D>
     fn pricing_complete(&self) -> bool {
         self.state.borrow().scheduler.complete
     }
+    fn pricing_timeout_requires_rollback(&self) -> bool {
+        self.state
+            .borrow()
+            .oracles
+            .iter()
+            .any(|oracle| oracle.solver.requires_rollback)
+    }
     fn request_enumeration_checkpoint(&mut self, _master: &ClpMaster) -> Result<bool> {
         let requested = self.request_initial_enumeration && self.state.borrow().universe.is_none();
         // A failed attempt must resume ordinary pricing, not request another
@@ -643,3 +688,7 @@ impl<const D: usize> ColumnGenerationController<D> {
         Ok((restored_master, saved.output.clone()))
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/master/model/objective_cutoff_tests.rs"]
+mod objective_cutoff_tests;

@@ -95,7 +95,9 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                     .cg
                     .time_limit
                     .min(self.deadline.saturating_duration_since(Instant::now()));
-                Ok(entry.node.solve(options))
+                let mut node = entry.node.fork()?;
+                node.reset_evaluation_artificials()?;
+                Ok(node.solve_forked(options))
             })
             .collect()
     }
@@ -110,6 +112,10 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
         let current_branch_order = if let Some(entry) = entry {
             if reused {
                 output.snapshot.state.mapped_lineage = entry.node.state.mapped_lineage;
+                output.snapshot.state.component_local_rows =
+                    entry.node.state.component_local_rows.clone();
+                output.snapshot.state.component_branch_exclusions =
+                    entry.node.state.component_branch_exclusions.clone();
             }
             entry.branch_order
         } else {
@@ -146,7 +152,16 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
         if options.share_inactive_columns {
             mapped_history.column_pool.absorb(&output.snapshot);
         }
-        let bound = output.master.bound;
+        mapped_history.record_committed(
+            &mut output,
+            result.incumbent,
+            reused,
+            options.tolerance,
+        )?;
+        // A fork can discard incumbent-dependent CG bounds while retaining
+        // the parent's valid tree floor. Use the same bound as frontier
+        // pruning, including when interrupted CG has no new finite bound.
+        let bound = output.master.bound.max(output.snapshot.tree_bound());
         let lineage = output.snapshot.state.mapped_lineage;
         mapped_history.completed_estimate = subtree_history
             .as_ref()
@@ -426,9 +441,10 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
         // family priorities (`proposals::collect`) and child direction.
         let proposals =
             proposals::collect_with_deadline(&output, options, windows, Some(deadline))?;
-        if options.mapped_strong_branching.is_some()
+        if options.branching_registry().strong_branching.is_some()
             && *selected_nodes >= options.node_limit
-            && (!proposals.is_empty() || options.branching == NetworkBranchingPolicy::Phased)
+            && (!proposals.is_empty()
+                || options.branching_registry().branching == NetworkBranchingPolicy::Phased)
         {
             result.status = TreeStatus::NodeLimit;
             *unresolved = Some(bound);
@@ -437,7 +453,8 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                 restore_ready: false,
             });
         }
-        let upper_first = options.branching != NetworkBranchingPolicy::ResourceFirst;
+        let upper_first =
+            options.branching_registry().branching != NetworkBranchingPolicy::ResourceFirst;
         let trials_before = mapped_history.processed_trials;
         let children = if let Some(mut children) = model_strong::choose_proposals(
             &output,
@@ -473,20 +490,30 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
         }
         if let Some(mut selection) = children {
             let children = &mut selection.children;
-            if children.len() != 2 {
-                return Err(invalid("network branch proposal must have two children"));
+            if children.len() != selection.evaluated.len() {
+                return Err(invalid("network branch proposal has invalid child storage"));
             }
-            let lineages = subtree_history
-                .as_mut()
-                .map(|h| h.split(lineage))
-                .unwrap_or([0; 2]);
+            component::inherit_branch_rows(&output.snapshot, children);
+            if children.is_empty() {
+                if let Some(history) = subtree_history.as_mut() {
+                    history.close(lineage);
+                }
+                return Ok(Decision::Continue);
+            }
+            let first_lineage = subtree_history.as_mut().map(|h| {
+                if children.len() == 2 {
+                    h.split(lineage)[0]
+                } else {
+                    h.split_many(lineage, children.len()).start
+                }
+            });
             // Objective-dependent exclusions only remove solutions costing at
             // least the incumbent, so this floor holds for every child even
             // when its fork dropped incumbent-justified warm bounds.
             let floor = bound.min(result.incumbent);
             for (side, child) in children.iter_mut().enumerate() {
                 child.state.node_depth = output.snapshot.state.node_depth.saturating_add(1);
-                child.state.mapped_lineage = lineages[side];
+                child.state.mapped_lineage = first_lineage.map_or(0, |first| first + side);
                 if floor.is_finite() {
                     child.state.tree_bound_floor = child.state.tree_bound_floor.max(floor);
                 }

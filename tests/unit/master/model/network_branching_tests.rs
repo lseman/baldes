@@ -16,7 +16,11 @@ fn multiplicity_first_matches_the_mapped_native_first_child_and_restores_parent(
     assert_eq!(root.master.lp, 1.5);
     // The unified dispatcher with the MultiplicityFirst preset, no strong trials.
     let configured = ModelTreeOptions {
-        mapped_strong_branching: None,
+        branching_registry: {
+            let mut __branch_registry = crate::master::model::BranchingRegistry::default();
+            __branch_registry.strong_branching = None;
+            __branch_registry
+        },
         ..Default::default()
     };
     let proposals = super::super::proposals::collect(&root, &configured, &[]).unwrap();
@@ -55,7 +59,7 @@ fn multiplicity_first_matches_the_mapped_native_first_child_and_restores_parent(
 #[test]
 fn default_network_branching_uses_the_recovered_native_count_first_policy() {
     assert_eq!(
-        format::SolveOptions::default().network_branching,
+        ModelTreeOptions::default().branching_registry.branching,
         NetworkBranchingPolicy::MultiplicityFirst
     );
     assert_eq!(
@@ -152,7 +156,7 @@ fn registered_tree_pairs_network_identities_sides_ranks_and_feasible_node_bounds
         options.node.cg.stabilize = false;
         options.node.cg.bound_mode = cg::BoundMode::Certified;
         // The reference runner records these controls without strong branching.
-        options.mapped_strong_branching = None;
+        options.branching_registry.strong_branching = None;
         let root = solve_with_master_variables(problem, vec![], options.node.clone()).unwrap();
         let mut result = ModelTreeOutput {
             status: TreeStatus::Incomplete,
@@ -305,7 +309,7 @@ fn observed_default_strong_multiplicity_selection_preserves_registered_network_o
             .unwrap();
         let mut options = strong_tree_options();
         options.node.cg.stabilize = false;
-        options.branching = NetworkBranchingPolicy::Phased;
+        options.branching_registry.branching = NetworkBranchingPolicy::Phased;
         let root = solve_with_master_variables(problem, vec![], options.node.clone()).unwrap();
         let proposals = super::super::proposals::collect(&root, &options, &[]).unwrap();
         let mut history = model_strong::History::default();
@@ -367,7 +371,12 @@ fn observed_default_strong_multiplicity_selection_preserves_registered_network_o
 /// these tests exercise them with the default phase schedule.
 fn strong_tree_options() -> ModelTreeOptions {
     ModelTreeOptions {
-        mapped_strong_branching: Some(crate::master::tree::StrongBranchingOptions::default()),
+        branching_registry: {
+            let mut __branch_registry = crate::master::model::BranchingRegistry::default();
+            __branch_registry.strong_branching =
+                Some(crate::master::tree::StrongBranchingOptions::default());
+            __branch_registry
+        },
         ..ModelTreeOptions::default()
     }
 }

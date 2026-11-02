@@ -11,7 +11,7 @@ fn rc101(customers: usize, rounding: Rounding) -> Problem {
 
 fn options(problem: &Problem) -> ModelTreeOptions {
     let mut configured = ModelTreeOptions::default();
-    configured.mapped_variables = problem.arc_flow_variables(1.);
+    configured.branching_registry.mapped_variables = problem.arc_flow_variables(1.);
     configured.node_limit = 2000;
     configured
 }
@@ -63,7 +63,7 @@ fn history_toggle_and_relative_gap_keep_valid_results() {
     let problem = rc101(25, Rounding::None);
     let plain = crate::master::tree::solve(problem.clone(), options(&problem)).unwrap();
     let mut configured = options(&problem);
-    configured.use_branching_history = false;
+    configured.branching_registry.use_branching_history = false;
     let unranked = crate::master::tree::solve(problem.clone(), configured).unwrap();
     assert_eq!(unranked.mapped_history_ranked, 0);
     assert!((unranked.incumbent - plain.incumbent).abs() < 1e-6);
@@ -79,7 +79,7 @@ fn history_toggle_and_relative_gap_keep_valid_results() {
 fn restricted_master_mip_supplies_a_replayed_root_incumbent() {
     let problem = rc101(25, Rounding::None);
     let mut configured = options(&problem);
-    configured.mapped_strong_branching = None;
+    configured.branching_registry.strong_branching = None;
     configured.node_limit = 1;
     let plain = crate::master::tree::solve(problem.clone(), configured.clone()).unwrap();
     assert!(plain.incumbent.is_infinite());

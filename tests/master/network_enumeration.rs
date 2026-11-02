@@ -465,7 +465,10 @@ mod mip {
         configured.enumerated_mip = Some(MipOptions::default());
         // Route-count strong trials would close these children before the
         // enumerated-MIP path that this test exercises.
-        configured.mapped_strong_branching = None;
+        configured
+            .branching_registry
+            .register(::baldes::master::model::BranchingRegistration::StrongBranching(None))
+            .unwrap();
         let tree = baldes::master::tree::solve(problem(), configured.clone()).unwrap();
         assert_eq!(tree.status, TreeStatus::Optimal);
         assert_eq!(tree.incumbent, 2.);

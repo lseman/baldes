@@ -56,8 +56,8 @@ impl CandidateSet {
     pub fn clear(&mut self) {
         *self = Self::new();
     }
-    fn key(&self, n: usize) -> (f64, i32) {
-        (self.nodes[n].score, self.nodes[n].id)
+    fn key(&self, n: usize) -> (f64, i32, usize) {
+        (self.nodes[n].score, self.nodes[n].id, self.nodes[n].value)
     }
     fn predecessor(&self, mut x: usize) -> usize {
         if self.nodes[x].left != NIL {
@@ -76,7 +76,22 @@ impl CandidateSet {
     }
     /// Returns false when an equivalent element is present (not inserted).
     pub fn insert(&mut self, score: f64, id: i32, value: usize) -> bool {
-        let k = (score, id);
+        self.insert_with(score, id, value, |a, b| less((a.0, a.1), (b.0, b.1)))
+    }
+    /// Order caller-owned handles using the same unique-position search and
+    /// red-black rebalancing as score-based candidates. This supports recovered
+    /// tolerant predicates without imposing Rust sort's total-order contract.
+    pub(crate) fn insert_by(&mut self, value: usize, less: impl Fn(usize, usize) -> bool) -> bool {
+        self.insert_with(0., 0, value, |a, b| less(a.2, b.2))
+    }
+    fn insert_with(
+        &mut self,
+        score: f64,
+        id: i32,
+        value: usize,
+        less: impl Fn((f64, i32, usize), (f64, i32, usize)) -> bool,
+    ) -> bool {
+        let k = (score, id, value);
         let mut x = self.root;
         let mut y = NIL;
         let mut comp = true;
@@ -92,18 +107,18 @@ impl CandidateSet {
         let mut j = y;
         if comp {
             if j == self.leftmost {
-                return self.insert_at(y, k, value);
+                let left = y == NIL || less(k, self.key(y));
+                return self.insert_at(y, (score, id), value, left);
             }
             j = self.predecessor(j);
         }
         if less(self.key(j), k) {
-            return self.insert_at(y, k, value);
+            let left = y == NIL || less(k, self.key(y));
+            return self.insert_at(y, (score, id), value, left);
         }
         false
     }
-    fn insert_at(&mut self, p: usize, k: (f64, i32), value: usize) -> bool {
-        // _M_insert_ with x == 0: left when p is the header or k < key(p).
-        let insert_left = p == NIL || less(k, self.key(p));
+    fn insert_at(&mut self, p: usize, k: (f64, i32), value: usize, insert_left: bool) -> bool {
         let z = self.nodes.len();
         self.nodes.push(Node {
             score: k.0,

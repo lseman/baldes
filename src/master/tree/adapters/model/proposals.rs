@@ -13,6 +13,8 @@ pub(super) fn multiplicity(network: i32, value: f64, priority: f64) -> Proposal 
         restriction: Restriction::Multiplicity { network },
         history_eligible: false,
         fresh: true,
+        origin: None,
+        component_admission: None,
     }
 }
 
@@ -41,14 +43,15 @@ fn inferred(proposal: &Proposal) -> Option<Inferred> {
 
 /// `MultiplicityFirst` and `ResourceFirst` are presets over the same
 /// priority dispatcher as `Phased`. Registered families (mapped variables,
-/// clusters, Ryan–Foster, packing) keep their configured priorities.
+/// clusters, component classes/generators, Ryan–Foster, packing) keep their
+/// configured priorities.
 /// Inferred families are ranked below the lowest registered priority in the
 /// order of the former cascades: resource, assignment, master variable, arc
 /// and window flow; route count comes first under `MultiplicityFirst` and
 /// after master variables under `ResourceFirst`. `Phased` uses
 /// `branch_priorities` unchanged.
 fn preset_priorities(proposals: &mut [Proposal], options: &ModelTreeOptions) {
-    let order: &[Inferred] = match options.branching {
+    let order: &[Inferred] = match options.branching_registry().branching {
         NetworkBranchingPolicy::Phased => return,
         NetworkBranchingPolicy::MultiplicityFirst => &[
             Inferred::Resource,
@@ -66,22 +69,13 @@ fn preset_priorities(proposals: &mut [Proposal], options: &ModelTreeOptions) {
             Inferred::Window,
         ],
     };
-    let registered: Vec<f64> = options
-        .mapped_variables
-        .iter()
-        .map(|v| v.priority)
-        .chain(options.clusters.iter().map(|c| c.priority))
-        .chain(options.ryan_foster.iter().map(|r| r.priority))
-        .chain(options.packing.iter().map(|p| p.priority))
-        .collect();
-    let low = registered.iter().copied().fold(0., f64::min);
-    let high = registered.iter().copied().fold(0., f64::max);
+    let (low, high) = super::super::family_registration::registered_priority_range(options);
     for proposal in proposals {
         let Some(family) = inferred(proposal) else {
             continue;
         };
         proposal.priority = if family == Inferred::Multiplicity
-            && options.branching == NetworkBranchingPolicy::MultiplicityFirst
+            && options.branching_registry().branching == NetworkBranchingPolicy::MultiplicityFirst
         {
             high + 1.
         } else {
@@ -108,18 +102,19 @@ pub(super) fn collect_with_deadline<const D: usize>(
 ) -> Result<Vec<Proposal>> {
     let node = &output.snapshot;
     let tolerance = options.tolerance;
-    let priorities = &options.branch_priorities;
-    let mut proposals = model_strong::registered_proposals(output, options, deadline)?;
+    let priorities = &options.branching_registry().branch_priorities;
+    let mut proposals =
+        super::super::family_registration::registered_proposals(output, options, deadline)?;
+    proposals.extend(super::super::family_registration::path_proposals(
+        output, options,
+    )?);
     for candidate in node.resource_group_candidates(tolerance)? {
         proposals.push(resource_proposal(candidate, priorities.resource));
     }
-    // Native bypasses this separator when strong branching is disabled.
-    if options.mapped_strong_branching.is_some() {
-        if let Some(packing) = &options.packing {
-            proposals.extend(packing.proposals(output, tolerance));
-        }
-    }
-    for candidate in if options.packing.is_some() {
+    proposals.extend(super::super::family_registration::packing_proposals(
+        output, options,
+    ));
+    for candidate in if options.branching_registry().packing.is_some() {
         vec![]
     } else {
         node.fractional_assignments(tolerance)?
@@ -136,6 +131,8 @@ pub(super) fn collect_with_deadline<const D: usize>(
             },
             history_eligible: true,
             fresh: true,
+            origin: None,
+            component_admission: None,
         });
     }
     for variable in &node.state.master_variables {
@@ -156,6 +153,8 @@ pub(super) fn collect_with_deadline<const D: usize>(
                 restriction: Restriction::Master { id: variable.id },
                 history_eligible: true,
                 fresh: true,
+                origin: None,
+                component_admission: None,
             });
         }
     }
@@ -183,7 +182,22 @@ pub(super) fn collect_with_deadline<const D: usize>(
                 arcs[oracle.index[id]] += quantity;
             }
         }
-        if count >= 0. && branching::fractional(count, tolerance) {
+        // The default empty component sequence uses the class-violation
+        // threshold, not the much smaller variable-integrality threshold.
+        // Generic fallback disjunctions remain available if this registry is
+        // exhausted, so declining this candidate does not certify integrality.
+        let distance = (count - count.round()).abs();
+        let minimum_fractionality = 0.02_f64;
+        if !options
+            .branching_registry()
+            .paths_per_network
+            .iter()
+            .any(|p| p.network == oracle.network.id)
+            && count >= 0.
+            && branching::fractional(count, tolerance)
+            && minimum_fractionality
+                < distance - (distance.max(minimum_fractionality) * 1e-10 + 1e-6)
+        {
             proposals.push(multiplicity(
                 oracle.network.id,
                 count,
@@ -207,6 +221,8 @@ pub(super) fn collect_with_deadline<const D: usize>(
                 },
                 history_eligible: true,
                 fresh: true,
+                origin: None,
+                component_admission: None,
             });
         }
         flows.insert(oracle.network.id, arcs);
@@ -238,6 +254,8 @@ pub(super) fn collect_with_deadline<const D: usize>(
                 },
                 history_eligible: true,
                 fresh: true,
+                origin: None,
+                component_admission: None,
             });
         }
     }
@@ -280,6 +298,8 @@ fn resource_proposal(candidate: ResourceGroupCandidate, priority: f64) -> Propos
         restriction: Restriction::Resource(candidate),
         history_eligible: true,
         fresh: true,
+        origin: Some(super::super::model_strong::ProducerFamily::PackingResource),
+        component_admission: None,
     }
 }
 

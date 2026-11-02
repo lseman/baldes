@@ -93,6 +93,7 @@ impl std::fmt::Debug for ActivitySource {
 #[derive(Clone, Debug)]
 pub struct PricingVariableRegistry {
     variables: Vec<OriginalPricingVariable>,
+    registration_order: HashMap<(i32, i32), usize>,
     branches: Vec<MappedBranchVariable>,
     graph_arcs: HashMap<i32, HashSet<i32>>,
     costs: Arc<Vec<OriginalVariableCosts>>,
@@ -114,6 +115,8 @@ pub struct OriginalColumn<'a> {
 /// Base arc costs/entries remain additive. Expansion uses finite binary64
 /// products and sums; the returned physical coefficients define the compiled
 /// model. Original variable bounds must be encoded by the caller's graph.
+/// Definition order is retained as original-variable registration order for
+/// aggregate candidate projection; reported variables remain canonically sorted.
 /// The input is owned, so failed compilation never edits a retained snapshot.
 pub fn compile_pricing_variables<const D: usize>(
     mut problem: Problem<D>,
@@ -154,6 +157,11 @@ pub fn compile_pricing_variables<const D: usize>(
         .map(|(p, n)| (n.id, p))
         .collect();
     let mut variables = definitions.to_vec();
+    let registration_order = definitions
+        .iter()
+        .enumerate()
+        .map(|(index, variable)| ((variable.network, variable.id), index))
+        .collect();
     variables.sort_by_key(|v| (v.network, v.id));
     let mut seen = HashSet::new();
     let mut branches = vec![];
@@ -230,7 +238,7 @@ pub fn compile_pricing_variables<const D: usize>(
             if variable.integer && !paired {
                 let branch = MappedBranchVariable {
                     name: format!("X_{}_{}", variable.network, variable.id),
-                    priority: variable.priority,
+                    priority: 1.,
                     networks: vec![MappedNetworkVariable {
                         network: variable.network,
                         arcs: vec![],
@@ -265,7 +273,7 @@ pub fn compile_pricing_variables<const D: usize>(
         if variable.integer && !variable.arcs.is_empty() {
             let branch = MappedBranchVariable {
                 name: format!("X_{}_{}", variable.network, variable.id),
-                priority: variable.priority,
+                priority: 1.,
                 networks: vec![MappedNetworkVariable {
                     network: variable.network,
                     activities: vec![],
@@ -371,6 +379,7 @@ pub fn compile_pricing_variables<const D: usize>(
         problem,
         PricingVariableRegistry {
             variables,
+            registration_order,
             branches,
             graph_arcs,
             costs: Arc::new(costs),
@@ -506,7 +515,8 @@ impl PricingVariableRegistry {
         })
     }
 
-    /// Compile an aggregated subproblem-variable branch.
+    /// Compile the child expression of an aggregated subproblem-variable branch.
+    /// `BranchingRegistry::register_with_pricing` also installs its candidate projection.
     pub fn aggregate(
         &self,
         aggregate: &AggregateVariableBranching,
@@ -539,10 +549,10 @@ impl PricingVariableRegistry {
         })
     }
 
-    /// Add compiled expressions and aggregates to a tree's mapped variables.
-    pub fn configure_expressions(
+    /// Compile original-variable entries into the branching registry.
+    pub(super) fn compile_branching(
         &self,
-        options: &mut ModelTreeOptions,
+        registry: &mut BranchingRegistry,
         expressions: &[BranchingExpression],
         aggregates: &[AggregateVariableBranching],
     ) -> Result<()> {
@@ -553,7 +563,7 @@ impl PricingVariableRegistry {
         for aggregate in aggregates {
             compiled.push(self.aggregate(aggregate)?);
         }
-        let mut names: HashSet<_> = options
+        let mut names: HashSet<_> = registry
             .mapped_variables
             .iter()
             .map(|v| v.name.clone())
@@ -561,20 +571,105 @@ impl PricingVariableRegistry {
         if compiled.iter().any(|v| !names.insert(v.name.clone())) {
             return Err(invalid("branching expression name conflict"));
         }
-        options.mapped_variables.extend(compiled);
+        let mut admission = registry.aggregate_admission.clone();
+        let mut projections = registry.aggregate_projection.clone();
+        let mut defaulted_admission = Vec::new();
+        for aggregate in aggregates {
+            let name = format!("AGG_{}", aggregate.id);
+            let mut members: Vec<_> = self
+                .variables
+                .iter()
+                .filter(|variable| {
+                    variable.id == aggregate.id
+                        && (aggregate.networks.is_empty()
+                            || aggregate.networks.contains(&variable.network))
+                })
+                .cloned()
+                .collect();
+            members
+                .sort_by_key(|variable| self.registration_order[&(variable.network, variable.id)]);
+            projections.insert(name.clone(), AggregateProjection::new(members));
+            if !admission.contains_key(&name) {
+                admission.insert(name.clone(), 1e-8);
+                defaulted_admission.push(name);
+            }
+        }
+        // Other admission registrations may refer to expressions that occur
+        // later in the same batch. Validate their values here and resolve all
+        // names once the complete registry is prepared for the tree.
+        if admission
+            .values()
+            .any(|&threshold| !model_mapping::valid_aggregate_threshold(threshold))
+        {
+            return Err(invalid(
+                "aggregate admission requires finite thresholds in (0, 0.5]",
+            ));
+        }
+        // Publish all registrations together only after the expressions and
+        // their admission controls have been validated. Existing aggregate
+        // projections are intentionally replaced by the compiled projection.
+        let mut updated = registry.clone();
+        let mut registrations: Vec<_> = compiled
+            .into_iter()
+            .map(BranchingRegistration::Mapped)
+            .collect();
+        for (name, threshold) in admission {
+            if !updated.aggregate_admission.contains_key(&name) {
+                registrations.push(BranchingRegistration::AggregateAdmission { name, threshold });
+            }
+        }
+        for (name, projection) in projections {
+            updated.aggregate_projection.remove(&name);
+            registrations.push(BranchingRegistration::AggregateProjection { name, projection });
+        }
+        updated.register_batch(registrations)?;
+        updated
+            .defaulted_aggregate_admission
+            .extend(defaulted_admission);
+        *registry = updated;
         Ok(())
     }
 
     /// Add registered integer activities to a tree without replacing explicit
     /// registrations. Name conflicts fail before publishing any edits.
     pub fn configure_tree(&self, options: &mut ModelTreeOptions) -> Result<()> {
-        let names: HashSet<_> = options.mapped_variables.iter().map(|v| &v.name).collect();
+        let names: HashSet<_> = options
+            .branching_registry
+            .mapped_variables
+            .iter()
+            .map(|v| &v.name)
+            .collect();
         if self.branches.iter().any(|v| names.contains(&v.name)) {
             return Err(invalid(
                 "original-variable branch registration name conflict",
             ));
         }
-        options.mapped_variables.extend(self.branches.clone());
+        let priorities: HashMap<_, _> = self
+            .variables
+            .iter()
+            .map(|v| (format!("X_{}_{}", v.network, v.id), v.priority))
+            .collect();
+        let mut registrations = Vec::new();
+        for branch in &self.branches {
+            let priority = priorities[&branch.name];
+            registrations.push(BranchingRegistration::Mapped(branch.clone()));
+            if !options
+                .branching_registry
+                .branch_selection
+                .contains_key(&branch.name)
+            {
+                registrations.push(BranchingRegistration::Selection {
+                    name: branch.name.clone(),
+                    selection: BranchSelection {
+                        family: "original-variables".into(),
+                        rule: BranchSelectionRule::MostFractional,
+                        variable_priority: priority,
+                        default_factor: priority,
+                    },
+                });
+            }
+        }
+        options.branching_registry.register_batch(registrations)?;
         self.configure_pricing(&mut options.node);
         Ok(())
     }
@@ -728,6 +823,40 @@ impl PricingVariableRegistry {
                 .upper()
                 .ok_or_else(|| invalid("original-variable activity overflow"))?,
         })
+    }
+}
+
+impl BranchingRegistry {
+    /// Register a sequence against original pricing identities atomically.
+    pub fn register_batch_with_pricing(
+        &mut self,
+        pricing: &PricingVariableRegistry,
+        registrations: impl IntoIterator<Item = BranchingRegistration>,
+    ) -> Result<()> {
+        let mut updated = self.clone();
+        for registration in registrations {
+            updated.register_with_pricing(pricing, registration)?;
+        }
+        *self = updated;
+        Ok(())
+    }
+
+    /// Register any branching entry, compiling original-variable expressions
+    /// against the supplied pricing-variable identities when necessary.
+    pub fn register_with_pricing(
+        &mut self,
+        pricing: &PricingVariableRegistry,
+        registration: BranchingRegistration,
+    ) -> Result<()> {
+        match registration {
+            BranchingRegistration::Expression(expression) => {
+                pricing.compile_branching(self, &[expression], &[])
+            }
+            BranchingRegistration::AggregateVariable(aggregate) => {
+                pricing.compile_branching(self, &[], &[aggregate])
+            }
+            other => self.register(other),
+        }
     }
 }
 

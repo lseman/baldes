@@ -10,14 +10,9 @@ Solve shared master rows with multiple pricing networks (Clp).
   --network-promising-limit N  positive-status budget (default: 1000000)
   --stabilization-max-tree-depth N  Disable stabilization at depth N (default: 10000)
   --network-unpromising-limit N  Per-batch queue budget (default: 1)
-  --network-branch-priorities FILE  Family priorities for phased JSON
-  --network-branch-directions FILE  Generator-name to upper-first/lower-first JSON (--tree)
-  --mapped-variables FILE  Registered original aggregate branch variables JSON
-  --packing FILE  packing-assignment registration JSON (--tree)
+  --branching-registrations FILE  Ordered branching registrations JSON (--tree)
   --original-variable-boxes FILE  Original identity lower/upper envelopes JSON
   --variable-boxes FILE  Verified variable-box envelopes JSON
-  --mapped-strong-branching  Rank branch proposals by strong trial solves (native default: off)
-  --no-mapped-strong-branching  Rank branch proposals without trial solves (default)
   --greedy              Initial residual construction with shifted costs (requires --tree)
   --local-search FILE     Partial-incumbent diving controls JSON (--tree; depth_limit >= 0 enables)
   --proximal FILE         Proximal configuration JSON (replaces smoothing)
@@ -29,7 +24,6 @@ Solve shared master rows with multiple pricing networks (Clp).
   --automatic-curvature-five-piece  Automatic five-piece curvature stabilization
   --proximal-width X      One proximal band, in dual row units
   --proximal-penalty X    Finite band penalty; omitted means hard box-step
-  --network-branching MODE  multiplicity-first (default), resource-first or phased
   --network-tree-search MODE  default (default), best-bound, bound-priority or depth-bound-priority
   --network-strategy2-rounding MODE  unrounded (default), guarded-tolerance or exact-ceil
   --network-open-node-limit N  primary frontier size (default: 1000)
@@ -134,15 +128,11 @@ fn parse_options(args: Vec<String>) -> Result<Option<NetworkOptions>, String> {
                 options.network_unpromising_limit =
                     value()?.parse::<usize>().map_err(|e| e.to_string())?;
             }
-            "--network-branch-priorities" => {
+            "--branching-registrations" => {
                 let text = std::fs::read_to_string(value()?).map_err(|e| e.to_string())?;
-                options.network_branch_priorities = serde_json::from_str(&text)
-                    .map_err(|e| format!("network branch priorities JSON: {e}"))?;
-            }
-            "--network-branch-directions" => {
-                let text = std::fs::read_to_string(value()?).map_err(|e| e.to_string())?;
-                options.network_branch_directions = serde_json::from_str(&text)
-                    .map_err(|e| format!("network branch directions JSON: {e}"))?;
+                let registrations: Vec<model::BranchingRegistration> = serde_json::from_str(&text)
+                    .map_err(|e| format!("branching registrations JSON: {e}"))?;
+                options.branching_registrations.extend(registrations);
             }
             "--original-variable-boxes" => {
                 options.original_variable_boxes = serde_json::from_str(
@@ -155,18 +145,6 @@ fn parse_options(args: Vec<String>) -> Result<Option<NetworkOptions>, String> {
                 options.variable_boxes =
                     serde_json::from_str(&text).map_err(|e| format!("variable boxes JSON: {e}"))?;
             }
-            "--packing" => {
-                let text = std::fs::read_to_string(value()?).map_err(|e| e.to_string())?;
-                options.packing =
-                    Some(serde_json::from_str(&text).map_err(|e| format!("packing JSON: {e}"))?);
-            }
-            "--mapped-variables" => {
-                let text = std::fs::read_to_string(value()?).map_err(|e| e.to_string())?;
-                options.mapped_variables = serde_json::from_str(&text)
-                    .map_err(|e| format!("mapped variables JSON: {e}"))?;
-            }
-            "--mapped-strong-branching" => options.mapped_strong_branching = true,
-            "--no-mapped-strong-branching" => options.mapped_strong_branching = false,
             "--proximal" => {
                 let text = std::fs::read_to_string(value()?).map_err(|e| e.to_string())?;
                 options.proximal =
@@ -181,11 +159,6 @@ fn parse_options(args: Vec<String>) -> Result<Option<NetworkOptions>, String> {
             "--network-pricing-schedule" => {
                 options.network_pricing_schedule =
                     model::NetworkPricingSchedule::parse(&value()?).map_err(|e| e.to_string())?
-            }
-            "--network-branching" => {
-                options.network_branching =
-                    baldes::master::tree::NetworkBranchingPolicy::parse(&value()?)
-                        .map_err(|e| e.to_string())?
             }
             "--network-tree-search" => {
                 options.network_tree_search =
@@ -308,23 +281,35 @@ pub(super) fn solve_networks(file: String, args: Vec<String>) -> Result<(), Stri
                 .tree_options_with_registry(&registry)
                 .map_err(|e| e.to_string())?;
             configured.time_limit = configured.time_limit.saturating_sub(started.elapsed());
-            let output = node.solve_tree(configured).map_err(|e| e.to_string())?;
-            SolveResult::tree(&output, started.elapsed().as_secs_f64())
+            solve_prepared(
+                SolveStart::Snapshot(node),
+                SolveMode::Tree(configured),
+                started,
+            )?
         } else {
             let mut configured = node_options;
             configured.cg.time_limit = configured.cg.time_limit.saturating_sub(started.elapsed());
-            let output = node.solve(configured).map_err(|e| e.to_string())?;
-            SolveResult::root(&output, started.elapsed().as_secs_f64())
+            solve_prepared(
+                SolveStart::Snapshot(node),
+                SolveMode::Root(configured),
+                started,
+            )?
         }
     } else if options.tree {
         let configured = options
             .tree_options_with_registry(&registry)
             .map_err(|e| e.to_string())?;
-        let output = baldes::master::tree::solve(problem, configured).map_err(|e| e.to_string())?;
-        SolveResult::tree(&output, started.elapsed().as_secs_f64())
+        solve_prepared(
+            SolveStart::Problem(problem),
+            SolveMode::Tree(configured),
+            started,
+        )?
     } else {
-        let output = model::solve(problem, node_options).map_err(|e| e.to_string())?;
-        SolveResult::root(&output, started.elapsed().as_secs_f64())
+        solve_prepared(
+            SolveStart::Problem(problem),
+            SolveMode::Root(node_options),
+            started,
+        )?
     };
     let result = result
         .with_original_variables(&registry)
@@ -351,3 +336,7 @@ pub(super) fn solve_networks(file: String, args: Vec<String>) -> Result<(), Stri
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "../../../../tests/unit/bin/baldes/cli/networks_tests.rs"]
+mod tests;

@@ -1,0 +1,41 @@
+[
+  {
+    "quota": 0,
+    "families": [
+      "10:3",
+      "10:3"
+    ],
+    "observed": {
+      "quota": 0,
+      "count": 0,
+      "cutoff": 0,
+      "calls": [],
+      "selected": []
+    }
+  },
+  {
+    "quota": 2,
+    "families": [
+      "10:0",
+      "10:0"
+    ],
+    "observed": {
+      "quota": 2,
+      "count": 0,
+      "cutoff": 10,
+      "calls": [
+        {
+          "family": 0,
+          "quota": 2,
+          "created": 0
+        },
+        {
+          "family": 1,
+          "quota": 2,
+          "created": 0
+        }
+      ],
+      "selected": []
+    }
+  }
+]

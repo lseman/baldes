@@ -229,8 +229,11 @@ fn native_node_limit_boundaries_match_all_four_retained_controls() {
             .arg(&model)
             .args([
                 "--tree",
-                "--network-branching",
-                "multiplicity-first",
+                "--branching-registrations",
+                concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/fixtures/branch_policy_multiplicity.json"
+                ),
                 "--proximal-explicit-five-piece",
                 "--network-tree-search",
                 case["policy"].as_str().unwrap(),
@@ -263,8 +266,18 @@ fn explicit_network_family_order_preserves_the_integer_optimum() {
     for policy in ["resource-first", "multiplicity-first"] {
         let tree = solve(&[
             "--tree",
-            "--network-branching",
-            policy,
+            "--branching-registrations",
+            if policy == "resource-first" {
+                concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/fixtures/branch_policy_resource.json"
+                )
+            } else {
+                concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/fixtures/branch_policy_multiplicity.json"
+                )
+            },
             "--no-stabilization",
         ]);
         assert_eq!(tree["status"], "Optimal");
@@ -280,7 +293,13 @@ fn explicit_network_family_order_preserves_the_integer_optimum() {
     assert!(!command()
         .arg("solve")
         .arg(fixture())
-        .args(["--network-branching", "unknown"])
+        .args([
+            "--branching-registrations",
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/branch_policy_invalid.json"
+            ),
+        ])
         .output()
         .unwrap()
         .status
@@ -620,20 +639,22 @@ fn native_depth_budgets_and_registered_aggregate_branches_preserve_objectives() 
         "2",
     ]);
     assert_eq!(root["lp"], 1.5);
-    let mappings =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/networks/mapped_variables.json");
     for strong in [true, false] {
-        let mut flags = vec![
+        let flags = vec![
             "--tree",
-            "--mapped-strong-branching",
-            "--network-branching",
-            "phased",
-            "--mapped-variables",
-            mappings.to_str().unwrap(),
+            "--branching-registrations",
+            if strong {
+                concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/fixtures/branch_example_mapped_strong.json"
+                )
+            } else {
+                concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/fixtures/branch_example_mapped.json"
+                )
+            },
         ];
-        if !strong {
-            flags.push("--no-mapped-strong-branching");
-        }
         let tree = solve(&flags);
         assert_eq!(tree["status"], "Optimal");
         assert_eq!(tree["incumbent"], 2.);
@@ -656,9 +677,11 @@ fn native_depth_budgets_and_registered_aggregate_branches_preserve_objectives() 
 fn native_phased_registry_evaluates_original_fallback_candidates() {
     let tree = solve(&[
         "--tree",
-        "--mapped-strong-branching",
-        "--network-branching",
-        "phased",
+        "--branching-registrations",
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/branch_phased_strong.json"
+        ),
     ]);
     assert_eq!(tree["status"], "Optimal");
     assert_eq!(tree["incumbent"], 2.);
@@ -676,9 +699,11 @@ fn native_phased_trial_budget_and_prepared_children_match_retained_controls() {
             let limit = case["limit"].as_u64().unwrap().to_string();
             let tree = solve(&[
                 "--tree",
-                "--mapped-strong-branching",
-                "--network-branching",
-                "phased",
+                "--branching-registrations",
+                concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/fixtures/branch_phased_strong.json"
+                ),
                 "--nodes",
                 &limit,
                 "--bound-mode",
@@ -716,8 +741,11 @@ fn native_depth_first_search_separates_processed_and_evaluated_nodes() {
             .arg(&model)
             .args([
                 "--tree",
-                "--network-branching",
-                "multiplicity-first",
+                "--branching-registrations",
+                concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/fixtures/branch_policy_multiplicity.json"
+                ),
                 "--network-tree-search",
                 selection,
                 "--proximal-explicit-five-piece",
@@ -885,8 +913,11 @@ fn native_scoring_gap_controls_are_finite_nonnegative_and_keep_original_optimum(
     for gap in ["0", "0.000001", "0.4"] {
         let tree = solve(&[
             "--tree",
-            "--network-branching",
-            "phased",
+            "--branching-registrations",
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/branch_policy_phased.json"
+            ),
             "--network-scoring-gap-tolerance",
             gap,
         ]);
@@ -922,9 +953,11 @@ fn exact_infeasible_trial_is_not_resolved_or_left_open_at_native_budget_boundari
                 .arg(&model)
                 .args([
                     "--tree",
-                    "--mapped-strong-branching",
-                    "--network-branching",
-                    "phased",
+                    "--branching-registrations",
+                    concat!(
+                        env!("CARGO_MANIFEST_DIR"),
+                        "/tests/fixtures/branch_phased_strong.json"
+                    ),
                     "--network-tree-search",
                     case["policy"].as_str().unwrap(),
                     "--nodes",
@@ -965,20 +998,18 @@ fn exact_infeasible_trial_is_not_resolved_or_left_open_at_native_budget_boundari
 
 #[test]
 fn mapped_phase_continuation_separates_native_screens_from_processed_exact_nodes() {
-    let mappings = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/multi_network_native_phased_mappings.json");
     for mode in ["numerical", "certified"] {
         let output = command()
             .arg("solve")
             .arg(fixture())
             .args([
                 "--tree",
-                "--mapped-strong-branching",
-                "--network-branching",
-                "resource-first",
-                "--mapped-variables",
+                "--branching-registrations",
+                concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/fixtures/branch_resource_mapped_strong.json"
+                ),
             ])
-            .arg(&mappings)
             .args(["--bound-mode", mode, "--no-stabilization", "--json", "-"])
             .output()
             .unwrap();
@@ -1036,14 +1067,14 @@ fn shared_inactive_tree_paths_keep_both_original_bound_modes() {
 
 #[test]
 fn native_packing_file_registers_original_assignment_branching() {
-    let packing = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/multi_network_native_packing.json");
     for mode in ["numerical", "certified"] {
         let result = solve(&[
             "--tree",
-            "--mapped-strong-branching",
-            "--packing",
-            packing.to_str().unwrap(),
+            "--branching-registrations",
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/branch_packing_strong.json"
+            ),
             "--no-stabilization",
             "--bound-mode",
             mode,
@@ -1057,26 +1088,29 @@ fn native_packing_file_registers_original_assignment_branching() {
     let invalid = command()
         .arg("solve")
         .arg(fixture())
-        .args(["--packing", packing.to_str().unwrap()])
+        .args([
+            "--branching-registrations",
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/branch_packing.json"
+            ),
+        ])
         .output()
         .unwrap();
     assert!(!invalid.status.success());
-    assert!(String::from_utf8_lossy(&invalid.stderr).contains("requires tree=true"));
+    assert!(String::from_utf8_lossy(&invalid.stderr).contains("require tree=true"));
 }
 
 #[test]
 fn named_native_branch_direction_controls_trial_order_through_cli() {
-    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
-    let packing = fixtures.join("multi_network_native_packing.json");
-    let directions = fixtures.join("multi_network_native_branch_directions.json");
     let result = solve(&[
         "--tree",
-        "--mapped-strong-branching",
         "--no-stabilization",
-        "--packing",
-        packing.to_str().unwrap(),
-        "--network-branch-directions",
-        directions.to_str().unwrap(),
+        "--branching-registrations",
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/branch_packing_directions.json"
+        ),
     ]);
     assert_eq!(result["status"], "Optimal");
     assert_eq!(result["incumbent"], 2.);
@@ -1096,11 +1130,17 @@ fn named_native_branch_direction_controls_trial_order_through_cli() {
     let root = command()
         .arg("solve")
         .arg(fixture())
-        .args(["--network-branch-directions", directions.to_str().unwrap()])
+        .args([
+            "--branching-registrations",
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/branch_directions.json"
+            ),
+        ])
         .output()
         .unwrap();
     assert!(!root.status.success());
-    assert!(String::from_utf8_lossy(&root.stderr).contains("requires tree=true"));
+    assert!(String::from_utf8_lossy(&root.stderr).contains("require tree=true"));
 }
 
 #[test]

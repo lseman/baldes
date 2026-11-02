@@ -134,7 +134,7 @@ fn registration_is_validated_even_with_zero_tree_budget() {
     ] {
         let mut options = ModelTreeOptions::default();
         options.node_limit = 0;
-        options.packing = Some(PackingBranching::new(
+        options.branching_registry.packing = Some(PackingBranching::new(
             1.,
             vec![NetworkPackingAssignment::new(
                 network,
@@ -240,4 +240,28 @@ fn half_distance_precedes_configuration_identity_and_interval_is_strict() {
         output.values = original.iter().map(|value| value * scale).collect();
         assert!(packing.proposals(&output, 1e-6).is_empty());
     }
+}
+
+#[test]
+fn historical_assignment_refresh_survives_a_different_fresh_network_winner() {
+    let mut packing = registry();
+    prepare(&mut packing, &problem());
+    let mut output = root();
+    for (route, value) in output.routes.iter().zip(&mut output.values) {
+        if route.network == 42 {
+            *value *= 0.6;
+        }
+    }
+    let fresh = packing.proposals(&output, 1e-6);
+    assert!(fresh.iter().any(|p| p.name == "ESA_7_2"));
+    assert!(!fresh.iter().any(|p| p.name == "ESA_42_2"));
+    let refreshed = packing.refresh(&output, "ESA_42_2", 1e-6).unwrap();
+    assert_eq!(refreshed.name, "ESA_42_2");
+    assert!(refreshed.value > 1e-6 && refreshed.value < 1. - 1e-6);
+    assert!(!refreshed.fresh);
+    assert!(refreshed.history_eligible);
+    assert_eq!(refreshed.history_key, "mapped:ESA_42_2");
+    output.values.fill(0.);
+    assert!(packing.refresh(&output, "ESA_42_2", 1e-6).is_none());
+    assert!(packing.refresh(&output, "ESA_missing", 1e-6).is_none());
 }

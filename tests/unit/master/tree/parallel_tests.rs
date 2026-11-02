@@ -14,8 +14,8 @@ fn parallel_batches_prove_the_sequential_optimum() {
     let solve = |threads: usize| {
         let problem = rc101(25);
         let mut configured = ModelTreeOptions::default();
-        configured.mapped_variables = problem.arc_flow_variables(1.);
-        configured.mapped_strong_branching = None;
+        configured.branching_registry.mapped_variables = problem.arc_flow_variables(1.);
+        configured.branching_registry.strong_branching = None;
         configured.node_limit = 2000;
         configured.threads = threads;
         crate::master::tree::solve(problem, configured).unwrap()

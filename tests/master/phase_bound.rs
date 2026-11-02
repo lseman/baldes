@@ -7,6 +7,66 @@ use baldes::master::{
 };
 
 #[test]
+fn minimum_cut_rounds_delay_tailing_off_but_do_not_repeat_empty_separation() {
+    struct Shrink {
+        rounds: usize,
+        available: usize,
+    }
+    impl cg::Controller<ClpMaster> for Shrink {
+        fn separates(&self) -> bool {
+            true
+        }
+        fn separate(&mut self, master: &mut ClpMaster, _: &[i32]) -> baldes::Result<usize> {
+            if self.rounds >= self.available {
+                return Ok(0);
+            }
+            self.rounds += 1;
+            master.add_row(
+                RowSense::LessEqual,
+                1. - self.rounds as f64 * 0.1,
+                &[(0, 1.)],
+            )?;
+            Ok(1)
+        }
+    }
+    for (minimum, available, expected) in [(0, 5, 1), (3, 5, 3), (3, 1, 1)] {
+        let mut master = ClpMaster::new().unwrap();
+        master.add_row(RowSense::Equal, 1., &[]).unwrap();
+        master.add_column(1., &[(0, 1.)]).unwrap();
+        master.add_column(2., &[(0, 1.)]).unwrap();
+        let mut controller = Shrink {
+            rounds: 0,
+            available,
+        };
+        let result = cg::optimize(
+            &mut master,
+            &[],
+            |_, _| {
+                Ok(Answer {
+                    columns: vec![],
+                    minimum: 0.,
+                    exact: true,
+                    bound_minimum: None,
+                })
+            },
+            &mut controller,
+            Options {
+                stabilize: false,
+                min_cut_rounds: minimum,
+                max_cut_rounds: 5,
+                tailing_off_threshold: 1e6,
+                tailing_off_counter: 1,
+                ..Options::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(result.status, Status::Optimal);
+        assert_eq!(result.cut_rounds, expected);
+        assert_eq!(controller.rounds, expected);
+    }
+}
+
+#[test]
 fn an_exact_phase_cannot_promote_an_incomplete_multi_domain_batch() {
     struct Partial;
     impl cg::Controller<ClpMaster> for Partial {
@@ -1206,4 +1266,187 @@ fn closing_exact_bound_keeps_feasible_master_before_empty_enumeration() {
     assert_eq!(controller.enumeration_calls, 0);
     assert_eq!(master.values()[0], 1.);
     assert!(out.warm_start.columns.iter().any(Option::is_some));
+}
+
+#[test]
+fn pricing_timeout_before_checkpoint_preserves_bounds_and_resumable_columns() {
+    for mode in [cg::BoundMode::Numerical, cg::BoundMode::Certified] {
+        for inherited in [false, true] {
+            let mut master = ClpMaster::new().unwrap();
+            master.add_row(RowSense::Equal, 1., &[]).unwrap();
+            master.add_column(2., &[(0, 1.)]).unwrap();
+            let warm = inherited.then(|| cg::WarmStart {
+                bound: 1.,
+                bound_mode: mode,
+                numerical_bound: 1.,
+                certified_bound: if mode == cg::BoundMode::Certified {
+                    1.
+                } else {
+                    f64::NEG_INFINITY
+                },
+                stabilization: None,
+                proximal: None,
+                generated_pool: vec![],
+                columns: vec![Some(Column {
+                    cost: 2.,
+                    entries: vec![(0, 1.)],
+                    reduced_cost: 0.,
+                    tag: 7,
+                    identity: "existing".into(),
+                    acceptable: true,
+                })],
+                artificials: vec![],
+                cut_artificials: vec![],
+                initial_rows: 1,
+            });
+            let out = cg::optimize(
+                &mut master,
+                &[],
+                |_, _| {
+                    Err(baldes::core::error::OrError {
+                        kind: baldes::core::error::ErrorKind::Runtime,
+                        message: "pricing hard time limit exceeded".into(),
+                    })
+                },
+                &mut NoController,
+                Options {
+                    stabilize: false,
+                    bound_mode: mode,
+                    warm_start: warm,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            assert_eq!(out.status, Status::TimeLimit);
+            assert_eq!(out.pricing_calls, 1);
+            assert_eq!(out.bound, if inherited { 1. } else { f64::NEG_INFINITY });
+            assert_eq!(out.warm_start.bound, out.bound);
+            assert_eq!(out.lp, 2.);
+            assert!(out.history.is_empty());
+            assert_eq!(out.warm_start.columns.len(), master.costs.len());
+            // A timed-out solve must remain usable, including column identities.
+            let resumed = cg::optimize(
+                &mut master,
+                &[],
+                |_, _| {
+                    Ok(Answer {
+                        columns: vec![],
+                        minimum: 0.,
+                        exact: true,
+                        bound_minimum: None,
+                    })
+                },
+                &mut NoController,
+                Options {
+                    stabilize: false,
+                    bound_mode: mode,
+                    warm_start: Some(out.warm_start),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            assert_eq!(resumed.status, Status::Optimal);
+            assert_eq!(resumed.lp, 2.);
+        }
+    }
+}
+
+#[test]
+fn pricing_timeout_defers_to_rollback_and_other_errors_still_propagate() {
+    struct Rollback(bool);
+    impl cg::Controller<ClpMaster> for Rollback {
+        fn pricing_timeout_requires_rollback(&self) -> bool {
+            self.0
+        }
+    }
+    for (rollback, error) in [
+        (
+            true,
+            baldes::core::error::OrError {
+                kind: baldes::core::error::ErrorKind::Runtime,
+                message: "pricing hard time limit exceeded".into(),
+            },
+        ),
+        (
+            false,
+            baldes::core::error::OrError {
+                kind: baldes::core::error::ErrorKind::Runtime,
+                message: "resource or bucket arithmetic or state failure".into(),
+            },
+        ),
+        (
+            false,
+            baldes::core::error::OrError {
+                kind: baldes::core::error::ErrorKind::InvalidArgument,
+                message: "invalid pricing time limit".into(),
+            },
+        ),
+        (
+            false,
+            baldes::core::error::OrError {
+                kind: baldes::core::error::ErrorKind::Runtime,
+                message: "pricing label limit exceeded".into(),
+            },
+        ),
+    ] {
+        let mut master = ClpMaster::new().unwrap();
+        master.add_row(RowSense::Equal, 1., &[]).unwrap();
+        master.add_column(2., &[(0, 1.)]).unwrap();
+        let actual = cg::optimize(
+            &mut master,
+            &[],
+            |_, _| Err(error.clone()),
+            &mut Rollback(rollback),
+            Options {
+                stabilize: false,
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert_eq!(actual.kind, error.kind);
+        assert_eq!(actual.message, error.message);
+    }
+}
+
+#[test]
+fn network_tree_pricing_timeout_retains_a_validated_initial_incumbent() {
+    use baldes::{
+        graph::Graph,
+        master::{model, tree},
+    };
+    let mut graph = Graph::<2>::new(3, 1).unwrap();
+    for v in 0..3 {
+        graph.set_bounds(v, 0, 0., 10.).unwrap();
+    }
+    graph.add_arc(0, 1, 1.).unwrap();
+    graph.add_arc(1, 2, 1.).unwrap();
+    let route = baldes::labeling::Route {
+        nodes: vec![0, 1, 2],
+        arcs: vec![0, 1],
+        original_cost: 2.,
+        cost: 2.,
+        resources: vec![0.],
+        resource_profile: vec![vec![0.]; 3],
+        coupled_values: vec![],
+    };
+    let problem = model::Problem::set_partitioning(graph, 1.).unwrap();
+    let mut options = tree::ModelTreeOptions::default();
+    options.node.cg.stabilize = false;
+    options.node.gap_enumeration = false;
+    options
+        .node
+        .pricing_options
+        .push(("BALDEShardTimeThresholdInPricing".into(), 0.));
+    options.initial_solution = Some((
+        2.,
+        vec![model::FixedRoute {
+            route: model::NetworkRoute { network: 0, route },
+            quantity: 1.,
+        }],
+    ));
+    let out = tree::solve(problem, options).unwrap();
+    assert_eq!(out.status, tree::TreeStatus::TimeLimit);
+    assert_eq!(out.incumbent, 2.);
+    assert_eq!(out.routes.len(), 1);
+    assert!(out.bound <= 2.);
 }

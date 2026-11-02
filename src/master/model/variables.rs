@@ -76,13 +76,15 @@ impl<const D: usize> NodeSnapshot<D> {
         if bounds.lower < 0. {
             return Err(invalid("nonnegative multiplicity lower bound required"));
         }
-        self.with_activity_bounds(
+        let mut node = self.with_activity_bounds(
             bounds,
             &[RowCoefficients {
                 network,
                 arcs: vec![0.; oracle.network.graph.arcs.len()],
                 per_route: 1.,
             }],
-        )
+        )?;
+        component::record_count_bounds(&mut node, network, bounds);
+        Ok(node)
     }
 }

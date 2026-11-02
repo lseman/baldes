@@ -83,10 +83,8 @@ def test_local_search_partial_incumbent_dives_reach_the_public_network_tree():
 @pytest.mark.parametrize("direction,first_side", [("upper-first", 1), ("lower-first", 0)])
 def test_named_native_branch_direction_reaches_trial_evaluation(direction, first_side):
     result = triangle().solve(
-        tree=True, stabilize=False, network_branching="phased", mapped_strong_branching=True,
-        mapped_variables=({"name": "count42", "priority": 1000.,
-                           "networks": [{"network": 42, "per_route": 1.}]},),
-        network_branch_directions={"count42": direction},
+        tree=True, stabilize=False, branching_registrations=[{'kind': 'policy', 'config': "phased"}] + [{'kind': 'strong-branching', 'config': {} if (True) else None}] + [{'kind': 'mapped', 'config': value} for value in (({"name": "count42", "priority": 1000.,
+                           "networks": [{"network": 42, "per_route": 1.}]},))] + [{'kind': 'direction', 'config': {'name': name, 'direction': direction}} for name, direction in ({"count42": direction}).items()],
     )
     assert result.status == "Optimal"
     assert result.incumbent == pytest.approx(2.)
@@ -97,17 +95,15 @@ def test_named_native_branch_direction_reaches_trial_evaluation(direction, first
 
 
 def test_named_branch_directions_reject_root_calls_and_unknown_directions():
-    with pytest.raises(ValueError, match="requires tree=true"):
-        triangle().solve(network_branch_directions={"count42": "lower-first"})
+    with pytest.raises(ValueError, match="require tree=true"):
+        triangle().solve(branching_registrations=[{'kind': 'direction', 'config': {'name': name, 'direction': direction}} for name, direction in ({"count42": "lower-first"}).items()])
     with pytest.raises(ValueError, match="unknown variant"):
-        triangle().solve(tree=True, network_branching="phased", mapped_strong_branching=True,
-                         network_branch_directions={"count42": "up"})
+        triangle().solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': "phased"}] + [{'kind': 'strong-branching', 'config': {} if (True) else None}] + [{'kind': 'direction', 'config': {'name': name, 'direction': direction}} for name, direction in ({"count42": "up"}).items()])
     # Named directions apply under every branching policy (unified dispatcher).
     triangle().solve(tree=True, node_limit=0,
-                     network_branch_directions={"count42": "lower-first"})
+                     branching_registrations=[{'kind': 'direction', 'config': {'name': name, 'direction': direction}} for name, direction in ({"count42": "lower-first"}).items()])
     with pytest.raises(ValueError, match="nonempty generator name"):
-        triangle().solve(tree=True, node_limit=0, network_branching="phased", mapped_strong_branching=True,
-                         network_branch_directions={" ": "lower-first"})
+        triangle().solve(tree=True, node_limit=0, branching_registrations=[{'kind': 'policy', 'config': "phased"}] + [{'kind': 'strong-branching', 'config': {} if (True) else None}] + [{'kind': 'direction', 'config': {'name': name, 'direction': direction}} for name, direction in ({" ": "lower-first"}).items()])
 
 
 @pytest.mark.parametrize("schedule", ["full-sweep", "cyclic", "sorted", "promising-first", "unvisited-first"])
@@ -207,11 +203,11 @@ def test_assignment_tree_and_limits(bound_mode):
 @pytest.mark.parametrize("policy", ["resource-first", "multiplicity-first", "phased"])
 def test_explicit_network_branch_order_in_fresh_and_snapshot_trees(policy):
     model = triangle()
-    fresh = model.solve(tree=True, network_branching=policy, stabilize=False)
+    fresh = model.solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': policy}], stabilize=False)
     assert fresh.status == "Optimal"
     assert fresh.incumbent == pytest.approx(2)
     root = model.solve(stabilize=False)
-    resumed = root.snapshot.solve(tree=True, network_branching=policy, stabilize=False)
+    resumed = root.snapshot.solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': policy}], stabilize=False)
     assert resumed.status == "Optimal"
     assert resumed.incumbent == pytest.approx(2)
     assert root.snapshot.solve(stabilize=False).lp == pytest.approx(1.5)
@@ -219,7 +215,7 @@ def test_explicit_network_branch_order_in_fresh_and_snapshot_trees(policy):
 
 def test_invalid_network_branch_order_is_rejected():
     with pytest.raises(ValueError, match="variant|branch"):
-        triangle().solve(tree=True, network_branching="unknown")
+        triangle().solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': "unknown"}])
 
 
 def test_python_nodes_branch_restore_and_own_their_state():
@@ -487,9 +483,7 @@ def test_registered_cross_network_aggregate_branching_preserves_original_tree(st
         "networks": [{"network": 7, "per_route": 1.},
                      {"network": 42, "per_route": 1.}],
     },)
-    result = triangle().solve(tree=True, mapped_variables=mappings,
-                              network_branching="resource-first",
-                              mapped_strong_branching=strong)
+    result = triangle().solve(tree=True, branching_registrations=[{'kind': 'mapped', 'config': value} for value in (mappings)] + [{'kind': 'policy', 'config': "resource-first"}] + [{'kind': 'strong-branching', 'config': {} if (strong) else None}])
     assert result.status == "Optimal"
     assert result.incumbent == pytest.approx(2.)
     assert (result.strong_branching_trials > 0) == strong
@@ -499,20 +493,20 @@ def test_registered_cross_network_aggregate_branching_preserves_original_tree(st
 
 
 def test_native_tree_selection_and_processed_node_accounting():
-    native = triangle().solve(tree=True, network_branching="multiplicity-first",
+    native = triangle().solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': "multiplicity-first"}],
                               network_tree_search="default")
-    best_bound = triangle().solve(tree=True, network_branching="multiplicity-first",
+    best_bound = triangle().solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': "multiplicity-first"}],
                                   network_tree_search="best-bound")
-    strategy2 = triangle().solve(tree=True, network_branching="multiplicity-first",
+    strategy2 = triangle().solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': "multiplicity-first"}],
                                  network_tree_search="bound-priority")
-    strategy3 = triangle().solve(tree=True, network_branching="multiplicity-first",
+    strategy3 = triangle().solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': "multiplicity-first"}],
                                  network_tree_search="depth-bound-priority")
     assert strategy3.status == "Optimal"
     assert strategy3.incumbent == pytest.approx(2.)
-    strategy2_unrounded = triangle().solve(tree=True, network_branching="multiplicity-first",
+    strategy2_unrounded = triangle().solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': "multiplicity-first"}],
                                           network_tree_search="bound-priority",
                                           network_strategy2_rounding="unrounded")
-    strategy2_exact = triangle().solve(tree=True, network_branching="multiplicity-first",
+    strategy2_exact = triangle().solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': "multiplicity-first"}],
                                        network_tree_search="bound-priority",
                                        network_strategy2_rounding="exact-ceil")
     assert native.status == best_bound.status == strategy2.status == strategy2_exact.status == "Optimal"
@@ -526,11 +520,11 @@ def test_native_tree_selection_and_processed_node_accounting():
     assert best_bound.tree_processed_nodes >= best_bound.nodes
     assert json.loads(native.to_json())["tree_processed_nodes"] == native.tree_processed_nodes
     assert json.loads(strategy2.to_json())["tree_processed_nodes"] == strategy2.tree_processed_nodes
-    overflow = triangle().solve(tree=True, network_branching="multiplicity-first",
+    overflow = triangle().solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': "multiplicity-first"}],
                                 network_tree_search="default", network_open_node_limit=1)
     assert overflow.status == "Optimal"
     assert overflow.incumbent == pytest.approx(2.)
-    all_overflow = triangle().solve(tree=True, network_branching="multiplicity-first",
+    all_overflow = triangle().solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': "multiplicity-first"}],
                                     network_tree_search="default", network_open_node_limit=0)
     assert all_overflow.status == "Incomplete"
     assert all_overflow.incumbent is None
@@ -592,7 +586,7 @@ def test_bounded_walk_model_round_trip_and_certified_negative_cycle():
 
 @pytest.mark.parametrize("gap", [0., 1e-6, 0.4])
 def test_native_branch_scoring_gap_keeps_original_proof_bounds(gap):
-    result = triangle().solve(tree=True, network_branching="phased",
+    result = triangle().solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': "phased"}],
                               network_scoring_gap_tolerance=gap)
     assert result.status == "Optimal"
     assert result.incumbent == pytest.approx(2.)
@@ -607,9 +601,9 @@ def test_negative_native_branch_scoring_gap_is_rejected():
 @pytest.mark.parametrize("mode", ["numerical", "certified"])
 def test_native_multiphase_screens_are_distinct_from_processed_exact_trials(mode):
     mappings = json.loads((Path(__file__).resolve().parents[2] / "tests/fixtures/multi_network_native_phased_mappings.json").read_text())
-    result = triangle().solve(tree=True, network_branching="resource-first",
-                              mapped_variables=tuple(mappings), stabilize=False,
-                              mapped_strong_branching=True, bound_mode=mode)
+    result = triangle().solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': "resource-first"}] + [{'kind': 'mapped', 'config': value} for value in (tuple(mappings))] + [{'kind': 'strong-branching', 'config': {} if (True) else None}],
+                              stabilize=False,
+                              bound_mode=mode)
     assert result.status == "Optimal"
     assert result.incumbent == pytest.approx(2.)
     assert result.bound == pytest.approx(2.)
@@ -647,8 +641,8 @@ def test_half_incident_mapping_preserves_integer_tree_bounds(mode):
             "arcs": [[0, 0.5], [1, 0.5], [6, 0.5], [7, 0.5]],
         }],
     }
-    result = triangle().solve(tree=True, mapped_variables=(mapping,),
-                              network_branching="resource-first", stabilize=False,
+    result = triangle().solve(tree=True, branching_registrations=[{'kind': 'mapped', 'config': value} for value in ((mapping,))] + [{'kind': 'policy', 'config': "resource-first"}],
+                              stabilize=False,
                               bound_mode=mode)
     assert result.status == "Optimal"
     assert result.incumbent == pytest.approx(2.)
@@ -659,7 +653,7 @@ def test_unpaired_half_mapping_is_rejected_before_branching():
     mapping = {"name": "fractional-route", "networks": [{"network": 7,
                "arcs": [[0, 0.5]]}]}
     with pytest.raises(ValueError, match="integer on every graph path"):
-        triangle().solve(tree=True, mapped_variables=(mapping,), stabilize=False)
+        triangle().solve(tree=True, branching_registrations=[{'kind': 'mapped', 'config': value} for value in ((mapping,))], stabilize=False)
 
 
 @pytest.mark.parametrize("mode", ["numerical", "certified"])
@@ -681,8 +675,8 @@ def test_native_plain_near_zero_admission_matches_physical_entries(mode):
 def test_native_packing_registration_without_manual_mappings(mode):
     fixture = Path(__file__).resolve().parents[2] / "tests/fixtures/multi_network_native_packing.json"
     packing = json.loads(fixture.read_text())
-    result = triangle().solve(tree=True, packing=packing, stabilize=False,
-                              mapped_strong_branching=True, bound_mode=mode)
+    result = triangle().solve(tree=True, branching_registrations=[{'kind': 'packing', 'config': packing}] + [{'kind': 'strong-branching', 'config': {} if (True) else None}], stabilize=False,
+                              bound_mode=mode)
     assert result.status == "Optimal"
     assert result.incumbent == pytest.approx(2.)
     assert result.bound == pytest.approx(2.)
@@ -693,9 +687,9 @@ def test_native_packing_registration_without_manual_mappings(mode):
 def test_native_packing_requires_tree_and_rejects_endpoint_labels():
     packing = {"priority": 1000., "networks": [{"network": 7, "vertices": [[0, 1]]}]}
     with pytest.raises(ValueError, match="requires tree=true"):
-        triangle().solve(packing=packing)
+        triangle().solve(branching_registrations=[{'kind': 'packing', 'config': packing}])
     with pytest.raises(ValueError, match="source and sink"):
-        triangle().solve(tree=True, packing=packing, node_limit=0)
+        triangle().solve(tree=True, branching_registrations=[{'kind': 'packing', 'config': packing}], node_limit=0)
 
 
 @pytest.mark.parametrize("mode", ["numerical", "certified"])
@@ -704,7 +698,7 @@ def test_native_packing_separator_is_bypassed_without_strong_branching(mode):
     packing = json.loads(fixture.read_text())
     model_fixture = fixture.with_name("multi_network_native_tree.json")
     result = NetworkProblem.from_json(model_fixture.read_text()).solve(
-        tree=True, packing=packing, mapped_strong_branching=False,
+        tree=True, branching_registrations=[{'kind': 'packing', 'config': packing}] + [{'kind': 'strong-branching', 'config': {} if (False) else None}],
         stabilize=False, bound_mode=mode)
     assert result.status == "Optimal"
     assert result.incumbent == pytest.approx(2.)
@@ -808,8 +802,8 @@ def test_original_integer_registration_reaches_fresh_and_snapshot_trials():
     model = NetworkProblem.from_json(json.dumps(data))
     root = model.solve(stabilize=False)
     assert root.original_variables[0]["lower"] == pytest.approx(0.5)
-    for result in [model.solve(tree=True, network_branching="phased", mapped_strong_branching=True, stabilize=False),
-                   root.snapshot.solve(tree=True, network_branching="phased", mapped_strong_branching=True, stabilize=False)]:
+    for result in [model.solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': "phased"}] + [{'kind': 'strong-branching', 'config': {} if (True) else None}], stabilize=False),
+                   root.snapshot.solve(tree=True, branching_registrations=[{'kind': 'policy', 'config': "phased"}] + [{'kind': 'strong-branching', 'config': {} if (True) else None}], stabilize=False)]:
         assert result.incumbent == 2.
         assert any(e.name == "X_7_4" for e in result.mapped_branch_evaluations)
         activity = result.original_variables[0]

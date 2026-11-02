@@ -382,7 +382,41 @@ impl ComponentClassGenerator {
     }
 }
 
+/// Raw publisher keys survive until the coordinator knows the current adaptive
+/// quota. Publication runs at that quota rather than assuming a prefix law.
+pub(in crate::master::model) struct ComponentPublication {
+    keys: Vec<ordering::PriorityKey>,
+}
+impl ComponentPublication {
+    pub(in crate::master::model) fn publish(
+        &self,
+        quota: usize,
+        deadline: Option<Instant>,
+    ) -> Option<Vec<usize>> {
+        let mut work = ordering::Work::new(deadline);
+        ordering::publish(&self.keys, quota, &mut work)
+    }
+}
+
+#[cfg(test)]
 pub(in crate::master::model::component) fn collect<const D: usize>(
+    output: &Output<D>,
+    generators: &[ComponentClassGenerator],
+    quota: usize,
+    tolerance: f64,
+    deadline: Option<Instant>,
+) -> Result<Vec<model_strong::Proposal>> {
+    let mut proposals = collect_admission(output, generators, quota, tolerance, deadline)?;
+    proposals.retain(|proposal| {
+        proposal
+            .component_admission
+            .as_ref()
+            .is_none_or(|view| view.legacy_order.is_some())
+    });
+    Ok(proposals)
+}
+
+pub(in crate::master::model::component) fn collect_admission<const D: usize>(
     output: &Output<D>,
     generators: &[ComponentClassGenerator],
     quota: usize,
@@ -411,22 +445,62 @@ pub(in crate::master::model::component) fn collect<const D: usize>(
             generated.push(Some(candidate));
         }
     }
-    let Some(retained) = ordering::publish(&keys, quota, &mut work) else {
+    // Keep the original shared publisher as the compatibility admission view.
+    // Native separation receives the whole quota independently per registration.
+    let Some(legacy) = ordering::publish(&keys, quota, &mut work) else {
         return Ok(vec![]);
     };
+    let mut publications = Vec::new();
+    let mut local_indices = Vec::new();
+    let mut start = 0;
+    while start < keys.len() {
+        let family = keys[start].family;
+        let end = keys[start..]
+            .iter()
+            .position(|key| key.family != family)
+            .map_or(keys.len(), |length| start + length);
+        let publication = std::sync::Arc::new(ComponentPublication {
+            keys: keys[start..end].to_vec(),
+        });
+        for index in start..end {
+            publications.push(publication.clone());
+            local_indices.push(index - start);
+        }
+        start = end;
+    }
+    let legacy_order: HashMap<_, _> = legacy
+        .iter()
+        .enumerate()
+        .map(|(ordinal, &index)| (index, ordinal))
+        .collect();
+    // Legacy members must enter the tolerant candidate set in precisely their
+    // prior order. Native-only members are removed before legacy sorting.
+    let mut retained = legacy;
+    for index in 0..keys.len() {
+        if !legacy_order.contains_key(&index) {
+            retained.push(index);
+        }
+    }
     let mut proposals = vec![];
-    for (ordinal, index) in retained.into_iter().enumerate() {
+    for index in retained {
         let candidate = generated[index].take().unwrap();
         if !work.alive() {
             return Ok(vec![]);
         }
-        // Replay the complete original quantity, including fixed integer routes,
-        // before constructing the actual floor/ceiling children.
         if let Some(mut proposal) = candidate.class.proposal(output, tolerance)? {
             proposal.restriction = model_strong::Restriction::GeneratedComponent {
                 class: candidate.class,
-                ordinal,
+                ordinal: legacy_order.get(&index).copied().unwrap_or(usize::MAX),
             };
+            proposal.origin = Some(model_strong::ProducerFamily::ComponentGenerator(
+                keys[index].family,
+            ));
+            proposal.component_admission = Some(Box::new(model_strong::ComponentAdmission {
+                publication: publications[index].clone(),
+                raw_index: local_indices[index],
+                native_order: None,
+                legacy_order: legacy_order.get(&index).copied(),
+            }));
             proposals.push(proposal);
         }
     }
@@ -435,3 +509,7 @@ pub(in crate::master::model::component) fn collect<const D: usize>(
     }
     Ok(proposals)
 }
+
+#[cfg(test)]
+#[path = "../../../../../tests/unit/master/model/component_family_publication_tests.rs"]
+mod family_publication_tests;

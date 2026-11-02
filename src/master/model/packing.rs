@@ -38,6 +38,13 @@ pub struct PackingBranching {
 }
 
 impl PackingBranching {
+    /// Prepared assignment generator names in construction order.
+    pub(super) fn generator_names(&self) -> impl Iterator<Item = &str> {
+        self.prepared
+            .iter()
+            .map(|(_, _, mapping)| mapping.name.as_str())
+    }
+
     pub fn new(priority: f64, networks: Vec<NetworkPackingAssignment>) -> Self {
         Self {
             priority,
@@ -165,8 +172,33 @@ impl PackingBranching {
                 restriction: Restriction::Mapped(mapping.clone()),
                 history_eligible: true,
                 fresh: true,
+                origin: Some(super::model_strong::ProducerFamily::PackingAssignment),
+                component_admission: None,
             })
             .collect()
+    }
+
+    /// Revisit one historical network assignment even when another network
+    /// wins this packing set's fresh-candidate selection at the current point.
+    pub(super) fn refresh<const D: usize>(
+        &self,
+        output: &Output<D>,
+        name: &str,
+        tolerance: f64,
+    ) -> Option<Proposal> {
+        let (_, _, mapping) = self.prepared.iter().find(|(_, _, v)| v.name == name)?;
+        let value = mapping.value(output)?;
+        (value > tolerance && value < 1. - tolerance).then(|| Proposal {
+            name: mapping.name.clone(),
+            history_key: format!("mapped:{}", mapping.name),
+            priority: mapping.priority,
+            value,
+            restriction: Restriction::Mapped(mapping.clone()),
+            history_eligible: true,
+            fresh: false,
+            origin: Some(super::model_strong::ProducerFamily::PackingAssignment),
+            component_admission: None,
+        })
     }
 }
 

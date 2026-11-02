@@ -1,0 +1,7 @@
+{
+  "base": 1000000.0,
+  "uplift": 0.2,
+  "effective": 1200000.0,
+  "observed_reset_count": 62,
+  "binary_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6"
+}

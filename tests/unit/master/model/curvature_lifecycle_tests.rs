@@ -65,6 +65,7 @@ fn explicit_dynamic_rows_and_ordinary_children_keep_physical_classification_inde
     assert!(ordinary.warm.proximal.is_none());
     let count = ordinary.master.rhs.len();
     let controller = ColumnGenerationController {
+        objective_cutoff: f64::INFINITY,
         state: Rc::new(RefCell::new(ordinary.state)),
         request_initial_enumeration: false,
         search_inactive_columns: false,

@@ -1,6 +1,55 @@
 use super::*;
 
 #[test]
+fn ordered_registration_json_round_trips_and_compiles_original_expressions() {
+    let input = serde_json::json!({
+        "tree": true,
+        "branching_registrations": [
+            {"kind": "policy", "config": "phased"},
+            {"kind": "mapped", "config": {"name": "first", "priority": 4.}},
+            {"kind": "expression", "config": {"name": "second", "priority": 4.,
+                "terms": [{"id": 9, "coefficient": 1.}]}},
+            {"kind": "strong-branching", "config": {"phases": [
+                {"candidates": 7, "restricted_master_only": true}
+            ]}}
+        ]
+    });
+    let options = SolveOptions::from_json(&input.to_string()).unwrap();
+    let round_trip = SolveOptions::from_json(&serde_json::to_string(&options).unwrap()).unwrap();
+    assert_eq!(
+        serde_json::to_value(&options).unwrap(),
+        serde_json::to_value(&round_trip).unwrap()
+    );
+    let problem = Model::from_json(include_str!(
+        "../../../../../examples/networks/triangle.json"
+    ))
+    .unwrap()
+    .problem::<2>()
+    .unwrap();
+    let (_, pricing) = compile_pricing_variables(problem, &[]).unwrap();
+    let tree = round_trip.tree_options_with_registry(&pricing).unwrap();
+    assert_eq!(
+        tree.branching_registry
+            .mapped_variables()
+            .iter()
+            .map(|v| v.name.as_str())
+            .collect::<Vec<_>>(),
+        ["first", "second"]
+    );
+    assert_eq!(
+        tree.branching_registry.strong_branching().unwrap().phases[0].candidates,
+        7
+    );
+    assert_eq!(
+        tree.branching_registry.construction_order(),
+        [
+            BranchFamilyRegistration::MappedRegistration(0),
+            BranchFamilyRegistration::MappedRegistration(1),
+        ]
+    );
+}
+
+#[test]
 fn network_pricing_schedule_round_trips_and_configures_root_and_tree() {
     for (name, policy) in [
         ("full-sweep", NetworkPricingSchedule::FullSweep),

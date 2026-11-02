@@ -15,7 +15,6 @@ fn triangle() -> Instance {
 }
 fn options() -> TreeOptions {
     let mut options = TreeOptions {
-        mapped_strong_branching: None,
         diving: None,
         time_limit: Duration::from_secs(10),
         ..Default::default()
@@ -34,7 +33,14 @@ fn restricted_mip(nodes: usize) -> Option<RestrictedMasterMip> {
 
 /// Branch on route count, then on the flow of every arc.
 fn arc_flow_only(problem: &RoutingContext, controls: &mut TreeOptions) {
-    controls.mapped_variables = problem.arc_flow_variables(1.);
+    controls
+        .branching_registry
+        .register_batch(
+            (problem.arc_flow_variables(1.))
+                .into_iter()
+                .map(::baldes::master::model::BranchingRegistration::Mapped),
+        )
+        .unwrap();
 }
 
 fn customers_of(route: &baldes::master::model::FixedRoute) -> Vec<i32> {
@@ -177,7 +183,15 @@ fn tree_rejects_nonfinite_family_priorities_before_solving() {
     for priority in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         let mut controls = options();
         controls.node_limit = 0;
-        controls.branch_priorities.arc = priority;
+        controls
+            .branching_registry
+            .register(::baldes::master::model::BranchingRegistration::Priorities(
+                ::baldes::master::tree::NetworkBranchPriorities {
+                    arc: priority,
+                    ..Default::default()
+                },
+            ))
+            .unwrap();
         let error = tree::solve(problem.clone(), controls).unwrap_err();
         assert!(error.to_string().contains("priorities"), "{error}");
     }
@@ -195,7 +209,10 @@ fn quota_one_records_trials_without_ranking_history_or_weakening_bounds() {
         let mut strong = tree::StrongBranchingOptions::default();
         strong.phases.truncate(1);
         strong.phases[0].candidates = 1;
-        controls.mapped_strong_branching = Some(strong);
+        controls
+            .branching_registry
+            .register(::baldes::master::model::BranchingRegistration::StrongBranching(Some(strong)))
+            .unwrap();
         let out = tree::solve(problem, controls).unwrap();
         assert_eq!(out.status, TreeStatus::Optimal, "{out:?}");
         assert!((out.incumbent - (4. + 2f64.sqrt())).abs() < 1e-6, "{out:?}");
@@ -221,7 +238,12 @@ fn adaptive_trial_budget_changes_work_without_changing_the_optimum() {
             arc_flow_only(&problem, &mut controls);
             let mut strong = tree::StrongBranchingOptions::default();
             strong.phases[0].subtree_ratio = ratio;
-            controls.mapped_strong_branching = Some(strong);
+            controls
+                .branching_registry
+                .register(
+                    ::baldes::master::model::BranchingRegistration::StrongBranching(Some(strong)),
+                )
+                .unwrap();
             let out = tree::solve(problem.clone(), controls).unwrap();
             assert_eq!(out.status, TreeStatus::Optimal, "{out:?}");
             assert!((out.incumbent - (4. + 2f64.sqrt())).abs() < 1e-6, "{out:?}");
@@ -245,7 +267,10 @@ fn completed_depth_history_keeps_numerical_and_certified_tree_bounds() {
         arc_flow_only(&problem, &mut controls);
         let mut strong = tree::StrongBranchingOptions::default();
         strong.use_history_subtree_size = true;
-        controls.mapped_strong_branching = Some(strong);
+        controls
+            .branching_registry
+            .register(::baldes::master::model::BranchingRegistration::StrongBranching(Some(strong)))
+            .unwrap();
         let out = tree::solve(problem, controls).unwrap();
         assert_eq!(out.status, TreeStatus::Optimal, "{out:?}");
         assert!((out.incumbent - (4. + 2f64.sqrt())).abs() < 1e-6, "{out:?}");
@@ -263,7 +288,10 @@ fn invalid_subtree_ratios_are_rejected_before_solving() {
         controls.node_limit = 0;
         let mut strong = tree::StrongBranchingOptions::default();
         strong.phases[0].subtree_ratio = ratio;
-        controls.mapped_strong_branching = Some(strong);
+        controls
+            .branching_registry
+            .register(::baldes::master::model::BranchingRegistration::StrongBranching(Some(strong)))
+            .unwrap();
         assert!(tree::solve(problem.clone(), controls)
             .unwrap_err()
             .to_string()
@@ -282,7 +310,10 @@ fn singleton_skips_ranking_phases_but_keeps_exact_trials_and_bounds() {
         arc_flow_only(&problem, &mut controls);
         let mut strong = tree::StrongBranchingOptions::default();
         strong.phases[0].candidates = 1;
-        controls.mapped_strong_branching = Some(strong);
+        controls
+            .branching_registry
+            .register(::baldes::master::model::BranchingRegistration::StrongBranching(Some(strong)))
+            .unwrap();
         let out = tree::solve(problem, controls).unwrap();
         assert_eq!(out.status, TreeStatus::Optimal, "{out:?}");
         assert!((out.incumbent - (4. + 2f64.sqrt())).abs() < 1e-6, "{out:?}");
@@ -393,7 +424,14 @@ fn small_trees_agree_with_exhaustive_elementary_route_universe() {
             .unwrap();
             let mut advanced = options();
             advanced.node.cg.bound_mode = mode;
-            advanced.mapped_strong_branching = Some(Default::default());
+            advanced
+                .branching_registry
+                .register(
+                    ::baldes::master::model::BranchingRegistration::StrongBranching(Some(
+                        Default::default(),
+                    )),
+                )
+                .unwrap();
             advanced.diving = Some(Default::default());
             let out = tree::solve(problem, advanced).unwrap();
             assert_eq!(out.bound_mode, mode);
@@ -419,7 +457,14 @@ fn strong_branching_solves_with_certified_child_bounds() {
         RoutingContext::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 2.).unwrap();
     let mut controls = options();
     controls.node.cg.bound_mode = BoundMode::Certified;
-    controls.mapped_strong_branching = Some(StrongBranchingOptions::default());
+    controls
+        .branching_registry
+        .register(
+            ::baldes::master::model::BranchingRegistration::StrongBranching(Some(
+                StrongBranchingOptions::default(),
+            )),
+        )
+        .unwrap();
     let out = tree::solve(problem, controls).unwrap();
     assert_eq!(out.status, TreeStatus::Optimal, "{out:?}");
     assert!(out.strong_branching_trials > 0);
@@ -520,7 +565,14 @@ fn fork_and_carry_inherits_cuts_basis_and_protects_branch_rows() {
             let mut controls = options();
             controls.threads = threads;
             controls.node = root_opts.clone();
-            controls.mapped_strong_branching = strong.then(StrongBranchingOptions::default);
+            controls
+                .branching_registry
+                .register(
+                    ::baldes::master::model::BranchingRegistration::StrongBranching(
+                        strong.then(StrongBranchingOptions::default),
+                    ),
+                )
+                .unwrap();
             controls.diving = Some(DivingOptions::default());
             let tree_out = tree::solve(problem.clone(), controls).unwrap();
             assert_eq!(tree_out.status, TreeStatus::Optimal, "{tree_out:?}");
@@ -552,8 +604,22 @@ fn ryan_foster_tree_agrees_with_exhaustive_routes_and_strong_trials() {
             let mut controls = options();
             controls.node.gap_enumeration = enumerate;
             arc_flow_only(&problem, &mut controls);
-            controls.ryan_foster = Some(RyanFosterBranching::new(2.));
-            controls.mapped_strong_branching = Some(Default::default());
+            if let Some(value) = Some(RyanFosterBranching::new(2.)) {
+                controls
+                    .branching_registry
+                    .register(::baldes::master::model::BranchingRegistration::RyanFoster(
+                        value,
+                    ))
+                    .unwrap();
+            }
+            controls
+                .branching_registry
+                .register(
+                    ::baldes::master::model::BranchingRegistration::StrongBranching(Some(
+                        Default::default(),
+                    )),
+                )
+                .unwrap();
             controls.diving = Some(Default::default());
             let out = tree::solve(problem.clone(), controls)
                 .unwrap_or_else(|e| panic!("n={n} enum={enumerate}: {e:?}"));
@@ -588,15 +654,39 @@ fn cluster_resource_and_history_trees_preserve_exhaustive_optimum() {
             if family != "resource" {
                 let mut clusters = NetworkClusterBranching::new(0);
                 clusters.partition = Some(vec![vec![1], vec![2, 3]]);
-                controls.clusters = vec![clusters];
+                controls
+                    .branching_registry
+                    .register_batch(
+                        (vec![clusters])
+                            .into_iter()
+                            .map(::baldes::master::model::BranchingRegistration::Cluster),
+                    )
+                    .unwrap();
             }
             if family != "cluster" {
-                controls.branching = NetworkBranchingPolicy::ResourceFirst;
+                controls
+                    .branching_registry
+                    .register(::baldes::master::model::BranchingRegistration::Policy(
+                        NetworkBranchingPolicy::ResourceFirst,
+                    ))
+                    .unwrap();
             }
             if strong {
-                controls.mapped_strong_branching = Some(Default::default());
+                controls
+                    .branching_registry
+                    .register(
+                        ::baldes::master::model::BranchingRegistration::StrongBranching(Some(
+                            Default::default(),
+                        )),
+                    )
+                    .unwrap();
             }
-            controls.use_branching_history = true;
+            controls
+                .branching_registry
+                .register(::baldes::master::model::BranchingRegistration::History(
+                    true,
+                ))
+                .unwrap();
             let result = tree::solve(problem, controls).unwrap();
             assert_eq!(
                 result.status,
@@ -666,9 +756,21 @@ fn edge_and_registered_aggregate_branching_reach_the_exhaustive_optimum() {
         for aggregate in [false, true] {
             let mut controls = options();
             controls.node.cg.bound_mode = mode;
-            controls.mapped_variables = problem.edge_flow_variables(1.);
+            controls
+                .branching_registry
+                .register_batch(
+                    (problem.edge_flow_variables(1.))
+                        .into_iter()
+                        .map(::baldes::master::model::BranchingRegistration::Mapped),
+                )
+                .unwrap();
             if aggregate {
-                controls.mapped_variables.push(routes.clone());
+                controls
+                    .branching_registry
+                    .register(::baldes::master::model::BranchingRegistration::Mapped(
+                        routes.clone(),
+                    ))
+                    .unwrap();
             }
             let out = tree::solve(problem.clone(), controls).unwrap();
             assert_eq!(out.status, TreeStatus::Optimal, "{out:?}");

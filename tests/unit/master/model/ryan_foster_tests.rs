@@ -33,6 +33,10 @@ fn candidates_are_fractional_cooccurrences_and_children_obey_the_pair() {
     for p in &proposals {
         assert!(p.value > 1e-6 && p.value < 0.999999, "{}", p.value);
         assert!(p.name.starts_with("PS_"));
+        assert_eq!(
+            p.origin,
+            Some(super::model_strong::ProducerFamily::PackingRyanFoster)
+        );
     }
     let best = proposals
         .iter()
@@ -96,8 +100,8 @@ fn ryan_foster_tree_reaches_the_default_branching_optimum() {
     let problem = rc101(25);
     let solve = |ryan_foster: Option<RyanFosterBranching>| {
         let mut configured = ModelTreeOptions::default();
-        configured.mapped_variables = problem.arc_flow_variables(1.);
-        configured.ryan_foster = ryan_foster;
+        configured.branching_registry.mapped_variables = problem.arc_flow_variables(1.);
+        configured.branching_registry.ryan_foster = ryan_foster;
         configured.node_limit = 2000;
         crate::master::tree::solve(problem.clone(), configured).unwrap()
     };

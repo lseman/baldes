@@ -1,0 +1,201 @@
+{
+  "binary_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "scope": "Original Node recording and mean-update paths, controlled preallocated context, two directions; no full native solver model. Only historical fraction differs across cases.",
+  "cases": [
+    {
+      "fraction": -100.0,
+      "counts": [
+        1,
+        1
+      ],
+      "means": [
+        -0.02,
+        0.039603960396039604
+      ],
+      "stored_gains": [
+        2.0,
+        4.0
+      ]
+    },
+    {
+      "fraction": -1.0,
+      "counts": [
+        1,
+        1
+      ],
+      "means": [
+        -2.0,
+        2.0
+      ],
+      "stored_gains": [
+        2.0,
+        4.0
+      ]
+    },
+    {
+      "fraction": -0.75,
+      "counts": [
+        1,
+        1
+      ],
+      "means": [
+        -2.6666666666666665,
+        2.2857142857142856
+      ],
+      "stored_gains": [
+        2.0,
+        4.0
+      ]
+    },
+    {
+      "fraction": -1e-07,
+      "counts": [
+        1,
+        1
+      ],
+      "means": [
+        -20000000.0,
+        3.9999996000000397
+      ],
+      "stored_gains": [
+        2.0,
+        4.0
+      ]
+    },
+    {
+      "fraction": 0.0,
+      "counts": [
+        1,
+        1
+      ],
+      "means": [
+        "inf",
+        4.0
+      ],
+      "stored_gains": [
+        2.0,
+        4.0
+      ]
+    },
+    {
+      "fraction": 1e-07,
+      "counts": [
+        1,
+        1
+      ],
+      "means": [
+        20000000.0,
+        4.00000040000004
+      ],
+      "stored_gains": [
+        2.0,
+        4.0
+      ]
+    },
+    {
+      "fraction": 1e-06,
+      "counts": [
+        1,
+        1
+      ],
+      "means": [
+        2000000.0,
+        4.000004000004
+      ],
+      "stored_gains": [
+        2.0,
+        4.0
+      ]
+    },
+    {
+      "fraction": 0.25,
+      "counts": [
+        1,
+        1
+      ],
+      "means": [
+        8.0,
+        5.333333333333333
+      ],
+      "stored_gains": [
+        2.0,
+        4.0
+      ]
+    },
+    {
+      "fraction": 0.9999999,
+      "counts": [
+        1,
+        1
+      ],
+      "means": [
+        2.00000020000002,
+        40000000.02105423
+      ],
+      "stored_gains": [
+        2.0,
+        4.0
+      ]
+    },
+    {
+      "fraction": 1.0,
+      "counts": [
+        1,
+        1
+      ],
+      "means": [
+        2.0,
+        "inf"
+      ],
+      "stored_gains": [
+        2.0,
+        4.0
+      ]
+    },
+    {
+      "fraction": 1.0000001,
+      "counts": [
+        1,
+        1
+      ],
+      "means": [
+        1.9999998000000199,
+        -39999999.97664531
+      ],
+      "stored_gains": [
+        2.0,
+        4.0
+      ]
+    },
+    {
+      "fraction": 2.0,
+      "counts": [
+        1,
+        1
+      ],
+      "means": [
+        1.0,
+        -4.0
+      ],
+      "stored_gains": [
+        2.0,
+        4.0
+      ]
+    },
+    {
+      "fraction": 100.0,
+      "counts": [
+        1,
+        1
+      ],
+      "means": [
+        0.02,
+        -0.04040404040404041
+      ],
+      "stored_gains": [
+        2.0,
+        4.0
+      ]
+    }
+  ]
+}

@@ -279,6 +279,9 @@ pub struct Options {
     pub gap_absolute: f64,
     pub gap_relative: f64,
     pub enumerated_columns_added: usize,
+    /// Successful separation rounds before tailing off may stop further cuts.
+    /// An empty separation pass still terminates normally.
+    pub min_cut_rounds: usize,
     pub max_cut_rounds: usize,
     /// Stop after this many rounds whose gain
     /// is below the threshold times 0.1|LP|.
@@ -317,6 +320,7 @@ impl Default for Options {
             gap_absolute: 1e-6,
             gap_relative: 1e-9,
             enumerated_columns_added: 0,
+            min_cut_rounds: 0,
             max_cut_rounds: 50,
             tailing_off_threshold: 0.02,
             tailing_off_counter: 3,
@@ -403,3 +407,7 @@ mod pool;
 #[cfg(all(test, feature = "clp"))]
 #[path = "../../../tests/unit/master/cg/identity_pool_tests.rs"]
 mod identity_pool_tests;
+
+#[cfg(all(test, feature = "clp"))]
+#[path = "../../../tests/unit/master/cg/objective_cutoff_tests.rs"]
+mod objective_cutoff_tests;

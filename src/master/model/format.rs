@@ -529,11 +529,12 @@ impl Model {
 #[serde(default, deny_unknown_fields)]
 pub struct SolveOptions {
     pub tree: bool,
+    /// Ordered registrations for every branching family and policy.
+    pub branching_registrations: Vec<BranchingRegistration>,
     pub network_pricing_schedule: NetworkPricingSchedule,
     pub network_unpromising_limit: usize,
     /// Native promising-status visit budget (default one million).
     pub network_promising_limit: usize,
-    pub network_branching: NetworkBranchingPolicy,
     pub network_tree_search: TreeSearchPolicy,
     pub network_strategy2_bound_rounding: IntegerBoundRounding,
     /// Primary frontier capacity before nodes use the overflow heap.
@@ -543,14 +544,6 @@ pub struct SolveOptions {
     pub network_search_inactive_columns: bool,
     pub variable_boxes: Vec<VariableBox>,
     pub original_variable_boxes: Vec<OriginalVariableBound>,
-    pub network_branch_priorities: NetworkBranchPriorities,
-    pub network_branch_directions: BTreeMap<String, NetworkBranchDirection>,
-    pub mapped_variables: Vec<MappedBranchVariable>,
-    /// Linear branching expressions over original variables (tree only;
-    /// they require original pricing variables or master variables).
-    pub branching_expressions: Vec<crate::master::model::BranchingExpression>,
-    /// Original variables summed over network copies (tree only).
-    pub aggregate_variable_branching: Vec<crate::master::model::AggregateVariableBranching>,
     /// Diving primal heuristic (tree only); disabled when absent.
     pub diving: Option<crate::master::tree::DivingOptions>,
     /// Initial shifted-cost residual construction (tree only).
@@ -564,17 +557,8 @@ pub struct SolveOptions {
     pub relative_gap: f64,
     /// Round node bounds up for integer-valued objectives (validated).
     pub integer_objective: bool,
-    /// Rank stored branching generators by history (native default on).
-    pub use_branching_history: bool,
     /// Worker threads for concurrent node evaluation.
     pub tree_threads: usize,
-    pub packing: Option<PackingBranching>,
-    /// Cluster boundary and pair branching generators (tree only).
-    pub clusters: Vec<crate::master::model::NetworkClusterBranching>,
-    /// Packing-set Ryan–Foster branching (tree only).
-    pub ryan_foster: Option<crate::master::model::RyanFosterBranching>,
-    /// Strong trials; off by default (native `ApplyStrongBranchingEvaluation`).
-    pub mapped_strong_branching: bool,
     pub synchronized_services: Vec<SynchronizedService>,
     pub enumerate: bool,
     pub enumeration_route_limit: usize,
@@ -592,6 +576,8 @@ pub struct SolveOptions {
     pub stabilization_max_tree_depth: i64,
     pub proximal: Option<crate::master::stabilization::ProximalParameters>,
     pub bound_mode: String,
+    /// Direct effective ordinary/branch setup cost; defaults to 1,200,000.
+    /// Explicit values are used as supplied, without another setup uplift.
     pub artificial_cost: f64,
     pub log_interval: Option<usize>,
     /// Initial bucket widths; an implicit paired base accepts one width.
@@ -602,10 +588,10 @@ impl Default for SolveOptions {
     fn default() -> Self {
         Self {
             tree: false,
+            branching_registrations: vec![],
             network_pricing_schedule: NetworkPricingSchedule::default(),
             network_unpromising_limit: 1,
             network_promising_limit: 1_000_000,
-            network_branching: NetworkBranchingPolicy::default(),
             network_tree_search: TreeSearchPolicy::default(),
             network_strategy2_bound_rounding: IntegerBoundRounding::default(),
             network_open_node_limit: 1000,
@@ -614,24 +600,14 @@ impl Default for SolveOptions {
             network_search_inactive_columns: false,
             variable_boxes: vec![],
             original_variable_boxes: vec![],
-            network_branch_priorities: NetworkBranchPriorities::default(),
-            network_branch_directions: BTreeMap::new(),
-            mapped_variables: vec![],
-            packing: None,
             restricted_master_mip: None,
             absolute_gap: 1e-6,
             relative_gap: 1e-9,
             integer_objective: false,
-            use_branching_history: true,
             tree_threads: 1,
             diving: None,
             greedy: false,
             local_search: None,
-            branching_expressions: vec![],
-            aggregate_variable_branching: vec![],
-            clusters: vec![],
-            ryan_foster: None,
-            mapped_strong_branching: false,
             synchronized_services: vec![],
             enumerate: false,
             enumeration_route_limit: 10000,
@@ -649,7 +625,7 @@ impl Default for SolveOptions {
             stabilization_max_tree_depth: 10_000,
             proximal: None,
             bound_mode: "numerical".into(),
-            artificial_cost: 2.76,
+            artificial_cost: 1_200_000.,
             log_interval: None,
             bucket_steps: vec![],
             pricing_options: BTreeMap::new(),
@@ -672,17 +648,16 @@ impl SolveOptions {
         &self,
         registry: &PricingVariableRegistry,
     ) -> Result<ModelTreeOptions> {
+        if !self.tree && !self.branching_registrations.is_empty() {
+            return Err(invalid("branching registrations require tree=true"));
+        }
         let mut unbound = self.clone();
         unbound.original_variable_boxes.clear();
-        unbound.branching_expressions.clear();
-        unbound.aggregate_variable_branching.clear();
+        unbound.branching_registrations.clear();
         let mut tree = unbound.tree_options()?;
+        tree.branching_registry
+            .register_batch_with_pricing(registry, self.branching_registrations.iter().cloned())?;
         registry.configure_tree(&mut tree)?;
-        registry.configure_expressions(
-            &mut tree,
-            &self.branching_expressions,
-            &self.aggregate_variable_branching,
-        )?;
         registry.configure_boxes(&mut tree.node, &self.original_variable_boxes)?;
         Ok(tree)
     }
@@ -691,30 +666,13 @@ impl SolveOptions {
         serde_json::from_str(text).map_err(|e| invalid(format!("network options JSON: {e}")))
     }
     pub fn node_options(&self) -> Result<Options> {
+        if !self.tree && !self.branching_registrations.is_empty() {
+            return Err(invalid("branching registrations require tree=true"));
+        }
         if !self.original_variable_boxes.is_empty() {
             return Err(invalid(
                 "original-variable boxes require a pricing-variable registry",
             ));
-        }
-        if !self.network_branch_directions.is_empty() && !self.tree {
-            return Err(invalid("network_branch_directions requires tree=true"));
-        }
-        if self
-            .network_branch_directions
-            .keys()
-            .any(|name| name.trim().is_empty())
-        {
-            return Err(invalid(
-                "branch direction requires a nonempty generator name",
-            ));
-        }
-        if self.packing.is_some() && !self.tree {
-            return Err(invalid("packing requires tree=true"));
-        }
-        if (!self.branching_expressions.is_empty() || !self.aggregate_variable_branching.is_empty())
-            && !self.tree
-        {
-            return Err(invalid("branching expressions require tree=true"));
         }
         if self.diving.is_some() && !self.tree {
             return Err(invalid("diving requires tree=true"));
@@ -724,12 +682,6 @@ impl SolveOptions {
         }
         if self.local_search.is_some() && !self.tree {
             return Err(invalid("local_search requires tree=true"));
-        }
-        if self.ryan_foster.is_some() && !self.tree {
-            return Err(invalid("Ryan–Foster branching requires tree=true"));
-        }
-        if !self.clusters.is_empty() && !self.tree {
-            return Err(invalid("cluster branching requires tree=true"));
         }
         if self.network_share_inactive_columns && !self.tree {
             return Err(invalid("network_share_inactive_columns requires tree=true"));
@@ -790,25 +742,23 @@ impl SolveOptions {
         Ok(options)
     }
     pub fn tree_options(&self) -> Result<ModelTreeOptions> {
-        if !self.branching_expressions.is_empty() || !self.aggregate_variable_branching.is_empty() {
+        if self.branching_registrations.iter().any(|registration| {
+            matches!(
+                registration,
+                BranchingRegistration::Expression(_) | BranchingRegistration::AggregateVariable(_)
+            )
+        }) {
             return Err(invalid(
-                "branching expressions require a pricing-variable registry",
+                "original-variable branching requires a pricing-variable registry",
             ));
         }
         let node = self.node_options()?;
-        Ok(ModelTreeOptions {
-            branching: self.network_branching,
+        let mut options = ModelTreeOptions {
             tree_search: self.network_tree_search,
             strategy2_bound_rounding: self.network_strategy2_bound_rounding,
             open_node_limit: self.network_open_node_limit,
             scoring_gap_tolerance: self.network_scoring_gap_tolerance,
             share_inactive_columns: self.network_share_inactive_columns,
-            branch_priorities: self.network_branch_priorities.clone(),
-            branch_directions: self.network_branch_directions.clone(),
-            mapped_variables: self.mapped_variables.clone(),
-            packing: self.packing.clone(),
-            clusters: self.clusters.clone(),
-            ryan_foster: self.ryan_foster.clone(),
             diving: self.diving.clone(),
             greedy: self.greedy,
             local_search: self.local_search.clone(),
@@ -816,11 +766,7 @@ impl SolveOptions {
             absolute_gap: self.absolute_gap,
             relative_gap: self.relative_gap,
             integer_objective: self.integer_objective,
-            use_branching_history: self.use_branching_history,
             threads: self.tree_threads,
-            mapped_strong_branching: self
-                .mapped_strong_branching
-                .then(crate::master::tree::StrongBranchingOptions::default),
             time_limit: node.cg.time_limit,
             node,
             node_limit: self.node_limit,
@@ -836,7 +782,11 @@ impl SolveOptions {
                 None
             },
             ..ModelTreeOptions::default()
-        })
+        };
+        options
+            .branching_registry
+            .register_batch(self.branching_registrations.iter().cloned())?;
+        Ok(options)
     }
 }
 

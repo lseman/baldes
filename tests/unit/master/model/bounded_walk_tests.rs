@@ -411,17 +411,22 @@ fn integer_mapping_rejects_walk_coefficients_beyond_binary64_exact_integer_range
         .unwrap();
     let controls = ModelTreeOptions {
         node_limit: 0,
-        mapped_variables: vec![MappedBranchVariable {
-            name: "unsafe".into(),
-            priority: 1.,
-            networks: vec![MappedNetworkVariable {
-                network: 7,
-                activities: vec![],
-                arcs: vec![(1, 3.)],
-                per_route: 0.,
-            }],
-            masters: vec![],
-        }],
+
+        branching_registry: {
+            let mut __branch_registry = crate::master::model::BranchingRegistry::default();
+            __branch_registry.mapped_variables = vec![MappedBranchVariable {
+                name: "unsafe".into(),
+                priority: 1.,
+                networks: vec![MappedNetworkVariable {
+                    network: 7,
+                    activities: vec![],
+                    arcs: vec![(1, 3.)],
+                    per_route: 0.,
+                }],
+                masters: vec![],
+            }];
+            __branch_registry
+        },
         ..Default::default()
     };
     assert!(crate::master::tree::solve(problem, controls).is_err());

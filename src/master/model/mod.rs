@@ -62,10 +62,12 @@ pub mod separation;
 mod set_partitioning;
 pub use preprocessing_adapter::{NetworkActivityBounds, PreprocessingOptions, PreprocessingReport};
 pub use separation::SeparationOptions;
+mod aggregate_projection;
 mod master_variables;
 mod model_mapping;
 mod original_costs;
 mod original_variables;
+pub use aggregate_projection::AggregateProjection;
 pub use original_costs::OriginalVariableCosts;
 pub use original_variables::{
     compile_pricing_variables, AggregateVariableBranching, BranchingExpression, BranchingTerm,
@@ -77,8 +79,10 @@ pub use grouped_boxes::{GroupedVariableBound, OriginalVariableBound};
 pub use variable_boxes::{ArcVariableBound, VariableBox};
 mod clusters;
 mod packing;
+pub(super) mod path_counts;
 pub use clusters::NetworkClusterBranching;
 pub use packing::{NetworkPackingAssignment, PackingBranching};
+pub use path_counts::PathsPerNetworkBranching;
 #[path = "../tree/strong/model.rs"]
 mod model_strong;
 mod variables;
@@ -86,7 +90,9 @@ pub use enumeration::{
     CutoffCostBound, CutoffEnumeration, EnumeratedMipOutput, EnumerationOptions, EnumerationReport,
 };
 pub use master_variables::MasterVariable;
-pub use model_mapping::{MappedBranchVariable, MappedNetworkVariable};
+pub use model_mapping::{
+    BranchSelection, BranchSelectionRule, MappedBranchVariable, MappedNetworkVariable,
+};
 pub use model_strong::{MappedBranchEvaluation, MappedEvaluationKind};
 pub use nonlinear::{RankOneCoefficients, RegisteredCutCoefficients};
 #[path = "../tree/adapters/model/mod.rs"]
@@ -179,15 +185,24 @@ pub struct Options {
     pub network_promising_limit: usize,
     /// Optional integer-time, simultaneous service by distinct route copies.
     pub synchronized_services: Vec<SynchronizedService>,
+    /// Column-generation controls. Model defaults use an effective ordinary/branch
+    /// artificial setup cost of 1,200,000; explicit costs are used directly.
     pub cg: cg::Options,
     pub pricing_options: Vec<(String, f64)>,
     pub enumeration: Option<EnumerationOptions>,
     /// Enumerate routes within the incumbent gap after exact pricing.
     pub gap_enumeration: bool,
+    /// Permit incumbent-dependent reduced-cost fixing and gap enumeration.
+    /// Strong screens disable this independently of retained feasible witnesses.
+    pub reduced_cost_fixing: bool,
     /// Known feasible objective of the original integer model, possibly outside
     /// this node's branch. Used only for objective-dependent pricing restrictions,
     /// never as a node-local witness or a published primal solution.
     pub fixing_upper_bound: Option<f64>,
+    /// Feasible objective of the original integer model, possibly outside this
+    /// node. Used only to close a valid bound gap, independently of pricing
+    /// restrictions. It never supplies a node-local witness or primal solution.
+    pub objective_cutoff: Option<f64>,
     /// Integer solve immediately after a retained gap pool is installed.
     pub gap_mip: Option<crate::master::solvers::mip::MipOptions>,
     pub preprocessing: PreprocessingOptions,
@@ -212,7 +227,7 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         let mut cg = cg::Options::default();
-        cg.artificial_cost = 2.76;
+        cg.artificial_cost = 1_200_000.;
         Self {
             integer_primal_termination: false,
             search_inactive_columns: false,
@@ -227,7 +242,9 @@ impl Default for Options {
             pricing_options: vec![],
             enumeration: None,
             gap_enumeration: true,
+            reduced_cost_fixing: true,
             fixing_upper_bound: None,
+            objective_cutoff: None,
             gap_mip: None,
             preprocessing: PreprocessingOptions::default(),
             master_solver: crate::master::clp::MasterSolver::Clp,
@@ -324,6 +341,9 @@ struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     /// Ordered logical component branches, retained independently of physical
     /// row retirement so later class generation preserves its inherited tree.
     component_branches: Vec<ComponentClassBranching>,
+    component_count_bounds: HashMap<i32, crate::master::preprocessing::Bounds>,
+    component_local_rows: Arc<Vec<component::BranchRow>>,
+    component_branch_exclusions: Arc<Vec<component::BranchRow>>,
     /// Original-model primal retained during this solve, separate from LP state.
     pricing_witness: Option<IntegerWitness>,
     /// Global feasible objective used only for objective-dependent fixing.
@@ -332,6 +352,11 @@ struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     witness_tolerance: f64,
     /// Native unstabilized variable-bound pricing admission.
     box_pricing_admission: bool,
+    /// Direct effective setup cost of ordinary and branch-row artificials.
+    /// Retained independently of penalties raised during an LP continuation.
+    ordinary_artificial_cost: f64,
+    /// Immutable creation costs for separated-row artificial columns.
+    cut_artificial_bases: HashMap<usize, f64>,
     variable_boxes: HashMap<i32, Vec<crate::master::preprocessing::Bounds>>,
     grouped_variable_boxes: HashMap<i32, grouped_boxes::PreparedBox>,
     original_variable_costs: Arc<Vec<OriginalVariableCosts>>,
@@ -359,6 +384,7 @@ struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     mapped_subtree_size: f64,
     mapped_subtree_priority: f64,
     mapped_lineage: usize,
+    branch_history_origin: Option<model_strong::BranchHistoryOrigin>,
     node_depth: usize,
     scheduler: Scheduler,
     synchronized_services: Vec<synchronization::Service>,
@@ -478,3 +504,6 @@ pub use solve::{solve, solve_master, solve_with_master_variables};
 #[cfg(test)]
 #[path = "../../../tests/unit/master/model/bounded_walk_tests.rs"]
 mod bounded_walk_tests;
+
+mod family_registration;
+pub use family_registration::{BranchFamilyRegistration, BranchingRegistration, BranchingRegistry};

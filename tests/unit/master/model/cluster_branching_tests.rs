@@ -100,8 +100,8 @@ fn cluster_branching_tree_reaches_the_default_branching_optimum() {
     let problem = Problem::set_partitioning(graph, 25.).unwrap();
     let solve = |clusters: Vec<NetworkClusterBranching>| {
         let mut options = ModelTreeOptions::default();
-        options.mapped_variables = problem.arc_flow_variables(1.);
-        options.clusters = clusters;
+        options.branching_registry.mapped_variables = problem.arc_flow_variables(1.);
+        options.branching_registry.clusters = clusters;
         options.node_limit = 2000;
         crate::master::tree::solve(problem.clone(), options).unwrap()
     };

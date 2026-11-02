@@ -120,8 +120,9 @@ impl NetworkBranchDirection {
 
 #[derive(Clone, Debug)]
 pub struct ModelTreeOptions {
+    /// Unified configuration and registration of all branching families.
+    pub branching_registry: super::BranchingRegistry,
     pub node: Options,
-    pub branching: NetworkBranchingPolicy,
     pub tree_search: TreeSearchPolicy,
     /// Rounding mode for strategy-2's integer-valued dual-bound queue key.
     pub strategy2_bound_rounding: IntegerBoundRounding,
@@ -130,23 +131,6 @@ pub struct ModelTreeOptions {
     /// Native absolute optimality-gap control for continuous-objective branch
     /// scoring. This margin does not change published proof bounds.
     pub scoring_gap_tolerance: f64,
-    pub branch_priorities: NetworkBranchPriorities,
-    /// Named generator directions, under every policy. Without one, a
-    /// family's native direction applies (Ryan–Foster: together first), then
-    /// the policy default. Side zero remains the lower bound side in history
-    /// and proof storage, independently of trial/admission order.
-    pub branch_directions: BTreeMap<String, NetworkBranchDirection>,
-    /// Explicit original integer variables spanning networks and static masters.
-    pub mapped_variables: Vec<MappedBranchVariable>,
-    /// Explicit whole-column classes; automatic native class-tree generation is separate.
-    pub component_classes: Vec<ComponentClassBranching>,
-    /// Registered integer-coordinate families with automatic class generation.
-    pub component_generators: Vec<ComponentClassGenerator>,
-    pub packing: Option<PackingBranching>,
-    /// Cluster boundary and pair generators, each on one network's arcs.
-    pub clusters: Vec<NetworkClusterBranching>,
-    /// Packing-set Ryan–Foster generators; the together child is upper.
-    pub ryan_foster: Option<RyanFosterBranching>,
     /// Diving primal heuristic; disabled by default, as in the native solver.
     pub diving: Option<DivingOptions>,
     /// Construct an initial residual solution by shifted-cost network pricing.
@@ -169,17 +153,12 @@ pub struct ModelTreeOptions {
     /// Every integer solution has an integer objective, so node bounds are
     /// rounded up before pruning (native `integerValuedBound`). Validated.
     pub integer_objective: bool,
-    /// Native `StrongBranchingUseHistory`: rank stored generators by history.
-    pub use_branching_history: bool,
     /// Worker threads evaluating a batch of open nodes concurrently. One keeps
     /// the sequential native search; more change the trajectory, never proofs.
     pub threads: usize,
     /// Reprice paths discovered in other tree nodes/trials in this recipient.
     /// Disabled by default; the retained native inactive-search gate is zero.
     pub share_inactive_columns: bool,
-    /// Phased trials rank explicit mapped generators; trial values never prune.
-    /// Disabled by default, as native `ApplyStrongBranchingEvaluation = false`.
-    pub mapped_strong_branching: Option<crate::master::tree::StrongBranchingOptions>,
     pub node_limit: usize,
     pub time_limit: Duration,
     pub tolerance: f64,
@@ -247,20 +226,12 @@ impl ModelTreeOptions {
 impl Default for ModelTreeOptions {
     fn default() -> Self {
         Self {
+            branching_registry: super::BranchingRegistry::default(),
             node: Options::default(),
-            branching: NetworkBranchingPolicy::default(),
             tree_search: TreeSearchPolicy::default(),
             strategy2_bound_rounding: IntegerBoundRounding::default(),
             open_node_limit: DEFAULT_OPEN_NODE_LIMIT,
             scoring_gap_tolerance: 1e-6,
-            branch_priorities: NetworkBranchPriorities::default(),
-            branch_directions: BTreeMap::new(),
-            mapped_variables: vec![],
-            component_classes: vec![],
-            component_generators: vec![],
-            packing: None,
-            clusters: vec![],
-            ryan_foster: None,
             diving: None,
             greedy: false,
             primal_heuristics: vec![],
@@ -271,10 +242,8 @@ impl Default for ModelTreeOptions {
             absolute_gap: 1e-6,
             relative_gap: 1e-9,
             integer_objective: false,
-            use_branching_history: true,
             threads: 1,
             share_inactive_columns: false,
-            mapped_strong_branching: None,
             node_limit: 10000,
             time_limit: Duration::from_secs(120),
             tolerance: 1e-6,
@@ -549,7 +518,12 @@ fn phased_fallback_selection<const D: usize>(
     })
 }
 
-fn solve<const D: usize>(start: Start<D>, options: ModelTreeOptions) -> Result<ModelTreeOutput> {
+fn solve<const D: usize>(
+    start: Start<D>,
+    mut options: ModelTreeOptions,
+) -> Result<ModelTreeOutput> {
+    // Rebuild lookup tables after caller edits or a change of problem.
+    options.invalidate_branching_cache();
     let Some(resource) = options.time_window_selection else {
         return solve_split(start, options, &[]);
     };
@@ -585,7 +559,7 @@ fn solve<const D: usize>(start: Start<D>, options: ModelTreeOptions) -> Result<M
             })
             .collect();
         let windows = time_windows::split(&mut problem, resource)?;
-        for class in &mut options.component_classes {
+        for class in &mut options.branching_registry.component_classes {
             if let Some(w) = windows.iter().find(|w| w.network == class.network) {
                 let positions = &component_positions[&class.network];
                 for coordinate in &mut class.coordinates {
@@ -601,7 +575,7 @@ fn solve<const D: usize>(start: Start<D>, options: ModelTreeOptions) -> Result<M
                 }
             }
         }
-        for generator in &mut options.component_generators {
+        for generator in &mut options.branching_registry.component_generators {
             if let Some(w) = windows.iter().find(|w| w.network == generator.network) {
                 let positions = &component_positions[&generator.network];
                 let copies: Vec<_> = w
@@ -616,7 +590,7 @@ fn solve<const D: usize>(start: Start<D>, options: ModelTreeOptions) -> Result<M
                 generator.remap_arcs(&copies)?;
             }
         }
-        for variable in &mut options.mapped_variables {
+        for variable in &mut options.branching_registry.mapped_variables {
             for contribution in &mut variable.networks {
                 if let Some(w) = windows.iter().find(|w| w.network == contribution.network) {
                     let original = contribution.arcs.clone();
@@ -668,7 +642,7 @@ fn solve_split<const D: usize>(
 ) -> Result<ModelTreeOutput> {
     validate_options(&options.node)?;
     options.node.integer_primal_termination = true;
-    options.branch_priorities.validate()?;
+    options.branching_registry.branch_priorities.validate()?;
     if options
         .master_heuristic
         .as_ref()
@@ -683,17 +657,22 @@ fn solve_split<const D: usize>(
     {
         return Err(invalid("primal heuristic name must be nonempty"));
     }
-    if options
-        .branch_directions
-        .keys()
-        .any(|name| name.trim().is_empty())
-    {
-        return Err(invalid(
-            "branch direction requires a nonempty generator name",
-        ));
-    }
-    if let Some(strong) = &options.mapped_strong_branching {
-        model_strong::validate(strong)?;
+    super::family_registration::validate(&options)?;
+    match &start {
+        Start::Fresh(problem, _) => super::path_counts::validate(
+            &options.branching_registry.paths_per_network,
+            problem
+                .networks
+                .iter()
+                .map(|network| (network.id, &network.graph)),
+        )?,
+        Start::Snapshot(node) => super::path_counts::validate(
+            &options.branching_registry.paths_per_network,
+            node.state
+                .oracles
+                .iter()
+                .map(|oracle| (oracle.network.id, oracle.network.graph.as_ref())),
+        )?,
     }
     if let Some(diving) = &options.diving {
         diving.validate()?;
@@ -765,23 +744,27 @@ fn solve_split<const D: usize>(
             }),
         )?,
     };
-    if let Some(packing) = &mut options.packing {
+    if let Some(packing) = &mut options.branching_registry.packing {
         match &start {
             Start::Fresh(problem, _) => packing.prepare(
                 problem.networks.iter().map(|n| (n.id, &n.graph)),
-                &options.mapped_variables,
+                &options.branching_registry.mapped_variables,
             )?,
             Start::Snapshot(node) => packing.prepare(
                 node.state
                     .oracles
                     .iter()
                     .map(|o| (o.network.id, o.network.graph.as_ref())),
-                &options.mapped_variables,
+                &options.branching_registry.mapped_variables,
             )?,
         }
-        options.branching = NetworkBranchingPolicy::Phased;
+        options
+            .branching_registry
+            .register(super::BranchingRegistration::Policy(
+                NetworkBranchingPolicy::Phased,
+            ))?;
     }
-    for clusters in &mut options.clusters {
+    for clusters in &mut options.branching_registry.clusters {
         match &start {
             Start::Fresh(problem, _) => {
                 clusters.prepare(problem.networks.iter().map(|n| (n.id, &n.graph)))?
@@ -794,29 +777,30 @@ fn solve_split<const D: usize>(
             )?,
         }
     }
-    if let Some(ryan_foster) = &mut options.ryan_foster {
+    super::family_registration::validate_selection(&options)?;
+    if let Some(ryan_foster) = &mut options.branching_registry.ryan_foster {
         match &start {
             Start::Fresh(problem, _) => ryan_foster.prepare(
                 problem.networks.iter().map(|n| (n.id, &n.graph)),
-                options.packing.as_ref(),
+                options.branching_registry.packing.as_ref(),
             )?,
             Start::Snapshot(node) => ryan_foster.prepare(
                 node.state
                     .oracles
                     .iter()
                     .map(|o| (o.network.id, o.network.graph.as_ref())),
-                options.packing.as_ref(),
+                options.branching_registry.packing.as_ref(),
             )?,
         }
     }
     match &start {
         Start::Fresh(problem, variables) => model_mapping::validate::<D>(
-            &options.mapped_variables,
+            &options.branching_registry.mapped_variables,
             problem.networks.iter().map(|n| (n.id, &n.graph)),
             variables,
         )?,
         Start::Snapshot(node) => model_mapping::validate::<D>(
-            &options.mapped_variables,
+            &options.branching_registry.mapped_variables,
             node.state
                 .oracles
                 .iter()
@@ -831,48 +815,25 @@ fn solve_split<const D: usize>(
     {
         return Err(invalid("fixed-solution separator name must be nonempty"));
     }
-    let mut class_names = HashSet::new();
-    for class in &options.component_classes {
-        if !class_names.insert(&class.name) {
-            return Err(invalid("duplicate component class name"));
+    match &start {
+        Start::Fresh(problem, _) => {
+            super::family_registration::validate_components(&options, |id| {
+                problem
+                    .networks
+                    .iter()
+                    .find(|n| n.id == id)
+                    .map(|n| &n.graph)
+            })?
         }
-        let graph = match &start {
-            Start::Fresh(problem, _) => problem
-                .networks
-                .iter()
-                .find(|n| n.id == class.network)
-                .map(|n| &n.graph),
-            Start::Snapshot(node) => node
-                .state
+        Start::Snapshot(node) => super::family_registration::validate_components(&options, |id| {
+            node.state
                 .oracles
                 .iter()
-                .find(|o| o.network.id == class.network)
-                .map(|o| o.network.graph.as_ref()),
-        }
-        .ok_or_else(|| invalid("component class network"))?;
-        class.for_graph(graph)?;
+                .find(|o| o.network.id == id)
+                .map(|o| o.network.graph.as_ref())
+        })?,
     }
-    let mut generator_names = HashSet::new();
-    for generator in &options.component_generators {
-        if !generator_names.insert(&generator.name) {
-            return Err(invalid("duplicate component generator name"));
-        }
-        let graph = match &start {
-            Start::Fresh(problem, _) => problem
-                .networks
-                .iter()
-                .find(|n| n.id == generator.network)
-                .map(|n| &n.graph),
-            Start::Snapshot(node) => node
-                .state
-                .oracles
-                .iter()
-                .find(|o| o.network.id == generator.network)
-                .map(|o| o.network.graph.as_ref()),
-        }
-        .ok_or_else(|| invalid("component generator network"))?;
-        generator.validate(graph)?;
-    }
+    options.compile_branching_registry()?;
     let networks: Vec<_> = match &start {
         Start::Fresh(problem, variables) => {
             problem.validate()?;
@@ -890,10 +851,17 @@ fn solve_split<const D: usize>(
     };
     let initial_bound = match &start {
         Start::Fresh(..) => f64::NEG_INFINITY,
-        Start::Snapshot(node) => match options.node.cg.bound_mode {
-            cg::BoundMode::Numerical => node.warm.numerical_bound,
-            cg::BoundMode::Certified => node.warm.certified_bound,
-        },
+        Start::Snapshot(node) => {
+            let selected = match options.node.cg.bound_mode {
+                cg::BoundMode::Numerical => node.warm.numerical_bound,
+                cg::BoundMode::Certified => node.warm.certified_bound,
+            };
+            if node.warm.bound_mode == options.node.cg.bound_mode {
+                selected.max(node.state.tree_bound_floor)
+            } else {
+                selected
+            }
+        }
     };
     if !options.scoring_gap_tolerance.is_finite() || options.scoring_gap_tolerance < 0. {
         return Err(invalid("scoring gap tolerance"));
@@ -1051,7 +1019,8 @@ fn solve_split<const D: usize>(
     }
     let base_depth = root.snapshot.state.node_depth;
     let mut subtree_history = options
-        .mapped_strong_branching
+        .branching_registry()
+        .strong_branching
         .as_ref()
         .filter(|s| s.use_history_subtree_size)
         .map(|_| crate::master::tree::strong::SubtreeHistory::new());

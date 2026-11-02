@@ -5,6 +5,8 @@
 use super::Graph;
 use crate::{invalid, Result};
 use std::collections::BTreeSet;
+mod sets;
+use sets::{CompactSet, ElementSet};
 /// Local NG memory word of a label.
 #[cfg(feature = "ng-memory-63")]
 pub type NgMask = u64;
@@ -60,8 +62,17 @@ impl PreparedNg {
                 backward: vec![Transition::default(); g.arcs.len()],
             });
         }
+        if g.element_count <= CompactSet::CAPACITY {
+            Self::prepare::<D, CompactSet>(g)
+        } else {
+            Self::prepare::<D, BTreeSet<usize>>(g)
+        }
+    }
+
+    fn prepare<const D: usize, S: ElementSet>(g: &Graph<D>) -> Result<Self> {
+        let n = g.vertices.len();
         let e = g.element_count;
-        let checked = |values: &[usize]| -> Result<BTreeSet<usize>> {
+        let checked = |values: &[usize]| -> Result<S> {
             if values.iter().any(|&id| id >= e) {
                 return Err(invalid("NG element out of range"));
             }
@@ -70,38 +81,35 @@ impl PreparedNg {
         let mut member = Vec::with_capacity(n);
         for v in &g.vertices {
             let mut m = checked(&v.memory)?;
-            m.extend(checked(&v.elements)?);
+            m.extend_set(&checked(&v.elements)?);
             if g.elementary || g.hard_walk_groups() {
-                m.extend(0..e);
+                m.extend_domain(e);
             }
             member.push(m);
         }
-        let mut incoming = vec![BTreeSet::new(); n];
+        let mut incoming = vec![S::default(); n];
         let mut outgoing = incoming.clone();
         let mut remembered = Vec::with_capacity(g.arcs.len());
         for a in &g.arcs {
-            let mut keep: BTreeSet<_> = member[a.tail]
-                .intersection(&member[a.head])
-                .copied()
-                .collect();
-            keep.extend(checked(&a.memory)?);
-            keep.extend(checked(&a.elements)?);
-            outgoing[a.tail].extend(&keep);
-            incoming[a.head].extend(&keep);
+            let mut keep = member[a.tail].intersect_set(&member[a.head]);
+            keep.extend_set(&checked(&a.memory)?);
+            keep.extend_set(&checked(&a.elements)?);
+            outgoing[a.tail].extend_set(&keep);
+            incoming[a.head].extend_set(&keep);
             remembered.push(keep);
         }
         let mut local = Vec::with_capacity(n);
         let mut vertex_bits = Vec::with_capacity(n);
         for v in 0..n {
             let mut own = member[v].clone();
-            own.extend(incoming[v].intersection(&outgoing[v]));
-            if own.len() > NG_MEMORY_CAPACITY {
+            own.extend_intersection(&incoming[v], &outgoing[v]);
+            if own.cardinality() > NG_MEMORY_CAPACITY {
                 return Err(invalid(format!(
                     "native NG local memory exceeds {NG_MEMORY_CAPACITY} elements"
                 )));
             }
             let mut positions = vec![None; e];
-            for (i, &id) in own.iter().enumerate() {
+            for (i, id) in own.elements().enumerate() {
                 positions[id] = Some(i as u8);
             }
             let bits = g.vertices[v]
@@ -123,16 +131,32 @@ impl PreparedNg {
                     } else {
                         (a.tail, a.head)
                     };
-                    let seen: BTreeSet<_> = g.vertices[to]
-                        .elements
-                        .iter()
-                        .chain(&a.elements)
-                        .copied()
-                        .collect();
                     let mut t = Transition::default();
-                    for &id in &seen {
+                    let mut seen_at_target: NgMask = 0;
+                    let mut remember = |id: usize| {
                         if let Some(bit) = local[from][id] {
                             t.forbidden |= 1 << bit;
+                        }
+                        if let Some(bit) = local[to][id] {
+                            seen_at_target |= 1 << bit;
+                        }
+                    };
+                    let seen = g.vertices[to].elements.iter().chain(&a.elements);
+                    // Long input slices can contain many duplicate elements.
+                    // Deduplicate those before replaying local coordinates.
+                    if g.vertices[to]
+                        .elements
+                        .len()
+                        .saturating_add(a.elements.len())
+                        > 256
+                    {
+                        let unique: S = seen.copied().collect();
+                        for id in unique.elements() {
+                            remember(id);
+                        }
+                    } else {
+                        for &id in seen {
+                            remember(id);
                         }
                     }
                     for &id in &a.elements {
@@ -140,12 +164,11 @@ impl PreparedNg {
                             t.base |= 1 << bit;
                         }
                     }
-                    for &id in keep {
-                        if seen.contains(&id) {
-                            continue;
-                        }
+                    for id in keep.elements() {
                         if let (Some(s), Some(tgt)) = (local[from][id], local[to][id]) {
-                            t.transfer.push((s, tgt));
+                            if seen_at_target & (1 << tgt) == 0 {
+                                t.transfer.push((s, tgt));
+                            }
                         }
                     }
                     t
@@ -170,3 +193,7 @@ impl PreparedNg {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/graph/ng_preparation_tests.rs"]
+mod tests;

@@ -36,6 +36,12 @@ fn default_priority() -> f64 {
 }
 
 impl NetworkClusterBranching {
+    /// Prepared generator names in construction order. Available after the
+    /// network has been prepared for a tree solve.
+    pub(super) fn generator_names(&self) -> impl Iterator<Item = &str> {
+        self.prepared.iter().map(|(name, _)| name.as_str())
+    }
+
     pub fn new(network: i32) -> Self {
         Self {
             network,
@@ -186,6 +192,8 @@ impl NetworkClusterBranching {
                 },
                 history_eligible: true,
                 fresh: true,
+                origin: None,
+                component_admission: None,
             });
         }
         Ok(proposals)

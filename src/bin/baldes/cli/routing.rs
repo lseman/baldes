@@ -113,6 +113,9 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
     let mut customers = None;
     let mut ng = 8;
     let mut options = model::Options::default();
+    // Keep routing's low initial feasibility penalty independent of the
+    // general model default. CG raises artificial penalties when necessary.
+    options.cg.artificial_cost = 2.76;
     // Master column clean-up: threshold 10000, keep ratio 0.66.
     options.cg.column_cleanup_threshold = 10000.;
     options.cg.column_cleanup_ratio = 0.66;
@@ -422,6 +425,14 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
     let node_limit = common.nodes.unwrap_or(10000);
     let json_path = common.json;
     options.separation.rank_one.enabled = rank1;
+    if enumerated_mip && !enumerate {
+        return Err("--enumerated-mip conflicts with --no-enumeration".into());
+    }
+    options.enumeration = enumerate.then(Default::default);
+    if !enumerate {
+        options.gap_enumeration = false;
+        options.reduced_cost_fixing = false;
+    }
     Ok(Some(RoutingOptions {
         ignore_time_windows,
         customers,
@@ -452,6 +463,38 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
         node_limit,
         json_path,
     }))
+}
+
+/// Arc instances produced by this adapter share an original-variable owner
+/// within each network. Edge and inferred hybrid producers have separate
+/// registration contracts and do not acquire this metadata.
+fn routing_branch_variables<const D: usize>(
+    problem: &model::Problem<D>,
+    branching: &str,
+) -> (
+    Vec<model::MappedBranchVariable>,
+    std::collections::BTreeMap<String, model::BranchSelection>,
+) {
+    let variables = match branching {
+        "edge" => return (problem.edge_flow_variables(1.), Default::default()),
+        "hybrid" => return (vec![], Default::default()),
+        _ => problem.arc_flow_variables(1.),
+    };
+    let selection = variables
+        .iter()
+        .map(|variable| {
+            // arc_flow_variables creates exactly one network term per arc.
+            let network = variable.networks[0].network;
+            (
+                variable.name.clone(),
+                model::BranchSelection {
+                    family: format!("routing-arcs:{network}"),
+                    ..Default::default()
+                },
+            )
+        })
+        .collect();
+    (variables, selection)
 }
 
 pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Result<(), String> {
@@ -682,7 +725,6 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
     // A root LP may use one route per customer; the tree enforces the fleet.
     let fleet = if tree { instance.vehicles } else { n };
     let mut node = options;
-    node.enumeration = enumerate.then(Default::default);
     let mut initial_solution = None;
     if let Some(time_limit) = hgs_time {
         let seed = instance
@@ -732,28 +774,8 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
         model::Problem::set_partitioning(graph, fleet as f64).map_err(|e| e.to_string())?;
     let result = if tree {
         use baldes::master::tree::{ModelTreeOptions, NetworkBranchingPolicy};
-        let mapped_variables = match branching.as_str() {
-            "edge" => problem.edge_flow_variables(1.),
-            // Phased collection already proposes every fractional arc flow.
-            "hybrid" => vec![],
-            _ => problem.arc_flow_variables(1.),
-        };
-        let configured = ModelTreeOptions {
-            branching: match branching.as_str() {
-                "resource" => NetworkBranchingPolicy::ResourceFirst,
-                "hybrid" => NetworkBranchingPolicy::Phased,
-                _ => NetworkBranchingPolicy::MultiplicityFirst,
-            },
-            mapped_variables,
-            clusters: if matches!(branching.as_str(), "cluster" | "hybrid") {
-                vec![baldes::master::model::NetworkClusterBranching::new(0)]
-            } else {
-                vec![]
-            },
-            ryan_foster: matches!(branching.as_str(), "ryan-foster" | "hybrid")
-                .then(|| baldes::master::model::RyanFosterBranching::new(2.)),
-            mapped_strong_branching: strong_branching
-                .then(baldes::master::tree::StrongBranchingOptions::default),
+        let (mapped_variables, branch_selection) = routing_branch_variables(&problem, &branching);
+        let mut configured = ModelTreeOptions {
             restricted_master_mip: tree_controls.restricted_mip.then(|| {
                 let mut mip = baldes::master::tree::RestrictedMasterMip::default();
                 if let Some(nodes) = tree_controls.mip_nodes {
@@ -764,7 +786,6 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
             absolute_gap: tree_controls.absolute_gap,
             relative_gap: tree_controls.relative_gap,
             integer_objective: tree_controls.integer_objective,
-            use_branching_history: tree_controls.history,
             threads: tree_controls.threads,
             diving: diving.then(|| baldes::master::tree::DivingOptions {
                 depth_limit: usize::MAX,
@@ -791,11 +812,45 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
             node,
             ..ModelTreeOptions::default()
         };
-        let output = baldes::master::tree::solve(problem, configured).map_err(|e| e.to_string())?;
-        SolveResult::tree(&output, started.elapsed().as_secs_f64())
+        use model::BranchingRegistration as Registration;
+        let mut registrations = vec![
+            Registration::Policy(match branching.as_str() {
+                "resource" => NetworkBranchingPolicy::ResourceFirst,
+                "hybrid" => NetworkBranchingPolicy::Phased,
+                _ => NetworkBranchingPolicy::MultiplicityFirst,
+            }),
+            Registration::StrongBranching(
+                strong_branching.then(baldes::master::tree::StrongBranchingOptions::default),
+            ),
+            Registration::History(tree_controls.history),
+        ];
+        registrations.extend(mapped_variables.into_iter().map(Registration::Mapped));
+        registrations.extend(
+            branch_selection
+                .into_iter()
+                .map(|(name, selection)| Registration::Selection { name, selection }),
+        );
+        if matches!(branching.as_str(), "cluster" | "hybrid") {
+            registrations.push(Registration::Cluster(model::NetworkClusterBranching::new(
+                0,
+            )));
+        }
+        if matches!(branching.as_str(), "ryan-foster" | "hybrid") {
+            registrations.push(Registration::RyanFoster(model::RyanFosterBranching::new(
+                2.,
+            )));
+        }
+        configured
+            .branching_registry
+            .register_batch(registrations)
+            .map_err(|e| e.to_string())?;
+        solve_prepared(
+            SolveStart::Problem(problem),
+            SolveMode::Tree(configured),
+            started,
+        )?
     } else {
-        let output = model::solve(problem, node).map_err(|e| e.to_string())?;
-        SolveResult::root(&output, started.elapsed().as_secs_f64())
+        solve_prepared(SolveStart::Problem(problem), SolveMode::Root(node), started)?
     };
     let data = result.to_json().map_err(|e| e.to_string())?;
     if let Some(path) = json_path {
@@ -854,3 +909,7 @@ impl Default for TreeControls {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../../../tests/unit/bin/baldes/cli/routing_tests.rs"]
+mod tests;

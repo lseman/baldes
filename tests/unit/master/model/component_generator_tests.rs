@@ -573,8 +573,8 @@ fn automatic_component_tree_preserves_the_integer_optimum() {
     let (root, options, generator) = fractional_patterns();
     let mut tree = ModelTreeOptions::default();
     tree.node = options;
-    tree.branching = NetworkBranchingPolicy::Phased;
-    tree.component_generators = vec![generator];
+    tree.branching_registry.branching = NetworkBranchingPolicy::Phased;
+    tree.branching_registry.component_generators = vec![generator];
     let solved = root.snapshot.solve_tree(tree).unwrap();
     assert_eq!(solved.incumbent, 40.);
     assert_eq!(solved.status, crate::master::tree::TreeStatus::Optimal);

@@ -1,0 +1,56 @@
+[
+  {
+    "threshold": 6.0,
+    "activity": 1.5,
+    "rows": [
+      [
+        true,
+        2.0
+      ],
+      [
+        true,
+        3.0
+      ],
+      [
+        false,
+        3.0
+      ]
+    ]
+  },
+  {
+    "threshold": 4.0,
+    "activity": 2.5,
+    "rows": [
+      [
+        true,
+        3.0
+      ],
+      [
+        true,
+        2.0
+      ],
+      [
+        false,
+        3.0
+      ]
+    ]
+  },
+  {
+    "threshold": 2.0,
+    "activity": 3.5,
+    "rows": [
+      [
+        true,
+        4.0
+      ],
+      [
+        true,
+        1.0
+      ],
+      [
+        false,
+        3.0
+      ]
+    ]
+  }
+]

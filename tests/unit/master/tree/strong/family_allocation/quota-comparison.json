@@ -1,0 +1,4739 @@
+{
+  "binary_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "cases": [
+    {
+      "quota": 1,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ]
+      ],
+      "generation": {
+        "quota": 1,
+        "count": 2,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 1,
+      "families": [
+        [
+          10.0,
+          3
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 1,
+        "count": 2,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 1,
+      "families": [
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 1,
+        "count": 1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 1,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          4
+        ],
+        [
+          10.0,
+          5
+        ]
+      ],
+      "generation": {
+        "quota": 1,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            2,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 1,
+      "families": [
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          4
+        ]
+      ],
+      "generation": {
+        "quota": 1,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            2,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 1,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ]
+      ],
+      "generation": {
+        "quota": 1,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            2,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 1,
+      "families": [
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          2
+        ]
+      ],
+      "generation": {
+        "quota": 1,
+        "count": 2,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 1,
+            "created": 0
+          },
+          {
+            "family": 3,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 1,
+            "created": 0
+          },
+          {
+            "family": 3,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            3,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 1,
+      "families": [
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          5
+        ]
+      ],
+      "generation": {
+        "quota": 1,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            2,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 1,
+      "families": [
+        [
+          11.0,
+          1
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 1,
+        "count": 1,
+        "cutoff": 11,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 11,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 1,
+      "families": [
+        [
+          10.75,
+          1
+        ],
+        [
+          10.25,
+          1
+        ],
+        [
+          9.75,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 1,
+        "count": 1,
+        "cutoff": 10.75,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10.75,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 1,
+      "families": [
+        [
+          11.0,
+          0
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 1,
+        "count": 1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 1,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 1,
+      "families": [
+        [
+          10.0,
+          3
+        ],
+        [
+          11.0,
+          1
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 1,
+        "count": 1,
+        "cutoff": 11,
+        "calls": [
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 11,
+        "calls": [
+          {
+            "family": 1,
+            "quota": 1,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 2,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ]
+      ],
+      "generation": {
+        "quota": 2,
+        "count": 2,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 2,
+      "families": [
+        [
+          10.0,
+          3
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 2,
+        "count": 4,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 2
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 2
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 2
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 2
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 2,
+      "families": [
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 2,
+        "count": 2,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 2
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 2
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 2,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          4
+        ],
+        [
+          10.0,
+          5
+        ]
+      ],
+      "generation": {
+        "quota": 2,
+        "count": 5,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 2
+          },
+          {
+            "family": 2,
+            "quota": 2,
+            "created": 2
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 2
+          },
+          {
+            "family": 2,
+            "quota": 2,
+            "created": 2
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 2,
+      "families": [
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          4
+        ]
+      ],
+      "generation": {
+        "quota": 2,
+        "count": 5,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 2
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 2,
+            "created": 2
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 2
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 2,
+            "created": 2
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 2,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ]
+      ],
+      "generation": {
+        "quota": 2,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 2,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 2,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 2,
+      "families": [
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          2
+        ]
+      ],
+      "generation": {
+        "quota": 2,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 2,
+            "created": 0
+          },
+          {
+            "family": 3,
+            "quota": 2,
+            "created": 2
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 2,
+            "created": 0
+          },
+          {
+            "family": 3,
+            "quota": 2,
+            "created": 2
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            3,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 2,
+      "families": [
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          5
+        ]
+      ],
+      "generation": {
+        "quota": 2,
+        "count": 6,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 2
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 2
+          },
+          {
+            "family": 2,
+            "quota": 2,
+            "created": 2
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 2
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 2
+          },
+          {
+            "family": 2,
+            "quota": 2,
+            "created": 2
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 2,
+      "families": [
+        [
+          11.0,
+          1
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 2,
+        "count": 1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 1,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 2,
+      "families": [
+        [
+          10.75,
+          1
+        ],
+        [
+          10.25,
+          1
+        ],
+        [
+          9.75,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 2,
+        "count": 2,
+        "cutoff": 10.25,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10.25,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 2,
+      "families": [
+        [
+          11.0,
+          0
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 2,
+        "count": 2,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 2
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 2,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 2
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 2,
+      "families": [
+        [
+          10.0,
+          3
+        ],
+        [
+          11.0,
+          1
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 2,
+        "count": 1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 1,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 1,
+            "quota": 2,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 3,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ]
+      ],
+      "generation": {
+        "quota": 3,
+        "count": 2,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 1,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 3,
+      "families": [
+        [
+          10.0,
+          3
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 3,
+        "count": 6,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 3
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 3
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 3
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 3
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 3,
+      "families": [
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 3,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 3
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 3
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 3,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          4
+        ],
+        [
+          10.0,
+          5
+        ]
+      ],
+      "generation": {
+        "quota": 3,
+        "count": 7,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 3
+          },
+          {
+            "family": 2,
+            "quota": 3,
+            "created": 3
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 3
+          },
+          {
+            "family": 2,
+            "quota": 3,
+            "created": 3
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 3,
+      "families": [
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          4
+        ]
+      ],
+      "generation": {
+        "quota": 3,
+        "count": 7,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 3
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 3,
+            "created": 3
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 3
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 3,
+            "created": 3
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            0,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 3,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ]
+      ],
+      "generation": {
+        "quota": 3,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 3,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 3,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 3,
+      "families": [
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          2
+        ]
+      ],
+      "generation": {
+        "quota": 3,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 3,
+            "created": 0
+          },
+          {
+            "family": 3,
+            "quota": 3,
+            "created": 2
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 3,
+            "created": 0
+          },
+          {
+            "family": 3,
+            "quota": 3,
+            "created": 2
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            3,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 3,
+      "families": [
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          5
+        ]
+      ],
+      "generation": {
+        "quota": 3,
+        "count": 9,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 3
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 3
+          },
+          {
+            "family": 2,
+            "quota": 3,
+            "created": 3
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 3
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 3
+          },
+          {
+            "family": 2,
+            "quota": 3,
+            "created": 3
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 3,
+      "families": [
+        [
+          11.0,
+          1
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 3,
+        "count": 1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 2,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 3,
+      "families": [
+        [
+          10.75,
+          1
+        ],
+        [
+          10.25,
+          1
+        ],
+        [
+          9.75,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 3,
+        "count": 2,
+        "cutoff": 9.75,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 1,
+        "count": -1,
+        "cutoff": 9.75,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 3,
+      "families": [
+        [
+          11.0,
+          0
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 3,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 3
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 3,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 3
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 3,
+      "families": [
+        [
+          10.0,
+          3
+        ],
+        [
+          11.0,
+          1
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 3,
+        "count": 1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 2,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 1,
+            "quota": 3,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 4,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ]
+      ],
+      "generation": {
+        "quota": 4,
+        "count": 2,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 2,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 4,
+      "families": [
+        [
+          10.0,
+          3
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 4,
+        "count": 6,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 3
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 3
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 3
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 3
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 4,
+      "families": [
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 4,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 3
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 1,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 3
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 4,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          4
+        ],
+        [
+          10.0,
+          5
+        ]
+      ],
+      "generation": {
+        "quota": 4,
+        "count": 9,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 4
+          },
+          {
+            "family": 2,
+            "quota": 4,
+            "created": 4
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 4
+          },
+          {
+            "family": 2,
+            "quota": 4,
+            "created": 4
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            2,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 4,
+      "families": [
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          4
+        ]
+      ],
+      "generation": {
+        "quota": 4,
+        "count": 9,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 4
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 4,
+            "created": 4
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 4
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 4,
+            "created": 4
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            0,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            2,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 4,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ]
+      ],
+      "generation": {
+        "quota": 4,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 4,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 1,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 4,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 4,
+      "families": [
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          2
+        ]
+      ],
+      "generation": {
+        "quota": 4,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 4,
+            "created": 0
+          },
+          {
+            "family": 3,
+            "quota": 4,
+            "created": 2
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 1,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 4,
+            "created": 0
+          },
+          {
+            "family": 3,
+            "quota": 4,
+            "created": 2
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            3,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 4,
+      "families": [
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          5
+        ]
+      ],
+      "generation": {
+        "quota": 4,
+        "count": 12,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 4
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 4
+          },
+          {
+            "family": 2,
+            "quota": 4,
+            "created": 4
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 4
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 4
+          },
+          {
+            "family": 2,
+            "quota": 4,
+            "created": 4
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            2,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 4,
+      "families": [
+        [
+          11.0,
+          1
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 4,
+        "count": 1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 3,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 4,
+      "families": [
+        [
+          10.75,
+          1
+        ],
+        [
+          10.25,
+          1
+        ],
+        [
+          9.75,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 4,
+        "count": 2,
+        "cutoff": 9.75,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 2,
+        "count": -1,
+        "cutoff": 9.75,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 4,
+      "families": [
+        [
+          11.0,
+          0
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 4,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 3
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 1,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 4,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 3
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 4,
+      "families": [
+        [
+          10.0,
+          3
+        ],
+        [
+          11.0,
+          1
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 4,
+        "count": 1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 3,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 1,
+            "quota": 4,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 5,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ]
+      ],
+      "generation": {
+        "quota": 5,
+        "count": 2,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 3,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 5,
+      "families": [
+        [
+          10.0,
+          3
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 5,
+        "count": 6,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 3
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 3
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 3
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 3
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 5,
+      "families": [
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 5,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 3
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 2,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 3
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 5,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          4
+        ],
+        [
+          10.0,
+          5
+        ]
+      ],
+      "generation": {
+        "quota": 5,
+        "count": 10,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 4
+          },
+          {
+            "family": 2,
+            "quota": 5,
+            "created": 5
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 4
+          },
+          {
+            "family": 2,
+            "quota": 5,
+            "created": 5
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            2,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 5,
+      "families": [
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          4
+        ]
+      ],
+      "generation": {
+        "quota": 5,
+        "count": 10,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 5
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 5,
+            "created": 4
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 5
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 5,
+            "created": 4
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            2,
+            1
+          ],
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 5,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ]
+      ],
+      "generation": {
+        "quota": 5,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 5,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 2,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 5,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 5,
+      "families": [
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          2
+        ]
+      ],
+      "generation": {
+        "quota": 5,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 5,
+            "created": 0
+          },
+          {
+            "family": 3,
+            "quota": 5,
+            "created": 2
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 2,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 5,
+            "created": 0
+          },
+          {
+            "family": 3,
+            "quota": 5,
+            "created": 2
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            3,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 5,
+      "families": [
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          5
+        ]
+      ],
+      "generation": {
+        "quota": 5,
+        "count": 15,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 5
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 5
+          },
+          {
+            "family": 2,
+            "quota": 5,
+            "created": 5
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 5
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 5
+          },
+          {
+            "family": 2,
+            "quota": 5,
+            "created": 5
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            2,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 5,
+      "families": [
+        [
+          11.0,
+          1
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 5,
+        "count": 1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 4,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 5,
+      "families": [
+        [
+          10.75,
+          1
+        ],
+        [
+          10.25,
+          1
+        ],
+        [
+          9.75,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 5,
+        "count": 2,
+        "cutoff": 9.75,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 3,
+        "count": -1,
+        "cutoff": 9.75,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 5,
+      "families": [
+        [
+          11.0,
+          0
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 5,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 3
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 2,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 5,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 3
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 5,
+      "families": [
+        [
+          10.0,
+          3
+        ],
+        [
+          11.0,
+          1
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 5,
+        "count": 1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 4,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 1,
+            "quota": 5,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 6,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ]
+      ],
+      "generation": {
+        "quota": 6,
+        "count": 2,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 4,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 6,
+      "families": [
+        [
+          10.0,
+          3
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 6,
+        "count": 6,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 3
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 3
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 3
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 3
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            2
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 6,
+      "families": [
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 6,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 3
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 3,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 3
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 6,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          4
+        ],
+        [
+          10.0,
+          5
+        ]
+      ],
+      "generation": {
+        "quota": 6,
+        "count": 10,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 4
+          },
+          {
+            "family": 2,
+            "quota": 6,
+            "created": 5
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 4
+          },
+          {
+            "family": 2,
+            "quota": 6,
+            "created": 5
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            2,
+            1
+          ],
+          [
+            2,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 6,
+      "families": [
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          4
+        ]
+      ],
+      "generation": {
+        "quota": 6,
+        "count": 10,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 5
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 6,
+            "created": 4
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 5
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 6,
+            "created": 4
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            2,
+            1
+          ],
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 6,
+      "families": [
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          1
+        ]
+      ],
+      "generation": {
+        "quota": 6,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 6,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 3,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 6,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 6,
+      "families": [
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          1
+        ],
+        [
+          10.0,
+          0
+        ],
+        [
+          10.0,
+          2
+        ]
+      ],
+      "generation": {
+        "quota": 6,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 6,
+            "created": 0
+          },
+          {
+            "family": 3,
+            "quota": 6,
+            "created": 2
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 3,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 1
+          },
+          {
+            "family": 2,
+            "quota": 6,
+            "created": 0
+          },
+          {
+            "family": 3,
+            "quota": 6,
+            "created": 2
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            3,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 6,
+      "families": [
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          5
+        ],
+        [
+          10.0,
+          5
+        ]
+      ],
+      "generation": {
+        "quota": 6,
+        "count": 15,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 5
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 5
+          },
+          {
+            "family": 2,
+            "quota": 6,
+            "created": 5
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 0,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 5
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 5
+          },
+          {
+            "family": 2,
+            "quota": 6,
+            "created": 5
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            2,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 6,
+      "families": [
+        [
+          11.0,
+          1
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 6,
+        "count": 1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 5,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 6,
+      "families": [
+        [
+          10.75,
+          1
+        ],
+        [
+          10.25,
+          1
+        ],
+        [
+          9.75,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 6,
+        "count": 2,
+        "cutoff": 9.75,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 4,
+        "count": -1,
+        "cutoff": 9.75,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 1
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 6,
+      "families": [
+        [
+          11.0,
+          0
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 6,
+        "count": 3,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 3
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 3,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 0,
+            "quota": 6,
+            "created": 0
+          },
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 3
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "quota": 6,
+      "families": [
+        [
+          10.0,
+          3
+        ],
+        [
+          11.0,
+          1
+        ],
+        [
+          10.0,
+          3
+        ]
+      ],
+      "generation": {
+        "quota": 6,
+        "count": 1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 1
+          }
+        ],
+        "selected": []
+      },
+      "selection": {
+        "quota": 5,
+        "count": -1,
+        "cutoff": 10,
+        "calls": [
+          {
+            "family": 1,
+            "quota": 6,
+            "created": 1
+          }
+        ],
+        "selected": [
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    }
+  ]
+}
