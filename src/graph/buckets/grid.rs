@@ -387,6 +387,7 @@ impl BucketGraph {
 
     /// Distinguish an unrepresentable lookup from a coordinate outside the
     /// grid, so completion queries do not treat arithmetic failure as proof.
+    #[inline]
     pub(crate) fn bucket_id_checked(
         &self,
         forward: bool,

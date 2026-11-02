@@ -54,6 +54,12 @@ pub const OPTION_TABLE: &[OptionInfo] = &[
         support: OptionSupport::Implemented("src/pricing/controller.rs; src/pricing/solve.rs"),
     },
     OptionInfo {
+        name: "BALDESuseRoundedHeuristicPricing",
+        kind: OptionKind::Bool,
+        default: 0.0,
+        support: OptionSupport::Implemented("src/pricing/variable_costs.rs; cached-cost heuristic candidates; exact pricing remains raw"),
+    },
+    OptionInfo {
         name: "BALDESuseBidirectionalSearch",
         kind: OptionKind::Int,
         default: 2.0,

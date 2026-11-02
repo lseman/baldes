@@ -51,9 +51,9 @@ impl<const D: usize> Solver<D> {
         self.raw_arc_costs = None;
         Ok(())
     }
-    /// Price the raw variable-cost problem for the functor interface. Rounding
-    /// can change dominance and discard the raw optimum, so correcting only a
-    /// returned cached route cannot establish a global raw pricing bound.
+    /// Price a functor phase. With rounded heuristic pricing enabled, heuristic
+    /// phases correct returned cached-cost routes; exact phases search the raw
+    /// objective because rounding can discard the route attaining its minimum.
     pub fn price_functor_phase(&mut self, index: usize, maximum: usize) -> Result<PricingResult> {
         if self
             .enumeration
@@ -81,6 +81,24 @@ impl<const D: usize> Solver<D> {
             .get(index)
             .ok_or_else(|| invalid("pricing phase out of range"))?
             .exact();
+        if !exact_phase
+            && self.options.get("BALDESuseRoundedHeuristicPricing")? != 0.
+            && (!self.variable_costs.is_empty() || self.raw_arc_costs.is_some())
+        {
+            let mut answer = self.price_phase(index, maximum, false)?;
+            if !answer.columns.is_empty() {
+                for route in &mut answer.columns {
+                    route.cost = self.corrected_bound(route.cost, route)?;
+                }
+                // The first route is the cached search's best, not necessarily
+                // the raw minimum. This result never certifies a bound.
+                answer.minimum_reduced_cost = answer.columns[0].cost;
+                answer.exact = false;
+                return Ok(answer);
+            }
+            // A capped or empty output cannot identify a route to correct.
+            // Preserve the previous raw-search behavior for that case.
+        }
         if self.variable_costs.is_empty()
             && self.raw_arc_costs.is_none()
             && (!exact_phase || (self.cuts.cuts.is_empty() && self.cuts.knapsack_cuts.is_empty()))

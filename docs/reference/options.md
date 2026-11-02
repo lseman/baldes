@@ -50,6 +50,7 @@ reconfigure its existing separator.
 | `BALDESredCostFixingTimeThreshold` | Double | `100.0` | [src/pricing/fixing_workflow.rs](../../src/pricing/fixing_workflow.rs); [src/master/model/fixing.rs](../../src/master/model/fixing.rs) |
 | `BALDESnumberOfBucketsPerVertex` | Int | `25.0` | [src/pricing/mod.rs](../../src/pricing/mod.rs) |
 | `BALDESdynamicBucketSteps` | Int | `1.0` | [src/pricing/controller.rs](../../src/pricing/controller.rs); [src/pricing/solve.rs](../../src/pricing/solve.rs) |
+| `BALDESuseRoundedHeuristicPricing` | Bool | `0.0` | [src/pricing/variable_costs.rs](../../src/pricing/variable_costs.rs); opt in to rounded-cost heuristic candidates; exact pricing uses raw costs |
 | `BALDESuseBidirectionalSearch` | Int | `2.0` | [src/pricing/mod.rs](../../src/pricing/mod.rs) |
 | `BALDESapplyReducedCostFixing` | Int | `1.0` | [src/pricing/fixing_workflow.rs](../../src/pricing/fixing_workflow.rs) |
 | `BALDESmaxNumOfColsPerIteration` | Int | `30.0` | [src/pricing/mod.rs](../../src/pricing/mod.rs); [src/pricing/solve.rs](../../src/pricing/solve.rs) |

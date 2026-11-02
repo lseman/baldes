@@ -1,6 +1,56 @@
 use super::*;
 
 #[test]
+fn cached_cost_rounds_each_variable_before_combining_arc_coefficients() {
+    let mut solver = Solver::<2>::new(2, 1).unwrap();
+    for vertex in 0..2 {
+        solver.graph.set_bounds(vertex, 0, 0., 10.).unwrap();
+    }
+    let id = solver.graph.add_arc(0, 1, 0.).unwrap();
+    solver.graph.arc_mut(id).unwrap().variables = vec![(0, 1.), (1, 1.), (2, 1.)];
+    solver.maximum_variable_id = Some(2);
+    solver
+        .set_option("BALDESuseBidirectionalSearch", 0.)
+        .unwrap();
+    // Rounding the sum would give zero. The recovered cache rounds each
+    // variable first, so only the negative contribution survives.
+    solver.cache_variable_costs(&[4e-9, 4e-9, -6e-9]).unwrap();
+    assert_eq!(solver.graph.arcs[0].reduced_cost, -1e-8);
+    let cached = solver.price_phase(0, 8, false).unwrap();
+    let route = &cached.columns[0];
+    let corrected = solver.corrected_bound(route.cost, route).unwrap();
+    assert!((corrected - 2e-9).abs() < 1e-20);
+    let raw = solver.price_functor_phase(0, 8).unwrap();
+    assert!(raw.exact);
+    assert!((raw.minimum_reduced_cost - 2e-9).abs() < 1e-20);
+}
+
+#[test]
+fn heuristic_functor_uses_cached_costs_but_exact_phase_finds_raw_minimum() {
+    let mut default = model();
+    default.cache_variable_costs(&[1e-9]).unwrap();
+    let raw_heuristic = default.price_functor_phase(1, 8).unwrap();
+    assert!(!raw_heuristic.exact);
+    assert_eq!(raw_heuristic.columns[0].arcs, [2, 3]);
+    let mut solver = model();
+    solver
+        .set_option("BALDESuseRoundedHeuristicPricing", 1.)
+        .unwrap();
+    // The first path costs zero after rounding but 0.1 at the raw price;
+    // the other path costs 0.05 in either objective.
+    solver.cache_variable_costs(&[1e-9]).unwrap();
+    let heuristic = solver.price_functor_phase(1, 8).unwrap();
+    assert!(!heuristic.exact);
+    assert_eq!(heuristic.columns[0].arcs, [0, 1]);
+    assert!((heuristic.minimum_reduced_cost - 0.1).abs() < 1e-12);
+    assert!((heuristic.columns[0].cost - 0.1).abs() < 1e-12);
+    let exact = solver.price_functor_phase(0, 8).unwrap();
+    assert!(exact.exact);
+    assert_eq!(exact.columns[0].arcs, [2, 3]);
+    assert_eq!(exact.minimum_reduced_cost, 0.05);
+}
+
+#[test]
 fn functor_searches_only_the_raw_objective_and_advances_one_round() {
     let mut solver = model();
     solver.cache_variable_costs(&[1e-9]).unwrap();
