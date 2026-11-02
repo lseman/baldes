@@ -19,6 +19,7 @@ mod options;
 pub(crate) use options::KPathSeparation;
 pub use options::{
     CapacityCutConfig, CutOptions, GeneralKPathCutConfig, KPathCutConfig, KnapsackCutConfig,
+    RankOneIncidenceConfig,
 };
 
 /// An installed row's selected memory, shared cheaply by node checkpoints.
@@ -109,6 +110,8 @@ pub(super) fn theta_variables<const D: usize>(problem: &Problem<D>) -> Result<Ve
 pub struct SeparationOptions {
     /// Rank-one cuts (`enabled`) and the tailing-off controls of every family.
     pub rank_one: CutOptions,
+    /// Optional explicit incidence for rank-one separation on unit shared rows.
+    pub rank_one_incidence: Option<RankOneIncidenceConfig>,
     pub capacity: Option<CapacityCutConfig>,
     pub kpath: Option<KPathCutConfig>,
     pub general_kpath: Option<GeneralKPathCutConfig>,
@@ -126,6 +129,7 @@ pub struct SeparationOptions {
 impl SeparationOptions {
     pub fn is_active(&self) -> bool {
         self.rank_one.enabled
+            || self.rank_one_incidence.is_some()
             || self.capacity.is_some()
             || self.kpath.is_some()
             || self.general_kpath.is_some()
@@ -159,10 +163,20 @@ enum Separator {
     Relaxation,
 }
 
+#[derive(Clone)]
+struct IncidenceRankOneState {
+    separator: crate::cuts::IncidenceCutSeparator,
+    active: Vec<(usize, crate::cuts::separation::SeparatedCut)>,
+    graph_ids: Vec<i32>,
+    memory_type: i32,
+    max_rank: i32,
+}
+
 /// Separation state retained by a node and inherited by its descendants.
 #[derive(Clone)]
 pub(super) struct CutState {
     pub(super) options: CutOptions,
+    incidence_rank_one: Option<IncidenceRankOneState>,
     /// Memory mode chosen at the root when automatic rank-one memory search ran.
     pub(super) resolved_memory_type: Option<crate::cuts::MemoryType>,
     /// Whether this node's cut generation stopped at the lowest priority due to tailing off.
@@ -431,7 +445,190 @@ fn partition_rows<const D: usize>(
     if customers.windows(2).any(|w| w[0].0 == w[1].0) {
         return None;
     }
+    // The vertex adapter assumes these rows are exactly the sum of arrivals
+    // at their mapped vertices. Extra sink-arc or route-wide contributions to
+    // those rows would make the generated inequalities refer to other rows.
+    let covers = |row| {
+        customers
+            .binary_search_by_key(&row, |&(row, _)| row)
+            .is_ok()
+    };
+    if network
+        .route_entries
+        .iter()
+        .any(|&(row, value)| value != 0. && covers(row))
+        || g.arcs
+            .iter()
+            .zip(network.arc_entries.iter())
+            .any(|(arc, entries)| {
+                arc.head == g.sink
+                    && entries
+                        .iter()
+                        .any(|&(row, value)| value != 0. && covers(row))
+            })
+    {
+        return None;
+    }
     Some(customers)
+}
+
+/// Whether the selected shared rows have contributions outside the vertex
+/// arrivals recognized by `partition_rows`.
+fn partition_rows_have_other_contributions<const D: usize>(
+    state: &State<D>,
+    covered: &[usize],
+) -> bool {
+    let contains = |row: usize| covered.binary_search(&row).is_ok();
+    state.master_variables.iter().any(|variable| {
+        (variable.bounds.lower != 0. || variable.bounds.upper != 0.)
+            && variable
+                .entries
+                .iter()
+                .any(|&(row, value)| value != 0. && contains(row))
+    }) || state.oracles.iter().any(|oracle| {
+        oracle.route_entries.iter().any(|&(row, value)| {
+            value != 0. && row.checked_sub(state.shared_offset).is_some_and(contains)
+        }) || oracle
+            .activity_rows
+            .iter()
+            .any(|entry| entry.coefficient != 0. && contains(entry.row))
+            || oracle.nonlinear_rows.iter().any(|&(_, row)| contains(row))
+            || oracle.knapsack_rows.iter().any(|&(_, row)| contains(row))
+            || oracle.presence_rows.iter().any(|&(_, row)| contains(row))
+            || oracle
+                .ryan_foster_rows
+                .iter()
+                .any(|(row, _)| contains(*row))
+            || oracle.resource_groups.iter().any(|(row, _)| contains(*row))
+    })
+}
+
+fn prepare_incidence_rank_one<const D: usize>(
+    state: &State<D>,
+    config: &RankOneIncidenceConfig,
+) -> Result<(IncidenceRankOneState, crate::cuts::MemoryType)> {
+    use crate::cuts::separation::prepare_incidence;
+    if config.rows.is_empty()
+        || config.rows.len() >= 1024
+        || config.graphs.len() != state.oracles.len()
+    {
+        return Err(invalid("explicit rank-one incidence rows or graphs"));
+    }
+    let mut sorted = config.rows.clone();
+    sorted.sort_unstable();
+    if sorted.windows(2).any(|pair| pair[0] == pair[1])
+        || sorted.iter().any(|&row| {
+            state
+                .shared_rows
+                .get(row)
+                .is_none_or(|entry| entry.sense != RowSense::Equal || entry.rhs != 1.)
+        })
+        || partition_rows_have_other_contributions(state, &sorted)
+    {
+        return Err(invalid(
+            "explicit rank-one incidence requires exclusive unit equality rows",
+        ));
+    }
+    let mapping: std::collections::BTreeMap<_, _> = config
+        .rows
+        .iter()
+        .enumerate()
+        .map(|(set, &row)| (row, set as i32))
+        .collect();
+    for oracle in &state.oracles {
+        let physical = &oracle.network.graph;
+        let graph = config
+            .graphs
+            .iter()
+            .find(|graph| graph.id == oracle.network.id)
+            .ok_or_else(|| invalid("explicit rank-one incidence graph ID"))?;
+        if graph.source != physical.source as i32
+            || graph.sink != physical.sink as i32
+            || graph.vertices.len() != physical.vertices.len()
+            || graph
+                .vertices
+                .iter()
+                .any(|v| v.id < 0 || v.id as usize >= physical.vertices.len())
+            || graph.vertices.iter().any(|v| {
+                (v.id == graph.source || v.id == graph.sink)
+                    && (!v.packing_sets.is_empty() || !v.covering_sets.is_empty())
+            })
+            || graph.arcs.len() != physical.arcs.len()
+            || graph.packing_set_count != config.rows.len() as i32
+            || graph.covering_set_count != config.rows.len() as i32
+            || oracle
+                .network
+                .route_entries
+                .iter()
+                .any(|&(row, value)| value != 0. && mapping.contains_key(&row))
+        {
+            return Err(invalid(
+                "explicit rank-one graph dimensions or route entries",
+            ));
+        }
+        let incidence =
+            prepare_incidence(graph).ok_or_else(|| invalid("explicit rank-one graph incidence"))?;
+        for (arc, entries) in physical.arcs.iter().zip(oracle.network.arc_entries.iter()) {
+            let index = usize::try_from(arc.id).map_err(|_| invalid("explicit rank-one arc ID"))?;
+            if incidence.arc_tail.get(index) != Some(&(arc.tail as i32))
+                || incidence.arc_head.get(index) != Some(&(arc.head as i32))
+            {
+                return Err(invalid("explicit rank-one physical arc"));
+            }
+            let mut contributions = std::collections::BTreeMap::<i32, f64>::new();
+            for &(row, value) in entries {
+                if let Some(&set) = mapping.get(&row) {
+                    *contributions.entry(set).or_default() += value;
+                }
+            }
+            contributions.retain(|_, value| *value != 0.);
+            if contributions.values().any(|&value| value != 1.) {
+                return Err(invalid("explicit rank-one master row arc coefficients"));
+            }
+            let expected: Vec<_> = contributions.keys().copied().collect();
+            if incidence.arc_packing_sets[index] != expected
+                || incidence.arc_covering_sets[index] != expected
+            {
+                return Err(invalid(
+                    "explicit rank-one incidence differs from master rows",
+                ));
+            }
+        }
+    }
+    let mut params = config.parameters.clone();
+    if !(1..=3).contains(&params.memory_type) {
+        return Err(invalid(
+            "explicit rank-one incidence requires a concrete memory mode",
+        ));
+    }
+    if cfg!(feature = "rank-one-node-memory") && params.memory_type == 1 {
+        params.memory_type = 2;
+    }
+    let resolved = match params.memory_type {
+        1 => crate::cuts::MemoryType::Arc,
+        2 => crate::cuts::MemoryType::Vertex,
+        3 => crate::cuts::MemoryType::AllVertices,
+        _ => unreachable!(),
+    };
+    let memory_type = match params.memory_type {
+        1 => 1,
+        3 => 2,
+        _ => 0,
+    };
+    let max_rank = params.max_num_rows;
+    let graph_ids = config.graphs.iter().map(|graph| graph.id).collect();
+    let refs: Vec<_> = config.graphs.iter().collect();
+    let separator = crate::cuts::IncidenceCutSeparator::new(params, &refs)?;
+    Ok((
+        IncidenceRankOneState {
+            separator,
+            active: vec![],
+            graph_ids,
+            memory_type,
+            max_rank,
+        },
+        resolved,
+    ))
 }
 
 /// Install or refresh the separation state of a node before its solve.
@@ -493,8 +690,22 @@ pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -
                 "several pricing networks do not support route recourse or negative graph IDs",
             ));
         }
+        let explicit = if let Some(config) = &separation.rank_one_incidence {
+            if separation.capacity.is_some()
+                || separation.kpath.is_some()
+                || separation.general_kpath.is_some()
+                || separation.knapsack.is_some()
+                || separation.route_recourse.is_some()
+                || separation.relaxation_improvement_priority > 0.
+            {
+                return Err(invalid("explicit rank-one incidence cannot be combined with other automatic separators"));
+            }
+            Some(prepare_incidence_rank_one(state, config)?)
+        } else {
+            None
+        };
         let mut network_customers = vec![];
-        if separation.is_active() {
+        if separation.is_active() && explicit.is_none() {
             let mut shared_rows = None;
             for oracle in &state.oracles {
                 let pairs =
@@ -510,6 +721,18 @@ pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -
                     ));
                 }
                 network_customers.push(pairs.into_iter().map(|(_, v)| v).collect());
+            }
+            if (separation.rank_one.enabled
+                || separation.capacity.is_some()
+                || separation.kpath.is_some())
+                && partition_rows_have_other_contributions(
+                    state,
+                    shared_rows.as_deref().unwrap_or(&[]),
+                )
+            {
+                return Err(invalid(
+                    "cut separation requires covered rows without non-vertex contributions",
+                ));
             }
         } else {
             network_customers = state.oracles.iter().map(|_| vec![]).collect();
@@ -530,6 +753,13 @@ pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -
                 map
             })
             .collect();
+        if let Some((incidence, _)) = &explicit {
+            for oracle in &mut state.oracles {
+                oracle
+                    .solver
+                    .set_option("BALDESrankOneCutsMaxNumRows", incidence.max_rank as f64)?;
+            }
+        }
         let pricing_graphs: Vec<_> = state
             .oracles
             .iter()
@@ -656,9 +886,16 @@ pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -
         } else {
             None
         };
+        let (incidence_rank_one, resolved_memory_type) = match explicit {
+            Some((state, memory)) => (Some(state), Some(memory)),
+            None => (None, None),
+        };
+        let mut rank_one_options = separation.rank_one.clone();
+        rank_one_options.enabled |= incidence_rank_one.is_some();
         state.cuts = Some(CutState {
-            options: separation.rank_one.clone(),
-            resolved_memory_type: None,
+            options: rank_one_options,
+            incidence_rank_one,
+            resolved_memory_type,
             stopped_by_tailing_off: false,
             lead_maps,
             network_customers,
@@ -1205,6 +1442,75 @@ impl<const D: usize> Round<'_, D> {
         fractional: &[FractionalColumn],
     ) -> Result<(usize, bool)> {
         let before = self.state.oracles[0].solver.cuts.cuts.len();
+        if let Some(incidence) = &mut self.cuts.incidence_rank_one {
+            use crate::cuts::separation::{Input, Solution};
+            let solver = &mut self.state.oracles[0].solver;
+            let default_graph = solver.graph.graph_id.max(0);
+            let solutions: Vec<_> = fractional
+                .iter()
+                .map(|column| {
+                    Ok(Solution {
+                        graph_id: if column.graph_id < 0 {
+                            default_graph
+                        } else {
+                            column.graph_id
+                        },
+                        enumerated: column.enumerated,
+                        arc_ids: column
+                            .arc_ids
+                            .clone()
+                            .ok_or_else(|| invalid("explicit rank-one column arcs"))?,
+                    })
+                })
+                .collect::<Result<_>>()?;
+            let mut active = vec![];
+            if incidence.memory_type == 1 {
+                for (index, descriptor) in &incidence.active {
+                    if solver.cuts.retired.contains(index) {
+                        continue;
+                    }
+                    let Some(cut) = solver.cuts.cuts.get(*index) else {
+                        continue;
+                    };
+                    let mut descriptor = descriptor.clone();
+                    descriptor.memory.clear();
+                    for &graph in &incidence.graph_ids {
+                        if let Some(memory) = cut.arc_memory_for_graph_ref(graph) {
+                            descriptor.memory.insert(graph, memory.clone());
+                        }
+                    }
+                    active.push(descriptor);
+                }
+            }
+            let input = Input {
+                solutions: solutions.iter().collect(),
+                values: fractional.iter().map(|column| column.value).collect(),
+                cut_memory_type: incidence.memory_type,
+                solutions_are_set_sequences: false,
+                separation_phase: solver.cuts.separation_phase.clamp(1, incidence.max_rank),
+                active_cuts: active,
+            };
+            let added = incidence
+                .separator
+                .separate_and_register(&mut solver.cuts, &input)?;
+            solver.cuts.separation_phase = incidence.separator.current_phase();
+            incidence.active.extend(added);
+            let count = solver.cuts.cuts.len() - before;
+            let changed = self.install_registry_cuts(
+                master,
+                rows,
+                before,
+                |registry, index| {
+                    if registry.is_covering(index) {
+                        RowSense::GreaterEqual
+                    } else {
+                        RowSense::LessEqual
+                    }
+                },
+                false,
+            )?;
+            return Ok((count, changed));
+        }
         let (first, rest) = self.state.oracles.split_at_mut(1);
         let solver = &mut first[0].solver;
         let mut graphs = vec![(&solver.graph, self.cuts.network_customers[0].as_slice())];
@@ -1777,6 +2083,7 @@ impl<const D: usize> Round<'_, D> {
             if self.values[column] > 1e-9 {
                 fractional.push(FractionalColumn {
                     vertices: interior(self.route(tag)),
+                    arc_ids: Some(self.route(tag).arcs.clone()),
                     value: self.values[column],
                     graph_id: self.graph_id(self.state.routes[tag].network),
                     enumerated: self
@@ -1788,6 +2095,7 @@ impl<const D: usize> Round<'_, D> {
         for fixed in &self.state.fixed_routes {
             fractional.push(FractionalColumn {
                 vertices: interior(&fixed.route.route),
+                arc_ids: Some(fixed.route.route.arcs.clone()),
                 value: fixed.quantity,
                 graph_id: self.graph_id(fixed.route.network),
                 enumerated: true,

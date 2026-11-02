@@ -38,6 +38,7 @@ fn enumeration_keeps_routes_with_same_support_and_distinct_cut_denominators() {
                 arc_memory: BTreeSet::new(),
                 graph_arc_memories: BTreeMap::new(),
                 arc_weights: BTreeMap::new(),
+                graph_arc_weights: Default::default(),
                 visit_once: false,
                 type2: false,
                 denominator,
@@ -978,6 +979,7 @@ fn enumeration_reprices_current_arc_and_strong_k_path_duals() {
             arc_memory: BTreeSet::new(),
             graph_arc_memories: BTreeMap::new(),
             arc_weights: BTreeMap::new(),
+            graph_arc_weights: Default::default(),
             visit_once: false,
             type2: false,
             denominator: 3,
@@ -1205,12 +1207,14 @@ fn kpath_memory_ignores_enumerated_columns() {
             .separate_fractional(&[
                 FractionalColumn {
                     vertices: vec![1, 3, 2],
+                    arc_ids: None,
                     value: 0.5,
                     graph_id: 0,
                     enumerated,
                 },
                 FractionalColumn {
                     vertices: vec![3],
+                    arc_ids: None,
                     value: 1.,
                     graph_id: 0,
                     enumerated: false,

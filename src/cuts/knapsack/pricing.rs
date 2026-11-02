@@ -182,7 +182,7 @@ impl KnapsackPricing {
             for (&load, &coefficient) in &cut.cut.coefficients {
                 let value = steps.range(..=load).next_back().map_or(0., |(_, &v)| v);
                 steps.entry(load).or_insert(value);
-                let delta = (coefficient - previous) as f64 * dual;
+                let delta = (coefficient as f64 - previous as f64) * dual;
                 for (_, cost) in steps.range_mut(load..) {
                     *cost += delta;
                 }

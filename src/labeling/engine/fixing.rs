@@ -1,6 +1,20 @@
 use super::*;
 
 impl<const D: usize> LabelingEngine<D> {
+    /// Fixing considers the complete bucket graph independently of the
+    /// current pricing phase, including the waiting represented by a jump.
+    pub(super) fn extend_for_fixing(
+        &self,
+        g: &Graph<D>,
+        forward: bool,
+        arc: &BucketArc,
+        from: LabelRef<'_, D>,
+    ) -> Option<StoredLabel<D>> {
+        let mut context = self.ctx();
+        context.phase.jump_arcs = true;
+        context.extend(g, forward, arc, from)
+    }
+
     /// A directional deletion is not physical path loss: a suffix in the
     /// opposite direction can still participate in a complete join. Jump arcs
     /// are rebuilt from surviving normal occurrences after publication.
@@ -155,9 +169,6 @@ impl<const D: usize> LabelingEngine<D> {
                         .arcs
                         .as_slice();
                     for arc in arcs {
-                        if arc.jump.is_some() {
-                            continue;
-                        }
                         let physical = &g.arcs[arc.physical];
                         if physical.reduced_cost >= NO_ROUTE_COST {
                             continue;
@@ -179,22 +190,28 @@ impl<const D: usize> LabelingEngine<D> {
                             // predecessor buckets, even without active labels.
                             let inherited =
                                 cache.initialize(&self.grid, true, source, physical.id, target);
-                            let useful = !inherited.is_empty()
-                                || self.forward.buckets[source.vertex][source.bucket]
-                                    .active
-                                    .iter()
-                                    .any(|&id| {
-                                        self.extend(g, true, arc, self.forward.labels.view(id))
+                            let useful =
+                                !inherited.is_empty()
+                                    || self.forward.buckets[source.vertex][source.bucket]
+                                        .active
+                                        .iter()
+                                        .any(|&id| {
+                                            self.extend_for_fixing(
+                                                g,
+                                                true,
+                                                arc,
+                                                self.forward.labels.view(id),
+                                            )
                                             .is_some_and(|label| {
                                                 self.ctx().terminal_cost(g, true, &label)
                                                     < threshold
                                             })
-                                    });
+                                        });
                             cache.associations.insert(
                                 (source, physical.id),
                                 if useful { vec![0] } else { vec![] },
                             );
-                            if !useful {
+                            if !useful && arc.jump.is_none() {
                                 removed.insert(arc.id);
                             }
                             continue;
@@ -221,7 +238,9 @@ impl<const D: usize> LabelingEngine<D> {
                             .map_err(|()| incomplete("fixing bucket index overflow"))?
                             .flatten();
                         let Some(arrival) = arrival else {
-                            removed.insert(arc.id);
+                            if arc.jump.is_none() {
+                                removed.insert(arc.id);
+                            }
                             continue;
                         };
                         let mut extended = vec![];
@@ -229,9 +248,12 @@ impl<const D: usize> LabelingEngine<D> {
                         for &id in
                             &self.storage(forward).buckets[source.vertex][source.bucket].active
                         {
-                            if let Some(l) =
-                                self.extend(g, forward, arc, self.storage(forward).labels.view(id))
-                            {
+                            if let Some(l) = self.extend_for_fixing(
+                                g,
+                                forward,
+                                arc,
+                                self.storage(forward).labels.view(id),
+                            ) {
                                 // An actual complete extension is independent
                                 // of the literal opposite-root key screen. Keep
                                 // this witness even when a completion gate rejects
@@ -410,7 +432,9 @@ impl<const D: usize> LabelingEngine<D> {
                         }
                         let eliminate = !contains(&self.grid, &frontier, target, arrival);
                         cache.associations.insert((source, physical.id), frontier);
-                        if eliminate {
+                        // Jump arcs are regenerated from ordinary survivors;
+                        // their frontier still informs successor buckets.
+                        if eliminate && arc.jump.is_none() {
                             removed.insert(arc.id);
                         }
                     }

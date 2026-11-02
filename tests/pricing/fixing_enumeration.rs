@@ -1,3 +1,7 @@
+mod covering_fixing_parity;
+mod cut_active_enumeration;
+mod window_parity;
+
 use baldes::enumeration::{Controls, Enumeration};
 use baldes::pricing::Solver;
 
@@ -362,4 +366,159 @@ fn incomplete_retained_universe_never_closes_pricing_or_inspection() {
         assert_eq!(complete.len(), 2);
         assert!(solver.enumeration.as_ref().unwrap().completed);
     }
+}
+
+fn check_reference_enumeration(input: &str, resources: usize) {
+    let mut lines = input.lines();
+    let header: Vec<_> = lines.next().unwrap().split_whitespace().collect();
+    let vertices: usize = header[0].parse().unwrap();
+    let arcs: usize = header[1].parse().unwrap();
+    let cutoff: f64 = header[2].parse().unwrap();
+    let mut solver = Solver::<2>::new(vertices, resources).unwrap();
+    solver.graph.vertices[0].elements.clear();
+    solver.graph.vertices[vertices - 1].elements.clear();
+    for vertex in 0..vertices {
+        solver.graph.set_bounds(vertex, 0, 0., 2.).unwrap();
+        if resources == 2 {
+            solver.graph.set_bounds(vertex, 1, 0., 1.).unwrap();
+        }
+    }
+    for _ in 0..arcs {
+        let fields: Vec<_> = lines.next().unwrap().split_whitespace().collect();
+        let id = solver
+            .graph
+            .add_arc(
+                fields[0].parse().unwrap(),
+                fields[1].parse().unwrap(),
+                fields[2].parse().unwrap(),
+            )
+            .unwrap();
+        let arc = solver.graph.arc_mut(id).unwrap();
+        arc.reduced_cost = fields[3].parse().unwrap();
+        for resource in 0..resources {
+            arc.consumption[resource] = fields[4 + resource].parse().unwrap();
+        }
+    }
+    solver.bucket_steps[0] = 1.;
+    let mut actual: Vec<Vec<usize>> = solver
+        .enumerate(cutoff)
+        .unwrap()
+        .iter()
+        .map(|route| route.arcs.iter().map(|&arc| arc as usize).collect())
+        .collect();
+    let mut expected: Vec<Vec<usize>> = lines
+        .map(|line| {
+            line.split_whitespace()
+                .map(|arc| arc.parse().unwrap())
+                .collect()
+        })
+        .collect();
+    assert_eq!(actual, expected, "captured path export order");
+    actual.sort();
+    expected.sort();
+    assert_eq!(expected.len(), 20);
+    assert_eq!(actual, expected);
+    if resources == 2 {
+        // This route is below the cost cutoff but violates the second resource.
+        let excluded = [0, 2, 9];
+        assert!(
+            excluded
+                .iter()
+                .map(|&i| solver.graph.arcs[i].reduced_cost)
+                .sum::<f64>()
+                < cutoff
+        );
+        assert!(
+            excluded
+                .iter()
+                .map(|&i| solver.graph.arcs[i].consumption[1])
+                .sum::<f64>()
+                > 1.
+        );
+        assert!(!actual.iter().any(|path| path == &excluded));
+    }
+}
+
+#[test]
+fn standard_enumeration_matches_captured_reference_paths() {
+    // Captured from standard-resource enumeration on a seven-customer model.
+    check_reference_enumeration(
+        include_str!("../fixtures/enumeration/standard-reference-capture.txt"),
+        1,
+    );
+}
+
+#[test]
+fn two_resource_enumeration_matches_captured_reference_paths() {
+    // The second resource removes a route that passes the cost cutoff.
+    check_reference_enumeration(
+        include_str!("../fixtures/enumeration/standard-two-resource-reference-capture.txt"),
+        2,
+    );
+}
+
+#[test]
+fn retained_standard_paths_match_captured_repricing_bits() {
+    use std::collections::BTreeMap;
+    use std::str::FromStr;
+
+    fn take<T: FromStr>(input: &mut std::str::SplitWhitespace<'_>) -> T {
+        input.next().unwrap().parse().ok().unwrap()
+    }
+
+    let mut input =
+        include_str!("../fixtures/enumeration/standard-repricing-reference-capture.txt")
+            .split_whitespace();
+    let vertices: usize = take(&mut input);
+    let arc_count: usize = take(&mut input);
+    let cutoff: f64 = take(&mut input);
+    let path_count: usize = take(&mut input);
+    let cases: usize = take(&mut input);
+    let mut solver = Solver::<2>::new(vertices, 1).unwrap();
+    solver.graph.vertices[0].elements.clear();
+    solver.graph.vertices[vertices - 1].elements.clear();
+    for vertex in 0..vertices {
+        solver.graph.set_bounds(vertex, 0, 0., 2.).unwrap();
+    }
+    for _ in 0..arc_count {
+        let tail = take(&mut input);
+        let head = take(&mut input);
+        let cost = take(&mut input);
+        let reduced_cost = take(&mut input);
+        let consumption = take(&mut input);
+        let id = solver.graph.add_arc(tail, head, cost).unwrap();
+        let arc = solver.graph.arc_mut(id).unwrap();
+        arc.reduced_cost = reduced_cost;
+        arc.consumption[0] = consumption;
+    }
+    let paths: Vec<Vec<i32>> = (0..path_count)
+        .map(|_| {
+            let len: usize = take(&mut input);
+            (0..len).map(|_| take(&mut input)).collect()
+        })
+        .collect();
+    solver.bucket_steps[0] = 1.;
+    assert_eq!(solver.enumerate(cutoff).unwrap().len(), path_count);
+    for case in 0..cases {
+        for arc in &mut solver.graph.arcs {
+            arc.reduced_cost = take(&mut input);
+        }
+        let expected: BTreeMap<_, _> = paths
+            .iter()
+            .cloned()
+            .map(|path| (path, take::<u64>(&mut input)))
+            .collect();
+        let retained = &mut solver.enumeration.as_mut().unwrap().paths;
+        retained
+            .inspect(&solver.graph, f64::INFINITY, &[], &[])
+            .unwrap();
+        let actual: BTreeMap<_, _> = retained
+            .routes(&solver.graph)
+            .unwrap()
+            .into_iter()
+            .map(|route| (route.arcs, route.cost.to_bits()))
+            .collect();
+        assert_eq!(actual, expected, "repricing case {case}");
+    }
+    assert_eq!((path_count, cases), (20, 3));
 }

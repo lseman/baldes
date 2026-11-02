@@ -1,6 +1,27 @@
 use super::*;
 
 #[test]
+fn bounded_search_draws_match_reference_distribution_including_rejection() {
+    let mut rng = MinStdRandom::new();
+    // Captured by calling the binary's bounded distribution with state 1.
+    for (range, expected, state) in [
+        (1, 0, 16_807),
+        (2, 0, 282_475_249),
+        (3, 2, 1_622_650_073),
+        (5, 2, 984_943_658),
+        (1_024, 545, 1_144_108_930),
+        (1_073_741_824, 470_211_271, 470_211_272),
+        (1_073_741_824, 101_027_543, 101_027_544),
+        (1_073_741_824, 823_564_439, 823_564_440),
+        (7, 3, 1_115_438_165),
+        (31, 25, 1_784_484_492),
+    ] {
+        assert_eq!(rng.uniform_below(range), expected);
+        assert_eq!(rng.state, state);
+    }
+}
+
+#[test]
 fn sparse_state_support_tracks_changed_rows_across_zero_multipliers() {
     let columns: Vec<_> = (0..129)
         .map(|i| {
@@ -177,4 +198,132 @@ fn randomized_row_sets_are_reproducible_with_independent_searches() {
     }
     check::<false>();
     check::<true>();
+}
+
+#[test]
+fn packing_search_starts_match_captured_reference_binary() {
+    let counts = [
+        [1, 0, 0, 1, 0],
+        [0, 1, 0, 0, 1],
+        [0, 1, 1, 0, 0],
+        [0, 0, 1, 0, 1],
+    ];
+    let values = [1.0, 0.5, 0.5, 0.5];
+    let columns: Vec<_> = counts
+        .into_iter()
+        .zip(values)
+        .map(|(counts, value)| ColumnInfo {
+            value,
+            elementary: true,
+            packing_set_count: counts.into(),
+            ..Default::default()
+        })
+        .collect();
+    let parent = Separation {
+        num_packing_sets: 5,
+        ..Default::default()
+    };
+    let mut search = LocalSearch::<false>::new(&parent, &columns, &[0, 1, 2, 3]);
+    let expected = [
+        ([0, 1, 4, 2], 984943658),
+        ([2, 0, 1, 4], 1457850878),
+        ([3, 4, 1, 2], 1115438165),
+        ([4, 0, 1, 3], 1137522503),
+        ([3, 0, 2, 1], 143542612),
+        ([2, 3, 1, 4], 1998097157),
+        ([4, 2, 0, 3], 1404280278),
+        ([2, 3, 4, 1], 1636807826),
+        ([1, 0, 4, 2], 704877633),
+        ([3, 4, 2, 0], 784558821),
+        ([1, 4, 3, 2], 1617819336),
+        ([3, 0, 2, 4], 1899894091),
+        ([1, 2, 4, 0], 1025921153),
+        ([1, 2, 3, 0], 357571490),
+        ([2, 4, 3, 0], 130060903),
+        ([4, 2, 1, 0], 685118024),
+        ([4, 1, 0, 2], 194847408),
+        ([4, 0, 2, 1], 824938981),
+        ([1, 4, 2, 0], 997389814),
+        ([4, 0, 3, 2], 1654001669),
+    ];
+    for (rows, state) in expected {
+        let mut actual = Vec::new();
+        search.build_packing_row_set(&parent, &columns, &mut actual, &[2, 1, 1, 1], 3, 0.5);
+        assert_eq!(actual, rows);
+        assert_eq!(search.rng.state, state);
+    }
+}
+
+#[test]
+fn covering_search_starts_match_captured_reference_binary() {
+    let counts = [
+        [1, 0, 0, 1, 0],
+        [0, 1, 0, 0, 1],
+        [0, 1, 1, 0, 0],
+        [0, 0, 1, 0, 1],
+    ];
+    let values = [1.0, 0.5, 0.5, 0.5];
+    let columns: Vec<_> = counts
+        .into_iter()
+        .zip(values)
+        .map(|(counts, value)| ColumnInfo {
+            value,
+            elementary: true,
+            covering_set_count: counts.into(),
+            ..Default::default()
+        })
+        .collect();
+    let parent = Separation {
+        num_covering_sets: 5,
+        ..Default::default()
+    };
+    let mut search = LocalSearch::<true>::new(&parent, &columns, &[0, 1, 2, 3]);
+    let expected = [
+        [3, 2, 4, 1],
+        [3, 2, 1, 0],
+        [4, 3, 1, 2],
+        [0, 2, 4, 1],
+        [0, 1, 2, 3],
+        [1, 0, 4, 3],
+        [2, 0, 1, 4],
+        [2, 3, 4, 0],
+        [2, 0, 4, 3],
+        [3, 2, 4, 0],
+        [4, 3, 2, 1],
+        [4, 3, 1, 0],
+        [0, 1, 4, 2],
+        [1, 0, 2, 4],
+        [2, 0, 1, 4],
+        [0, 1, 2, 4],
+        [1, 3, 2, 4],
+        [3, 4, 1, 2],
+        [2, 3, 1, 4],
+        [4, 0, 2, 1],
+    ];
+    for rows in expected {
+        let mut actual = Vec::new();
+        search.build_covering_row_set(&columns, &mut actual, &[1, 1, 1, 1], 0.5);
+        assert_eq!(actual, rows);
+    }
+}
+
+#[test]
+fn covering_random_stream_continues_across_search_rounds() {
+    let mut parent = Separation {
+        num_covering_sets: 5,
+        ..Default::default()
+    };
+    parent.params.ls_num_iterations = 1;
+    let columns = vec![ColumnInfo {
+        value: 0.5,
+        covering_set_count: vec![1; 5],
+        ..Default::default()
+    }];
+    let mut first = LocalSearch::<true>::new(&parent, &columns, &[0]);
+    let mut cuts = CandidateSet::new();
+    first.run(&mut parent, &columns, &mut cuts, 4, 2.0, &[1; 4], -3, 0);
+    let mut continued = first.covering_rng.clone();
+    let mut next = LocalSearch::<true>::new(&parent, &columns, &[0]);
+    assert_eq!(next.covering_rng.next(), continued.next());
+    assert_ne!(next.covering_rng.next(), GnuRand::new(1).next());
 }

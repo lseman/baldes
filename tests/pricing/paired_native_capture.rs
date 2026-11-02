@@ -648,6 +648,7 @@ fn paired_fixing_preserves_enumeration_with_presence_and_branching() {
     use baldes::pricing::restrictions::RyanFosterConstraint;
 
     let mut eliminated = 0;
+    let mut regenerated_jumps = 0;
     for together in [false, true] {
         for presence in [false, true] {
             for cutoff in [-1., 0., 1., 2.] {
@@ -699,6 +700,17 @@ fn paired_fixing_preserves_enumeration_with_presence_and_branching() {
                 let expected = baseline.enumerate(cutoff).unwrap();
                 let report = fixed.fix(cutoff).unwrap();
                 eliminated += report.eliminated_forward + report.eliminated_backward;
+                let engine = fixed.engine.as_ref().unwrap();
+                let jumps = [&engine.grid.forward, &engine.grid.backward]
+                    .into_iter()
+                    .flat_map(|direction| direction.buckets.iter().flatten())
+                    .flat_map(|bucket| &bucket.arcs)
+                    .filter(|arc| arc.jump.is_some())
+                    .count();
+                if jumps != 0 {
+                    regenerated_jumps += jumps;
+                    fixed.fix(cutoff).unwrap();
+                }
                 let actual = fixed.enumerate(cutoff).unwrap();
                 let paths = |routes: Vec<baldes::Route>| {
                     let mut paths: Vec<_> = routes.into_iter().map(|route| route.arcs).collect();
@@ -714,6 +726,7 @@ fn paired_fixing_preserves_enumeration_with_presence_and_branching() {
         }
     }
     assert!(eliminated > 0);
+    assert!(regenerated_jumps > 0);
 }
 
 #[test]
@@ -1074,3 +1087,241 @@ mod paired_standard_matrix;
 
 #[path = "paired_signed_affine_capture.rs"]
 mod paired_signed_affine_capture;
+
+#[cfg(feature = "clp")]
+#[test]
+fn custom_enumeration_registered_capture_preserves_both_orientations() {
+    let captured: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/coupled/custom_enumeration_native.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        captured["reference_sha256"],
+        "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6"
+    );
+    let costs = captured["physical_arc_costs"].as_array().unwrap();
+    let mut solver = baldes::pricing::Solver::<2>::new(7, 1).unwrap();
+    solver.graph.vertices[0].elements.clear();
+    solver.graph.vertices[6].elements.clear();
+    for vertex in 0..7 {
+        solver.graph.set_bounds(vertex, 0, 0., 2.).unwrap();
+    }
+    for customer in 1..=5 {
+        let mut edges = vec![(0, customer), (customer, 6)];
+        edges.extend(
+            (1..=5)
+                .filter(|&other| other != customer)
+                .map(|other| (customer, other)),
+        );
+        for (tail, head) in edges {
+            let id = solver
+                .graph
+                .add_arc(tail, head, if tail == 0 { 1. } else { 0. })
+                .unwrap();
+            let arc = solver.graph.arc_mut(id).unwrap();
+            arc.reduced_cost = costs[id as usize].as_f64().unwrap();
+            arc.consumption[0] = if head == 6 { 0. } else { 1. };
+        }
+    }
+    solver
+        .graph
+        .set_coupled_resources(&[CoupledResource::CustomResource {
+            increments: vec![0.25; 30],
+            weights: vec![0.125; 30],
+            forward_bound: None,
+            backward_bound: None,
+        }])
+        .unwrap();
+    solver.bucket_steps[0] = 1.;
+    let routes = solver
+        .enumerate(captured["cutoff"].as_f64().unwrap())
+        .unwrap();
+    let mut actual: Vec<Vec<i32>> = routes.iter().map(|r| r.arcs.clone()).collect();
+    actual.sort();
+    let mut expected: Vec<Vec<i32>> = captured["paths"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| {
+            row["arcs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|arc| arc.as_i64().unwrap() as i32)
+                .collect()
+        })
+        .collect();
+    expected.sort();
+    // The reference retains one orientation per customer pair. BALDES keeps
+    // both because custom states do not establish path coalescing safety.
+    assert_eq!(actual.len(), 20);
+    assert_eq!(expected.len(), 10);
+    assert!(expected
+        .iter()
+        .all(|path| actual.binary_search(path).is_ok()));
+    let sets = |paths: &[Vec<i32>]| {
+        let mut sets: Vec<Vec<usize>> = paths
+            .iter()
+            .map(|path| {
+                let mut vertices: Vec<_> = path
+                    .iter()
+                    .map(|id| solver.graph.arcs[*id as usize].head)
+                    .filter(|&head| head != 6)
+                    .collect();
+                vertices.sort_unstable();
+                vertices
+            })
+            .collect();
+        sets.sort();
+        sets.dedup();
+        sets
+    };
+    assert_eq!(sets(&actual), sets(&expected));
+    for route in routes {
+        assert_eq!(
+            solver
+                .record_enumerated_custom_machine_path(&route.arcs)
+                .unwrap(),
+            Some(0.1875)
+        );
+        assert_eq!(route.cost, 0.);
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn paired_front_dependent_knapsack_cut_reports_missing_resource_mapping() {
+    use baldes::cuts::knapsack::{KnapsackKind, ResourceKnapsackCut, RouteLoadKnapsackCut};
+    use std::collections::BTreeMap;
+
+    let mut solver = baldes::pricing::Solver::<2>::new(4, 1).unwrap();
+    solver.graph.graph_id = 7;
+    solver.graph.vertices[0].elements.clear();
+    solver.graph.vertices[3].elements.clear();
+    for vertex in 0..4 {
+        solver.graph.set_bounds(vertex, 0, 0., 2.5).unwrap();
+    }
+    for (tail, head, consumption) in [(0, 1, 1.), (1, 2, 1.), (2, 3, 0.)] {
+        let id = solver.graph.add_arc(tail, head, -1.).unwrap();
+        solver.graph.arc_mut(id).unwrap().consumption[0] = consumption;
+    }
+    install_capture_front(&mut solver.graph, 1.);
+    let baseline = solver.price_phase(0, 10, false).unwrap();
+    assert!(!baseline.columns.is_empty());
+    solver.cuts.knapsack_cuts.push(ResourceKnapsackCut {
+        id: 0,
+        row: 0,
+        cut_class: 0,
+        graph_resources: BTreeMap::from([(7, (1, 1.))]),
+        cut: RouteLoadKnapsackCut {
+            kind: KnapsackKind::Rounding,
+            numerator: 1,
+            denominator: 3,
+            rhs: 4,
+            lhs: 0.,
+            violation: 0.,
+            thresholds: vec![],
+            coefficients: BTreeMap::from([(0, 0), (3, 1), (6, 2), (9, 3), (12, 4)]),
+        },
+        dual: -2.,
+    });
+    solver.knapsack_exact_coefficients = true;
+    let error = solver.price_phase(0, 10, false).unwrap_err();
+    assert!(
+        format!("{error:?}").contains("exact knapsack resource mapping"),
+        "{error:?}"
+    );
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn paired_front_scalar_knapsack_charges_the_master_coefficient() {
+    use baldes::cuts::knapsack::{KnapsackKind, ResourceKnapsackCut, RouteLoadKnapsackCut};
+    use std::collections::BTreeMap;
+
+    // Native paired-plus-scalar calls retained the same bound and paths when
+    // the captured cut price was zeroed. Here we verify the distinct Rust
+    // coefficient-consistent behavior on a single paired route.
+    let native = include_str!("../fixtures/coupled/paired_scalar_knapsack_native.txt");
+    assert_eq!(native.lines().count(), 3);
+    assert!(native.lines().all(|line| line.starts_with("2.0 -2.0 ")));
+    assert_eq!(
+        include_str!("../fixtures/coupled/paired_scalar_knapsack_inspection_native.txt"),
+        "2.0 -2.0 18\n"
+    );
+    let mut solver = baldes::pricing::Solver::<2>::new(4, 2).unwrap();
+    solver.graph.graph_id = 7;
+    solver.graph.vertices[0].elements.clear();
+    solver.graph.vertices[3].elements.clear();
+    for vertex in 0..4 {
+        for resource in 0..2 {
+            solver.graph.set_bounds(vertex, resource, 0., 2.5).unwrap();
+        }
+    }
+    for (tail, head, consumption) in [(0, 1, 1.), (1, 2, 1.), (2, 3, 0.)] {
+        let id = solver.graph.add_arc(tail, head, -2.).unwrap();
+        solver.graph.arc_mut(id).unwrap().consumption[0] = consumption;
+        solver.graph.arc_mut(id).unwrap().consumption[1] = consumption;
+    }
+    install_capture_front(&mut solver.graph, 1.);
+    solver.knapsack_resource_indices = BTreeMap::from([(2, 1)]);
+    solver.knapsack_exact_coefficients = true;
+    solver.cuts.knapsack_cuts.push(ResourceKnapsackCut {
+        id: 0,
+        row: 0,
+        cut_class: 0,
+        graph_resources: BTreeMap::from([(7, (2, 1.))]),
+        cut: RouteLoadKnapsackCut {
+            kind: KnapsackKind::Rounding,
+            numerator: 1,
+            denominator: 2,
+            rhs: 4,
+            lhs: 0.,
+            violation: 0.,
+            thresholds: vec![],
+            coefficients: BTreeMap::from([(0, 0), (2, 1), (4, 2), (6, 3), (8, 4)]),
+        },
+        dual: 0.,
+    });
+    let without_price = solver.price_phase(0, 10, false).unwrap();
+    solver.cuts.knapsack_cuts[0].dual = -2.;
+    let with_price = solver.price_phase(0, 10, false).unwrap();
+    let before = without_price
+        .columns
+        .iter()
+        .find(|route| route.arcs == [0, 1, 2])
+        .unwrap();
+    let after = with_price
+        .columns
+        .iter()
+        .find(|route| route.arcs == [0, 1, 2])
+        .unwrap();
+    assert_eq!(after.resources[1], 2.);
+    assert_eq!(
+        solver.knapsack_coefficient(&solver.cuts.knapsack_cuts[0], &after.resources),
+        1
+    );
+    assert_eq!(after.cost - before.cost, 2.);
+
+    // Reprice the retained universe after the cut price changes. The native
+    // capture reaches inspection with price 2 but does not change its output
+    // when that price is zeroed.
+    solver.cuts.knapsack_cuts[0].dual = 0.;
+    solver.price_phase(0, 10, false).unwrap();
+    let retained = solver.enumerate(0.).unwrap();
+    assert!(retained.iter().any(|route| route.arcs == [0, 1, 2]));
+    let without_price = solver.price_phase(0, 10, false).unwrap();
+    solver.cuts.knapsack_cuts[0].dual = -2.;
+    let with_price = solver.price_phase(0, 10, false).unwrap();
+    let before = without_price
+        .columns
+        .iter()
+        .find(|route| route.arcs == [0, 1, 2])
+        .unwrap();
+    let after = with_price
+        .columns
+        .iter()
+        .find(|route| route.arcs == [0, 1, 2])
+        .unwrap();
+    assert_eq!(after.cost - before.cost, 2.);
+}

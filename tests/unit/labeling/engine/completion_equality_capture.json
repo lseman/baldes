@@ -1,0 +1,2021 @@
+{
+  "scope": "Native one-disposable one-equality owner; controlled one-bucket labels",
+  "cases": [
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.499998,
+        0.24999999999999997
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.499998,
+        0.24999999999999997
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.499998,
+        0.24999999999999997
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.499998,
+        0.24999999999999997
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.499998,
+        0.25
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.499998,
+        0.25
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.499998,
+        0.25
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.499998,
+        0.25
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.499998,
+        0.25000000000000006
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.499998,
+        0.25000000000000006
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.499998,
+        0.25000000000000006
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.499998,
+        0.25000000000000006
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.5,
+        0.24999999999999997
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.5,
+        0.24999999999999997
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.5,
+        0.24999999999999997
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.5,
+        0.24999999999999997
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.5,
+        0.25
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.5,
+        0.25
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.5,
+        0.25
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.5,
+        0.25
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.5,
+        0.25000000000000006
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.5,
+        0.25000000000000006
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.5,
+        0.25000000000000006
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.5,
+        0.25000000000000006
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.500002,
+        0.24999999999999997
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.500002,
+        0.24999999999999997
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.500002,
+        0.24999999999999997
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.500002,
+        0.24999999999999997
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.500002,
+        0.25
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.500002,
+        0.25
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.500002,
+        0.25
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.500002,
+        0.25
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.500002,
+        0.25000000000000006
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.500002,
+        0.25000000000000006
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.500002,
+        0.25000000000000006
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.25
+      ],
+      "backward": [
+        0.500002,
+        0.25000000000000006
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.499998,
+        0.7499999999999999
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.499998,
+        0.7499999999999999
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.499998,
+        0.7499999999999999
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.499998,
+        0.7499999999999999
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.499998,
+        0.75
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.499998,
+        0.75
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.499998,
+        0.75
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.499998,
+        0.75
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.499998,
+        0.7500000000000001
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.499998,
+        0.7500000000000001
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.499998,
+        0.7500000000000001
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.499998,
+        0.7500000000000001
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.5,
+        0.7499999999999999
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.5,
+        0.7499999999999999
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.5,
+        0.7499999999999999
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.5,
+        0.7499999999999999
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.5,
+        0.75
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.5,
+        0.75
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.5,
+        0.75
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.5,
+        0.75
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.5,
+        0.7500000000000001
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.5,
+        0.7500000000000001
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.5,
+        0.7500000000000001
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.5,
+        0.7500000000000001
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.500002,
+        0.7499999999999999
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.500002,
+        0.7499999999999999
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.500002,
+        0.7499999999999999
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.500002,
+        0.7499999999999999
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.500002,
+        0.75
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.500002,
+        0.75
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.500002,
+        0.75
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.500002,
+        0.75
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.500002,
+        0.7500000000000001
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.500002,
+        0.7500000000000001
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.500002,
+        0.7500000000000001
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        0.5,
+        0.75
+      ],
+      "backward": [
+        0.500002,
+        0.7500000000000001
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.499998,
+        0.24999999999999997
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.499998,
+        0.24999999999999997
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.499998,
+        0.24999999999999997
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.499998,
+        0.24999999999999997
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.499998,
+        0.25
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.499998,
+        0.25
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.499998,
+        0.25
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.499998,
+        0.25
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.499998,
+        0.25000000000000006
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.499998,
+        0.25000000000000006
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.499998,
+        0.25000000000000006
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.499998,
+        0.25000000000000006
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.5,
+        0.24999999999999997
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.5,
+        0.24999999999999997
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.5,
+        0.24999999999999997
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.5,
+        0.24999999999999997
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.5,
+        0.25
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.5,
+        0.25
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.5,
+        0.25
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.5,
+        0.25
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.5,
+        0.25000000000000006
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.5,
+        0.25000000000000006
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.5,
+        0.25000000000000006
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.5,
+        0.25000000000000006
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.500002,
+        0.24999999999999997
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.500002,
+        0.24999999999999997
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.500002,
+        0.24999999999999997
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.500002,
+        0.24999999999999997
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.500002,
+        0.25
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.500002,
+        0.25
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.500002,
+        0.25
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.500002,
+        0.25
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.500002,
+        0.25000000000000006
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.500002,
+        0.25000000000000006
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.500002,
+        0.25000000000000006
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.25
+      ],
+      "backward": [
+        1.500002,
+        0.25000000000000006
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.499998,
+        0.7499999999999999
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.499998,
+        0.7499999999999999
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.499998,
+        0.7499999999999999
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.499998,
+        0.7499999999999999
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.499998,
+        0.75
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.499998,
+        0.75
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.499998,
+        0.75
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.499998,
+        0.75
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.499998,
+        0.7500000000000001
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.499998,
+        0.7500000000000001
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.499998,
+        0.7500000000000001
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.499998,
+        0.7500000000000001
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.5,
+        0.7499999999999999
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.5,
+        0.7499999999999999
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.5,
+        0.7499999999999999
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.5,
+        0.7499999999999999
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.5,
+        0.75
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.5,
+        0.75
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.5,
+        0.75
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.5,
+        0.75
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.5,
+        0.7500000000000001
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.5,
+        0.7500000000000001
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.5,
+        0.7500000000000001
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.5,
+        0.7500000000000001
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.500002,
+        0.7499999999999999
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.500002,
+        0.7499999999999999
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.500002,
+        0.7499999999999999
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.500002,
+        0.7499999999999999
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.500002,
+        0.75
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.500002,
+        0.75
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.500002,
+        0.75
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.500002,
+        0.75
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.500002,
+        0.7500000000000001
+      ],
+      "overlap": false,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.500002,
+        0.7500000000000001
+      ],
+      "overlap": false,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.500002,
+        0.7500000000000001
+      ],
+      "overlap": true,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "forward": [
+        1.5,
+        0.75
+      ],
+      "backward": [
+        1.500002,
+        0.7500000000000001
+      ],
+      "overlap": true,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    }
+  ]
+}

@@ -198,3 +198,41 @@ fn preserved_identity_index_is_shared_until_membership_changes() {
     assert!(!child.insert(make(vec![0, 1])));
     assert_eq!(child.routes(&graph).unwrap().len(), 2);
 }
+
+#[test]
+fn custom_native_candidate_sequence_coalesces_equal_masks_when_enabled() {
+    // Captured at the native custom-resource insertion entry. Each row stores
+    // its hash partition, unioned element mask, cost and before/after sizes.
+    for preserve in [false, true] {
+        let mut storage = PathStorage::new(1).unwrap();
+        storage.preserve_arc_paths = preserve;
+        for (id, row) in
+            include_str!("../../../fixtures/coupled/custom_enumeration_candidates_native.txt")
+                .lines()
+                .enumerate()
+        {
+            let fields: Vec<_> = row.split_whitespace().collect();
+            let partition: u32 = fields[0].parse().unwrap();
+            let mut visited = [0; 16];
+            visited[0] = fields[1].parse().unwrap();
+            let cost: f64 = fields[2].parse().unwrap();
+            let native_before: usize = fields[3].parse().unwrap();
+            let native_after: usize = fields[4].parse().unwrap();
+            let native_unchanged = fields[5] == "1";
+            let inserted = storage.insert(Path {
+                arcs: vec![id],
+                element_hash: partition,
+                visited,
+                original_cost: cost,
+                reduced_cost: 0.,
+            });
+            if preserve {
+                assert!(inserted, "candidate={id}");
+            } else {
+                assert_eq!(inserted, native_after > native_before, "candidate={id}");
+                assert_eq!(!inserted, native_unchanged, "candidate={id}");
+            }
+        }
+        assert_eq!(storage.len, if preserve { 20 } else { 10 });
+    }
+}

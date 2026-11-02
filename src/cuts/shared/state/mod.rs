@@ -450,9 +450,10 @@ fn build_inputs_with_duals<const D: usize>(
         let covering = cut.class == CutClass::Covering;
         let sign = if covering { -1 } else { 1 };
         let coefficient: Vec<i32> = (0..vertices).map(|v| weights[v] * sign).collect();
-        let arc_coefficient: BTreeMap<i32, i32> = cut
-            .arc_weights
-            .iter()
+        let arc_weights = cut.arc_weights_for_graph(graph);
+        let arc_coefficient: BTreeMap<i32, i32> = arc_weights
+            .into_iter()
+            .flat_map(|weights| weights.iter())
             .map(|(&a, &w)| (a, w * sign))
             .collect();
         limited.push(LimitedInput {
@@ -468,6 +469,8 @@ fn build_inputs_with_duals<const D: usize>(
                 .collect(),
             memory_arcs: cut.arc_memory_for_graph(graph),
         });
+        let ordered_support_was_graph_vertices = ordered_support.is_some()
+            && (!cut.graph_support.is_empty() || !cut.graph_pricing_support.is_empty());
         let mut ordered_support = match ordered_support {
             Some(s) => s.clone(),
             None => {
@@ -476,13 +479,28 @@ fn build_inputs_with_duals<const D: usize>(
                     .map(|v| (v, weights[v]))
                     .collect();
                 s.extend(
-                    cut.arc_weights
-                        .iter()
+                    arc_weights
+                        .into_iter()
+                        .flat_map(|weights| weights.iter())
                         .map(|(&a, &w)| (vertices + a as usize, w)),
                 );
                 s
             }
         };
+        // Graph-specific vertex support contains only vertices. Unlike the
+        // legacy ordered support, it does not already include arc entries.
+        if !cut.graph_arc_weights.is_empty() {
+            // Legacy ordered support may contain arc IDs from another graph.
+            ordered_support.retain(|&(id, _)| id < vertices);
+        }
+        if !cut.graph_arc_weights.is_empty() || ordered_support_was_graph_vertices {
+            ordered_support.extend(
+                arc_weights
+                    .into_iter()
+                    .flat_map(|weights| weights.iter())
+                    .map(|(&a, &w)| (vertices + a as usize, w)),
+            );
+        }
         for entry in &mut ordered_support {
             entry.1 *= sign;
         }

@@ -16,7 +16,12 @@ pub(super) fn normalize<const D: usize>(input: &RankOneCut, g: &Graph<D>) -> Res
             "original-set k-path mapping requires an explicit physical descriptor",
         ));
     }
-    if input.visit_once && (input.memory_kind == MemoryKind::Arc || !input.arc_weights.is_empty()) {
+    if input.visit_once
+        && (input.memory_kind == MemoryKind::Arc
+            || input
+                .arc_weights_for_graph(graph)
+                .is_some_and(|w| !w.is_empty()))
+    {
         return Err(invalid(
             "strong k-path pricing requires vertex memory and support",
         ));
@@ -32,6 +37,11 @@ pub(super) fn normalize<const D: usize>(input: &RankOneCut, g: &Graph<D>) -> Res
         }
     }
     let mut cut = input.clone();
+    cut.arc_weights = input
+        .arc_weights_for_graph(graph)
+        .cloned()
+        .unwrap_or_default();
+    cut.graph_arc_weights.clear();
     cut.weights = (0..n).map(|v| input.weight_for_graph(graph, v)).collect();
     if (0..n).any(|v| cut.weights[v] != input.pricing_weight_for_graph(graph, v)) {
         return Err(invalid("registered row and pricing supports must agree"));

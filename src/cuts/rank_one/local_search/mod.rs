@@ -3,8 +3,38 @@
 use super::separation::{bit, Bits, ColumnInfo, SeparatedCut, Separation};
 use super::subcuts;
 use crate::cuts::shared::rbtree::CandidateSet;
-use crate::rng::Xoroshiro128Plus;
+use crate::rng::GnuRand;
 use std::collections::{BTreeMap, HashSet};
+
+/// Park–Miller generator and libstdc++ bounded-integer sampling.
+#[derive(Clone)]
+struct MinStdRandom {
+    state: u64,
+}
+
+impl MinStdRandom {
+    fn new() -> Self {
+        Self { state: 1 }
+    }
+
+    fn next(&mut self) -> u64 {
+        self.state = self.state * 16_807 % 2_147_483_647;
+        self.state
+    }
+
+    fn uniform_below(&mut self, range: u64) -> u64 {
+        const ENGINE_RANGE: u64 = 2_147_483_645;
+        assert!((1..=ENGINE_RANGE).contains(&range));
+        let scale = ENGINE_RANGE / range;
+        let limit = scale * range;
+        loop {
+            let value = self.next() - 1;
+            if value < limit {
+                return value / scale;
+            }
+        }
+    }
+}
 
 /// Per state (weighted row count), the bitset of columns in that state.
 fn compute_state_bitmap<const COVERING: bool>(
@@ -67,7 +97,8 @@ pub struct LocalSearch<const COVERING: bool> {
     nwords: usize,
     max_count: i32,
     row_max_count: Vec<i32>,
-    rng: Xoroshiro128Plus,
+    rng: MinStdRandom,
+    covering_rng: GnuRand,
 }
 
 mod bitset;

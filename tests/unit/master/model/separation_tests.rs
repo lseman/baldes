@@ -503,6 +503,7 @@ fn changed_rank_one_memory_refreshes_installed_coefficients_in_each_memory_mode(
                     BTreeMap::new()
                 },
                 arc_weights: BTreeMap::new(),
+                graph_arc_weights: Default::default(),
                 visit_once: false,
                 type2: false,
                 denominator: 2,
@@ -574,4 +575,421 @@ fn changed_rank_one_memory_refreshes_installed_coefficients_in_each_memory_mode(
             );
         }
     }
+}
+
+#[test]
+fn partition_rows_reject_extra_sink_or_route_contributions_to_covered_rows() {
+    use crate::master::model::OracleNetwork;
+    let mut problem = rc101_networks(5, 1);
+    let mut network = problem.networks.remove(0);
+    let mut rows = problem.rows;
+    let original: OracleNetwork<_> = network.clone().into();
+    let covered = super::partition_rows(&rows, &original).unwrap();
+    let row = covered[0].0;
+    let sink_arc = network
+        .graph
+        .arcs
+        .iter()
+        .position(|arc| arc.head == network.graph.sink)
+        .unwrap();
+    network.arc_entries[sink_arc].push((row, 1.));
+    assert!(super::partition_rows(&rows, &network.clone().into()).is_none());
+    network.arc_entries[sink_arc].pop();
+    network.route_entries.push((row, 1.));
+    assert!(super::partition_rows(&rows, &network.clone().into()).is_none());
+    network.route_entries.clear();
+    let unrelated = rows.len();
+    rows.push(rows[0].clone());
+    network.arc_entries[sink_arc].push((unrelated, 1.));
+    network.route_entries.push((unrelated, 1.));
+    assert_eq!(super::partition_rows(&rows, &network.into()), Some(covered));
+}
+
+#[test]
+fn vertex_cut_rows_reject_static_and_resource_activity_contributions() {
+    use crate::master::model::{
+        solve_with_master_variables, AccumulatedActivityEntry, MasterVariable,
+    };
+    use crate::master::preprocessing::Bounds;
+    let problem = rc101_networks(5, 1);
+    let mut options = Options::default();
+    options.separation.rank_one.enabled = true;
+    options.preprocessing.enabled = false;
+    options.cg.time_limit = std::time::Duration::ZERO;
+    let variable = MasterVariable {
+        id: 100,
+        cost: 0.,
+        bounds: Bounds {
+            lower: 0.,
+            upper: 1.,
+        },
+        integer: false,
+        entries: vec![(0, 1.)],
+    };
+    let error = solve_with_master_variables(problem.clone(), vec![variable], options.clone())
+        .err()
+        .expect("a static contribution changes the covered row");
+    assert!(
+        error.to_string().contains("non-vertex contributions"),
+        "{error}"
+    );
+
+    let mut unrelated_problem = problem.clone();
+    let unrelated_row = unrelated_problem.rows.len();
+    unrelated_problem
+        .rows
+        .push(crate::master::formulation::Row {
+            sense: crate::master::RowSense::LessEqual,
+            rhs: 1.,
+        });
+    let unrelated = MasterVariable {
+        id: 101,
+        cost: 0.,
+        bounds: Bounds {
+            lower: 0.,
+            upper: 1.,
+        },
+        integer: false,
+        entries: vec![(unrelated_row, 1.)],
+    };
+    assert!(
+        solve_with_master_variables(unrelated_problem, vec![unrelated], options.clone()).is_ok()
+    );
+
+    let mut activity_problem = problem;
+    let graph = &mut activity_problem.networks[0].graph;
+    let arc_count = graph.arcs.len();
+    graph
+        .set_coupled_resources(&[crate::graph::coupled::CoupledResource::CustomResource {
+            increments: vec![1.; arc_count],
+            weights: vec![1.; arc_count],
+            forward_bound: None,
+            backward_bound: None,
+        }])
+        .unwrap();
+    activity_problem.networks[0]
+        .activity_entries
+        .push(AccumulatedActivityEntry {
+            resource: 0,
+            row: 0,
+            coefficient: 1.,
+        });
+    let error = super::super::solve(activity_problem, options)
+        .err()
+        .expect("resource activity changes the covered row");
+    assert!(
+        error.to_string().contains("non-vertex contributions"),
+        "{error}"
+    );
+}
+
+fn mixed_arc_problem_and_config() -> (Problem<2>, crate::master::model::RankOneIncidenceConfig) {
+    use crate::cuts::separation::{ArcData, GraphData, Parameters, VertexData};
+    use crate::graph::{Graph, Window};
+    use crate::master::formulation::Row;
+    use crate::master::model::{Network, RankOneIncidenceConfig};
+    use crate::master::RowSense;
+    let capture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../fixtures/cuts/rank_one_two_graph_mixed_complete_separation_native.json"
+    ))
+    .unwrap();
+    let number = |v: &serde_json::Value| v.as_i64().unwrap() as i32;
+    let mut networks = vec![];
+    let mut graphs = vec![];
+    for (id, arc_key, entry_key) in [
+        (7, "arcs7", "master_entries7"),
+        (8, "arcs8", "master_entries8"),
+    ] {
+        let mut graph = Graph::<2>::new(8, 1).unwrap();
+        graph.graph_id = id;
+        graph.elementary = true;
+        let membership = (0..8)
+            .map(|v| match v {
+                1 => vec![1],
+                3..=6 => vec![v - 1],
+                _ => vec![],
+            })
+            .collect();
+        graph
+            .configure_ng(6, membership, vec![(0..6).collect(); 8])
+            .unwrap();
+        for v in 0..8 {
+            graph.set_bounds(v, 0, 0., 2.).unwrap();
+        }
+        let mut graph_data = GraphData {
+            id,
+            source: 0,
+            sink: 7,
+            elem_set_count: 6,
+            packing_set_count: 6,
+            covering_set_count: 6,
+            vertices: (0..8)
+                .map(|v| {
+                    let sets = match v {
+                        1 => vec![1],
+                        3..=6 => vec![v - 1],
+                        _ => vec![],
+                    };
+                    VertexData {
+                        id: v,
+                        elem_sets: sets.clone(),
+                        packing_sets: sets.clone(),
+                        covering_sets: sets,
+                    }
+                })
+                .collect(),
+            ..Default::default()
+        };
+        for arc in capture[arc_key].as_array().unwrap() {
+            let (arc_id, tail, head) = (
+                number(&arc["id"]),
+                number(&arc["tail"]) as usize,
+                number(&arc["head"]) as usize,
+            );
+            let cost = if tail == 0 { 1. } else { 0. } + if id == 8 { 0.01 } else { 0. };
+            graph.add_arc_with_id(arc_id, tail, head, cost).unwrap();
+            let physical = graph.arc_mut(arc_id).unwrap();
+            physical.consumption[0] = if head == 7 { 0. } else { 1. };
+            let sets = if head == 1 && tail != 4 && tail != 5 {
+                vec![0]
+            } else {
+                vec![]
+            };
+            physical.elements = sets.iter().map(|&x| x as usize).collect();
+            physical.memory = (0..6).collect();
+            graph_data.arcs.push(ArcData {
+                id: arc_id,
+                tail: tail as i32,
+                head: head as i32,
+                elem_sets: sets.clone(),
+                packing_sets: sets.clone(),
+                covering_sets: sets,
+                ..Default::default()
+            });
+        }
+        let arc_entries = capture[entry_key]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entries| {
+                entries
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|entry| (number(&entry[0]) as usize, entry[1].as_f64().unwrap()))
+                    .collect()
+            })
+            .collect();
+        networks.push(Network {
+            id,
+            graph,
+            multiplicity: Window::new(0., 6.).unwrap(),
+            arc_entries,
+            route_entries: vec![],
+            activity_entries: vec![],
+        });
+        graphs.push(graph_data);
+    }
+    let rows = (0..6)
+        .map(|_| Row {
+            sense: RowSense::Equal,
+            rhs: 1.,
+        })
+        .collect();
+    let parameters = Parameters {
+        max_num_rows: 5,
+        max_num_per_round: 20,
+        memory_type: 1,
+        arc_memory_type: 2,
+        sp_dependent_memory: false,
+        ls_num_iterations: 1000,
+        neighbourhood_size: 16,
+        max_num_triplets: 10000,
+        violation_tolerance: 0.02,
+        ..Default::default()
+    };
+    (
+        Problem { rows, networks },
+        RankOneIncidenceConfig {
+            rows: (0..6).collect(),
+            graphs,
+            parameters,
+        },
+    )
+}
+
+#[test]
+fn explicit_arc_incidence_rank_one_closes_captured_two_network_root() {
+    let (problem, config) = mixed_arc_problem_and_config();
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    options.preprocessing.enabled = false;
+    options
+        .pricing_options
+        .push(("BALDESuseBidirectionalSearch".into(), 0.));
+    let plain = super::super::solve(problem.clone(), options.clone()).unwrap();
+    assert!((plain.master.lp - 2.5).abs() < 1e-7, "{}", plain.master.lp);
+    options.separation.rank_one_incidence = Some(config);
+    let cut = super::super::solve(problem.clone(), options).unwrap();
+    assert!(cut.cuts > 0);
+    assert!((cut.master.lp - 3.).abs() < 1e-7, "{}", cut.master.lp);
+
+    // Enumerate every elementary route with at most two customer visits.
+    // For integer partitions, no selected row can occur twice on one route.
+    let registry = &cut.snapshot.state.oracles[0].solver.cuts;
+    let mut candidates = vec![];
+    for network in &problem.networks {
+        for first in 1..=6 {
+            for second in 0..=6 {
+                if second == first {
+                    continue;
+                }
+                let mut vertices = vec![0, first];
+                if second != 0 {
+                    vertices.push(second);
+                }
+                vertices.push(7);
+                let mut path = vec![];
+                let mut counts = [0u8; 6];
+                for pair in vertices.windows(2) {
+                    let (index, arc) = network
+                        .graph
+                        .arcs
+                        .iter()
+                        .enumerate()
+                        .find(|(_, arc)| arc.tail == pair[0] && arc.head == pair[1])
+                        .unwrap();
+                    path.push((arc.tail, arc.head, arc.id));
+                    for &(row, value) in &network.arc_entries[index] {
+                        assert_eq!(value, 1.);
+                        counts[row] += 1;
+                    }
+                }
+                if counts.iter().any(|&count| count > 1) {
+                    continue;
+                }
+                let mask = counts
+                    .iter()
+                    .enumerate()
+                    .fold(0u8, |mask, (row, &count)| mask | (count << row));
+                let coefficients = registry
+                    .cuts
+                    .iter()
+                    .map(|row| {
+                        [
+                            crate::cuts::coefficient(row, network.id, &path, false).unwrap(),
+                            crate::cuts::coefficient(row, network.id, &path, true).unwrap(),
+                        ]
+                    })
+                    .collect::<Vec<_>>();
+                if mask == 0 {
+                    assert!(coefficients.iter().all(|&values| values == [0, 0]));
+                    continue;
+                }
+                for (cut, &[limited, full]) in registry.cuts.iter().zip(&coefficients) {
+                    assert!(match cut.class {
+                        crate::cuts::CutClass::Packing => full >= limited,
+                        crate::cuts::CutClass::Covering => full <= limited,
+                    });
+                }
+                candidates.push((mask, coefficients));
+            }
+        }
+    }
+    fn partitions(
+        mask: u8,
+        candidates: &[(u8, Vec<[i32; 2]>)],
+        cuts: &[crate::cuts::RankOneCut],
+        sums: &mut [[i32; 2]],
+        checked: &mut usize,
+    ) {
+        if mask == 0b11_1111 {
+            for (cut, sum) in cuts.iter().zip(sums.iter()) {
+                for &value in sum {
+                    assert!(
+                        match cut.class {
+                            crate::cuts::CutClass::Packing => value <= cut.rhs,
+                            crate::cuts::CutClass::Covering => value >= cut.rhs,
+                        },
+                        "cut {cut:?}, value {value}"
+                    );
+                }
+            }
+            *checked += 1;
+            return;
+        }
+        let next = (!mask & 0b11_1111).trailing_zeros();
+        for (covered, coefficients) in candidates {
+            if covered & (1 << next) == 0 || covered & mask != 0 {
+                continue;
+            }
+            for (sum, coefficient) in sums.iter_mut().zip(coefficients) {
+                sum[0] += coefficient[0];
+                sum[1] += coefficient[1];
+            }
+            partitions(mask | covered, candidates, cuts, sums, checked);
+            for (sum, coefficient) in sums.iter_mut().zip(coefficients) {
+                sum[0] -= coefficient[0];
+                sum[1] -= coefficient[1];
+            }
+        }
+    }
+    let mut checked = 0;
+    partitions(
+        0,
+        &candidates,
+        &registry.cuts,
+        &mut vec![[0, 0]; registry.cuts.len()],
+        &mut checked,
+    );
+    assert!(checked > 0);
+}
+
+#[test]
+fn explicit_arc_incidence_requires_exact_unit_master_rows() {
+    use crate::master::model::{solve_with_master_variables, MasterVariable};
+    use crate::master::preprocessing::Bounds;
+    let (problem, config) = mixed_arc_problem_and_config();
+    let mut options = Options::default();
+    options.preprocessing.enabled = false;
+    options.cg.time_limit = std::time::Duration::ZERO;
+    let mut mismatched = config.clone();
+    mismatched.graphs[0].arcs[0].packing_sets.clear();
+    options.separation.rank_one_incidence = Some(mismatched);
+    let error = super::super::solve(problem.clone(), options.clone())
+        .err()
+        .expect("incomplete incidence must be rejected");
+    assert!(
+        error.to_string().contains("differs from master rows"),
+        "{error}"
+    );
+
+    options.separation.rank_one_incidence = Some(config.clone());
+    let mut fractional = problem.clone();
+    fractional.networks[0].arc_entries[0][0].1 = 0.5;
+    let error = super::super::solve(fractional, options.clone())
+        .err()
+        .expect("fractional set incidence must be rejected");
+    assert!(
+        error.to_string().contains("master row arc coefficients"),
+        "{error}"
+    );
+
+    let variable = MasterVariable {
+        id: 100,
+        cost: 0.,
+        bounds: Bounds {
+            lower: 0.,
+            upper: 1.,
+        },
+        integer: false,
+        entries: vec![(0, 1.)],
+    };
+    let error = solve_with_master_variables(problem, vec![variable], options)
+        .err()
+        .expect("independent contributions must be rejected");
+    assert!(
+        error.to_string().contains("exclusive unit equality rows"),
+        "{error}"
+    );
 }

@@ -38,16 +38,6 @@ impl<const D: usize> LabelingEngine<D> {
         self.ctx().join_cost(g, vertex, f.into(), b.into())
     }
 
-    pub(super) fn extend(
-        &self,
-        g: &Graph<D>,
-        forward: bool,
-        arc: &BucketArc,
-        from: LabelRef<'_, D>,
-    ) -> Option<StoredLabel<D>> {
-        self.ctx().extend(g, forward, arc, from)
-    }
-
     /// A sweep of one direction on this engine's own counters; `other` holds
     /// the opposite direction's label count for the combined label limit.
     pub(super) fn sweep<'a>(

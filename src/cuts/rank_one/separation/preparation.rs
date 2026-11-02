@@ -12,10 +12,13 @@ impl Separation {
         let mut gi = GraphInfo {
             num_packing_sets: g.packing_set_count,
             num_covering_sets: g.covering_set_count,
-            packing_set_vertices: vec![vec![]; g.packing_set_count as usize],
-            covering_set_vertices: vec![vec![]; g.covering_set_count as usize],
-            packing_set_arcs: vec![vec![]; g.packing_set_count as usize],
-            covering_set_arcs: vec![vec![]; g.covering_set_count as usize],
+            // Cut support uses the separator-wide set IDs. A graph may not
+            // contain every set present in another graph, so retain empty
+            // slots for those IDs when constructing shared cut memory.
+            packing_set_vertices: vec![vec![]; self.num_packing_sets as usize],
+            covering_set_vertices: vec![vec![]; self.num_covering_sets as usize],
+            packing_set_arcs: vec![vec![]; self.num_packing_sets as usize],
+            covering_set_arcs: vec![vec![]; self.num_covering_sets as usize],
             ..Default::default()
         };
         for v in &g.vertices {
@@ -114,7 +117,7 @@ impl Separation {
     }
 
     /// Packing-set neighbourhoods from the graphs or their distances.
-    pub(super) fn calculate_packing_neighbours(&mut self, graphs: &[&GraphData]) {
+    pub(super) fn calculate_packing_neighbours(&mut self, graphs: &[&GraphData]) -> bool {
         let n = self.num_packing_sets as usize;
         self.packing_neighbours = vec![[0; 16]; n];
         self.packing_distances_defined = false;
@@ -128,6 +131,9 @@ impl Separation {
                 }
                 self.packing_distances_defined = true;
                 for &e in list {
+                    if !(0..1024).contains(&e) {
+                        return false;
+                    }
                     set_bit(&mut self.packing_neighbours[p], e as usize);
                 }
             }
@@ -139,11 +145,19 @@ impl Separation {
                 if g.elem_set_distances.is_empty() {
                     continue;
                 }
+                if g.elem_set_distances.len() < n
+                    || g.elem_set_distances.iter().take(n).any(|row| row.len() < n)
+                {
+                    return false;
+                }
                 let (c, c1) = (count as f64, (count + 1) as f64);
                 for i in 0..n {
                     for j in 0..n {
                         let d = &mut dist[i][j];
                         *d = (*d * c + g.elem_set_distances[i][j]) / c1;
+                        if d.is_nan() {
+                            return false;
+                        }
                     }
                 }
                 count += 1;
@@ -173,7 +187,7 @@ impl Separation {
                 self.packing_distances_defined = true;
             }
             if !self.packing_distances_defined {
-                return;
+                return true;
             }
         }
         if self.params.ls_num_iterations > 0 {
@@ -187,6 +201,7 @@ impl Separation {
                 }
             }
         }
+        true
     }
 
     pub(super) fn meet(&self, a: i32, b: i32) -> bool {
@@ -287,7 +302,9 @@ impl Separation {
         if self.params.max_num_rows > 3 {
             if self.num_packing_sets > 0 {
                 self.build_packing_permut_vectors();
-                self.calculate_packing_neighbours(graphs);
+                if !self.calculate_packing_neighbours(graphs) {
+                    return false;
+                }
                 if !self.packing_distances_defined && self.params.max_num_triplets <= 0 {
                     self.params.ls_num_iterations = 0;
                     self.params.max_num_rows = 4;

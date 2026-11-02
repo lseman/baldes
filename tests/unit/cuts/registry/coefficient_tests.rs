@@ -80,6 +80,7 @@ fn build_memory_policy_and_generated_cut_pricing_agree() {
         .into_iter()
         .map(|vertices| FractionalColumn {
             vertices,
+            arc_ids: None,
             value: 0.5,
             graph_id: 0,
             enumerated: false,
@@ -154,6 +155,7 @@ fn dense_packing_matches_graph_support_for_walks_and_memory_policies() {
         arc_memory: BTreeSet::new(),
         graph_arc_memories: BTreeMap::new(),
         arc_weights: BTreeMap::new(),
+        graph_arc_weights: Default::default(),
         visit_once: false,
         type2: false,
         denominator: 2,
@@ -247,6 +249,7 @@ fn rank_one_rounds_inherit_only_active_arc_memories() {
                 .into_iter()
                 .map(|vertices| FractionalColumn {
                     vertices,
+                    arc_ids: None,
                     value: 0.5,
                     graph_id: 7,
                     enumerated: false,
@@ -303,6 +306,7 @@ fn vertex_budget_includes_active_cuts_and_releases_retired_cuts() {
             .into_iter()
             .map(|vertices| FractionalColumn {
                 vertices,
+                arc_ids: None,
                 value: 0.5,
                 graph_id: 7,
                 enumerated: false,
@@ -336,6 +340,7 @@ fn vertex_budget_option_reaches_default_separator_and_rejects_negative_limits() 
         .into_iter()
         .map(|vertices| FractionalColumn {
             vertices,
+            arc_ids: None,
             value: 0.5,
             graph_id: 0,
             enumerated: false,
@@ -370,4 +375,131 @@ fn vertex_budget_option_reaches_default_separator_and_rejects_negative_limits() 
     assert!(registry
         .separate_default(&graph, &options, &[1, 2, 3], &columns)
         .is_err());
+}
+
+#[test]
+fn fractional_routes_preserve_parallel_arcs_and_validate_graph_endpoints() {
+    let mut graph = Graph::<2>::new(4, 0).unwrap();
+    graph.graph_id = 7;
+    let first = graph.add_arc(0, 1, 0.).unwrap();
+    let parallel = graph.add_arc(0, 1, 0.).unwrap();
+    let last = graph.add_arc(1, 3, 0.).unwrap();
+    let mut column = FractionalColumn {
+        vertices: vec![1],
+        arc_ids: Some(vec![parallel, last]),
+        value: 0.5,
+        graph_id: 7,
+        enumerated: false,
+    };
+    let registry = CutRegistry::default();
+    let index = super::routes::FractionalRouteIndex::new(&graph);
+    assert_eq!(
+        registry.fractional_route(&graph, &column, &index).unwrap(),
+        vec![(0, 1, parallel), (1, 3, last)]
+    );
+    column.arc_ids = None;
+    assert_eq!(
+        registry.fractional_route(&graph, &column, &index).unwrap(),
+        vec![(0, 1, first), (1, 3, last)]
+    );
+    column.arc_ids = Some(vec![parallel]);
+    assert!(registry.fractional_route(&graph, &column, &index).is_err());
+    column.arc_ids = Some(vec![last, parallel]);
+    assert!(registry.fractional_route(&graph, &column, &index).is_err());
+    column.arc_ids = Some(vec![parallel, 1000]);
+    assert!(registry.fractional_route(&graph, &column, &index).is_err());
+
+    let mut other = Graph::<2>::new(4, 0).unwrap();
+    other.graph_id = 8;
+    let other_last = other.add_arc(1, 3, 0.).unwrap();
+    let other_first = other.add_arc(0, 1, 0.).unwrap();
+    other.add_arc(0, 1, 0.).unwrap();
+    column.arc_ids = None;
+    let other_index = super::routes::FractionalRouteIndex::new(&other);
+    assert_eq!(
+        registry
+            .fractional_route(&other, &column, &other_index)
+            .unwrap(),
+        vec![(0, 1, other_first), (1, 3, other_last)]
+    );
+}
+
+#[test]
+fn rank_one_separation_accepts_exact_parallel_arcs_and_rejects_mismatched_routes() {
+    let mut graph = Graph::<2>::new(6, 1).unwrap();
+    graph.graph_id = 7;
+    for tail in 0..6 {
+        for head in 0..6 {
+            if tail != head {
+                graph.add_arc(tail, head, 1.).unwrap();
+            }
+        }
+    }
+    let parallel = graph.add_arc(4, 2, 1.).unwrap();
+    let columns: Vec<_> = [vec![1, 4, 2], vec![1, 3], vec![2, 3]]
+        .into_iter()
+        .map(|vertices| {
+            let mut path = vec![graph.source];
+            path.extend(&vertices);
+            path.push(graph.sink);
+            let arc_ids = path
+                .windows(2)
+                .map(|pair| {
+                    if pair == [4, 2] {
+                        parallel
+                    } else {
+                        graph
+                            .arcs
+                            .iter()
+                            .find(|arc| arc.tail == pair[0] && arc.head == pair[1])
+                            .unwrap()
+                            .id
+                    }
+                })
+                .collect();
+            FractionalColumn {
+                vertices,
+                arc_ids: Some(arc_ids),
+                value: 0.5,
+                graph_id: 7,
+                enumerated: false,
+            }
+        })
+        .collect();
+    let mut registry = CutRegistry::default();
+    registry.parameters.graph_id = 7;
+    registry.parameters.max_rank = 3;
+    registry.parameters.memory_type = MemoryType::Arc;
+    assert_eq!(registry.separate(&graph, &[1, 2, 3], &columns).unwrap(), 1);
+    #[cfg(not(feature = "rank-one-node-memory"))]
+    assert!(registry.cuts[0].arc_memory_for_graph(7).contains(&parallel));
+    let mut bad = columns;
+    bad[0].arc_ids.as_mut().unwrap()[1] = parallel;
+    assert!(registry.separate(&graph, &[1, 2, 3], &bad).is_err());
+}
+
+#[test]
+fn vertex_route_cache_tracks_graph_identity_and_in_place_arc_changes() {
+    let mut first = Graph::<2>::new(4, 0).unwrap();
+    first.add_arc_with_id(10, 0, 1, 0.).unwrap();
+    first.add_arc_with_id(11, 1, 3, 0.).unwrap();
+    let mut second = Graph::<2>::new(4, 0).unwrap();
+    second.add_arc_with_id(20, 0, 1, 0.).unwrap();
+    second.add_arc_with_id(21, 1, 3, 0.).unwrap();
+    let registry = CutRegistry::default();
+    assert_eq!(
+        registry.route(&first, &[1]).unwrap(),
+        vec![(0, 1, 10), (1, 3, 11)]
+    );
+    assert_eq!(
+        registry.route(&second, &[1]).unwrap(),
+        vec![(0, 1, 20), (1, 3, 21)]
+    );
+    second.arc_mut(20).unwrap().id = 30;
+    assert_eq!(
+        registry.route(&second, &[1]).unwrap(),
+        vec![(0, 1, 30), (1, 3, 21)]
+    );
+    second.arc_mut(30).unwrap().head = 2;
+    assert!(registry.route(&second, &[1]).is_err());
 }

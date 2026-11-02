@@ -13,6 +13,7 @@ fn cut(id: i32, visit_once: bool) -> RankOneCut {
         arc_memory: [3].into_iter().collect(),
         graph_arc_memories: BTreeMap::new(),
         arc_weights: [(3, 1)].into_iter().collect(),
+        graph_arc_weights: Default::default(),
         visit_once,
         type2: false,
         denominator: 3,
@@ -127,7 +128,7 @@ fn cached_prices_match_fresh_inputs_across_activation_rounding_and_duplicate_ord
 fn every_nondual_cut_field_invalidates_the_source_snapshot() {
     let (registry, graph) = fixture();
     let (_, source) = build_inputs_cached(&registry, &graph, false);
-    let edits: [fn(&mut RankOneCut); 19] = [
+    let edits: [fn(&mut RankOneCut); 20] = [
         |c| c.weights.push(1),
         |c| {
             c.graph_support.insert(0, vec![(1, 2)]);
@@ -150,6 +151,10 @@ fn every_nondual_cut_field_invalidates_the_source_snapshot() {
         },
         |c| {
             c.arc_weights.insert(9, 2);
+        },
+        |c| {
+            c.graph_arc_weights
+                .insert(7, [(9, 2)].into_iter().collect());
         },
         |c| c.visit_once = !c.visit_once,
         |c| c.type2 = !c.type2,
@@ -244,4 +249,47 @@ fn rounded_duals_filter_raw_values_before_native_rounding() {
     assert!(!source.matches(&registry, &graph, true));
     let (exact, _) = build_inputs_cached(&registry, &graph, true);
     assert_eq!(exact.0[0].dual, 1.004e-6);
+}
+
+#[test]
+fn graph_local_arc_weights_reach_limited_and_full_pricing_inputs() {
+    let mut registry = CutRegistry::default();
+    let mut input = cut(0, false);
+    input.graph_support = [(7, vec![(1, 1)]), (8, vec![(2, 1)])].into_iter().collect();
+    input.graph_arc_weights = [
+        (7, [(3, 1)].into_iter().collect()),
+        (8, [(4, 2)].into_iter().collect()),
+    ]
+    .into_iter()
+    .collect();
+    registry.cuts.push(input);
+    let mut graph = Graph::<2>::new(6, 0).unwrap();
+    for (id, arc, weight, vertex) in [(7, 3, 1, 1), (8, 4, 2, 2)] {
+        graph.graph_id = id;
+        let inputs = build_inputs_with_duals(&registry, &graph, false);
+        assert_eq!(
+            inputs.0[0].arc_coefficient,
+            [(arc, weight)].into_iter().collect()
+        );
+        assert_eq!(
+            inputs.2[0].arc_coefficient,
+            [(arc, weight)].into_iter().collect()
+        );
+        assert_eq!(
+            inputs.2[0].ordered_support,
+            vec![(vertex, 1), (6 + arc as usize, weight)]
+        );
+    }
+    // Legacy ordered support can include an arc from another graph; replace
+    // those entries with this graph's local arc weights.
+    registry.cuts[0].graph_support.clear();
+    registry.cuts[0].ordered_support = Some(vec![(1, 1), (9, 1)]);
+    graph.graph_id = 8;
+    let inputs = build_inputs_with_duals(&registry, &graph, false);
+    assert_eq!(inputs.2[0].ordered_support, vec![(1, 1), (10, 2)]);
+    registry.cuts[0].graph_support = [(7, vec![(1, 1)]), (8, vec![(2, 1)])].into_iter().collect();
+    graph.graph_id = 9;
+    let inputs = build_inputs_with_duals(&registry, &graph, false);
+    assert!(inputs.0[0].arc_coefficient.is_empty());
+    assert!(inputs.2[0].ordered_support.is_empty());
 }

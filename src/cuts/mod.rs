@@ -14,7 +14,7 @@ mod registry;
 
 pub use registry::{
     coefficient, memory_policy, route_arcs, CandidateMode, CutClass, CutRegistry, FractionalColumn,
-    MemoryKind, MemoryPolicy, MemoryType, RankOneCut, SeparationParameters,
+    IncidenceCutSeparator, MemoryKind, MemoryPolicy, MemoryType, RankOneCut, SeparationParameters,
 };
 
 // Compatibility with the original flat module layout.

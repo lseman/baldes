@@ -1,5 +1,4 @@
 use super::*;
-use std::collections::HashMap;
 
 impl CutRegistry {
     /// Separates with the current parameters and registers every emitted cut.
@@ -123,6 +122,13 @@ impl CutRegistry {
             incidences.push((id, incidence));
             graphs.push(graph);
         }
+        let route_indices: BTreeMap<_, _> = graph_ids
+            .iter()
+            .map(|&id| {
+                let graph = lookup(id).map_or(g, |(graph, _)| graph);
+                (id, super::routes::FractionalRouteIndex::new(graph))
+            })
+            .collect();
         let mut solutions = vec![];
         for c in columns {
             if !c.value.is_finite() || c.value < 0. {
@@ -133,27 +139,14 @@ impl CutRegistry {
             } else {
                 c.graph_id
             };
-            let arcs = match lookup(column_graph) {
-                Some((other, _)) if multi && other.graph_id.max(0) != g.graph_id.max(0) => {
-                    let ends: HashMap<(usize, usize), i32> = other
-                        .arcs
-                        .iter()
-                        .rev()
-                        .map(|a| ((a.tail, a.head), a.id))
-                        .collect();
-                    let mut walk = vec![other.source];
-                    walk.extend_from_slice(&c.vertices);
-                    walk.push(other.sink);
-                    walk.windows(2)
-                        .map(|w| {
-                            ends.get(&(w[0], w[1]))
-                                .map(|&id| (w[0], w[1], id))
-                                .ok_or_else(|| invalid("fractional column arc"))
-                        })
-                        .collect::<Result<Vec<_>>>()?
-                }
-                _ => self.route(g, &c.vertices)?,
-            };
+            if multi && c.arc_ids.is_some() && lookup(column_graph).is_none() {
+                return Err(invalid("unknown fractional column graph"));
+            }
+            let column_graph_data = lookup(column_graph).map_or(g, |(graph, _)| graph);
+            let index = route_indices
+                .get(&column_graph)
+                .ok_or_else(|| invalid("unknown fractional column graph"))?;
+            let arcs = self.fractional_route(column_graph_data, c, index)?;
             solutions.push(Solution {
                 graph_id: if c.graph_id < 0 {
                     p.graph_id
@@ -252,6 +245,7 @@ impl CutRegistry {
                     && cut.graph_support.is_empty()
                     && cut.graph_pricing_support.is_empty()
                     && cut.arc_weights.is_empty()
+                    && cut.graph_arc_weights.is_empty()
                     && !cut.visit_once
                     && (cut.class == CutClass::Covering) == p.covering
             })
@@ -333,6 +327,7 @@ impl CutRegistry {
                 arc_memory: BTreeSet::new(),
                 graph_arc_memories: BTreeMap::new(),
                 arc_weights: BTreeMap::new(),
+                graph_arc_weights: Default::default(),
                 visit_once: false,
                 type2: native.kind == 2,
                 denominator: native.denominator.abs(),

@@ -287,8 +287,7 @@ fn multiway_component_tree_proves_the_enumerated_two_triangle_optimum() {
                 let mut __branch_registry = crate::master::model::BranchingRegistry::default();
                 __branch_registry.branching = NetworkBranchingPolicy::Phased;
                 __branch_registry.component_classes = vec![class.clone()];
-                __branch_registry.strong_branching =
-                    strong.then(StrongBranchingOptions::default);
+                __branch_registry.strong_branching = strong.then(StrongBranchingOptions::default);
                 __branch_registry
             },
             ..Default::default()

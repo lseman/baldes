@@ -3,6 +3,17 @@ use crate::cuts::capacity::{CapacityParameters, TimeWindows};
 use crate::cuts::knapsack::{KnapsackParameters, KnapsackRow};
 use crate::cuts::kpath::{GeneralKPathSeparator, KPathGraph, KPathParameters, KPathSeparator};
 
+/// Explicit set incidence and its corresponding unit equality master rows.
+#[derive(Clone, Debug)]
+pub struct RankOneIncidenceConfig {
+    /// Set ID `i` represents shared master row `rows[i]`.
+    pub rows: Vec<usize>,
+    /// One physical incidence graph for each pricing network.
+    pub graphs: Vec<crate::cuts::separation::GraphData>,
+    /// Separator controls; use an explicit vertex or arc memory mode.
+    pub parameters: crate::cuts::separation::Parameters,
+}
+
 /// Rank-one cut controls of the root driver.
 #[derive(Clone, Debug)]
 pub struct CutOptions {

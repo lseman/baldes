@@ -61,7 +61,7 @@ mod route_bounds;
 pub mod separation;
 mod set_partitioning;
 pub use preprocessing_adapter::{NetworkActivityBounds, PreprocessingOptions, PreprocessingReport};
-pub use separation::SeparationOptions;
+pub use separation::{RankOneIncidenceConfig, SeparationOptions};
 mod aggregate_projection;
 mod master_variables;
 mod model_mapping;

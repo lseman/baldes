@@ -1,0 +1,10373 @@
+{
+  "scope": "Native one-resource owner; controlled three-bucket predecessor graphs",
+  "cases": [
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 0,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 1,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 2,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 3,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 4,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 5,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 6,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": true,
+      "checks": 3
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 0,
+      "present": 7,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 0,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 1,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 2,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 3,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 4,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 5,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 6,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 1,
+      "present": 7,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 0,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 1,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 2,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 3,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 4,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 5,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 6,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 0,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 0,
+      "target": 0,
+      "scan": true,
+      "exists": true,
+      "checks": 3
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 0,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 0,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 0,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 0,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 1,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 1,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 1,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 1,
+      "target": 1,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 1,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 1,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 2,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 2,
+      "target": 0,
+      "scan": true,
+      "exists": true,
+      "checks": 2
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 2,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 2,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 2
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 2,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 2,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 3,
+      "target": 0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 3,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 3,
+      "target": 1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 3,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 3,
+      "target": 2,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 3,
+      "target": 2,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 4,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 4,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 4,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 4,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 4,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 4,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 5,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 5,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 5,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 5,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 5,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 5,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 6,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 6,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 6,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 6,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 6,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 6,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 7,
+      "target": 0,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 7,
+      "target": 0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 7,
+      "target": 1,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 7,
+      "target": 1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 7,
+      "target": 2,
+      "scan": false,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "topology": 2,
+      "present": 7,
+      "high": 7,
+      "target": 2,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    }
+  ]
+}

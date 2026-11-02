@@ -1,0 +1,389 @@
+{
+  "scope": "Native initialized packing-cut resource, controlled one-bucket labels",
+  "cases": [
+    {
+      "own": 0,
+      "other": 0,
+      "threshold": -2.1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 0,
+      "threshold": -2.1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 0,
+      "threshold": -2.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 0,
+      "threshold": -2.0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 0,
+      "threshold": -1.5,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 0,
+      "threshold": -1.5,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "own": 0,
+      "other": 0,
+      "threshold": -1.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 0,
+      "threshold": -1.0,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "own": 0,
+      "other": 0,
+      "threshold": -0.9,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 0,
+      "threshold": -0.9,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "own": 0,
+      "other": 0,
+      "threshold": 0.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 0,
+      "threshold": 0.0,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "own": 0,
+      "other": 1,
+      "threshold": -2.1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 1,
+      "threshold": -2.1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 1,
+      "threshold": -2.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 1,
+      "threshold": -2.0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 1,
+      "threshold": -1.5,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 1,
+      "threshold": -1.5,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "own": 0,
+      "other": 1,
+      "threshold": -1.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 1,
+      "threshold": -1.0,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "own": 0,
+      "other": 1,
+      "threshold": -0.9,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 1,
+      "threshold": -0.9,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "own": 0,
+      "other": 1,
+      "threshold": 0.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 0,
+      "other": 1,
+      "threshold": 0.0,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "own": 1,
+      "other": 0,
+      "threshold": -2.1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 0,
+      "threshold": -2.1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 0,
+      "threshold": -2.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 0,
+      "threshold": -2.0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 0,
+      "threshold": -1.5,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 0,
+      "threshold": -1.5,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "own": 1,
+      "other": 0,
+      "threshold": -1.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 0,
+      "threshold": -1.0,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "own": 1,
+      "other": 0,
+      "threshold": -0.9,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 0,
+      "threshold": -0.9,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "own": 1,
+      "other": 0,
+      "threshold": 0.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 0,
+      "threshold": 0.0,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "own": 1,
+      "other": 1,
+      "threshold": -2.1,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 1,
+      "threshold": -2.1,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 1,
+      "threshold": -2.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 1,
+      "threshold": -2.0,
+      "scan": true,
+      "exists": false,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 1,
+      "threshold": -1.5,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 1,
+      "threshold": -1.5,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "own": 1,
+      "other": 1,
+      "threshold": -1.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 1,
+      "threshold": -1.0,
+      "scan": true,
+      "exists": false,
+      "checks": 1
+    },
+    {
+      "own": 1,
+      "other": 1,
+      "threshold": -0.9,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 1,
+      "threshold": -0.9,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    },
+    {
+      "own": 1,
+      "other": 1,
+      "threshold": 0.0,
+      "scan": false,
+      "exists": true,
+      "checks": 0
+    },
+    {
+      "own": 1,
+      "other": 1,
+      "threshold": 0.0,
+      "scan": true,
+      "exists": true,
+      "checks": 1
+    }
+  ]
+}

@@ -140,8 +140,10 @@ impl CoupledKernel {
         if (forward_total - backward_total).abs() > 1e-6 {
             return Ok(None);
         }
+        // The recorder adds the two label accumulators first, then adds the
+        // callback cross term. Its tolerance check observes this exact order.
         let joined =
-            (left.state.concatenate(&right.state) + left.wrapper_cost) + right.wrapper_cost;
+            left.state.concatenate(&right.state) + (left.wrapper_cost + right.wrapper_cost);
         if (joined - forward_total).abs() > 1e-6 {
             return Ok(None);
         }

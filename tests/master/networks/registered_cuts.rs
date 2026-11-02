@@ -458,3 +458,75 @@ fn composite_terms_share_one_master_variable_coefficient() {
     certified.cg.bound_mode = BoundMode::Certified;
     optimal(&complete.solve(certified).unwrap(), 5.);
 }
+
+#[test]
+fn registered_graph_local_arc_weights_match_independent_network_descriptors() {
+    let root = model::solve(gap_problem(true), options()).unwrap();
+    optimal(&root, 4.);
+    let mut shared = cut(5, &[1]);
+    shared.visit_once = false;
+    shared.class = CutClass::Packing;
+    shared.weights.fill(0);
+    shared.memory_kind = MemoryKind::Arc;
+    shared.arc_memory = (0..8).collect();
+    shared.graph_arc_weights = [
+        (7, [(0, 1), (2, 1)].into_iter().collect()),
+        (42, [(0, 1), (1, 1)].into_iter().collect()),
+    ]
+    .into_iter()
+    .collect();
+    let mut left = shared.clone();
+    left.arc_weights = left.graph_arc_weights[&7].clone();
+    left.graph_arc_weights.clear();
+    let mut right = shared.clone();
+    right.arc_weights = right.graph_arc_weights[&42].clone();
+    right.graph_arc_weights.clear();
+    let row = Row {
+        sense: RowSense::LessEqual,
+        rhs: 1.,
+    };
+    let descriptors = |left, right| {
+        [
+            RegisteredCutCoefficients {
+                network: 7,
+                cut: left,
+            },
+            RegisteredCutCoefficients {
+                network: 42,
+                cut: right,
+            },
+        ]
+    };
+    let together = root
+        .snapshot
+        .with_registered_cut_row(row.clone(), &descriptors(shared.clone(), shared))
+        .unwrap();
+    let independent = root
+        .snapshot
+        .with_registered_cut_row(row, &descriptors(left, right))
+        .unwrap();
+    let together_result = together.solve(options()).unwrap();
+    let independent_result = independent.solve(options()).unwrap();
+    optimal(&together_result, 4.5);
+    optimal(&independent_result, 4.5);
+    let together_complete = together
+        .enumerate(&EnumerationOptions::default())
+        .unwrap()
+        .preprocess()
+        .unwrap();
+    let independent_complete = independent
+        .enumerate(&EnumerationOptions::default())
+        .unwrap()
+        .preprocess()
+        .unwrap();
+    let mut certified = options();
+    certified.cg.bound_mode = BoundMode::Certified;
+    assert_eq!(
+        together_complete
+            .solve(certified.clone())
+            .unwrap()
+            .master
+            .lp,
+        independent_complete.solve(certified).unwrap().master.lp
+    );
+}

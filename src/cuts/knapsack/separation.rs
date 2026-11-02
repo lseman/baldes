@@ -355,3 +355,7 @@ impl KnapsackSeparator {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/cuts/knapsack/separation_tests.rs"]
+mod tests;

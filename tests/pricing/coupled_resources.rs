@@ -140,6 +140,95 @@ fn paired_waiting_cost_matches_native_join_at_every_split() {
     }
 }
 
+#[test]
+fn paired_fractional_waiting_joins_match_native_capture() {
+    use baldes::graph::coupled::descriptor::{
+        FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
+    };
+    use baldes::graph::coupled::{MachineArcFunctionInput, PairedResourceMode};
+    let constant = |lo: f64, hi: f64, value: f64| match lo == hi {
+        true => PreparedSlopeFunction::constant_point(value, lo).unwrap(),
+        false => PreparedSlopeFunction::from_prepared_pairs(vec![(value, lo), (0., hi)]).unwrap(),
+    };
+    let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+    // Native resource helper capture: 36 fractional rate pairs, all three splits.
+    // The helper uses synthetic recovered layouts; this does not test recording.
+    let windows = [
+        Window::new(0., 1.).unwrap(),
+        Window::new(3., 8.).unwrap(),
+        Window::new(6., 10.).unwrap(),
+    ];
+    for row in include_str!("../fixtures/coupled/fractional_waiting_native.txt").lines() {
+        let fields: Vec<_> = row.split_whitespace().collect();
+        let raw: Vec<f64> = fields[..2].iter().map(|v| v.parse().unwrap()).collect();
+        let native: Vec<u64> = fields[2..]
+            .iter()
+            .map(|v| u64::from_str_radix(v, 16).unwrap())
+            .collect();
+        let (first_wait, second_wait) = (raw[0] as i32, raw[1] as i32);
+        {
+            let mut graph = Graph::<2>::new(3, 0).unwrap();
+            graph.add_arc(0, 1, -20.).unwrap();
+            graph.add_arc(1, 2, -20.).unwrap();
+            graph
+                .set_coupled_resources(&[CoupledResource::PairedFront {
+                    mode: PairedResourceMode::CostBounded,
+                }])
+                .unwrap();
+            let base: Vec<_> = (0..2)
+                .map(|arc| constant(windows[arc].lower, windows[arc].upper, 1.))
+                .collect();
+            let increments = [2., 1.];
+            let waiting = [first_wait, second_wait];
+            let inputs: Vec<_> = (0..2)
+                .map(|arc| MachineArcFunctionInput {
+                    physical_arc: arc,
+                    tail_bounds: windows[arc],
+                    waiting_bounds: windows[arc + 1],
+                    waiting_rate: waiting[arc],
+                    base: &base[arc],
+                    dependent: affine(increments[arc]),
+                    dependent_lower: affine(0.),
+                    dependent_upper: affine(100.),
+                })
+                .collect();
+            let prepared = graph.prepare_paired_front_program_with_rates(
+                0,
+                &inputs,
+                affine(0.),
+                windows[0],
+                windows[2],
+                &raw,
+                FrontierBudget::default(),
+            );
+            assert!(
+                matches!(prepared, FrontierOutcome::Complete(())),
+                "{prepared:?}"
+            );
+            let kernel = graph.coupled_kernel().unwrap();
+            for split in 0..=2 {
+                let (mut f, mut b) = (kernel.root(true), kernel.root(false));
+                let mut cost = 0.;
+                for arc in 0..split {
+                    let (next, delta) = kernel.extend(&f, arc, true).unwrap().unwrap();
+                    f = next;
+                    cost += delta;
+                }
+                for arc in (split..2).rev() {
+                    let (next, delta) = kernel.extend(&b, arc, false).unwrap().unwrap();
+                    b = next;
+                    cost += delta;
+                }
+                assert_eq!(
+                    (cost + kernel.join(&f, &b).unwrap().unwrap()).to_bits(),
+                    native[split],
+                    "raw waiting={raw:?}, split={split}"
+                );
+            }
+        }
+    }
+}
+
 fn function() -> PiecewiseLinearFunction {
     PiecewiseLinearFunction::new(vec![[0., 0.], [1., 2.], [2., 1.], [4., 3.]]).unwrap()
 }
@@ -1585,6 +1674,905 @@ fn integral_backward_signed_suffix_has_zero_compensation_without_rounding_slack(
         assert!(
             kernel.join(&prefix, &a).unwrap().unwrap()
                 <= kernel.join(&prefix, &b).unwrap().unwrap()
+        );
+    }
+}
+
+#[test]
+fn paired_fractional_waiting_forward_recorder_matches_native_capture() {
+    use baldes::graph::coupled::descriptor::{
+        FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
+    };
+    use baldes::graph::coupled::{MachineArcFunctionInput, PairedResourceMode};
+
+    // Registered native solver: base source [0,1], interior [3,7], terminal
+    // [0,8], arc consumption 1, dependent increment 1.
+    // Native pricing recorded the whole path in the forward history.
+    for rate in [0_f64, 0.25, 0.75, 1., 1.25, 1.75, 2.25, 2.75] {
+        let mut graph = Graph::<2>::new(3, 0).unwrap();
+        graph.add_arc(0, 1, 0.).unwrap();
+        graph.add_arc(1, 2, 0.).unwrap();
+        graph
+            .set_coupled_resources(&[CoupledResource::PairedFront {
+                mode: PairedResourceMode::CostUnbounded,
+            }])
+            .unwrap();
+        let tail = [Window::new(0., 1.).unwrap(), Window::new(3., 7.).unwrap()];
+        let waiting = [Window::new(3., 7.).unwrap(), Window::new(4., 8.).unwrap()];
+        let base: Vec<_> = tail
+            .iter()
+            .map(|w| {
+                PreparedSlopeFunction::from_prepared_pairs(vec![(1., w.lower), (0., w.upper)])
+                    .unwrap()
+            })
+            .collect();
+        let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+        let inputs: Vec<_> = (0..2)
+            .map(|arc| MachineArcFunctionInput {
+                physical_arc: arc,
+                tail_bounds: tail[arc],
+                waiting_bounds: waiting[arc],
+                waiting_rate: rate as i32,
+                base: &base[arc],
+                dependent: affine(1.),
+                dependent_lower: affine(0.),
+                dependent_upper: affine(8.),
+            })
+            .collect();
+        let budget = FrontierBudget::default();
+        let prepared = graph.prepare_paired_front_program_with_rates(
+            0,
+            &inputs,
+            affine(0.),
+            tail[0],
+            Window::new(0., 8.).unwrap(),
+            &[rate, rate],
+            budget,
+        );
+        assert!(
+            matches!(prepared, FrontierOutcome::Complete(())),
+            "{prepared:?}"
+        );
+        let kernel = graph.coupled_kernel().unwrap();
+        let mut forward = kernel.root(true);
+        for arc in 0..2 {
+            forward = kernel.extend(&forward, arc, true).unwrap().unwrap().0;
+        }
+        let result =
+            graph.reconstruct_paired_machine_join(0, &forward, &kernel.root(false), budget);
+        let FrontierOutcome::Complete(record) = result else {
+            panic!("{result:?}")
+        };
+        assert_eq!(record.path.base, [1., 3., 4.]);
+        assert_eq!(
+            record.path.dependent,
+            [0., 1. + rate.trunc(), 2. + rate.trunc()]
+        );
+        assert_eq!(record.path.waiting, [1., 0.]);
+        assert_eq!(record.initial_waiting, 1.);
+    }
+}
+
+#[test]
+fn paired_fractional_rate_backward_suffix_recorder_matches_native_zero_wait_capture() {
+    use baldes::graph::coupled::descriptor::{
+        FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
+    };
+    use baldes::graph::coupled::{MachineArcFunctionInput, PairedResourceMode};
+
+    // Registered native five-customer model, path [0,5,25], split after the
+    // second arc. The third native arc has zero base consumption.
+    let mut graph = Graph::<2>::new(4, 0).unwrap();
+    for arc in 0..3 {
+        graph.add_arc(arc, arc + 1, 0.).unwrap();
+    }
+    graph
+        .set_coupled_resources(&[CoupledResource::PairedFront {
+            mode: PairedResourceMode::CostUnbounded,
+        }])
+        .unwrap();
+    let tail = [
+        Window::new(0., 1.5).unwrap(),
+        Window::new(1., 2.5).unwrap(),
+        Window::new(1., 2.5).unwrap(),
+    ];
+    let waiting = [
+        Window::new(1., 2.5).unwrap(),
+        Window::new(2., 2.5).unwrap(),
+        Window::new(1., 2.5).unwrap(),
+    ];
+    let base: Vec<_> = tail
+        .iter()
+        .enumerate()
+        .map(|(i, w)| {
+            PreparedSlopeFunction::from_prepared_pairs(vec![
+                (if i == 2 { 0. } else { 1. }, w.lower),
+                (0., w.upper),
+            ])
+            .unwrap()
+        })
+        .collect();
+    let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+    let inputs: Vec<_> = (0..3)
+        .map(|arc| MachineArcFunctionInput {
+            physical_arc: arc,
+            tail_bounds: tail[arc],
+            waiting_bounds: waiting[arc],
+            waiting_rate: 0,
+            base: &base[arc],
+            dependent: affine(0.25),
+            dependent_lower: affine(0.),
+            dependent_upper: affine(8.),
+        })
+        .collect();
+    let budget = FrontierBudget::default();
+    let prepared = graph.prepare_paired_front_program_with_rates(
+        0,
+        &inputs,
+        affine(0.),
+        tail[0],
+        Window::new(0., 2.5).unwrap(),
+        &[0.75; 3],
+        budget,
+    );
+    assert!(
+        matches!(prepared, FrontierOutcome::Complete(())),
+        "{prepared:?}"
+    );
+    let kernel = graph.coupled_kernel().unwrap();
+    let mut forward = kernel.root(true);
+    for arc in 0..2 {
+        forward = kernel.extend(&forward, arc, true).unwrap().unwrap().0;
+    }
+    let backward = kernel
+        .extend(&kernel.root(false), 2, false)
+        .unwrap()
+        .unwrap()
+        .0;
+    let result = graph.reconstruct_paired_machine_join(0, &forward, &backward, budget);
+    let FrontierOutcome::Complete(record) = result else {
+        panic!("{result:?}")
+    };
+    assert_eq!(record.path.base, [0., 1., 2., 2.]);
+    assert_eq!(record.path.dependent, [0., 0.25, 0.5, 0.75]);
+    assert_eq!(record.path.waiting, [0., 0., 0.]);
+    assert_eq!(record.initial_waiting, 0.);
+}
+
+#[test]
+fn paired_fractional_rate_nonzero_suffix_wait_matches_native_recording() {
+    use baldes::graph::coupled::descriptor::{
+        FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
+    };
+    use baldes::graph::coupled::{MachineArcFunctionInput, PairedResourceMode};
+
+    // Native operators generated the histories; the recorder capture contains
+    // 36 raw-rate pairs and all three splits, including nonzero suffix waits.
+    let joins: Vec<_> = include_str!("../fixtures/coupled/fractional_waiting_native.txt")
+        .lines()
+        .map(|row| row.split_whitespace().collect::<Vec<_>>())
+        .collect();
+    let mut breakpoint_differences = 0;
+    for (case, row) in include_str!("../fixtures/coupled/fractional_waiting_recorder_native.txt")
+        .lines()
+        .enumerate()
+    {
+        let values: Vec<f64> = row.split_whitespace().map(|v| v.parse().unwrap()).collect();
+        let rates = [values[0], values[1]];
+        let split = values[2] as usize;
+        assert_eq!(split, case % 3);
+        assert_eq!(joins[case / 3][0].parse::<f64>().unwrap(), rates[0]);
+        assert_eq!(joins[case / 3][1].parse::<f64>().unwrap(), rates[1]);
+        let mut graph = Graph::<2>::new(3, 0).unwrap();
+        graph.add_arc(0, 1, 0.).unwrap();
+        graph.add_arc(1, 2, 0.).unwrap();
+        graph
+            .set_coupled_resources(&[CoupledResource::PairedFront {
+                mode: PairedResourceMode::CostBounded,
+            }])
+            .unwrap();
+        let windows = [
+            Window::new(0., 1.).unwrap(),
+            Window::new(3., 8.).unwrap(),
+            Window::new(6., 10.).unwrap(),
+        ];
+        let base: Vec<_> = windows[..2]
+            .iter()
+            .map(|w| {
+                PreparedSlopeFunction::from_prepared_pairs(vec![(1., w.lower), (0., w.upper)])
+                    .unwrap()
+            })
+            .collect();
+        let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+        let inputs: Vec<_> = (0..2)
+            .map(|arc| MachineArcFunctionInput {
+                physical_arc: arc,
+                tail_bounds: windows[arc],
+                waiting_bounds: windows[arc + 1],
+                waiting_rate: rates[arc] as i32,
+                base: &base[arc],
+                dependent: affine(if arc == 0 { 2. } else { 1. }),
+                dependent_lower: affine(0.),
+                dependent_upper: affine(100.),
+            })
+            .collect();
+        let budget = FrontierBudget::default();
+        let prepared = graph.prepare_paired_front_program_with_rates(
+            0,
+            &inputs,
+            affine(0.),
+            windows[0],
+            windows[2],
+            &rates,
+            budget,
+        );
+        assert!(
+            matches!(prepared, FrontierOutcome::Complete(())),
+            "{prepared:?}"
+        );
+        let kernel = graph.coupled_kernel().unwrap();
+        let (mut forward, mut backward) = (kernel.root(true), kernel.root(false));
+        for arc in 0..split {
+            forward = kernel.extend(&forward, arc, true).unwrap().unwrap().0;
+        }
+        for arc in (split..2).rev() {
+            backward = kernel.extend(&backward, arc, false).unwrap().unwrap().0;
+        }
+        let joined = kernel.paired_machine_resource_join(0, &forward, &backward, budget);
+        let FrontierOutcome::Complete(joined) = joined else {
+            panic!("rates={rates:?}, split={split}: {joined:?}")
+        };
+        let dependent = joined.dependent.unwrap();
+        let captured_join = u64::from_str_radix(joins[case / 3][2 + split], 16).unwrap();
+        assert_eq!(dependent.to_bits(), captured_join);
+        let result = graph.reconstruct_paired_machine_join(0, &forward, &backward, budget);
+        let FrontierOutcome::Complete(record) = result else {
+            panic!("rates={rates:?}, split={split}: {result:?}")
+        };
+        assert_eq!(
+            record.path.base,
+            values[3..6],
+            "rates={rates:?}, split={split}"
+        );
+        assert_eq!(
+            record.path.dependent,
+            values[6..9],
+            "rates={rates:?}, split={split}"
+        );
+        assert_eq!(
+            record.initial_waiting, values[9],
+            "rates={rates:?}, split={split}"
+        );
+        assert_eq!(
+            record.path.waiting,
+            values[10..12],
+            "rates={rates:?}, split={split}"
+        );
+        assert_eq!(
+            record.path.dependent[2], values[12],
+            "rates={rates:?}, split={split}"
+        );
+        if (dependent + 1e-6).floor() != (record.path.dependent[2] + 1e-6).floor() {
+            breakpoint_differences += 1;
+        }
+    }
+    assert_eq!(breakpoint_differences, 41);
+}
+
+#[test]
+fn paired_affine_fractional_waiting_recorder_matches_native_capture() {
+    use baldes::graph::coupled::descriptor::{
+        FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
+    };
+    use baldes::graph::coupled::{MachineArcFunctionInput, PairedResourceMode};
+
+    // Native operators generated the histories; the recorder capture contains
+    // 81 slope/rate combinations and all three splits.
+    for row in include_str!("../fixtures/coupled/affine_waiting_recorder_native.txt").lines() {
+        let values: Vec<f64> = row.split_whitespace().map(|v| v.parse().unwrap()).collect();
+        let slopes = [values[0], values[1]];
+        let rates = [values[2], values[3]];
+        let split = values[4] as usize;
+        let mut graph = Graph::<2>::new(3, 0).unwrap();
+        graph.add_arc(0, 1, 0.).unwrap();
+        graph.add_arc(1, 2, 0.).unwrap();
+        graph
+            .set_coupled_resources(&[CoupledResource::PairedFront {
+                mode: PairedResourceMode::CostBounded,
+            }])
+            .unwrap();
+        let windows = [
+            Window::new(0., 1.).unwrap(),
+            Window::new(3., 8.).unwrap(),
+            Window::new(6., 10.).unwrap(),
+        ];
+        let base: Vec<_> = windows[..2]
+            .iter()
+            .map(|w| {
+                PreparedSlopeFunction::from_prepared_pairs(vec![(1., w.lower), (0., w.upper)])
+                    .unwrap()
+            })
+            .collect();
+        let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+        let inputs: Vec<_> = (0..2)
+            .map(|arc| MachineArcFunctionInput {
+                physical_arc: arc,
+                tail_bounds: windows[arc],
+                waiting_bounds: windows[arc + 1],
+                waiting_rate: rates[arc] as i32,
+                base: &base[arc],
+                dependent: MachineRootInput::Affine(RawAffine::new(4., slopes[arc]).unwrap()),
+                dependent_lower: affine(0.),
+                dependent_upper: affine(100.),
+            })
+            .collect();
+        let budget = FrontierBudget::default();
+        let prepared = graph.prepare_paired_front_program_with_rates(
+            0,
+            &inputs,
+            affine(0.),
+            windows[0],
+            windows[2],
+            &rates,
+            budget,
+        );
+        assert!(
+            matches!(prepared, FrontierOutcome::Complete(())),
+            "{prepared:?}"
+        );
+        let kernel = graph.coupled_kernel().unwrap();
+        let (mut forward, mut backward) = (kernel.root(true), kernel.root(false));
+        for arc in 0..split {
+            forward = kernel.extend(&forward, arc, true).unwrap().unwrap().0;
+        }
+        for arc in (split..2).rev() {
+            backward = kernel.extend(&backward, arc, false).unwrap().unwrap().0;
+        }
+        let result = graph.reconstruct_paired_machine_join(0, &forward, &backward, budget);
+        let FrontierOutcome::Complete(record) = result else {
+            panic!("slopes={slopes:?}, rates={rates:?}, split={split}: {result:?}")
+        };
+        assert_eq!(
+            record.path.base,
+            values[5..8],
+            "slopes={slopes:?}, rates={rates:?}, split={split}"
+        );
+        assert_eq!(
+            record.path.dependent,
+            values[8..11],
+            "slopes={slopes:?}, rates={rates:?}, split={split}"
+        );
+        assert_eq!(
+            record.initial_waiting, values[11],
+            "slopes={slopes:?}, rates={rates:?}, split={split}"
+        );
+        assert_eq!(
+            record.path.waiting,
+            values[12..14],
+            "slopes={slopes:?}, rates={rates:?}, split={split}"
+        );
+        assert_eq!(
+            record.path.dependent[2], values[14],
+            "slopes={slopes:?}, rates={rates:?}, split={split}"
+        );
+    }
+}
+
+#[test]
+fn paired_piecewise_fractional_waiting_recorder_matches_native_capture() {
+    use baldes::graph::coupled::descriptor::{
+        FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
+    };
+    use baldes::graph::coupled::{MachineArcFunctionInput, PairedResourceMode};
+
+    // Native operators generated the histories; the recorder capture contains
+    // 55 complete programs plus 14 split-zero records before native failures.
+    for row in include_str!("../fixtures/coupled/piecewise_waiting_recorder_native.txt").lines() {
+        let values: Vec<f64> = row.split_whitespace().map(|v| v.parse().unwrap()).collect();
+        let slopes = [values[0], values[1]];
+        let rates = [values[2], values[3]];
+        let split = values[4] as usize;
+        let mut graph = Graph::<2>::new(3, 0).unwrap();
+        graph.add_arc(0, 1, 0.).unwrap();
+        graph.add_arc(1, 2, 0.).unwrap();
+        graph
+            .set_coupled_resources(&[CoupledResource::PairedFront {
+                mode: PairedResourceMode::CostBounded,
+            }])
+            .unwrap();
+        let windows = [
+            Window::new(0., 1.).unwrap(),
+            Window::new(3., 8.).unwrap(),
+            Window::new(6., 10.).unwrap(),
+        ];
+        let base: Vec<_> = windows[..2]
+            .iter()
+            .map(|w| {
+                PreparedSlopeFunction::from_prepared_pairs(vec![(1., w.lower), (0., w.upper)])
+                    .unwrap()
+            })
+            .collect();
+        let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+        let dependent: Vec<_> = windows[..2]
+            .iter()
+            .enumerate()
+            .map(|(arc, w)| {
+                PreparedSlopeFunction::from_prepared_pairs(vec![
+                    (4., w.lower),
+                    (slopes[arc], (w.lower + w.upper) / 2.),
+                    (-slopes[arc], w.upper),
+                ])
+                .unwrap()
+            })
+            .collect();
+        let inputs: Vec<_> = (0..2)
+            .map(|arc| MachineArcFunctionInput {
+                physical_arc: arc,
+                tail_bounds: windows[arc],
+                waiting_bounds: windows[arc + 1],
+                waiting_rate: rates[arc] as i32,
+                base: &base[arc],
+                dependent: MachineRootInput::Vector(&dependent[arc]),
+                dependent_lower: affine(0.),
+                dependent_upper: affine(100.),
+            })
+            .collect();
+        let budget = FrontierBudget::default();
+        let prepared = graph.prepare_paired_front_program_with_rates(
+            0,
+            &inputs,
+            affine(0.),
+            windows[0],
+            windows[2],
+            &rates,
+            budget,
+        );
+        assert!(
+            matches!(prepared, FrontierOutcome::Complete(())),
+            "{prepared:?}"
+        );
+        let kernel = graph.coupled_kernel().unwrap();
+        let (mut forward, mut backward) = (kernel.root(true), kernel.root(false));
+        for arc in 0..split {
+            forward = kernel.extend(&forward, arc, true).unwrap().unwrap().0;
+        }
+        for arc in (split..2).rev() {
+            backward = kernel.extend(&backward, arc, false).unwrap().unwrap().0;
+        }
+        let result = graph.reconstruct_paired_machine_join(0, &forward, &backward, budget);
+        let FrontierOutcome::Complete(record) = result else {
+            panic!("slopes={slopes:?}, rates={rates:?}, split={split}: {result:?}")
+        };
+        assert_eq!(
+            record.path.base,
+            values[5..8],
+            "slopes={slopes:?}, rates={rates:?}, split={split}"
+        );
+        assert_eq!(
+            record.path.dependent,
+            values[8..11],
+            "slopes={slopes:?}, rates={rates:?}, split={split}"
+        );
+        assert_eq!(
+            record.initial_waiting, values[11],
+            "slopes={slopes:?}, rates={rates:?}, split={split}"
+        );
+        assert_eq!(
+            record.path.waiting,
+            values[12..14],
+            "slopes={slopes:?}, rates={rates:?}, split={split}"
+        );
+        assert_eq!(
+            record.path.dependent[2], values[14],
+            "slopes={slopes:?}, rates={rates:?}, split={split}"
+        );
+    }
+}
+
+#[test]
+fn paired_piecewise_native_backward_domain_failure_is_reported() {
+    use baldes::graph::coupled::descriptor::{
+        FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
+    };
+    use baldes::graph::coupled::{MachineArcFunctionInput, PairedResourceMode};
+
+    // Native operators generated the histories; the recorder capture contains
+    // 55 complete programs plus 14 split-zero records before native failures.
+    for row in include_str!("../fixtures/coupled/piecewise_backward_failure_native.txt").lines() {
+        let values: Vec<f64> = row.split_whitespace().map(|v| v.parse().unwrap()).collect();
+        let slopes = [values[0], values[1]];
+        let rates = [values[2], values[3]];
+        let mut graph = Graph::<2>::new(3, 0).unwrap();
+        graph.add_arc(0, 1, 0.).unwrap();
+        graph.add_arc(1, 2, 0.).unwrap();
+        graph
+            .set_coupled_resources(&[CoupledResource::PairedFront {
+                mode: PairedResourceMode::CostBounded,
+            }])
+            .unwrap();
+        let windows = [
+            Window::new(0., 1.).unwrap(),
+            Window::new(3., 8.).unwrap(),
+            Window::new(6., 10.).unwrap(),
+        ];
+        let base: Vec<_> = windows[..2]
+            .iter()
+            .map(|w| {
+                PreparedSlopeFunction::from_prepared_pairs(vec![(1., w.lower), (0., w.upper)])
+                    .unwrap()
+            })
+            .collect();
+        let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+        let dependent: Vec<_> = windows[..2]
+            .iter()
+            .enumerate()
+            .map(|(arc, w)| {
+                PreparedSlopeFunction::from_prepared_pairs(vec![
+                    (4., w.lower),
+                    (slopes[arc], (w.lower + w.upper) / 2.),
+                    (-slopes[arc], w.upper),
+                ])
+                .unwrap()
+            })
+            .collect();
+        let inputs: Vec<_> = (0..2)
+            .map(|arc| MachineArcFunctionInput {
+                physical_arc: arc,
+                tail_bounds: windows[arc],
+                waiting_bounds: windows[arc + 1],
+                waiting_rate: rates[arc] as i32,
+                base: &base[arc],
+                dependent: MachineRootInput::Vector(&dependent[arc]),
+                dependent_lower: affine(0.),
+                dependent_upper: affine(100.),
+            })
+            .collect();
+        let budget = FrontierBudget::default();
+        let prepared = graph.prepare_paired_front_program_with_rates(
+            0,
+            &inputs,
+            affine(0.),
+            windows[0],
+            windows[2],
+            &rates,
+            budget,
+        );
+        assert!(
+            matches!(prepared, FrontierOutcome::Complete(())),
+            "{prepared:?}"
+        );
+        let kernel = graph.coupled_kernel().unwrap();
+        let backward = kernel
+            .extend(&kernel.root(false), 1, false)
+            .unwrap()
+            .unwrap()
+            .0;
+        let error = kernel.extend(&backward, 0, false).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("machine reverse waiting invalid empty count"),
+            "slopes={slopes:?}, rates={rates:?}: {error}"
+        );
+    }
+}
+
+#[test]
+fn paired_piecewise_native_forward_domain_failure_is_reported() {
+    use baldes::graph::coupled::descriptor::{
+        FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
+    };
+    use baldes::graph::coupled::{MachineArcFunctionInput, PairedResourceMode};
+
+    // Native operators generated the histories; the recorder capture contains
+    // 55 complete programs plus 14 split-zero records before native failures.
+    for row in include_str!("../fixtures/coupled/piecewise_forward_failure_native.txt").lines() {
+        let values: Vec<f64> = row.split_whitespace().map(|v| v.parse().unwrap()).collect();
+        let slopes = [values[0], values[1]];
+        let rates = [values[2], values[3]];
+        let mut graph = Graph::<2>::new(3, 0).unwrap();
+        graph.add_arc(0, 1, 0.).unwrap();
+        graph.add_arc(1, 2, 0.).unwrap();
+        graph
+            .set_coupled_resources(&[CoupledResource::PairedFront {
+                mode: PairedResourceMode::CostBounded,
+            }])
+            .unwrap();
+        let windows = [
+            Window::new(0., 1.).unwrap(),
+            Window::new(3., 8.).unwrap(),
+            Window::new(6., 10.).unwrap(),
+        ];
+        let base: Vec<_> = windows[..2]
+            .iter()
+            .map(|w| {
+                PreparedSlopeFunction::from_prepared_pairs(vec![(1., w.lower), (0., w.upper)])
+                    .unwrap()
+            })
+            .collect();
+        let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+        let dependent: Vec<_> = windows[..2]
+            .iter()
+            .enumerate()
+            .map(|(arc, w)| {
+                PreparedSlopeFunction::from_prepared_pairs(vec![
+                    (4., w.lower),
+                    (slopes[arc], (w.lower + w.upper) / 2.),
+                    (-slopes[arc], w.upper),
+                ])
+                .unwrap()
+            })
+            .collect();
+        let inputs: Vec<_> = (0..2)
+            .map(|arc| MachineArcFunctionInput {
+                physical_arc: arc,
+                tail_bounds: windows[arc],
+                waiting_bounds: windows[arc + 1],
+                waiting_rate: rates[arc] as i32,
+                base: &base[arc],
+                dependent: MachineRootInput::Vector(&dependent[arc]),
+                dependent_lower: affine(0.),
+                dependent_upper: affine(100.),
+            })
+            .collect();
+        let budget = FrontierBudget::default();
+        let prepared = graph.prepare_paired_front_program_with_rates(
+            0,
+            &inputs,
+            affine(0.),
+            windows[0],
+            windows[2],
+            &rates,
+            budget,
+        );
+        assert!(
+            matches!(prepared, FrontierOutcome::Complete(())),
+            "{prepared:?}"
+        );
+        let kernel = graph.coupled_kernel().unwrap();
+        let error = kernel.extend(&kernel.root(true), 0, true).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("machine waiting produced no segments"),
+            "slopes={slopes:?}, rates={rates:?}: {error}"
+        );
+    }
+}
+
+#[test]
+fn custom_resource_recorder_matches_native_signed_paths_at_every_split() {
+    // Native callbacks build each retained label state; native recordBestSolution
+    // then replays the whole path and compares the supplied joined states.
+    for row in include_str!("../fixtures/coupled/custom_recorder_native.txt").lines() {
+        let values: Vec<f64> = row.split_whitespace().map(|v| v.parse().unwrap()).collect();
+        let split = values[1] as usize;
+        let mut graph = Graph::<2>::new(4, 0).unwrap();
+        for arc in 0..3 {
+            graph.add_arc(arc, arc + 1, 0.).unwrap();
+        }
+        graph
+            .set_coupled_resources(&[CoupledResource::CustomResource {
+                increments: values[2..5].to_vec(),
+                weights: values[5..8].to_vec(),
+                forward_bound: None,
+                backward_bound: None,
+            }])
+            .unwrap();
+        let kernel = graph.coupled_kernel().unwrap();
+        let (mut forward, mut backward) = (kernel.root(true), kernel.root(false));
+        for arc in 0..split {
+            forward = kernel.extend(&forward, arc, true).unwrap().unwrap().0;
+        }
+        for arc in (split..3).rev() {
+            backward = kernel.extend(&backward, arc, false).unwrap().unwrap().0;
+        }
+        assert_eq!(
+            kernel
+                .record_custom_machine_path(&[0, 1, 2], &forward, &backward)
+                .unwrap(),
+            Some(values[8]),
+            "seed={}, split={split}",
+            values[0]
+        );
+    }
+}
+
+#[test]
+fn custom_resource_recorder_matches_registered_native_solver_paths() {
+    // The reference registered model returned these physical arc IDs and raw
+    // custom-resource values at both forward and backward terminal splits.
+    let mut graph = Graph::<2>::new(4, 0).unwrap();
+    for (tail, head) in [(0, 3), (0, 1), (1, 3), (0, 2), (2, 3)] {
+        graph.add_arc(tail, head, 0.).unwrap();
+    }
+    graph
+        .set_coupled_resources(&[CoupledResource::CustomResource {
+            increments: vec![0., 2., 1., 1., 2.],
+            weights: vec![0., 1., 3., 2., 0.],
+            forward_bound: None,
+            backward_bound: None,
+        }])
+        .unwrap();
+    let kernel = graph.coupled_kernel().unwrap();
+    for (arcs, value) in [([3, 4], 2.), ([1, 2], 11.)] {
+        for split in [0, 2] {
+            let (mut forward, mut backward) = (kernel.root(true), kernel.root(false));
+            for &arc in &arcs[..split] {
+                forward = kernel.extend(&forward, arc, true).unwrap().unwrap().0;
+            }
+            for &arc in arcs[split..].iter().rev() {
+                backward = kernel.extend(&backward, arc, false).unwrap().unwrap().0;
+            }
+            assert_eq!(
+                kernel
+                    .record_custom_machine_path(&arcs, &forward, &backward)
+                    .unwrap(),
+                Some(value),
+                "arcs={arcs:?}, split={split}"
+            );
+        }
+    }
+}
+
+#[test]
+fn enumerated_custom_recorder_preserves_registered_native_values() {
+    // Native registered pricing recorded [1,2] at 11 and [3,4] at 2 in
+    // both terminal directions. Enumeration retains the same custom states.
+    for direction in [0., 1., 2.] {
+        let mut solver = baldes::pricing::Solver::<2>::new(4, 1).unwrap();
+        for vertex in 0..4 {
+            solver.graph.set_bounds(vertex, 0, 0., 4.).unwrap();
+        }
+        for (id, tail, head, cost) in [
+            (1, 0, 1, -10.),
+            (2, 1, 3, 0.),
+            (3, 0, 2, -9.),
+            (4, 2, 3, 0.),
+        ] {
+            solver.graph.add_arc_with_id(id, tail, head, cost).unwrap();
+            solver.graph.arc_mut(id).unwrap().consumption[0] = 1.;
+        }
+        solver
+            .graph
+            .set_coupled_resources(&[CoupledResource::CustomResource {
+                increments: vec![2., 1., 1., 2.],
+                weights: vec![1., 3., 2., 0.],
+                forward_bound: None,
+                backward_bound: None,
+            }])
+            .unwrap();
+        solver.enumeration_preserve_arc_paths = true;
+        solver
+            .set_option("BALDESuseBidirectionalSearch", direction)
+            .unwrap();
+        let routes = solver.enumerate(100.).unwrap();
+        assert_eq!(routes.len(), 2, "direction={direction}");
+        for (path, expected) in [([1, 2], 11.), ([3, 4], 2.)] {
+            assert!(routes.iter().any(|route| route.arcs == path));
+            assert_eq!(
+                solver.record_enumerated_custom_machine_path(&path).unwrap(),
+                Some(expected),
+                "direction={direction}, path={path:?}"
+            );
+        }
+        let mut sibling = solver.fork_for_node();
+        let retained = solver.inspect_enumeration(0.).unwrap().unwrap();
+        assert_eq!(retained.len(), 1, "direction={direction}");
+        assert_eq!(retained[0].arcs, [3, 4]);
+        assert_eq!(
+            solver
+                .record_enumerated_custom_machine_path(&[3, 4])
+                .unwrap(),
+            Some(2.)
+        );
+        assert_eq!(
+            solver
+                .record_enumerated_custom_machine_path(&[1, 2])
+                .unwrap(),
+            None
+        );
+        assert_eq!(sibling.inspect_enumeration(100.).unwrap().unwrap().len(), 2);
+        assert_eq!(
+            sibling
+                .record_enumerated_custom_machine_path(&[1, 2])
+                .unwrap(),
+            Some(11.)
+        );
+    }
+}
+
+#[test]
+fn custom_recorder_matches_native_cancellation_acceptance_and_values() {
+    // Native callbacks and recorder ran in separate processes per case, because
+    // its failed tolerance checks terminate the process. Inputs are finite.
+    for row in include_str!("../fixtures/coupled/custom_recorder_cancellation_native.txt").lines() {
+        let values: Vec<f64> = row.split_whitespace().map(|v| v.parse().unwrap()).collect();
+        let split = values[1] as usize;
+        let mut graph = Graph::<2>::new(4, 0).unwrap();
+        for arc in 0..3 {
+            graph.add_arc(arc, arc + 1, 0.).unwrap();
+        }
+        graph
+            .set_coupled_resources(&[CoupledResource::CustomResource {
+                increments: values[2..5].to_vec(),
+                weights: values[5..8].to_vec(),
+                forward_bound: None,
+                backward_bound: None,
+            }])
+            .unwrap();
+        let kernel = graph.coupled_kernel().unwrap();
+        let (mut forward, mut backward) = (kernel.root(true), kernel.root(false));
+        for arc in 0..split {
+            forward = kernel.extend(&forward, arc, true).unwrap().unwrap().0;
+        }
+        for arc in (split..3).rev() {
+            backward = kernel.extend(&backward, arc, false).unwrap().unwrap().0;
+        }
+        let actual = kernel
+            .record_custom_machine_path(&[0, 1, 2], &forward, &backward)
+            .unwrap();
+        let expected = (values[8] == 1.).then_some(values[9]);
+        assert_eq!(
+            actual.map(f64::to_bits),
+            expected.map(f64::to_bits),
+            "seed={}, split={split}",
+            values[0]
+        );
+    }
+}
+
+#[test]
+fn custom_join_wrappers_match_native_cancellation_and_sentinel_cases() {
+    // Native 0x605cd0 wraps the actual callbacks; both directions, cancellation,
+    // signed zero and values adjacent to its 1e12 rejection sentinel are covered.
+    for row in include_str!("../fixtures/coupled/custom_join_wrapper_native.txt").lines() {
+        let fields: Vec<_> = row.split_whitespace().collect();
+        let seed: i32 = fields[0].parse().unwrap();
+        let split: usize = fields[1].parse().unwrap();
+        let symmetric = fields[2] == "1";
+        let previous = f64::from_bits(fields[3].parse().unwrap());
+        let accepted = fields[4] == "1";
+        let expected: u64 = fields[5].parse().unwrap();
+        let increments: Vec<f64> = fields[6..9].iter().map(|v| v.parse().unwrap()).collect();
+        let weights: Vec<f64> = fields[9..12].iter().map(|v| v.parse().unwrap()).collect();
+        let mut graph = Graph::<2>::new(4, 0).unwrap();
+        for arc in 0..3 {
+            graph.add_arc(arc, arc + 1, 0.).unwrap();
+        }
+        graph
+            .set_coupled_resources(&[CoupledResource::CustomResource {
+                increments,
+                weights,
+                forward_bound: None,
+                backward_bound: None,
+            }])
+            .unwrap();
+        let kernel = graph.coupled_kernel().unwrap();
+        let mut left = kernel.root(true);
+        for arc in 0..split {
+            left = kernel.extend(&left, arc, true).unwrap().unwrap().0;
+        }
+        let mut right = kernel.root(symmetric);
+        if symmetric {
+            for arc in split..3 {
+                right = kernel.extend(&right, arc, true).unwrap().unwrap().0;
+            }
+        } else {
+            for arc in (split..3).rev() {
+                right = kernel.extend(&right, arc, false).unwrap().unwrap().0;
+            }
+        }
+        let result = if symmetric {
+            kernel.custom_machine_resource_forward_join(0, &left, &right, previous)
+        } else {
+            kernel.custom_machine_resource_join(0, &left, &right, previous)
+        }
+        .unwrap();
+        assert_eq!(
+            result.map(f64::to_bits),
+            accepted.then_some(expected),
+            "seed={seed}, split={split}, symmetric={symmetric}, previous={previous:?}"
         );
     }
 }

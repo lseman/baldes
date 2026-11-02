@@ -192,6 +192,9 @@ impl Route {
 #[cfg(test)]
 #[path = "../../tests/unit/labeling/identity_tests.rs"]
 mod identity_tests;
+#[cfg(test)]
+#[path = "../../tests/unit/labeling/standard_join_tests.rs"]
+mod standard_join_tests;
 #[derive(Clone, Debug, Default)]
 pub struct Statistics {
     pub generated: usize,

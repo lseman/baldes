@@ -19,6 +19,7 @@ fn solver() -> Solver<2> {
         arc_memory: BTreeSet::new(),
         graph_arc_memories: BTreeMap::new(),
         arc_weights: BTreeMap::new(),
+        graph_arc_weights: Default::default(),
         visit_once: false,
         type2: false,
         denominator: 2,

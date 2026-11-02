@@ -1,4 +1,13 @@
 use super::*;
+use crate::rng::Xoroshiro128Plus;
+
+fn next_search_random<const COVERING: bool>(search: &LocalSearch<COVERING>) -> u64 {
+    if COVERING {
+        u64::from(search.covering_rng.clone().next())
+    } else {
+        search.rng.clone().next()
+    }
+}
 use crate::cuts::rank_one::separation::{
     five_or_more_row_denominator, five_or_more_row_numerators, five_or_more_row_rhs, GraphData,
     Incidence, Parameters,
@@ -274,7 +283,7 @@ fn check<const COVERING: bool>(iterations: i32, checks: bool, neighbours: bool) 
         snapshots.push((
             expected_parent.arena.clone(),
             expected_cuts.ordered(),
-            expected_search.rng.clone().next(),
+            next_search_random(&expected_search),
             expected_parent.round_cut_counter,
         ));
     }
@@ -291,7 +300,7 @@ fn check<const COVERING: bool>(iterations: i32, checks: bool, neighbours: bool) 
             for (&(rows, kind), expected) in classes.iter().zip(&snapshots) {
                 call(&mut actual_search, &mut actual_parent, &columns, &mut actual_cuts, rows, kind, false);
                 assert_eq!(&(actual_parent.arena.clone(), actual_cuts.ordered(),
-                    actual_search.rng.clone().next(), actual_parent.round_cut_counter), expected,
+                    next_search_random(&actual_search), actual_parent.round_cut_counter), expected,
                     "covering={COVERING}, rows={rows}, kind={kind}, starts={iterations}, checks={checks}, neighbours={neighbours}, threads={threads}");
             }
         });
@@ -380,7 +389,7 @@ fn parallel_starts_keep_first_duplicate_and_covering_signs_across_batches() {
                 .numerators
                 .iter()
                 .all(|&m| (m < 0) == COVERING));
-            outputs.push((state.arena, cuts.ordered(), search.rng.clone().next()));
+            outputs.push((state.arena, cuts.ordered(), next_search_random(&search)));
         }
         assert_eq!(outputs[0], outputs[1]);
     }
@@ -409,7 +418,7 @@ fn measure<const COVERING: bool>(rows: i32, iterations: i32) {
                     let start = Instant::now();
                     call(&mut search, &mut state, &columns, &mut cuts, rows, 0, reference);
                     let elapsed = start.elapsed().as_secs_f64() * 1000.0;
-                    let actual = (state.arena, cuts.ordered(), search.rng.clone().next());
+                    let actual = (state.arena, cuts.ordered(), next_search_random(&search));
                     if let Some(ref expected) = expected { assert_eq!(&actual, expected); }
                     else { expected = Some(actual.clone()); }
                     std::hint::black_box(actual);

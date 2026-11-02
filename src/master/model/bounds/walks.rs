@@ -111,8 +111,8 @@ fn penalty<const D: usize>(
         for &(_, head, id) in path {
             magnitude =
                 magnitude.checked_add(i64::from(input.weight_for_graph(graph, head)).abs())?;
-            magnitude = magnitude
-                .checked_add(i64::from(input.arc_weights.get(&id).copied().unwrap_or(0)).abs())?;
+            magnitude =
+                magnitude.checked_add(i64::from(input.arc_weight_for_graph(graph, id)).abs())?;
         }
         if magnitude > i64::from(i32::MAX) || path.len() > i32::MAX as usize {
             return None;

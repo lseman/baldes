@@ -306,6 +306,9 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                     );
                 }
             }
+            if COVERING {
+                parent.covering_search_rng = self.covering_rng.clone();
+            }
             return;
         }
         // The bound depends on the column counts and multiplier multiset,
@@ -341,6 +344,9 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                 denominator,
                 class,
             );
+        }
+        if COVERING {
+            parent.covering_search_rng = self.covering_rng.clone();
         }
     }
 

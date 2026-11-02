@@ -411,6 +411,9 @@ pub struct Separation {
     pub neighbours_208: Vec<Bits>,
     /// Candidate arena; the candidate set holds indices into it.
     pub arena: Vec<SeparatedCut>,
+    /// Random stream retained across covering-search rounds.
+    #[doc(hidden)]
+    pub covering_search_rng: crate::rng::GnuRand,
 }
 
 /// All distinct permutations of a multiset, in recursive swap order.

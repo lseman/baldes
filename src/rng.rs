@@ -130,15 +130,18 @@ impl Xoroshiro128Plus {
 #[path = "../tests/unit/rng/tests.rs"]
 mod tests;
 
-/// Isolated GNU libc `rand()` sequence used by recovered master heuristics.
-/// This preserves native draws without mutating the process-global C RNG.
+/// Isolated GNU libc `rand()` sequence.
+#[doc(hidden)]
 #[derive(Clone, Debug)]
-#[cfg(any(feature = "clp", test))]
-pub(crate) struct GnuRand {
+pub struct GnuRand {
     state: [u32; 31],
     cursor: usize,
 }
-#[cfg(any(feature = "clp", test))]
+impl Default for GnuRand {
+    fn default() -> Self {
+        Self::new(1)
+    }
+}
 impl GnuRand {
     pub(crate) fn new(seed: u32) -> Self {
         let seed = if seed == 0 { 1 } else { seed };

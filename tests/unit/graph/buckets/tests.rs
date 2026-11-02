@@ -292,3 +292,20 @@ fn bucket_refinement_indexes_old_cells_with_the_grid_row_width() {
         }
     }
 }
+
+#[test]
+fn automatic_grid_preserves_large_scaled_window_precision() {
+    use super::{BucketGraph, Graph};
+    let mut graph = Graph::<2>::new(3, 1).unwrap();
+    for vertex in 0..3 {
+        graph.set_bounds(vertex, 0, 0., 220_000.1234).unwrap();
+    }
+    let arc = graph.add_arc(0, 1, 0.).unwrap();
+    graph.arc_mut(arc).unwrap().consumption[0] = 1.;
+    graph.add_arc(1, 2, 0.).unwrap();
+    let grid = BucketGraph::prepare(&graph, [0.; 2], 25, true).unwrap();
+    assert_eq!(grid.step[0].to_bits(), 8_800.005_f64.to_bits());
+    // The captured reference binary converts the scaled window to i32 and
+    // obtains 8_800.0048; retaining the exact grid unit avoids that overflow.
+    assert_ne!(grid.step[0].to_bits(), 8_800.0048_f64.to_bits());
+}

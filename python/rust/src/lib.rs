@@ -440,6 +440,7 @@ impl Solver {
                 arc_memory: arc_memory.into_iter().collect(),
                 graph_arc_memories: Default::default(),
                 arc_weights: Default::default(),
+                graph_arc_weights: Default::default(),
                 visit_once: false,
                 type2: false,
                 denominator,

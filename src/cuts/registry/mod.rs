@@ -65,6 +65,9 @@ pub struct RankOneCut {
     pub arc_memory: BTreeSet<i32>,
     pub graph_arc_memories: BTreeMap<i32, BTreeSet<i32>>,
     pub arc_weights: BTreeMap<i32, i32>,
+    /// Arc weights indexed by graph and local arc ID. When nonempty, a
+    /// missing graph has no weighted arcs; otherwise `arc_weights` is used.
+    pub graph_arc_weights: BTreeMap<i32, BTreeMap<i32, i32>>,
     pub visit_once: bool,
     pub type2: bool,
     pub denominator: i32,
@@ -77,6 +80,21 @@ pub struct RankOneCut {
     pub ordered_support: Option<Vec<(usize, i32)>>,
 }
 impl RankOneCut {
+    pub fn arc_weights_for_graph(&self, graph: i32) -> Option<&BTreeMap<i32, i32>> {
+        if self.graph_arc_weights.is_empty() {
+            Some(&self.arc_weights)
+        } else {
+            self.graph_arc_weights.get(&graph)
+        }
+    }
+
+    pub fn arc_weight_for_graph(&self, graph: i32, arc: i32) -> i32 {
+        self.arc_weights_for_graph(graph)
+            .and_then(|weights| weights.get(&arc))
+            .copied()
+            .unwrap_or(0)
+    }
+
     pub fn weight_for_graph(&self, graph: i32, vertex: usize) -> i32 {
         if self.graph_support.is_empty() {
             return self.weights.get(vertex).copied().unwrap_or(0);
@@ -161,6 +179,9 @@ impl RankOneCut {
 #[derive(Clone, Debug)]
 pub struct FractionalColumn {
     pub vertices: Vec<usize>,
+    /// Exact physical arc IDs, including source and sink arcs, when known.
+    /// `None` retains vertex-only route reconstruction.
+    pub arc_ids: Option<Vec<i32>>,
     pub value: f64,
     pub graph_id: i32,
     pub enumerated: bool,
@@ -250,15 +271,18 @@ pub struct CutRegistry {
     pub parameters: SeparationParameters,
     pub separation_phase: i32,
     pub covering_sets_present: bool,
-    /// Endpoints -> (tail, head, smallest physical arc ID), for the graph
-    /// with this many arcs.
+    /// Cached endpoint lookup and the exact arc identity it describes.
     ends: std::cell::RefCell<(
         usize,
         std::collections::HashMap<(usize, usize), (usize, usize, i32)>,
+        Vec<(i32, usize, usize)>,
     )>,
 }
 
 mod cloning;
+mod incidence_registration;
+mod incidence_separator;
+pub use incidence_separator::IncidenceCutSeparator;
 
 fn physical_arcs<'a, const D: usize>(
     g: &'a Graph<D>,
@@ -317,7 +341,9 @@ pub fn coefficient(
         && (input.type2 || input.class == CutClass::Packing)
         && input.memory_kind == MemoryKind::Vertex
         && input.graph_support.is_empty()
-        && input.arc_weights.is_empty()
+        && input
+            .arc_weights_for_graph(graph)
+            .is_none_or(BTreeMap::is_empty)
     {
         let memory = if input.graph_dependent_memory {
             input.graph_memories.get(&graph)
@@ -388,7 +414,10 @@ pub fn coefficient(
         {
             return Ok(0);
         }
-        if !input.arc_weights.is_empty() {
+        if input
+            .arc_weights_for_graph(graph)
+            .is_some_and(|w| !w.is_empty())
+        {
             return Err(invalid("native strong k-path requires vertex support"));
         }
         let mut inside = false;
@@ -455,13 +484,9 @@ pub fn coefficient(
         if w != 0 {
             step(sign * w);
         }
-        if let Some(&aw) = (!input.arc_weights.is_empty())
-            .then(|| input.arc_weights.get(&id))
-            .flatten()
-        {
-            if aw != 0 {
-                step(sign * aw);
-            }
+        let aw = input.arc_weight_for_graph(graph, id);
+        if aw != 0 {
+            step(sign * aw);
         }
     }
     Ok(count)

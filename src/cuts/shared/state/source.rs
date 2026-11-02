@@ -51,6 +51,7 @@ fn same_cut_shape(a: &RankOneCut, b: &RankOneCut) -> bool {
         arc_memory,
         graph_arc_memories,
         arc_weights,
+        graph_arc_weights,
         visit_once,
         type2,
         denominator,
@@ -72,6 +73,7 @@ fn same_cut_shape(a: &RankOneCut, b: &RankOneCut) -> bool {
         && arc_memory == &b.arc_memory
         && graph_arc_memories == &b.graph_arc_memories
         && arc_weights == &b.arc_weights
+        && graph_arc_weights == &b.graph_arc_weights
         && visit_once == &b.visit_once
         && type2 == &b.type2
         && denominator == &b.denominator

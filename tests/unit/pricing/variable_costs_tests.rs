@@ -470,6 +470,7 @@ fn raw_workspace_refreshes_cut_shapes_duals_and_rollback_budgets() {
         arc_memory: Default::default(),
         graph_arc_memories: Default::default(),
         arc_weights: Default::default(),
+        graph_arc_weights: Default::default(),
         visit_once: false,
         type2: false,
         denominator: 2,

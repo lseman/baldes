@@ -38,6 +38,7 @@ impl Clone for CutRegistry {
         let target_ends = self.ends.get_mut();
         target_ends.0 = source_ends.0;
         target_ends.1.clone_from(&source_ends.1);
+        target_ends.2.clone_from(&source_ends.2);
     }
 }
 
@@ -57,6 +58,7 @@ fn clone_cut_into(source: &RankOneCut, target: &mut RankOneCut) {
         arc_memory,
         graph_arc_memories,
         arc_weights,
+        graph_arc_weights,
         visit_once,
         type2,
         denominator,
@@ -80,6 +82,7 @@ fn clone_cut_into(source: &RankOneCut, target: &mut RankOneCut) {
     target.arc_memory.clone_from(arc_memory);
     target.graph_arc_memories.clone_from(graph_arc_memories);
     target.arc_weights.clone_from(arc_weights);
+    target.graph_arc_weights.clone_from(graph_arc_weights);
     target.ordered_support.clone_from(ordered_support);
     target.graph_dependent_memory = *graph_dependent_memory;
     target.memory_kind = *memory_kind;
