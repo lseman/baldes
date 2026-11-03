@@ -1,0 +1,962 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "arcs": [
+    {
+      "id": 0,
+      "tail": 0,
+      "head": 1
+    },
+    {
+      "id": 1,
+      "tail": 1,
+      "head": 10
+    },
+    {
+      "id": 2,
+      "tail": 1,
+      "head": 2
+    },
+    {
+      "id": 3,
+      "tail": 1,
+      "head": 3
+    },
+    {
+      "id": 4,
+      "tail": 1,
+      "head": 4
+    },
+    {
+      "id": 5,
+      "tail": 1,
+      "head": 5
+    },
+    {
+      "id": 6,
+      "tail": 1,
+      "head": 6
+    },
+    {
+      "id": 7,
+      "tail": 1,
+      "head": 7
+    },
+    {
+      "id": 8,
+      "tail": 1,
+      "head": 8
+    },
+    {
+      "id": 9,
+      "tail": 1,
+      "head": 9
+    },
+    {
+      "id": 10,
+      "tail": 0,
+      "head": 2
+    },
+    {
+      "id": 11,
+      "tail": 2,
+      "head": 10
+    },
+    {
+      "id": 12,
+      "tail": 2,
+      "head": 1
+    },
+    {
+      "id": 13,
+      "tail": 2,
+      "head": 3
+    },
+    {
+      "id": 14,
+      "tail": 2,
+      "head": 4
+    },
+    {
+      "id": 15,
+      "tail": 2,
+      "head": 5
+    },
+    {
+      "id": 16,
+      "tail": 2,
+      "head": 6
+    },
+    {
+      "id": 17,
+      "tail": 2,
+      "head": 7
+    },
+    {
+      "id": 18,
+      "tail": 2,
+      "head": 8
+    },
+    {
+      "id": 19,
+      "tail": 2,
+      "head": 9
+    },
+    {
+      "id": 20,
+      "tail": 0,
+      "head": 3
+    },
+    {
+      "id": 21,
+      "tail": 3,
+      "head": 10
+    },
+    {
+      "id": 22,
+      "tail": 3,
+      "head": 1
+    },
+    {
+      "id": 23,
+      "tail": 3,
+      "head": 2
+    },
+    {
+      "id": 24,
+      "tail": 3,
+      "head": 4
+    },
+    {
+      "id": 25,
+      "tail": 3,
+      "head": 5
+    },
+    {
+      "id": 26,
+      "tail": 3,
+      "head": 6
+    },
+    {
+      "id": 27,
+      "tail": 3,
+      "head": 7
+    },
+    {
+      "id": 28,
+      "tail": 3,
+      "head": 8
+    },
+    {
+      "id": 29,
+      "tail": 3,
+      "head": 9
+    },
+    {
+      "id": 30,
+      "tail": 0,
+      "head": 4
+    },
+    {
+      "id": 31,
+      "tail": 4,
+      "head": 10
+    },
+    {
+      "id": 32,
+      "tail": 4,
+      "head": 1
+    },
+    {
+      "id": 33,
+      "tail": 4,
+      "head": 2
+    },
+    {
+      "id": 34,
+      "tail": 4,
+      "head": 3
+    },
+    {
+      "id": 35,
+      "tail": 4,
+      "head": 5
+    },
+    {
+      "id": 36,
+      "tail": 4,
+      "head": 6
+    },
+    {
+      "id": 37,
+      "tail": 4,
+      "head": 7
+    },
+    {
+      "id": 38,
+      "tail": 4,
+      "head": 8
+    },
+    {
+      "id": 39,
+      "tail": 4,
+      "head": 9
+    },
+    {
+      "id": 40,
+      "tail": 0,
+      "head": 5
+    },
+    {
+      "id": 41,
+      "tail": 5,
+      "head": 10
+    },
+    {
+      "id": 42,
+      "tail": 5,
+      "head": 1
+    },
+    {
+      "id": 43,
+      "tail": 5,
+      "head": 2
+    },
+    {
+      "id": 44,
+      "tail": 5,
+      "head": 3
+    },
+    {
+      "id": 45,
+      "tail": 5,
+      "head": 4
+    },
+    {
+      "id": 46,
+      "tail": 5,
+      "head": 6
+    },
+    {
+      "id": 47,
+      "tail": 5,
+      "head": 7
+    },
+    {
+      "id": 48,
+      "tail": 5,
+      "head": 8
+    },
+    {
+      "id": 49,
+      "tail": 5,
+      "head": 9
+    },
+    {
+      "id": 50,
+      "tail": 0,
+      "head": 6
+    },
+    {
+      "id": 51,
+      "tail": 6,
+      "head": 10
+    },
+    {
+      "id": 52,
+      "tail": 6,
+      "head": 1
+    },
+    {
+      "id": 53,
+      "tail": 6,
+      "head": 2
+    },
+    {
+      "id": 54,
+      "tail": 6,
+      "head": 3
+    },
+    {
+      "id": 55,
+      "tail": 6,
+      "head": 4
+    },
+    {
+      "id": 56,
+      "tail": 6,
+      "head": 5
+    },
+    {
+      "id": 57,
+      "tail": 6,
+      "head": 7
+    },
+    {
+      "id": 58,
+      "tail": 6,
+      "head": 8
+    },
+    {
+      "id": 59,
+      "tail": 6,
+      "head": 9
+    },
+    {
+      "id": 60,
+      "tail": 0,
+      "head": 7
+    },
+    {
+      "id": 61,
+      "tail": 7,
+      "head": 10
+    },
+    {
+      "id": 62,
+      "tail": 7,
+      "head": 1
+    },
+    {
+      "id": 63,
+      "tail": 7,
+      "head": 2
+    },
+    {
+      "id": 64,
+      "tail": 7,
+      "head": 3
+    },
+    {
+      "id": 65,
+      "tail": 7,
+      "head": 4
+    },
+    {
+      "id": 66,
+      "tail": 7,
+      "head": 5
+    },
+    {
+      "id": 67,
+      "tail": 7,
+      "head": 6
+    },
+    {
+      "id": 68,
+      "tail": 7,
+      "head": 8
+    },
+    {
+      "id": 69,
+      "tail": 7,
+      "head": 9
+    },
+    {
+      "id": 70,
+      "tail": 0,
+      "head": 8
+    },
+    {
+      "id": 71,
+      "tail": 8,
+      "head": 10
+    },
+    {
+      "id": 72,
+      "tail": 8,
+      "head": 1
+    },
+    {
+      "id": 73,
+      "tail": 8,
+      "head": 2
+    },
+    {
+      "id": 74,
+      "tail": 8,
+      "head": 3
+    },
+    {
+      "id": 75,
+      "tail": 8,
+      "head": 4
+    },
+    {
+      "id": 76,
+      "tail": 8,
+      "head": 5
+    },
+    {
+      "id": 77,
+      "tail": 8,
+      "head": 6
+    },
+    {
+      "id": 78,
+      "tail": 8,
+      "head": 7
+    },
+    {
+      "id": 79,
+      "tail": 8,
+      "head": 9
+    },
+    {
+      "id": 80,
+      "tail": 0,
+      "head": 9
+    },
+    {
+      "id": 81,
+      "tail": 9,
+      "head": 10
+    },
+    {
+      "id": 82,
+      "tail": 9,
+      "head": 1
+    },
+    {
+      "id": 83,
+      "tail": 9,
+      "head": 2
+    },
+    {
+      "id": 84,
+      "tail": 9,
+      "head": 3
+    },
+    {
+      "id": 85,
+      "tail": 9,
+      "head": 4
+    },
+    {
+      "id": 86,
+      "tail": 9,
+      "head": 5
+    },
+    {
+      "id": 87,
+      "tail": 9,
+      "head": 6
+    },
+    {
+      "id": 88,
+      "tail": 9,
+      "head": 7
+    },
+    {
+      "id": 89,
+      "tail": 9,
+      "head": 8
+    }
+  ],
+  "calls": [
+    {
+      "columns": [
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            0,
+            9,
+            81
+          ],
+          "value": 1.0
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            10,
+            16,
+            51
+          ],
+          "value": 1.0
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            20,
+            25,
+            41
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            20,
+            27,
+            61
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            30,
+            38,
+            71
+          ],
+          "value": 1.0
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            40,
+            47,
+            61
+          ],
+          "value": 0.5
+        }
+      ],
+      "memory_type": 0,
+      "phase": 1,
+      "cuts": [
+        {
+          "descriptor": {
+            "id": 0,
+            "rhs": 2.0,
+            "kind": 1,
+            "rows": 3,
+            "class": -1,
+            "denominator": -2,
+            "numerators": [
+              -1,
+              -1,
+              -1
+            ],
+            "set_ids": [
+              2,
+              4,
+              6
+            ]
+          },
+          "memory_type": 0,
+          "memory": [
+            {
+              "graph": 7,
+              "values": [
+                3,
+                5,
+                7
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "columns": [
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            0,
+            9,
+            81
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            10,
+            12,
+            1
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            10,
+            19,
+            81
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            20,
+            27,
+            61
+          ],
+          "value": 1.0
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            30,
+            38,
+            71
+          ],
+          "value": 1.0
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            50,
+            56,
+            41
+          ],
+          "value": 1.0
+        }
+      ],
+      "memory_type": 0,
+      "phase": 4,
+      "cuts": [
+        {
+          "descriptor": {
+            "id": 1,
+            "rhs": 2.0,
+            "kind": 1,
+            "rows": 3,
+            "class": -1,
+            "denominator": -2,
+            "numerators": [
+              -1,
+              -1,
+              -1
+            ],
+            "set_ids": [
+              0,
+              1,
+              8
+            ]
+          },
+          "memory_type": 0,
+          "memory": [
+            {
+              "graph": 7,
+              "values": [
+                1,
+                2,
+                9
+              ]
+            }
+          ]
+        },
+        {
+          "descriptor": {
+            "id": 2,
+            "rhs": 3.0,
+            "kind": 1,
+            "rows": 5,
+            "class": 0,
+            "denominator": -2,
+            "numerators": [
+              -1,
+              -1,
+              -1,
+              -1,
+              -1
+            ],
+            "set_ids": [
+              0,
+              1,
+              2,
+              6,
+              8
+            ]
+          },
+          "memory_type": 0,
+          "memory": [
+            {
+              "graph": 7,
+              "values": [
+                1,
+                2,
+                3,
+                7,
+                9
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "columns": [
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            0,
+            9,
+            81
+          ],
+          "value": 1.0
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            10,
+            16,
+            51
+          ],
+          "value": 1.0
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            20,
+            27,
+            61
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            20,
+            28,
+            71
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            30,
+            35,
+            41
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            30,
+            38,
+            71
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            40,
+            47,
+            61
+          ],
+          "value": 0.5
+        }
+      ],
+      "memory_type": 0,
+      "phase": 5,
+      "cuts": [
+        {
+          "descriptor": {
+            "id": 3,
+            "rhs": 3.0,
+            "kind": 1,
+            "rows": 5,
+            "class": 1,
+            "denominator": -3,
+            "numerators": [
+              -2,
+              -1,
+              -2,
+              -1,
+              -1
+            ],
+            "set_ids": [
+              2,
+              3,
+              4,
+              6,
+              7
+            ]
+          },
+          "memory_type": 0,
+          "memory": [
+            {
+              "graph": 7,
+              "values": [
+                3,
+                4,
+                5,
+                7,
+                8
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "columns": [
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            0,
+            9,
+            81
+          ],
+          "value": 0.75
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            0,
+            7,
+            61
+          ],
+          "value": 0.25
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            10,
+            19,
+            81
+          ],
+          "value": 0.25
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            10,
+            16,
+            51
+          ],
+          "value": 0.75
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            20,
+            25,
+            41
+          ],
+          "value": 0.25
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            20,
+            27,
+            61
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            20,
+            28,
+            71
+          ],
+          "value": 0.25
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            30,
+            35,
+            41
+          ],
+          "value": 0.25
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            30,
+            38,
+            71
+          ],
+          "value": 0.75
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            50,
+            56,
+            41
+          ],
+          "value": 0.25
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            40,
+            47,
+            61
+          ],
+          "value": 0.25
+        }
+      ],
+      "memory_type": 0,
+      "phase": 5,
+      "cuts": [
+        {
+          "descriptor": {
+            "id": 4,
+            "rhs": 3.0,
+            "kind": 1,
+            "rows": 5,
+            "class": 0,
+            "denominator": -2,
+            "numerators": [
+              -1,
+              -1,
+              -1,
+              -1,
+              -1
+            ],
+            "set_ids": [
+              2,
+              3,
+              4,
+              6,
+              7
+            ]
+          },
+          "memory_type": 0,
+          "memory": [
+            {
+              "graph": 7,
+              "values": [
+                3,
+                4,
+                5,
+                7,
+                8
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

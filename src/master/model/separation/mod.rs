@@ -165,10 +165,12 @@ enum Separator {
 
 #[derive(Clone)]
 struct IncidenceRankOneState {
+    config: std::sync::Arc<RankOneIncidenceConfig>,
     separator: crate::cuts::IncidenceCutSeparator,
     active: Vec<(usize, crate::cuts::separation::SeparatedCut)>,
     graph_ids: Vec<i32>,
     memory_type: i32,
+    automatic_memory: bool,
     max_rank: i32,
 }
 
@@ -214,6 +216,51 @@ pub(super) struct CutState {
 }
 
 impl CutState {
+    pub(crate) fn incidence_config(&self) -> Option<&RankOneIncidenceConfig> {
+        self.incidence_rank_one
+            .as_ref()
+            .map(|incidence| incidence.config.as_ref())
+    }
+    pub(crate) fn incidence_history(&self) -> Option<crate::cuts::IncidenceCutSeparator> {
+        self.incidence_rank_one
+            .as_ref()
+            .map(|incidence| incidence.separator.clone())
+    }
+
+    pub(crate) fn set_incidence_history(&mut self, history: &crate::cuts::IncidenceCutSeparator) {
+        if let Some(incidence) = &mut self.incidence_rank_one {
+            incidence.separator = history.clone();
+        }
+    }
+
+    /// Continue separator search across automatic-memory checkpoint restores.
+    pub(super) fn inherit_incidence_search(&mut self, other: &Self) {
+        if let (Some(target), Some(source)) =
+            (&mut self.incidence_rank_one, &other.incidence_rank_one)
+        {
+            target.separator = source.separator.clone();
+        }
+    }
+
+    pub(super) fn automatic_incidence_memory(&self) -> bool {
+        self.incidence_rank_one
+            .as_ref()
+            .is_some_and(|incidence| incidence.automatic_memory)
+    }
+
+    pub(super) fn resolve_rank_one_memory(&mut self, memory: crate::cuts::MemoryType) {
+        self.resolved_memory_type = Some(memory);
+        if let Some(incidence) = &mut self.incidence_rank_one {
+            if incidence.automatic_memory {
+                incidence.memory_type = match memory {
+                    crate::cuts::MemoryType::Arc => 1,
+                    crate::cuts::MemoryType::AllVertices => 2,
+                    crate::cuts::MemoryType::Automatic | crate::cuts::MemoryType::Vertex => 0,
+                };
+            }
+        }
+    }
+
     pub(super) fn rank_one_cuts_present(&self) -> bool {
         self.rows
             .iter()
@@ -287,6 +334,7 @@ pub(super) fn supports_row_cleanup<const D: usize>(state: &State<D>) -> bool {
                 && oracle.knapsack_rows.is_empty()
                 && oracle.resource_groups.is_empty()
                 && oracle.ryan_foster_rows.is_empty()
+                && oracle.arc_set_branch_rows.is_empty()
         })
 }
 
@@ -499,6 +547,10 @@ fn partition_rows_have_other_contributions<const D: usize>(
                 .ryan_foster_rows
                 .iter()
                 .any(|(row, _)| contains(*row))
+            || oracle
+                .arc_set_branch_rows
+                .iter()
+                .any(|(row, _)| contains(*row))
             || oracle.resource_groups.iter().any(|(row, _)| contains(*row))
     })
 }
@@ -506,7 +558,7 @@ fn partition_rows_have_other_contributions<const D: usize>(
 fn prepare_incidence_rank_one<const D: usize>(
     state: &State<D>,
     config: &RankOneIncidenceConfig,
-) -> Result<(IncidenceRankOneState, crate::cuts::MemoryType)> {
+) -> Result<(IncidenceRankOneState, Option<crate::cuts::MemoryType>)> {
     use crate::cuts::separation::prepare_incidence;
     if config.rows.is_empty()
         || config.rows.len() >= 1024
@@ -596,18 +648,17 @@ fn prepare_incidence_rank_one<const D: usize>(
         }
     }
     let mut params = config.parameters.clone();
-    if !(1..=3).contains(&params.memory_type) {
-        return Err(invalid(
-            "explicit rank-one incidence requires a concrete memory mode",
-        ));
+    if !(0..=3).contains(&params.memory_type) {
+        return Err(invalid("explicit rank-one incidence memory mode"));
     }
-    if cfg!(feature = "rank-one-node-memory") && params.memory_type == 1 {
+    if cfg!(feature = "rank-one-node-memory") && params.memory_type <= 1 {
         params.memory_type = 2;
     }
     let resolved = match params.memory_type {
-        1 => crate::cuts::MemoryType::Arc,
-        2 => crate::cuts::MemoryType::Vertex,
-        3 => crate::cuts::MemoryType::AllVertices,
+        0 => None,
+        1 => Some(crate::cuts::MemoryType::Arc),
+        2 => Some(crate::cuts::MemoryType::Vertex),
+        3 => Some(crate::cuts::MemoryType::AllVertices),
         _ => unreachable!(),
     };
     let memory_type = match params.memory_type {
@@ -616,15 +667,18 @@ fn prepare_incidence_rank_one<const D: usize>(
         _ => 0,
     };
     let max_rank = params.max_num_rows;
+    let automatic_memory = params.memory_type == 0;
     let graph_ids = config.graphs.iter().map(|graph| graph.id).collect();
     let refs: Vec<_> = config.graphs.iter().collect();
     let separator = crate::cuts::IncidenceCutSeparator::new(params, &refs)?;
     Ok((
         IncidenceRankOneState {
+            config: std::sync::Arc::new(config.clone()),
             separator,
             active: vec![],
             graph_ids,
             memory_type,
+            automatic_memory,
             max_rank,
         },
         resolved,
@@ -636,6 +690,24 @@ fn prepare_incidence_rank_one<const D: usize>(
 /// separators and cuts and restarts the round counters for its depth.
 pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -> Result<()> {
     let separation = &options.separation;
+    let incidence_enabled = separation.rank_one_incidence.is_some()
+        || (separation.rank_one.enabled
+            && state
+                .cuts
+                .as_ref()
+                .is_some_and(|cuts| cuts.incidence_rank_one.is_some()));
+    if incidence_enabled
+        && (separation.capacity.is_some()
+            || separation.kpath.is_some()
+            || separation.general_kpath.is_some()
+            || separation.knapsack.is_some()
+            || separation.route_recourse.is_some()
+            || separation.relaxation_improvement_priority > 0.)
+    {
+        return Err(invalid(
+            "explicit rank-one incidence cannot be combined with other automatic separators",
+        ));
+    }
     for oracle in &state.oracles {
         let graph = &oracle.network.graph;
         if graph.max_route_arcs().is_some() && !graph.bounded_walks_are_vertex_simple() {
@@ -645,6 +717,7 @@ pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -
                 ));
             }
             if separation.rank_one.enabled
+                || incidence_enabled
                 || separation.capacity.is_some()
                 || separation.kpath.is_some()
                 || separation.general_kpath.is_some()
@@ -662,7 +735,20 @@ pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -
         1.
     };
     if let Some(cuts) = state.cuts.as_mut() {
+        if let Some(config) = &separation.rank_one_incidence {
+            if cuts
+                .incidence_rank_one
+                .as_ref()
+                .is_none_or(|incidence| !incidence.config.same_as(config))
+            {
+                return Err(invalid(
+                    "cannot change explicit rank-one incidence on a retained snapshot",
+                ));
+            }
+        }
         cuts.options = separation.rank_one.clone();
+        cuts.options.enabled |=
+            cuts.incidence_rank_one.is_some() && separation.rank_one_incidence.is_some();
         cuts.stopped_by_tailing_off = false;
         cuts.capacity_priority = capacity_priority;
         cuts.relaxation_priority = separation.relaxation_improvement_priority;
@@ -691,15 +777,6 @@ pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -
             ));
         }
         let explicit = if let Some(config) = &separation.rank_one_incidence {
-            if separation.capacity.is_some()
-                || separation.kpath.is_some()
-                || separation.general_kpath.is_some()
-                || separation.knapsack.is_some()
-                || separation.route_recourse.is_some()
-                || separation.relaxation_improvement_priority > 0.
-            {
-                return Err(invalid("explicit rank-one incidence cannot be combined with other automatic separators"));
-            }
             Some(prepare_incidence_rank_one(state, config)?)
         } else {
             None
@@ -887,7 +964,7 @@ pub(super) fn prepare<const D: usize>(state: &mut State<D>, options: &Options) -
             None
         };
         let (incidence_rank_one, resolved_memory_type) = match explicit {
-            Some((state, memory)) => (Some(state), Some(memory)),
+            Some((state, memory)) => (Some(state), memory),
             None => (None, None),
         };
         let mut rank_one_options = separation.rank_one.clone();
@@ -2377,3 +2454,6 @@ pub(super) fn cut_counts<const D: usize>(state: &State<D>) -> Vec<(&'static str,
 #[cfg(test)]
 #[path = "../../../../tests/unit/master/model/separation_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+pub(crate) use tests::mixed_arc_problem_and_config;

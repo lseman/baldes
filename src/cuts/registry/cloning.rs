@@ -20,6 +20,7 @@ impl Clone for CutRegistry {
             parameters,
             separation_phase,
             covering_sets_present,
+            covering_search_rng,
             ends,
         } = source;
         self.cuts.truncate(cuts.len());
@@ -34,6 +35,7 @@ impl Clone for CutRegistry {
         self.parameters.clone_from(parameters);
         self.separation_phase = *separation_phase;
         self.covering_sets_present = *covering_sets_present;
+        self.covering_search_rng.clone_from(covering_search_rng);
         let source_ends = ends.borrow();
         let target_ends = self.ends.get_mut();
         target_ends.0 = source_ends.0;

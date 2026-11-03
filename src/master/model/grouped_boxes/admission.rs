@@ -49,6 +49,7 @@ pub(in crate::master::model) fn coupled<const D: usize>(
         || !oracle.presence_rows.is_empty()
         || !oracle.resource_groups.is_empty()
         || !oracle.ryan_foster_rows.is_empty()
+        || !oracle.arc_set_branch_rows.is_empty()
     {
         return None;
     }

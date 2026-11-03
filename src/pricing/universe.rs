@@ -77,6 +77,7 @@ impl<const D: usize> Solver<D> {
             max_route_arcs: self.controls.max_route_arcs,
             preserve_arc_paths: self.enumeration_preserve_arc_paths
                 || !self.ryan_foster.is_empty()
+                || !self.arc_set_branches.is_empty()
                 || self.enumeration_feasibility.is_some()
                 || self.presence_pricing.active(),
             // Dominance needs only one working partition. Path export tracks
@@ -211,7 +212,10 @@ impl<const D: usize> Solver<D> {
                 c.satisfied_by(
                     std::iter::once(g.source).chain(p.arcs.iter().map(|&a| g.arcs[a].head)),
                 )
-            })
+            }) && self
+                .arc_set_branches
+                .iter()
+                .all(|c| c.satisfied_by(p.arcs.iter().map(|&a| g.arcs[a].id)))
         });
         if interrupted || enumeration_started.elapsed() > total_time_limit {
             return Err(incomplete("enumeration time limit exceeded"));

@@ -153,14 +153,17 @@ impl<const D: usize> Solver<D> {
         phase: phases::Phase,
     ) -> Result<LabelingEngine<D>> {
         let mut controls = controls;
-        // A one-sided arc fixing need not preserve reverse-arc symmetry.
-        if self.forbidden_arcs.iter().any(|&b| b) {
+        // Arc fixings and packing-set memberships can distinguish reverse arcs.
+        if self.forbidden_arcs.iter().any(|&b| b) || !self.arc_set_branches.is_empty() {
             controls.use_symmetric_execution = false;
         }
         let mut engine = LabelingEngine::prepare(&self.graph, controls, phase)?;
         engine.forbidden_arcs = self.forbidden_arcs.clone();
-        engine.branching =
-            restrictions::RyanFosterResources::prepare(&self.graph, &self.ryan_foster)?;
+        engine.branching = restrictions::RyanFosterResources::prepare_arc_sets(
+            &self.graph,
+            &self.ryan_foster,
+            &self.arc_set_branches,
+        )?;
         engine.cuts.knapsack = self.knapsack_pricing.clone();
         if !engine.load_cuts(
             &self.graph,

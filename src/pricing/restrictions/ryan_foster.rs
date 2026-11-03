@@ -52,14 +52,119 @@ pub struct BinaryConsumption {
     pub toggle: bool,
 }
 
+/// Packing-set membership on physical arc IDs, including any head membership.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ArcSetConstraint {
+    pub first: Vec<i32>,
+    pub second: Vec<i32>,
+    pub together: bool,
+}
+impl ArcSetConstraint {
+    /// Check a complete route using physical arc IDs.
+    pub fn satisfied_by(&self, arcs: impl IntoIterator<Item = i32>) -> bool {
+        let (mut first, mut second) = (false, false);
+        for arc in arcs {
+            first |= self.first.contains(&arc);
+            second |= self.second.contains(&arc);
+        }
+        if self.together {
+            first == second
+        } else {
+            !(first && second)
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct RyanFosterResources {
     pub resources: usize,
     pub vertices: Vec<Vec<BinaryConsumption>>,
+    /// Branch events indexed by physical graph arc position.
+    pub arcs: Vec<Vec<BinaryConsumption>>,
     /// Native together constraints require even parity at the terminal/join.
     pub parity: [u32; 16],
 }
 impl RyanFosterResources {
+    /// Prepare arc-set operations on top of existing vertex restrictions.
+    /// Each physical arc is listed once per set, even when both the arc and
+    /// its head have the same packing-set membership.
+    pub fn prepare_arc_sets<const D: usize>(
+        g: &Graph<D>,
+        vertices: &[RyanFosterConstraint],
+        constraints: &[ArcSetConstraint],
+    ) -> Result<Self> {
+        let mut result = Self::prepare(g, vertices)?;
+        if constraints.is_empty() {
+            return Ok(result);
+        }
+        result.arcs = vec![vec![]; g.arcs.len()];
+        let indices: std::collections::BTreeMap<_, _> = g
+            .arcs
+            .iter()
+            .enumerate()
+            .map(|(index, arc)| (arc.id, index))
+            .collect();
+        for constraint in constraints {
+            let index = result.resources;
+            result.resources += if constraint.together { 3 } else { 1 };
+            if result.resources > 512 {
+                return Err(invalid("Ryan–Foster exceeds 512 binary resources"));
+            }
+            if constraint.together {
+                result.parity[index / 32] |= 1 << (index % 32);
+            }
+            for (arcs, seen) in [
+                (&constraint.first, index + 1),
+                (&constraint.second, index + 2),
+            ] {
+                let mut unique = std::collections::BTreeSet::new();
+                for id in arcs {
+                    let physical = *indices
+                        .get(id)
+                        .ok_or_else(|| invalid("Ryan–Foster unknown arc ID"))?;
+                    if !unique.insert(physical) {
+                        continue;
+                    }
+                    result.arcs[physical].push(BinaryConsumption {
+                        resource: index,
+                        toggle: constraint.together,
+                    });
+                    if constraint.together {
+                        result.arcs[physical].push(BinaryConsumption {
+                            resource: seen,
+                            toggle: false,
+                        });
+                    }
+                }
+            }
+        }
+        Ok(result)
+    }
+
+    /// Apply all events on an arc atomically; rejected arcs leave state intact.
+    pub fn traverse_arc(&self, state: &mut BranchState, physical: usize) -> bool {
+        let Some(ops) = self.arcs.get(physical) else {
+            return self.arcs.is_empty();
+        };
+        if ops.is_empty() {
+            return true;
+        }
+        let mut words = state.as_deref().copied().unwrap_or([0; 16]);
+        for op in ops {
+            let mask = 1 << (op.resource % 32);
+            let word = &mut words[op.resource / 32];
+            if op.toggle {
+                *word ^= mask;
+            } else if *word & mask != 0 {
+                return false;
+            } else {
+                *word |= mask;
+            }
+        }
+        *state = Some(Arc::new(words));
+        true
+    }
+
     pub fn prepare<const D: usize>(
         g: &Graph<D>,
         constraints: &[RyanFosterConstraint],

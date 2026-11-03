@@ -96,6 +96,7 @@ fn envelope<const D: usize>(state: &State<D>, row: usize) -> Option<(f64, f64)> 
             || oracle.activity_rows.iter().any(|entry| entry.row == row)
             || oracle.resource_groups.iter().any(|&(r, _)| r == row)
             || oracle.ryan_foster_rows.iter().any(|&(r, _)| r == row)
+            || oracle.arc_set_branch_rows.iter().any(|(r, _)| *r == row)
         {
             return None;
         }
@@ -223,6 +224,7 @@ fn complete_envelope<const D: usize>(
                 .iter()
                 .map(|(r, _)| *r)
                 .chain(oracle.ryan_foster_rows.iter().map(|(r, _)| *r))
+                .chain(oracle.arc_set_branch_rows.iter().map(|(r, _)| *r))
             {
                 if r == row {
                     high.add(1.)?;

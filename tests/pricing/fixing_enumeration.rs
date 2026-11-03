@@ -522,3 +522,469 @@ fn retained_standard_paths_match_captured_repricing_bits() {
     }
     assert_eq!((path_count, cases), (20, 3));
 }
+#[test]
+fn fixing_matches_native_prepared_grid_and_selected_labels() {
+    use baldes::graph::Graph;
+    use baldes::labeling::engine::{EngineControls, LabelingEngine};
+    use baldes::labeling::Controls;
+    use baldes::pricing::phases::Phase;
+
+    let mut lines = include_str!("../fixtures/cuts/seed8_fixing_prepared_input.txt").lines();
+    let header: Vec<_> = lines.next().unwrap().split_whitespace().collect();
+    let n: usize = header[0].parse().unwrap();
+    let arc_count: usize = header[1].parse().unwrap();
+    let cutoff: f64 = header[2].parse().unwrap();
+    let mut graph = Graph::<2>::new(n, 1).unwrap();
+    for v in [0, n - 1] {
+        graph.vertices[v].elements.clear();
+        graph.vertices[v].memory.clear();
+    }
+    for v in 0..n {
+        let bounds: Vec<f64> = lines
+            .next()
+            .unwrap()
+            .split_whitespace()
+            .map(|x| x.parse().unwrap())
+            .collect();
+        graph.set_bounds(v, 0, bounds[0], bounds[1]).unwrap();
+    }
+    for _ in 0..arc_count {
+        let arc: Vec<_> = lines.next().unwrap().split_whitespace().collect();
+        let id = graph
+            .add_arc(
+                arc[0].parse().unwrap(),
+                arc[1].parse().unwrap(),
+                arc[2].parse().unwrap(),
+            )
+            .unwrap();
+        let arc_mut = graph.arc_mut(id).unwrap();
+        arc_mut.reduced_cost = arc[3].parse().unwrap();
+        arc_mut.consumption[0] = arc[4].parse().unwrap();
+    }
+    let options = EngineControls {
+        steps: [0.25, 0.].into(),
+        bidirectional: true,
+        bidirectional_mode: 1,
+        direction_flags: 3,
+        use_symmetric_execution: false,
+        ..Default::default()
+    };
+    let phase = Phase {
+        check_ng: true,
+        jump_arcs: true,
+        labels_per_bucket: i64::MAX,
+    };
+    let mut engine = LabelingEngine::prepare(&graph, options, phase).unwrap();
+    engine
+        .prepare_full_labels(&graph, &Controls::default())
+        .unwrap();
+    let mut actual = Vec::new();
+    let mut capture = |stage: &str, engine: &LabelingEngine<2>| {
+        for (direction, grid) in [
+            ("forward", &engine.grid.forward),
+            ("backward", &engine.grid.backward),
+        ] {
+            for (vertex, buckets) in grid.buckets.iter().enumerate() {
+                for (bucket, row) in buckets.iter().enumerate() {
+                    for arc in &row.arcs {
+                        let physical = &graph.arcs[arc.physical];
+                        actual.push(format!(
+                            "{stage} {direction} {} {bucket} {} {} {}",
+                            engine.grid.order[vertex],
+                            physical.tail,
+                            physical.head,
+                            arc.jump.map_or(-1, |v| v as isize)
+                        ));
+                    }
+                }
+            }
+        }
+    };
+    capture("before", &engine);
+    engine.fix_bucket_arcs(&graph, cutoff).unwrap();
+    capture("after", &engine);
+    for line in include_str!("../fixtures/cuts/seed8_fixing_selected_labels.txt").lines() {
+        let mut f = line.split_whitespace();
+        let direction = f.next().unwrap();
+        let vertex: usize = f.next().unwrap().parse().unwrap();
+        let bucket: usize = f.next().unwrap().parse().unwrap();
+        let lower: f64 = f.next().unwrap().parse().unwrap();
+        let count: usize = f.next().unwrap().parse().unwrap();
+        let storage = if direction == "forward" {
+            &mut engine.forward
+        } else {
+            &mut engine.backward
+        };
+        let vertex = engine.grid.internal[vertex];
+        let old = storage.buckets[vertex][bucket].active.clone();
+        let mut chosen = Vec::new();
+        for _ in 0..count {
+            let cost: f64 = f.next().unwrap().parse().unwrap();
+            let resource: f64 = f.next().unwrap().parse().unwrap();
+            let ng: u16 = f.next().unwrap().parse().unwrap();
+            let id = *old
+                .iter()
+                .find(|&&id| {
+                    let label = &storage.labels[id];
+                    (label.cost - cost).abs() < 1e-10
+                        && (label.resources[0] - resource).abs() < 1e-10
+                        && label.ng == ng
+                        && !chosen.contains(&id)
+                })
+                .expect("captured native label must exist in the independently built Rust store");
+            chosen.push(id);
+        }
+        let hot: Vec<_> = chosen
+            .iter()
+            .map(|&id| baldes::labeling::storage::HotLabel::of(&storage.labels[id]))
+            .collect();
+        let row = &mut storage.buckets[vertex][bucket];
+        row.active = chosen;
+        row.hot = Default::default();
+        for label in hot {
+            row.hot.push(label);
+        }
+        row.lower_cost = lower;
+    }
+    // This second pass deliberately reuses selected native label state; it is
+    // a comparison probe, not a complete independent pricing certificate.
+    engine.full_ready = true;
+    engine.fix_bucket_arcs(&graph, 0.25).unwrap();
+    capture("second", &engine);
+    actual.sort();
+    let mut expected: Vec<_> = include_str!("../fixtures/cuts/seed8_fixing_native_arcs.txt")
+        .lines()
+        .map(str::to_owned)
+        .collect();
+    expected.sort();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn fixing_completion_matches_native_backward_label_pruning() {
+    use baldes::graph::Graph;
+    use baldes::labeling::engine::{EngineControls, LabelingEngine};
+    use baldes::pricing::phases::Phase;
+
+    let mut lines = include_str!("../fixtures/cuts/seed8_fixing_prepared_input.txt").lines();
+    let header: Vec<_> = lines.next().unwrap().split_whitespace().collect();
+    let n: usize = header[0].parse().unwrap();
+    let arc_count: usize = header[1].parse().unwrap();
+    let mut graph = Graph::<2>::new(n, 1).unwrap();
+    for vertex in [0, n - 1] {
+        graph.vertices[vertex].elements.clear();
+        graph.vertices[vertex].memory.clear();
+    }
+    for vertex in 0..n {
+        let bounds: Vec<f64> = lines
+            .next()
+            .unwrap()
+            .split_whitespace()
+            .map(|x| x.parse().unwrap())
+            .collect();
+        graph.set_bounds(vertex, 0, bounds[0], bounds[1]).unwrap();
+    }
+    for _ in 0..arc_count {
+        let arc: Vec<_> = lines.next().unwrap().split_whitespace().collect();
+        let id = graph
+            .add_arc(
+                arc[0].parse().unwrap(),
+                arc[1].parse().unwrap(),
+                arc[2].parse().unwrap(),
+            )
+            .unwrap();
+        let arc_mut = graph.arc_mut(id).unwrap();
+        arc_mut.reduced_cost = arc[3].parse().unwrap();
+        arc_mut.consumption[0] = arc[4].parse().unwrap();
+    }
+    let engine = LabelingEngine::prepare(
+        &graph,
+        EngineControls {
+            steps: [0.25, 0.].into(),
+            bidirectional: true,
+            bidirectional_mode: 1,
+            direction_flags: 3,
+            use_symmetric_execution: false,
+            ..Default::default()
+        },
+        Phase {
+            check_ng: true,
+            jump_arcs: true,
+            labels_per_bucket: i64::MAX,
+        },
+    )
+    .unwrap();
+    let mut solver = baldes::pricing::Solver::<2>::new(n, 1).unwrap();
+    solver.graph = graph;
+    solver.engine = Some(engine);
+    solver
+        .options
+        .set("BALDESuseComplBoundsInRedCostFixing", 2.)
+        .unwrap();
+    solver.fix(header[2].parse().unwrap()).unwrap();
+    let engine = solver.engine.as_ref().unwrap();
+    assert!(engine.statistics.completion_pruned > 0);
+    let quantize = |x: f64| (x * 1e9).round() as i64;
+    let mut actual = Vec::new();
+    for (direction, storage) in [("forward", &engine.forward), ("backward", &engine.backward)] {
+        for (vertex, buckets) in storage.buckets.iter().enumerate() {
+            for (bucket, row) in buckets.iter().enumerate() {
+                for &id in &row.active {
+                    let label = &storage.labels[id];
+                    actual.push((
+                        direction.to_owned(),
+                        engine.grid.order[vertex],
+                        bucket,
+                        quantize(label.cost),
+                        quantize(label.resources[0]),
+                        label.ng,
+                    ));
+                }
+            }
+        }
+    }
+    let mut expected = Vec::new();
+    for line in include_str!("../fixtures/cuts/seed8_fixing_selected_labels.txt").lines() {
+        let mut fields = line.split_whitespace();
+        let direction = fields.next().unwrap().to_owned();
+        let vertex: usize = fields.next().unwrap().parse().unwrap();
+        let bucket: usize = fields.next().unwrap().parse().unwrap();
+        let _: f64 = fields.next().unwrap().parse().unwrap();
+        let count: usize = fields.next().unwrap().parse().unwrap();
+        for _ in 0..count {
+            let cost: f64 = fields.next().unwrap().parse().unwrap();
+            let resource: f64 = fields.next().unwrap().parse().unwrap();
+            let ng = fields.next().unwrap().parse().unwrap();
+            expected.push((
+                direction.clone(),
+                vertex,
+                bucket,
+                quantize(cost),
+                quantize(resource),
+                ng,
+            ));
+        }
+    }
+    actual.sort();
+    expected.sort();
+    assert_eq!(expected.len(), 74);
+    assert_eq!(actual, expected);
+
+    let mut arcs = Vec::new();
+    let graph = &solver.graph;
+    let mut capture = |stage: &str, engine: &LabelingEngine<2>| {
+        for (direction, grid) in [
+            ("forward", &engine.grid.forward),
+            ("backward", &engine.grid.backward),
+        ] {
+            for (vertex, buckets) in grid.buckets.iter().enumerate() {
+                for (bucket, row) in buckets.iter().enumerate() {
+                    for arc in &row.arcs {
+                        let physical = &graph.arcs[arc.physical];
+                        arcs.push(format!(
+                            "{stage} {direction} {} {bucket} {} {} {}",
+                            engine.grid.order[vertex],
+                            physical.tail,
+                            physical.head,
+                            arc.jump.map_or(-1, |v| v as isize)
+                        ));
+                    }
+                }
+            }
+        }
+    };
+    let engine = solver.engine.as_mut().unwrap();
+    capture("after", engine);
+    // The native second pass is debugger-scheduled. Reusing these matched
+    // completion-pruned labels likewise requires a diagnostic override.
+    engine.full_ready = true;
+    engine.fix_bucket_arcs(graph, 0.25).unwrap();
+    capture("second", engine);
+    arcs.sort();
+    let mut expected_arcs: Vec<_> = include_str!("../fixtures/cuts/seed8_fixing_native_arcs.txt")
+        .lines()
+        .filter(|line| !line.starts_with("before "))
+        .map(str::to_owned)
+        .collect();
+    expected_arcs.sort();
+    assert_eq!(arcs, expected_arcs);
+}
+
+fn check_captured_enumeration(
+    input: &str,
+    captured_paths: &str,
+    exact: bool,
+    align_elements: bool,
+    count: usize,
+) {
+    use baldes::graph::Graph;
+    use baldes::labeling::engine::{EngineControls, LabelingEngine};
+    use baldes::pricing::phases::Phase;
+    use std::collections::BTreeSet;
+
+    let mut lines = input.lines();
+    let header: Vec<_> = lines.next().unwrap().split_whitespace().collect();
+    let n: usize = header[0].parse().unwrap();
+    let arc_count: usize = header[1].parse().unwrap();
+    let cutoff: f64 = header[2].parse().unwrap();
+    let mut graph = Graph::<2>::new(n, 1).unwrap();
+    for vertex in [0, n - 1] {
+        graph.vertices[vertex].elements.clear();
+        graph.vertices[vertex].memory.clear();
+    }
+    if align_elements {
+        for vertex in 1..n - 1 {
+            graph.vertices[vertex].elements = vec![vertex - 1];
+            graph.vertices[vertex].memory = vec![vertex - 1];
+        }
+    }
+    for vertex in 0..n {
+        let bounds: Vec<f64> = lines
+            .next()
+            .unwrap()
+            .split_whitespace()
+            .map(|x| x.parse().unwrap())
+            .collect();
+        graph.set_bounds(vertex, 0, bounds[0], bounds[1]).unwrap();
+    }
+    for _ in 0..arc_count {
+        let arc: Vec<_> = lines.next().unwrap().split_whitespace().collect();
+        let id = graph
+            .add_arc(
+                arc[0].parse().unwrap(),
+                arc[1].parse().unwrap(),
+                arc[2].parse().unwrap(),
+            )
+            .unwrap();
+        let arc_mut = graph.arc_mut(id).unwrap();
+        arc_mut.reduced_cost = arc[3].parse().unwrap();
+        arc_mut.consumption[0] = arc[4].parse().unwrap();
+    }
+    let engine = LabelingEngine::prepare(
+        &graph,
+        EngineControls {
+            steps: [0.25, 0.].into(),
+            bidirectional: true,
+            bidirectional_mode: 1,
+            direction_flags: 3,
+            use_symmetric_execution: false,
+            ..Default::default()
+        },
+        Phase {
+            check_ng: true,
+            jump_arcs: true,
+            labels_per_bucket: i64::MAX,
+        },
+    )
+    .unwrap();
+    let mut solver = baldes::pricing::Solver::<2>::new(n, 1).unwrap();
+    solver.graph = graph;
+    solver.engine = Some(engine);
+    solver
+        .options
+        .set("BALDESuseComplBoundsInRedCostFixing", 2.)
+        .unwrap();
+    solver.fix(cutoff).unwrap();
+    let routes = solver.enumerate(cutoff).unwrap();
+    let signature = |arcs: &[i32]| {
+        let mut vertices = BTreeSet::new();
+        let mut cost = 0.;
+        let mut original_cost = 0.;
+        for &index in arcs {
+            let arc = &solver.graph.arcs[index as usize];
+            if arc.head != solver.graph.sink {
+                vertices.insert(arc.head);
+            }
+            cost += arc.reduced_cost;
+            original_cost += arc.cost;
+        }
+        (
+            vertices,
+            (cost * 1e9).round() as i64,
+            (original_cost * 1e9).round() as i64,
+        )
+    };
+    let mut actual: Vec<_> = routes
+        .iter()
+        .map(|route| {
+            let result = signature(&route.arcs);
+            assert_eq!((route.cost * 1e9).round() as i64, result.1);
+            assert_eq!((route.original_cost * 1e9).round() as i64, result.2);
+            result
+        })
+        .collect();
+    let mut expected: Vec<_> = captured_paths
+        .lines()
+        .map(|line| {
+            let arcs: Vec<i32> = line
+                .split_whitespace()
+                .map(|id| id.parse().unwrap())
+                .collect();
+            signature(&arcs)
+        })
+        .collect();
+    assert_eq!(expected.len(), count);
+    actual.sort();
+    expected.sort();
+    assert_eq!(actual, expected);
+    if exact {
+        let mut actual_paths: Vec<_> = routes.iter().map(|route| route.arcs.clone()).collect();
+        let mut native_paths: Vec<Vec<i32>> = captured_paths
+            .lines()
+            .map(|line| {
+                line.split_whitespace()
+                    .map(|id| id.parse().unwrap())
+                    .collect()
+            })
+            .collect();
+        if !align_elements {
+            actual_paths.sort();
+            native_paths.sort();
+        }
+        assert_eq!(actual_paths, native_paths);
+    }
+}
+
+#[test]
+fn fixing_enumeration_matches_native_visited_sets_and_reduced_costs() {
+    check_captured_enumeration(
+        include_str!("../fixtures/cuts/seed8_fixing_prepared_input.txt"),
+        include_str!("../fixtures/cuts/seed8_enumeration_native_paths.txt"),
+        false,
+        false,
+        44,
+    );
+}
+
+#[test]
+fn fixing_enumeration_matches_captured_paths_with_default_element_ids() {
+    check_captured_enumeration(
+        include_str!("../fixtures/cuts/seed8_enumeration_external_input.txt"),
+        include_str!("../fixtures/cuts/seed8_enumeration_external_native_paths.txt"),
+        true,
+        false,
+        44,
+    );
+}
+
+#[test]
+fn fixing_enumeration_matches_native_ordered_paths_with_aligned_element_ids() {
+    check_captured_enumeration(
+        include_str!("../fixtures/cuts/seed8_enumeration_external_input.txt"),
+        include_str!("../fixtures/cuts/seed8_enumeration_external_native_paths.txt"),
+        true,
+        true,
+        44,
+    );
+}
+
+#[test]
+fn fixing_enumeration_matches_second_native_ordered_capture() {
+    check_captured_enumeration(
+        include_str!("../fixtures/cuts/seed2_enumeration_external_input.txt"),
+        include_str!("../fixtures/cuts/seed2_enumeration_external_native_paths.txt"),
+        true,
+        true,
+        55,
+    );
+}

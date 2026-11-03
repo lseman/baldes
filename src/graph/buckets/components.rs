@@ -315,58 +315,7 @@ impl BucketGraph {
             }
             self.direction_mut(forward).buckets[v][idx].predecessors = preds;
         }
-        // Iterative Tarjan retains native adjacency visitation order without a
-        // recursive call stack proportional to the number of resource cells.
-        let n = ids.len();
-        let mut index = vec![None; n];
-        let mut low = vec![0; n];
-        let mut on = vec![false; n];
-        let mut active = vec![];
-        let mut component = vec![usize::MAX; n];
-        let mut serial = 0;
-        let mut count = 0;
-        index[root] = Some(serial);
-        low[root] = serial;
-        serial += 1;
-        active.push(root);
-        on[root] = true;
-        let mut frames = vec![(root, 0usize)];
-        while let Some((v, next)) = frames.last_mut() {
-            let v = *v;
-            if *next < edges[v].len() {
-                let w = edges[v][*next];
-                *next += 1;
-                if !reached[w] {
-                    continue;
-                }
-                if index[w].is_none() {
-                    index[w] = Some(serial);
-                    low[w] = serial;
-                    serial += 1;
-                    active.push(w);
-                    on[w] = true;
-                    frames.push((w, 0));
-                } else if on[w] {
-                    low[v] = low[v].min(index[w].unwrap());
-                }
-            } else {
-                frames.pop();
-                if low[v] == index[v].unwrap() {
-                    loop {
-                        let w = active.pop().unwrap();
-                        on[w] = false;
-                        component[w] = count;
-                        if w == v {
-                            break;
-                        }
-                    }
-                    count += 1;
-                }
-                if let Some((parent, _)) = frames.last() {
-                    low[*parent] = low[*parent].min(low[v]);
-                }
-            }
-        }
+        let (component, count) = component_indices(&edges, &reached, root);
         let mut components = vec![vec![]; count];
         for (i, &id) in ids.iter().enumerate() {
             if reached[i] {
@@ -404,4 +353,63 @@ impl BucketGraph {
         d.depth = depth;
         Ok(())
     }
+}
+
+// Iterative Tarjan preserves adjacency visitation order without a recursive stack.
+pub(super) fn component_indices(
+    edges: &[Vec<usize>],
+    reached: &[bool],
+    root: usize,
+) -> (Vec<usize>, usize) {
+    let n = edges.len();
+    let mut index = vec![None; n];
+    let mut low = vec![0; n];
+    let mut on = vec![false; n];
+    let mut active = vec![];
+    let mut component = vec![usize::MAX; n];
+    let mut serial = 0;
+    let mut count = 0;
+    index[root] = Some(serial);
+    low[root] = serial;
+    serial += 1;
+    active.push(root);
+    on[root] = true;
+    let mut frames = vec![(root, 0usize)];
+    while let Some((v, next)) = frames.last_mut() {
+        let v = *v;
+        if *next < edges[v].len() {
+            let w = edges[v][*next];
+            *next += 1;
+            if !reached[w] {
+                continue;
+            }
+            if index[w].is_none() {
+                index[w] = Some(serial);
+                low[w] = serial;
+                serial += 1;
+                active.push(w);
+                on[w] = true;
+                frames.push((w, 0));
+            } else if on[w] {
+                low[v] = low[v].min(index[w].unwrap());
+            }
+        } else {
+            frames.pop();
+            if low[v] == index[v].unwrap() {
+                loop {
+                    let w = active.pop().unwrap();
+                    on[w] = false;
+                    component[w] = count;
+                    if w == v {
+                        break;
+                    }
+                }
+                count += 1;
+            }
+            if let Some((parent, _)) = frames.last() {
+                low[*parent] = low[*parent].min(low[v]);
+            }
+        }
+    }
+    (component, count)
 }

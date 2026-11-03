@@ -166,9 +166,11 @@ fn dense_packing_matches_graph_support_for_walks_and_memory_policies() {
         id: 0,
         ordered_support: None,
     };
+    dense.memory = vec![true; 4];
+    assert_eq!(coefficient(&dense, 7, &[(0, 3, 0)], false).unwrap(), 2);
     // A sparse graph-specific support forces the general implementation.
     // Include repeats, out-of-range vertices, signed/large weights, and
-    // memory breaks; a coefficient increments once per nonzero weight.
+    // memory breaks in both implementations.
     for denominator in [1, 2, 3] {
         dense.denominator = denominator;
         for mask in 0..16 {

@@ -882,6 +882,7 @@ impl PathStorage {
             .collect()
     }
     fn route<const D: usize>(&self, g: &Graph<D>, path: &Path) -> Result<Route> {
+        let mut retained_record = None;
         let retained_selection = if g
             .coupled_kernel()
             .is_some_and(|kernel| kernel.machine_paired_join_complete())
@@ -898,7 +899,35 @@ impl PathStorage {
                 Some(resource),
                 FrontierBudget::default(),
             ) {
-                FrontierOutcome::Complete(selection) => Some((resource, selection.dependent)),
+                FrontierOutcome::Complete(selection) => {
+                    let value = if selection.dependent.is_some() {
+                        let record = match self.reconstruct_front_program_resource_with_debug(
+                            g,
+                            &path.arcs,
+                            Some(resource),
+                            0,
+                            FrontierBudget::default(),
+                        ) {
+                            FrontierOutcome::Complete(record) => record,
+                            FrontierOutcome::Empty => {
+                                return Err(invalid("enumerated paired recorder is infeasible"));
+                            }
+                            FrontierOutcome::Unknown(reason) => {
+                                return Err(crate::incomplete(format!(
+                                    "paired retained recorder unavailable: {reason:?}"
+                                )));
+                            }
+                        };
+                        let value = record.path.dependent.last().copied().ok_or_else(|| {
+                            crate::incomplete("paired retained recorder has no terminal value")
+                        })?;
+                        retained_record = Some(record);
+                        Some(value)
+                    } else {
+                        None
+                    };
+                    Some((resource, value))
+                }
                 FrontierOutcome::Empty => {
                     return Err(invalid("enumerated paired join is infeasible"))
                 }
@@ -949,6 +978,38 @@ impl PathStorage {
             nodes.push(a.head as i32);
             resource_profile.push(q[..g.resources.len()].to_vec());
         }
+        let mut original_cost = path.original_cost;
+        if let Some(record) = retained_record {
+            let kernel = g.coupled_kernel().unwrap();
+            if let Some(slot) = kernel.bound_paired_base_resource(g) {
+                if record.path.base.len() != resource_profile.len() {
+                    return Err(crate::incomplete(
+                        "paired retained recorder profile length mismatch",
+                    ));
+                }
+                for (profile, &base) in resource_profile.iter_mut().zip(&record.path.base) {
+                    profile[slot] = base;
+                }
+                q[slot] = *record.path.base.last().unwrap();
+            }
+            let join = self
+                .machine_contributions
+                .get(path.arcs.as_slice())
+                .unwrap();
+            let left = join.forward.scalar_original_cost().ok_or_else(|| {
+                crate::incomplete("paired retained forward scalar cost unavailable")
+            })?;
+            let right = join.backward.scalar_original_cost().ok_or_else(|| {
+                crate::incomplete("paired retained backward scalar cost unavailable")
+            })?;
+            let value = *record.path.dependent.last().unwrap();
+            original_cost = (left + right) + kernel.recorded_paired_original_objective(value)?;
+            if !original_cost.is_finite() {
+                return Err(crate::incomplete(
+                    "reconstructed route objective is nonfinite",
+                ));
+            }
+        }
         Ok(Route {
             coupled_values: if let Some((resource, value)) = retained_selection {
                 value
@@ -962,7 +1023,7 @@ impl PathStorage {
             nodes,
             arcs: path.arcs.iter().map(|&a| g.arcs[a].id).collect(),
             cost: path.reduced_cost,
-            original_cost: path.original_cost,
+            original_cost,
             resources: q[..g.resources.len()].to_vec(),
             resource_profile,
         })

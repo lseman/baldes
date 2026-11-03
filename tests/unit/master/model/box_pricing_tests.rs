@@ -1,5 +1,61 @@
 use super::*;
 
+#[test]
+fn pricing_prepares_captured_cut_price_order_after_retirement() {
+    use crate::cuts::{CutClass, MemoryKind, RankOneCut};
+    use std::collections::{BTreeMap, BTreeSet};
+
+    let mut output = positive_network(1., false);
+    let state = &mut output.snapshot.state;
+    let oracle = &mut state.oracles[0];
+    for id in 0..9 {
+        oracle.solver.cuts.cuts.push(RankOneCut {
+            weights: vec![0, 1, 0],
+            graph_support: BTreeMap::new(),
+            graph_pricing_support: BTreeMap::new(),
+            general_kpath_support: None,
+            memory: vec![false, true, false],
+            graph_dependent_memory: false,
+            graph_memories: BTreeMap::new(),
+            memory_kind: MemoryKind::Vertex,
+            arc_memory: BTreeSet::new(),
+            graph_arc_memories: BTreeMap::new(),
+            arc_weights: BTreeMap::new(),
+            graph_arc_weights: BTreeMap::new(),
+            visit_once: false,
+            type2: false,
+            denominator: 2,
+            dual: 0.,
+            class: CutClass::Packing,
+            rhs: 1,
+            kind: 0,
+            id,
+            ordered_support: None,
+        });
+        if ![0, 4, 8].contains(&(id as usize)) {
+            oracle.solver.cuts.retire(id as usize);
+        }
+    }
+    oracle.nonlinear_rows = vec![(0, 0), (4, 1), (8, 2)];
+    let phase = oracle
+        .solver
+        .phases
+        .iter()
+        .position(|phase| phase.exact())
+        .unwrap();
+    state.rhs.resize(state.shared_offset + 3, 0.);
+    let mut duals = vec![0.; state.rhs.len()];
+    duals[state.shared_offset..].copy_from_slice(&[
+        -0.10000000000000009,
+        -0.10000000000000009,
+        -0.19999999999999996,
+    ]);
+    state.price(phase, &duals).unwrap();
+    let cuts = &state.oracles[0].solver.cuts;
+    assert_eq!(cuts.pricing_order, [8, 0, 4]);
+    assert!(cuts.round_duals);
+}
+
 fn positive_network(lower: f64, stabilized: bool) -> Output<2> {
     let mut graph = Graph::<2>::new(3, 0).unwrap();
     graph.add_arc(0, 1, 1.).unwrap();

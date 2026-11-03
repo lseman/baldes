@@ -1,6 +1,76 @@
 use super::floor_isize;
 
 #[test]
+fn bucket_component_order_matches_native_tarjan_capture() {
+    for line in include_str!("../../../fixtures/cuts/bucket_tarjan_native.txt")
+        .lines()
+        .chain(include_str!("../../../fixtures/cuts/bucket_tarjan_natural.txt").lines())
+    {
+        let mut fields = line.split_whitespace().map(|x| x.parse::<i32>().unwrap());
+        let n = fields.next().unwrap() as usize;
+        let root = fields.next().unwrap() as usize;
+        let edges: Vec<Vec<usize>> = (0..n)
+            .map(|_| {
+                let len = fields.next().unwrap() as usize;
+                (0..len).map(|_| fields.next().unwrap() as usize).collect()
+            })
+            .collect();
+        let expected: Vec<_> = (0..n).map(|_| fields.next().unwrap()).collect();
+        assert!(fields.next().is_none());
+        let mut reached = vec![false; n];
+        let mut pending = vec![root];
+        while let Some(vertex) = pending.pop() {
+            if !std::mem::replace(&mut reached[vertex], true) {
+                pending.extend(edges[vertex].iter().copied());
+            }
+        }
+        let (components, count) = super::components::component_indices(&edges, &reached, root);
+        let actual: Vec<_> = components
+            .iter()
+            .zip(&reached)
+            .map(|(&c, &seen)| if seen { (count - 1 - c) as i32 } else { -1 })
+            .collect();
+        assert_eq!(actual, expected, "root {root}, edges {edges:?}");
+    }
+}
+
+#[test]
+fn standard_bucket_graph_components_match_native_model() {
+    use super::{BucketGraph, Graph};
+
+    let capture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../fixtures/cuts/bucket_tarjan_standard_model.json"
+    ))
+    .unwrap();
+    let mut graph = Graph::<2>::new(11, 1).unwrap();
+    for vertex in 0..11 {
+        graph.set_bounds(vertex, 0, 0., 2.).unwrap();
+    }
+    for arc in capture["arcs"].as_array().unwrap() {
+        let tail = arc[0].as_u64().unwrap() as usize;
+        let head = arc[1].as_u64().unwrap() as usize;
+        let id = graph.add_arc(tail, head, 0.).unwrap();
+        graph.arc_mut(id).unwrap().consumption[0] = arc[2].as_f64().unwrap();
+    }
+    let grid = BucketGraph::prepare(&graph, [1., 0.], 100, true).unwrap();
+    for (index, direction) in [&grid.forward, &grid.backward].iter().enumerate() {
+        let actual: Vec<_> = direction
+            .buckets
+            .iter()
+            .flatten()
+            .map(|bucket| bucket.component.map(|value| value as i32).unwrap_or(-1))
+            .collect();
+        let expected: Vec<_> = capture["components"][index]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_i64().unwrap() as i32)
+            .collect();
+        assert_eq!(actual, expected);
+    }
+}
+
+#[test]
 fn automatic_grid_supports_large_resource_windows() {
     use super::{BucketGraph, Graph};
     let mut graph = Graph::<2>::new(3, 1).unwrap();

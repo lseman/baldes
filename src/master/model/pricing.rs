@@ -444,6 +444,7 @@ fn additive<const D: usize>(oracle: &Oracle<D>) -> crate::master::pricing::Addit
             && oracle.presence_rows.is_empty()
             && oracle.resource_groups.is_empty()
             && oracle.ryan_foster_rows.is_empty()
+            && oracle.arc_set_branch_rows.is_empty()
             && oracle.activity_rows.is_empty(),
     }
 }
@@ -465,6 +466,7 @@ fn finite_variable_box<const D: usize>(
         || !oracle.presence_rows.is_empty()
         || !oracle.resource_groups.is_empty()
         || !oracle.ryan_foster_rows.is_empty()
+        || !oracle.arc_set_branch_rows.is_empty()
         || !oracle.activity_rows.is_empty()
         || oracle.network.graph.has_coupled_resources()
     {
@@ -514,6 +516,7 @@ fn grouped_variable_box<const D: usize>(
         || !oracle.presence_rows.is_empty()
         || !oracle.resource_groups.is_empty()
         || !oracle.ryan_foster_rows.is_empty()
+        || !oracle.arc_set_branch_rows.is_empty()
         || !oracle.activity_rows.is_empty()
         || oracle.network.graph.has_coupled_resources()
     {

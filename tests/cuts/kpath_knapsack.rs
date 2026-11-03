@@ -9,6 +9,99 @@ use baldes::Graph;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[test]
+fn standard_knapsack_pricing_charges_recorded_native_coefficient() {
+    use baldes::cuts::knapsack::{ResourceKnapsackCut, RouteLoadKnapsackCut};
+
+    let mut cut = ResourceKnapsackCut {
+        id: 0,
+        row: 0,
+        cut_class: 0,
+        graph_resources: BTreeMap::from([(7, (1, 1.))]),
+        dual: -1.,
+        cut: RouteLoadKnapsackCut {
+            kind: KnapsackKind::Rounding,
+            numerator: 1,
+            denominator: 3,
+            rhs: 4,
+            lhs: 0.,
+            violation: 0.,
+            thresholds: vec![],
+            coefficients: BTreeMap::from([(0, 0), (3, 1), (6, 2), (9, 3), (12, 4)]),
+        },
+    };
+    for (capture, expected) in [
+        (
+            include_str!("../fixtures/cuts/knapsack_standard_recorded_native.txt"),
+            [27, 36],
+        ),
+        (
+            include_str!("../fixtures/cuts/knapsack_standard_inspection_native.txt"),
+            [9, 9],
+        ),
+    ] {
+        let mut counts = [0, 0];
+        for line in capture.lines() {
+            let values: Vec<f64> = line
+                .split_whitespace()
+                .map(|v| v.parse().unwrap())
+                .collect();
+            assert_eq!(values.len(), 6);
+            assert_eq!(values[0], 1.);
+            let coefficient = cut.coefficient(7, &values[2..4]);
+            assert_eq!(f64::from(coefficient), values[5]);
+            counts[coefficient as usize] += 1;
+            assert_eq!(values[4] + values[0] * values[5], 0.);
+        }
+        assert_eq!(counts, expected);
+    }
+
+    for mode in [0., 1., 2.] {
+        let mut solver = Solver::<2>::new(4, 2).unwrap();
+        solver.graph.graph_id = 7;
+        solver.knapsack_exact_coefficients = true;
+        solver
+            .options
+            .set("BALDESuseBidirectionalSearch", mode)
+            .unwrap();
+        for vertex in 0..4 {
+            for resource in 0..2 {
+                solver.graph.set_bounds(vertex, resource, 0., 4.).unwrap();
+            }
+        }
+        for (tail, head, cost, base) in [(0, 1, -1., 1.), (1, 2, 0., 1.), (2, 3, 0., 0.)] {
+            let id = solver.graph.add_arc(tail, head, cost).unwrap();
+            let arc = solver.graph.arc_mut(id).unwrap();
+            arc.consumption[0] = base;
+            arc.consumption[1] = 1.;
+        }
+        cut.dual = 0.;
+        solver.cuts.knapsack_cuts.push(cut.clone());
+        let uncharged = solver.price_phase(0, 10, false).unwrap();
+        assert_eq!(uncharged.minimum_reduced_cost, -1.);
+        solver.cuts.knapsack_cuts[0].dual = -1.;
+        let charged = solver.price_phase(0, 10, false).unwrap();
+        assert_eq!(charged.minimum_reduced_cost, 0.);
+        assert_eq!(solver.enumerate(10.).unwrap()[0].cost, 0.);
+        solver.cuts.knapsack_cuts[0].dual = 0.;
+        assert_eq!(
+            solver
+                .price_phase(0, 10, false)
+                .unwrap()
+                .minimum_reduced_cost,
+            -1.
+        );
+        solver.cuts.knapsack_cuts[0].dual = -1.;
+        assert_eq!(
+            solver
+                .price_phase(0, 10, false)
+                .unwrap()
+                .minimum_reduced_cost,
+            0.
+        );
+    }
+}
+
+#[test]
 fn enumeration_keeps_routes_with_same_support_and_distinct_cut_denominators() {
     use baldes::cuts::{CutClass, MemoryKind, RankOneCut};
     for mode in [0., 1., 2.] {

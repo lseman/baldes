@@ -197,14 +197,14 @@ fn automatic_rank_one_memory_evaluates_root_and_persists_choice_to_children() {
 
     let root = super::super::solve(rc101_networks(25, 1), options.clone()).unwrap();
     let cuts_state = root.snapshot.state.cuts.as_ref().unwrap();
-    let resolved = cuts_state
-        .resolved_memory_type
-        .expect("root automatic search must resolve memory type");
-    if cfg!(feature = "rank-one-node-memory") {
-        assert_eq!(resolved, MemoryType::Vertex);
+    let resolved = if cfg!(feature = "rank-one-node-memory") {
+        assert_eq!(cuts_state.resolved_memory_type, None);
+        MemoryType::Vertex
     } else {
-        assert!(matches!(resolved, MemoryType::Vertex | MemoryType::Arc));
-    }
+        cuts_state
+            .resolved_memory_type
+            .expect("root automatic search must resolve memory type")
+    };
     let expected_kind = match resolved {
         MemoryType::Arc => MemoryKind::Arc,
         _ => MemoryKind::Vertex,
@@ -218,8 +218,7 @@ fn automatic_rank_one_memory_evaluates_root_and_persists_choice_to_children() {
         assert_eq!(registry.cuts[*idx].memory_kind, expected_kind);
     }
 
-    // Forking a child node whose options still pass BALDESrankOneCutsMemoryType = 0
-    // inherits the root's resolved choice rather than re-running automatic search.
+    // A child inherits the root decision, or the build-wide vertex policy.
     let mut child_snapshot = root.snapshot.fork().unwrap();
     child_snapshot.state.node_depth = 1;
     let child = child_snapshot.solve(options).unwrap();
@@ -230,7 +229,11 @@ fn automatic_rank_one_memory_evaluates_root_and_persists_choice_to_children() {
             .cuts
             .as_ref()
             .and_then(|c| c.resolved_memory_type),
-        Some(resolved)
+        if cfg!(feature = "rank-one-node-memory") {
+            None
+        } else {
+            Some(resolved)
+        }
     );
     assert_eq!(
         child.snapshot.state.oracles[0]
@@ -238,7 +241,11 @@ fn automatic_rank_one_memory_evaluates_root_and_persists_choice_to_children() {
             .options
             .get("BALDESrankOneCutsMemoryType")
             .unwrap() as i32,
-        resolved as i32
+        if cfg!(feature = "rank-one-node-memory") {
+            0
+        } else {
+            resolved as i32
+        }
     );
 }
 
@@ -258,7 +265,12 @@ fn automatic_rank_one_memory_skips_arc_pass_on_tailing_off_and_closed_incumbent(
     let out = super::super::solve(rc101_networks(25, 1), tailed).unwrap();
     let cuts = out.snapshot.state.cuts.as_ref().unwrap();
     assert!(cuts.stopped_by_tailing_off);
-    assert_eq!(cuts.resolved_memory_type, Some(MemoryType::Vertex));
+    let expected_resolution = if cfg!(feature = "rank-one-node-memory") {
+        None
+    } else {
+        Some(MemoryType::Vertex)
+    };
+    assert_eq!(cuts.resolved_memory_type, expected_resolution);
 
     // When Pass 1 already closes the incumbent gap, it keeps Vertex memory without Pass 2.
     let mut closed = Options::default();
@@ -274,7 +286,7 @@ fn automatic_rank_one_memory_skips_arc_pass_on_tailing_off_and_closed_incumbent(
             .cuts
             .as_ref()
             .and_then(|c| c.resolved_memory_type),
-        Some(MemoryType::Vertex)
+        expected_resolution
     );
 }
 
@@ -683,7 +695,8 @@ fn vertex_cut_rows_reject_static_and_resource_activity_contributions() {
     );
 }
 
-fn mixed_arc_problem_and_config() -> (Problem<2>, crate::master::model::RankOneIncidenceConfig) {
+pub(crate) fn mixed_arc_problem_and_config(
+) -> (Problem<2>, crate::master::model::RankOneIncidenceConfig) {
     use crate::cuts::separation::{ArcData, GraphData, Parameters, VertexData};
     use crate::graph::{Graph, Window};
     use crate::master::formulation::Row;
@@ -816,6 +829,350 @@ fn mixed_arc_problem_and_config() -> (Problem<2>, crate::master::model::RankOneI
             parameters,
         },
     )
+}
+
+#[test]
+fn incidence_history_handoff_keeps_sibling_rows_independent() {
+    use crate::cuts::separation::{Input, Solution};
+    let (problem, config) = mixed_arc_problem_and_config();
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    options.preprocessing.enabled = false;
+    options.separation.rank_one_incidence = Some(config);
+    let root = super::super::solve(problem, options).unwrap();
+    let mut first = root.snapshot.fork().unwrap();
+    let mut second = root.snapshot.fork().unwrap();
+    let initial = second
+        .incidence_separator_history()
+        .unwrap()
+        .generated_cut_count();
+    let original_rows = second.state.cuts.as_ref().unwrap().rows.clone();
+    let capture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../fixtures/cuts/rank_one_two_graph_mixed_complete_separation_native.json"
+    ))
+    .unwrap();
+    let call = &capture["call"];
+    let columns: Vec<_> = call["columns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| Solution {
+            graph_id: c["graph"].as_i64().unwrap() as i32,
+            enumerated: c["enumerated"].as_i64().unwrap() != 0,
+            arc_ids: c["arc_ids"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|id| id.as_i64().unwrap() as i32)
+                .collect(),
+        })
+        .collect();
+    let input = Input {
+        solutions: columns.iter().collect(),
+        values: call["columns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c["value"].as_f64().unwrap())
+            .collect(),
+        cut_memory_type: 1,
+        solutions_are_set_sequences: false,
+        separation_phase: 1,
+        active_cuts: vec![],
+    };
+    let mut registry = crate::cuts::CutRegistry::default();
+    let source = first
+        .state
+        .cuts
+        .as_mut()
+        .unwrap()
+        .incidence_rank_one
+        .as_mut()
+        .unwrap();
+    let generated = source
+        .separator
+        .separate_and_register(&mut registry, &input)
+        .unwrap();
+    assert!(!generated.is_empty());
+    let history = first.incidence_separator_history().unwrap();
+    assert!(history.generated_cut_count() > initial);
+    second.set_incidence_separator_history(&history);
+    assert_eq!(
+        second
+            .incidence_separator_history()
+            .unwrap()
+            .generated_cut_count(),
+        history.generated_cut_count()
+    );
+    assert_eq!(second.state.cuts.as_ref().unwrap().rows, original_rows);
+    assert_eq!(
+        root.snapshot
+            .incidence_separator_history()
+            .unwrap()
+            .generated_cut_count(),
+        initial
+    );
+}
+
+#[test]
+fn explicit_incidence_automatic_memory_keeps_the_open_eight_row_root() {
+    use crate::cuts::separation::{ArcData, GraphData, Parameters, VertexData};
+    use crate::master::model::{format::Model, RankOneIncidenceConfig};
+
+    let problem = Model::from_json(include_str!(
+        "../../../fixtures/cuts/rank_one_auto_eight_model.json"
+    ))
+    .unwrap()
+    .problem::<2>()
+    .unwrap();
+    let graphs = problem
+        .networks
+        .iter()
+        .map(|network| GraphData {
+            id: network.id,
+            source: 0,
+            sink: 9,
+            elem_set_count: 8,
+            packing_set_count: 8,
+            covering_set_count: 8,
+            vertices: (0..10)
+                .map(|id| {
+                    let sets = match id {
+                        1 => vec![1],
+                        3..=8 => vec![id - 1],
+                        _ => vec![],
+                    };
+                    VertexData {
+                        id,
+                        elem_sets: sets.clone(),
+                        packing_sets: sets.clone(),
+                        covering_sets: sets,
+                    }
+                })
+                .collect(),
+            arcs: network
+                .graph
+                .arcs
+                .iter()
+                .map(|arc| {
+                    let sets = if arc.head == 1 && arc.tail != 4 && arc.tail != 5 {
+                        vec![0]
+                    } else {
+                        vec![]
+                    };
+                    ArcData {
+                        id: arc.id,
+                        tail: arc.tail as i32,
+                        head: arc.head as i32,
+                        elem_sets: sets.clone(),
+                        packing_sets: sets.clone(),
+                        covering_sets: sets,
+                    }
+                })
+                .collect(),
+            ..Default::default()
+        })
+        .collect();
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    options.preprocessing.enabled = false;
+    options.separation.rank_one.tailing_off_counter = 100;
+    options.separation.rank_one_incidence = Some(RankOneIncidenceConfig {
+        rows: (0..8).collect(),
+        graphs,
+        parameters: Parameters {
+            max_num_rows: 5,
+            max_num_per_round: 1,
+            memory_type: 0,
+            arc_memory_type: 2,
+            violation_tolerance: 0.02,
+            ..Default::default()
+        },
+    });
+    for networks in [1, 2] {
+        let mut problem = problem.clone();
+        problem.networks.truncate(networks);
+        let mut options = options.clone();
+        options
+            .separation
+            .rank_one_incidence
+            .as_mut()
+            .unwrap()
+            .graphs
+            .truncate(networks);
+        let output = super::super::solve(problem, options).unwrap();
+        assert_eq!(output.master.status, crate::master::cg::Status::Optimal);
+        assert!(output.cuts > 0);
+        assert!((output.master.lp - 3.5).abs() < 1e-7);
+        assert!((output.master.bound - 3.5).abs() < 1e-7);
+        assert!(output
+            .snapshot
+            .state
+            .cuts
+            .as_ref()
+            .unwrap()
+            .resolved_memory_type
+            .is_some());
+        if !cfg!(feature = "rank-one-node-memory") {
+            let cuts = output.snapshot.state.cuts.as_ref().unwrap();
+            let incidence = cuts.incidence_rank_one.as_ref().unwrap();
+            assert!(
+                incidence.separator.generated_cut_count() as usize > incidence.active.len(),
+                "the selected snapshot must retain search history from both memory passes"
+            );
+        }
+    }
+}
+
+#[test]
+fn explicit_arc_incidence_automatic_memory_resolves_and_tracks_the_selected_pass() {
+    let (problem, mut config) = mixed_arc_problem_and_config();
+    config.parameters.memory_type = 0;
+    config.parameters.max_num_per_round = 1;
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    options.preprocessing.enabled = false;
+    options.separation.rank_one.tailing_off_counter = 100;
+    options.separation.rank_one_incidence = Some(config);
+    let root = super::super::solve(problem, options.clone()).unwrap();
+    assert!((root.master.lp - 3.).abs() < 1e-7);
+    let cuts = root.snapshot.state.cuts.as_ref().unwrap();
+    let chosen = cuts.resolved_memory_type.unwrap();
+    let incidence = cuts.incidence_rank_one.as_ref().unwrap();
+    assert_eq!(incidence.memory_type, i32::from(chosen == MemoryType::Arc));
+    assert_eq!(
+        incidence.automatic_memory,
+        !cfg!(feature = "rank-one-node-memory")
+    );
+    let kind = if chosen == MemoryType::Arc {
+        MemoryKind::Arc
+    } else {
+        MemoryKind::Vertex
+    };
+    for &(index, _) in &cuts.rows {
+        assert_eq!(
+            root.snapshot.state.oracles[0].solver.cuts.cuts[index].memory_kind,
+            kind
+        );
+    }
+    let mut changed_options = options.clone();
+    changed_options
+        .separation
+        .rank_one_incidence
+        .as_mut()
+        .unwrap()
+        .parameters
+        .max_num_per_round += 1;
+    let error = root.snapshot.solve(changed_options).err().unwrap();
+    assert!(error
+        .message
+        .contains("cannot change explicit rank-one incidence"));
+    let mut changed_options = options.clone();
+    changed_options
+        .separation
+        .rank_one_incidence
+        .as_mut()
+        .unwrap()
+        .graphs[0]
+        .id += 1;
+    let error = root.snapshot.solve(changed_options).err().unwrap();
+    assert!(error
+        .message
+        .contains("cannot change explicit rank-one incidence"));
+    let mut incompatible = options.clone();
+    incompatible.separation.relaxation_improvement_priority = 1.;
+    let error = root.snapshot.solve(incompatible.clone()).err().unwrap();
+    assert!(error.message.contains("cannot be combined"));
+    incompatible.separation.rank_one_incidence = None;
+    incompatible.separation.rank_one.enabled = true;
+    let error = root.snapshot.solve(incompatible).err().unwrap();
+    assert!(error.message.contains("cannot be combined"));
+
+    let mut child = root.snapshot.fork().unwrap();
+    child.state.node_depth = 1;
+    let child = child.solve(options.clone()).unwrap();
+    assert!(child.snapshot.state.cuts.as_ref().unwrap().options.enabled);
+    assert_eq!(
+        child
+            .snapshot
+            .state
+            .cuts
+            .as_ref()
+            .unwrap()
+            .resolved_memory_type,
+        Some(chosen)
+    );
+    let mut disabled_options = options;
+    disabled_options.separation.rank_one_incidence = None;
+    let disabled = root
+        .snapshot
+        .fork()
+        .unwrap()
+        .solve(disabled_options)
+        .unwrap();
+    assert!(
+        !disabled
+            .snapshot
+            .state
+            .cuts
+            .as_ref()
+            .unwrap()
+            .options
+            .enabled
+    );
+
+    if !cfg!(feature = "rank-one-node-memory") {
+        let mut cloned = cuts.clone();
+        cloned.resolve_rank_one_memory(MemoryType::Arc);
+        assert_eq!(cloned.incidence_rank_one.as_ref().unwrap().memory_type, 1);
+        cloned.resolve_rank_one_memory(MemoryType::Vertex);
+        assert_eq!(cloned.incidence_rank_one.as_ref().unwrap().memory_type, 0);
+    }
+}
+
+#[test]
+fn explicit_multiple_arc_sets_close_captured_two_network_root() {
+    let (mut problem, mut config) = mixed_arc_problem_and_config();
+    config.parameters.max_num_per_round = 1;
+    for (network, incidence) in problem.networks.iter_mut().zip(&mut config.graphs) {
+        let index = network
+            .graph
+            .arcs
+            .iter()
+            .position(|arc| arc.tail == 2 && arc.head == 1)
+            .unwrap();
+        let arc_id = network.graph.arcs[index].id;
+        network.graph.arcs[index].elements.push(5);
+        network.arc_entries[index].push((5, 1.));
+        let arc = incidence
+            .arcs
+            .iter_mut()
+            .find(|arc| arc.id == arc_id)
+            .unwrap();
+        arc.elem_sets.push(5);
+        arc.packing_sets.push(5);
+        arc.covering_sets.push(5);
+        // Repeated incidence entries do not duplicate the physical row entry.
+        arc.elem_sets.push(0);
+        arc.packing_sets.push(0);
+        arc.covering_sets.push(0);
+        let vertex = incidence.vertices.iter_mut().find(|v| v.id == 1).unwrap();
+        vertex.elem_sets.push(1);
+        vertex.packing_sets.push(1);
+        vertex.covering_sets.push(1);
+    }
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    options.preprocessing.enabled = false;
+    options
+        .pricing_options
+        .push(("BALDESuseBidirectionalSearch".into(), 0.));
+    let plain = super::super::solve(problem.clone(), options.clone()).unwrap();
+    assert!((plain.master.lp - 2.5).abs() < 1e-7, "{}", plain.master.lp);
+    options.separation.rank_one_incidence = Some(config);
+    let cut = super::super::solve(problem, options).unwrap();
+    assert!(cut.cuts > 0);
+    assert!((cut.master.lp - 3.).abs() < 1e-7, "{}", cut.master.lp);
 }
 
 #[test]

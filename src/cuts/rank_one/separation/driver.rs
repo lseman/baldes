@@ -116,13 +116,26 @@ impl Separation {
     }
 
     /// Separates packing then covering cuts rank by rank. Returned cuts carry
-    /// final ids and memories.
+    /// final ids and memories. Nonempty set-sequence input cannot be used for
+    /// covering separation or covering-based packing, and set IDs must be nonnegative.
     pub fn separate(&mut self, input: &Input) -> Option<Vec<SeparatedCut>> {
         let mut out = vec![];
         if self.num_packing_sets == 0 && self.num_covering_sets == 0 {
             return Some(out);
         }
         if input.solutions.len() != input.values.len() {
+            return None;
+        }
+        if input.solutions_are_set_sequences
+            && (input
+                .solutions
+                .iter()
+                .any(|solution| solution.arc_ids.iter().any(|&set| set < 0))
+                || (!input.solutions.is_empty()
+                    && self.num_covering_sets > 0
+                    && (self.params.type_to_separate != 1
+                        || self.params.use_cov_sets_for_one_row_packing)))
+        {
             return None;
         }
         self.num_separate_calls += 1;

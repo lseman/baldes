@@ -99,7 +99,11 @@ impl<const D: usize> Solver<D> {
         &mut self,
         constraints: Vec<restrictions::RyanFosterConstraint>,
     ) -> Result<()> {
-        let prepared = restrictions::RyanFosterResources::prepare(&self.graph, &constraints)?;
+        let prepared = restrictions::RyanFosterResources::prepare_arc_sets(
+            &self.graph,
+            &constraints,
+            &self.arc_set_branches,
+        )?;
         if constraints != self.ryan_foster {
             if !self.ryan_foster.iter().all(|c| constraints.contains(c)) {
                 self.restore_arcs();
@@ -121,6 +125,25 @@ impl<const D: usize> Solver<D> {
                     })
                 });
             }
+        }
+        Ok(())
+    }
+
+    /// Install branch restrictions expressed as packing-set arc membership.
+    /// Changing them rebuilds labels and any retained route universe because
+    /// prior path coalescing may have discarded distinct arc sequences.
+    pub fn set_arc_set_branches(
+        &mut self,
+        constraints: Vec<restrictions::ArcSetConstraint>,
+    ) -> Result<()> {
+        restrictions::RyanFosterResources::prepare_arc_sets(
+            &self.graph,
+            &self.ryan_foster,
+            &constraints,
+        )?;
+        if constraints != self.arc_set_branches {
+            self.restore_arcs();
+            self.arc_set_branches = constraints;
         }
         Ok(())
     }

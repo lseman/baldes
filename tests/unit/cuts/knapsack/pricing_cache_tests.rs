@@ -21,6 +21,39 @@ fn cut() -> ResourceKnapsackCut {
 }
 
 #[test]
+fn exact_retrieval_only_requires_a_mapping_for_effective_cut_prices() {
+    let mut unpriced = cut();
+    unpriced.dual = 0.;
+    let mut pricing = KnapsackPricing::default();
+    pricing
+        .retrieve_exact(&[unpriced.clone()], 4, &BTreeMap::new())
+        .unwrap();
+    assert!(!pricing.active);
+    assert_eq!(pricing.cost(&[]), 0.);
+
+    for dual in [-1., -f64::MIN_POSITIVE] {
+        unpriced.dual = dual;
+        assert!(pricing
+            .retrieve_exact(&[unpriced.clone()], 4, &BTreeMap::new())
+            .is_err());
+    }
+    unpriced.dual = -2.;
+    for coefficients in [BTreeMap::new(), BTreeMap::from([(0, 0), (3, 0)])] {
+        unpriced.cut.coefficients = coefficients;
+        pricing
+            .retrieve_exact(&[unpriced.clone()], 4, &BTreeMap::new())
+            .unwrap();
+        assert!(!pricing.active);
+        assert_eq!(pricing.cost(&[]), 0.);
+    }
+    unpriced.dual = 0.;
+    unpriced.cut.coefficients = BTreeMap::from([(0, 1), (3, 0)]);
+    assert!(pricing
+        .retrieve_exact(&[unpriced], 4, &BTreeMap::new())
+        .is_err());
+}
+
+#[test]
 fn retrieval_handles_coefficient_differences_outside_i32_range() {
     let mut cut = cut();
     cut.dual = -0.5;
@@ -499,4 +532,42 @@ fn native_paired_cut_dual_capture_preserves_master_coefficient_charge() {
         assert_eq!(pricing.cost(&resources), native_price);
         assert_eq!(native_bound + pricing.cost(&resources), 0.);
     }
+}
+
+#[test]
+fn paired_cut_charge_matches_recorded_native_route_values() {
+    let mut item = cut();
+    item.graph_resources = BTreeMap::from([(7, (1, 1.))]);
+    item.cut.coefficients = BTreeMap::from([(0, 0), (3, 1), (6, 2), (9, 3), (12, 4)]);
+    let mut positive = 0;
+    let mut zero = 0;
+    for line in include_str!("paired_recorded_dual_native.txt").lines() {
+        let values: Vec<f64> = line
+            .split_whitespace()
+            .map(|v| v.parse().unwrap())
+            .collect();
+        assert_eq!(values.len(), 7);
+        let price = values[1];
+        let resources = [values[3], values[4]];
+        item.dual = -price;
+        let mut pricing = KnapsackPricing::default();
+        pricing
+            .retrieve_exact(&[item.clone()], 7, &BTreeMap::from([(1, 1)]))
+            .unwrap();
+        let coefficient = item.coefficient(7, &resources);
+        assert_eq!(f64::from(coefficient), values[6]);
+        assert_eq!(pricing.cost(&resources), price * f64::from(coefficient));
+        // This model's paired objective coefficient is one.
+        let reduced = values[5] + resources[1];
+        if coefficient == 1 {
+            positive += 1;
+            assert_eq!(reduced, values[2]);
+            assert_eq!(reduced + pricing.cost(&resources), 0.);
+        } else {
+            zero += 1;
+            assert_eq!(coefficient, 0);
+            assert_eq!(reduced, 0.);
+        }
+    }
+    assert_eq!((positive, zero), (36, 27));
 }

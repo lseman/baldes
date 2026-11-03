@@ -184,7 +184,15 @@ pub fn prepare_arcs<const D: usize>(
         };
         into[to].push(i);
     }
-    let coordinates = |at: i32| if at < 0 { (-1, -1) } else { (at >> 5, at % 32) };
+    let coordinates = |at: i32| {
+        if at == i32::MIN {
+            (0, -1)
+        } else if at < 0 {
+            (-1, -1)
+        } else {
+            (at >> 5, at % 32)
+        }
+    };
     let mut push = |arc: usize,
                     owner: usize,
                     mask: u32,
@@ -269,6 +277,31 @@ pub fn prepare_arcs<const D: usize>(
                 continue;
             };
             let a = &g.arcs[i];
+            if cut.arc_memory && increment > 0 && !cut.memory_arcs.contains(&id) {
+                // A supported packing arc charges even outside arc memory.
+                // Crossing that arc resets history on its tail side, while
+                // the head side may still hold the new remainder.
+                // Native divides the missing head position (-1) by 32 with
+                // truncation toward zero, yielding word 0 and shift -1.
+                let head = if position[a.head] < 0 {
+                    i32::MIN
+                } else {
+                    position[a.head]
+                };
+                let (source, target) = if forward { (-1, head) } else { (head, -1) };
+                push(
+                    i,
+                    owner,
+                    mask,
+                    cut.denominator,
+                    source,
+                    target,
+                    increment,
+                    cut.covering,
+                    cut.dual,
+                );
+                continue;
+            }
             if increment < 1 || position[a.head] >= 0 || position[a.tail] >= 0 {
                 continue;
             }

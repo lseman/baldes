@@ -49,6 +49,7 @@ pub(super) fn deterministic_entries<const D: usize>(
         && oracle.presence_rows.is_empty()
         && oracle.resource_groups.is_empty()
         && oracle.ryan_foster_rows.is_empty()
+        && oracle.arc_set_branch_rows.is_empty()
         && oracle.activity_rows.is_empty()
     {
         return Ok(vec![]);

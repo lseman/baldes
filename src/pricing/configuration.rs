@@ -181,7 +181,12 @@ impl<const D: usize> Solver<D> {
                 .options
                 .get("BALDEScheckDominInOtherBuckets")
                 .unwrap_or(1.)
-                != 0.,
+                != 0.
+                && self
+                    .options
+                    .get("BALDESlabelDominanceStrategy")
+                    .unwrap_or(0.)
+                    != 1.,
             ..Default::default()
         }
     }

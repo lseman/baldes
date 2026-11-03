@@ -281,8 +281,10 @@ impl<const D: usize> Enumeration<D> {
                         physical.tail
                     };
                     next.hops += 1;
-                    if let (Some(branching), Some(state)) = (branching, &next.branch_state) {
-                        if !branching.can_visit(state, next.vertex) {
+                    if let (Some(branching), Some(state)) = (branching, &mut next.branch_state) {
+                        if !branching.traverse_arc(state, arc.physical)
+                            || !branching.can_visit(state, next.vertex)
+                        {
                             continue;
                         }
                     }

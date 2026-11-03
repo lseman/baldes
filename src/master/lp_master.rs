@@ -127,6 +127,11 @@ pub trait LpMaster: Sized + 'static {
     /// the row rather than inventing a basis status.
     fn row_is_basic(&self, row: usize) -> Result<bool>;
 
+    /// Whether the row may be considered for cut cleanup by this backend.
+    fn row_cleanup_candidate(&self, row: usize) -> Result<bool> {
+        self.row_is_basic(row)
+    }
+
     /// Cut cleanup: the cut rows (from `initial_rows`
     /// on) to remove, ascending. Backends normally forward to the shared
     /// [`cleanup_cut_rows`].
@@ -178,7 +183,7 @@ pub fn cleanup_cut_rows<M: LpMaster>(master: &M, initial_rows: usize) -> Result<
     let mut kept = 0;
     let mut candidates = vec![];
     for row in initial_rows..rhs.len() {
-        if !master.row_is_basic(row)? {
+        if !master.row_cleanup_candidate(row)? {
             kept += 1;
             continue;
         }

@@ -959,6 +959,480 @@ fn complete_mixed_incidence_separation_matches_two_graph_reference_capture() {
     ));
 }
 
+#[test]
+fn mixed_incidence_separation_matches_two_native_rounds() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_multiround_native.json"
+    ));
+}
+
+#[test]
+fn mixed_incidence_graph_dependent_memory_matches_three_native_rounds() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_multiround_dependent_native.json"
+    ));
+}
+
+#[test]
+fn mixed_incidence_vertex_memory_matches_three_native_rounds() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_multiround_vertex_native.json"
+    ));
+}
+
+#[test]
+fn mixed_incidence_automatic_memory_matches_native_two_pass_and_child_calls() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_eight_automatic_tree_native.json"
+    ));
+}
+
+#[test]
+fn mixed_incidence_automatic_checkpoint_matches_native_with_retained_separator() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_eight_automatic_checkpoint_native.json"
+    ));
+}
+
+#[test]
+fn mixed_incidence_eight_row_arc_memory_matches_native_rounds() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_eight_arc_native.json"
+    ));
+}
+
+#[test]
+fn mixed_incidence_eight_row_arc_memory_matches_native_child_inputs() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_eight_arc_tree_native.json"
+    ));
+}
+
+#[test]
+fn mixed_incidence_matches_native_cleanup_active_inputs() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_eight_cleanup_native.json"
+    ));
+}
+
+#[test]
+fn mixed_incidence_matches_native_cuts_generated_after_cleanup() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_ten_cleanup_native.json"
+    ));
+}
+
+#[test]
+fn mixed_incidence_matches_native_weighted_cleanup_rounds() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_weighted_cleanup_native.json"
+    ));
+}
+
+#[test]
+fn mixed_incidence_siblings_match_with_shared_separator_history() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_ryan_foster_siblings_native.json"
+    ));
+}
+
+#[test]
+fn mixed_incidence_strong_branching_matches_native_separation_inputs() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_strong_trials_native.json"
+    ));
+}
+
+#[test]
+fn native_ryan_foster_checks_arc_defined_set_membership() {
+    let capture: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/ryan_foster_arc_set_satisfies_native.json"
+    ))
+    .unwrap();
+    let graph: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_weighted_cleanup_native.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        capture["reference_sha256"],
+        "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6"
+    );
+    assert_eq!(capture["sets"], serde_json::json!([0, 2]));
+    let cases = capture["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 256);
+    for case in cases {
+        let graph_id = case["graph"].as_i64().unwrap();
+        let arcs = graph[if graph_id == 7 { "arcs7" } else { "arcs8" }]
+            .as_array()
+            .unwrap();
+        let mut first = false;
+        let mut second = false;
+        for id in case["arcs"].as_array().unwrap() {
+            let arc = &arcs[id.as_u64().unwrap() as usize];
+            let tail = arc["tail"].as_i64().unwrap();
+            let head = arc["head"].as_i64().unwrap();
+            first |= head == 1 && tail != 4 && tail != 5;
+            second |= head == 3;
+        }
+        assert_eq!(
+            case["native_count"].as_u64().unwrap(),
+            u64::from(first) + u64::from(second)
+        );
+        let expected = if case["together"].as_bool().unwrap() {
+            first == second
+        } else {
+            !(first && second)
+        };
+        assert_eq!(case["accepted"].as_bool().unwrap(), expected, "{case}");
+    }
+    // Both routes visit vertex 1, but only the first enters it on an arc in set 0.
+    for (arcs, accepted) in [(vec![0, 1], false), (vec![27, 29, 1], true)] {
+        assert!(cases.iter().any(|case| {
+            case["graph"] == 7
+                && case["together"] == true
+                && case["arcs"] == serde_json::json!(arcs)
+                && case["accepted"] == accepted
+        }));
+    }
+}
+
+#[test]
+fn arc_set_branch_labels_match_native_route_decisions() {
+    use baldes::labeling::engine::{EngineControls, LabelingEngine};
+    use baldes::pricing::phases::Phase;
+    use baldes::pricing::restrictions::{ArcSetConstraint, RyanFosterResources};
+    let capture: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/ryan_foster_arc_set_satisfies_native.json"
+    ))
+    .unwrap();
+    let graphs: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_weighted_cleanup_native.json"
+    ))
+    .unwrap();
+    for case in capture["cases"].as_array().unwrap() {
+        let source = graphs[if case["graph"] == 7 { "arcs7" } else { "arcs8" }]
+            .as_array()
+            .unwrap();
+        let mut graph = baldes::graph::Graph::<2>::new(10, 0).unwrap();
+        let mut first = vec![];
+        let mut second = vec![];
+        for value in case["arcs"].as_array().unwrap() {
+            let id = value.as_i64().unwrap() as i32;
+            let arc = &source[id as usize];
+            let tail = arc["tail"].as_u64().unwrap() as usize;
+            let head = arc["head"].as_u64().unwrap() as usize;
+            graph.add_arc_with_id(id, tail, head, -1.).unwrap();
+            if head == 1 && tail != 4 && tail != 5 {
+                first.push(id);
+            }
+            if head == 3 {
+                second.push(id);
+            }
+        }
+        let branch = ArcSetConstraint {
+            first,
+            second,
+            together: case["together"].as_bool().unwrap(),
+        };
+        for bidirectional in [false, true] {
+            let mut engine = LabelingEngine::prepare(
+                &graph,
+                EngineControls {
+                    bidirectional,
+                    ..Default::default()
+                },
+                Phase {
+                    check_ng: true,
+                    jump_arcs: true,
+                    labels_per_bucket: i64::MAX,
+                },
+            )
+            .unwrap();
+            engine.branching =
+                RyanFosterResources::prepare_arc_sets(&graph, &[], &[branch.clone()]).unwrap();
+            let result = engine.solve(&graph, &baldes::Controls::default()).unwrap();
+            assert_eq!(
+                !result.columns.is_empty(),
+                case["accepted"].as_bool().unwrap(),
+                "bidirectional={bidirectional} {case}"
+            );
+        }
+        let mut solver = baldes::pricing::Solver::<2>::new(10, 0).unwrap();
+        solver.graph = graph;
+        assert!(
+            !solver.enumerate(1.).unwrap().is_empty(),
+            "unrestricted {case}"
+        );
+        solver.set_arc_set_branches(vec![branch]).unwrap();
+        let priced = solver.price_phase(0, 150, false).unwrap();
+        assert_eq!(
+            !priced.columns.is_empty(),
+            case["accepted"].as_bool().unwrap()
+        );
+        let enumerated = solver.enumerate(1.).unwrap();
+        assert_eq!(
+            !enumerated.is_empty(),
+            case["accepted"].as_bool().unwrap(),
+            "{case}"
+        );
+    }
+}
+
+#[test]
+fn overlapping_arc_set_events_are_atomic() {
+    use baldes::pricing::restrictions::{ArcSetConstraint, RyanFosterResources};
+    let mut graph = baldes::graph::Graph::<2>::new(3, 0).unwrap();
+    graph.add_arc_with_id(17, 0, 1, 0.).unwrap();
+    let constraint = |together| ArcSetConstraint {
+        first: vec![17, 17],
+        second: vec![17],
+        together,
+    };
+    let apart = RyanFosterResources::prepare_arc_sets(&graph, &[], &[constraint(false)]).unwrap();
+    let mut state = None;
+    assert!(!apart.traverse_arc(&mut state, 0));
+    assert!(state.is_none());
+    let together = RyanFosterResources::prepare_arc_sets(&graph, &[], &[constraint(true)]).unwrap();
+    assert!(together.traverse_arc(&mut state, 0));
+    assert!(together.accepts(&state));
+    let saved = state.clone();
+    assert!(!together.traverse_arc(&mut state, 0));
+    assert_eq!(state, saved);
+}
+
+#[test]
+fn mixed_incidence_preserves_covering_vertex_cost_missing_from_native() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_signed_pricing_native.json"
+    ));
+}
+
+#[test]
+fn exact_root_pricing_preserves_raw_costs_when_native_rounding_ties_routes() {
+    let capture: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/rounded_exact_root_pricing_native.json"
+    ))
+    .unwrap();
+    let topology: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_eight_vertex_native.json"
+    ))
+    .unwrap();
+    let raw: Vec<f64> = capture["raw_arc_costs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_f64().unwrap())
+        .collect();
+    let mut solver = Solver::<2>::new(10, 1).unwrap();
+    solver.graph.graph_id = 7;
+    for vertex in 0..10 {
+        solver.graph.set_bounds(vertex, 0, 0., 2.).unwrap();
+    }
+    solver
+        .graph
+        .configure_ng(
+            8,
+            (0..10)
+                .map(|v| {
+                    if (1..=8).contains(&v) {
+                        vec![v - 1]
+                    } else {
+                        vec![]
+                    }
+                })
+                .collect(),
+            vec![(0..8).collect(); 10],
+        )
+        .unwrap();
+    for (index, arc) in topology["arcs7"].as_array().unwrap().iter().enumerate() {
+        let head = arc["head"].as_u64().unwrap() as usize;
+        let id = solver
+            .graph
+            .add_arc(arc["tail"].as_u64().unwrap() as usize, head, 0.)
+            .unwrap();
+        let arc = solver.graph.arc_mut(id).unwrap();
+        arc.consumption[0] = if head == 9 { 0. } else { 1. };
+        arc.variables = vec![(index, 1.)];
+    }
+    solver.maximum_variable_id = Some(raw.len() - 1);
+    solver.cache_variable_costs(&raw).unwrap();
+    let recorded = capture["recorded_costs"].as_array().unwrap();
+    assert_eq!(recorded.len(), 64);
+    for record in recorded {
+        let arcs = record["arcs"].as_array().unwrap();
+        let cost: f64 = arcs
+            .iter()
+            .map(|id| solver.graph.arcs[id.as_u64().unwrap() as usize].reduced_cost)
+            .sum();
+        assert_eq!(cost.to_bits(), record["cost"].as_f64().unwrap().to_bits());
+    }
+    let first = vec![18, 25, 55];
+    let second = vec![18, 23, 37];
+    let position = |arcs: &[i32]| {
+        capture["returned_arcs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .position(|path| *path == serde_json::json!(arcs))
+            .unwrap()
+    };
+    assert!(position(&first) < position(&second));
+    let cached = solver.price_phase(0, 1000, false).unwrap();
+    let cached_position = |arcs: &[i32]| {
+        cached
+            .columns
+            .iter()
+            .position(|route| route.arcs == arcs)
+            .unwrap()
+    };
+    assert!(cached_position(&first) < cached_position(&second));
+    let native: Vec<Vec<i32>> = capture["returned_arcs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| serde_json::from_value(v.clone()).unwrap())
+        .collect();
+    let cached_arcs: Vec<_> = cached.columns.iter().map(|r| r.arcs.clone()).collect();
+    assert_eq!(cached_arcs, native);
+    let exact = solver.price_functor_phase(0, 1000).unwrap();
+    assert!(exact.exact);
+    let cost = |arcs: &[i32]| exact.columns.iter().find(|r| r.arcs == arcs).unwrap().cost;
+    assert!(cost(&second) < cost(&first));
+    let mut reordered: Vec<_> = exact.columns.iter().collect();
+    reordered.sort_by(|a, b| {
+        let cached_cost = |route: &Route| -> f64 {
+            route
+                .arcs
+                .iter()
+                .map(|&id| solver.graph.arcs[id as usize].reduced_cost)
+                .sum()
+        };
+        cached_cost(a).total_cmp(&cached_cost(b))
+    });
+    assert_eq!(reordered.len(), native.len());
+    // A stable post-sort cannot recreate candidate IDs assigned by the cached
+    // search. Ties retain their raw-search order instead.
+    assert_eq!(
+        reordered
+            .iter()
+            .zip(&native)
+            .filter(|(actual, expected)| actual.arcs != **expected)
+            .count(),
+        32
+    );
+}
+
+#[test]
+fn mixed_incidence_eight_row_vertex_memory_matches_native_rounds() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_eight_vertex_native.json"
+    ));
+}
+
+#[test]
+fn mixed_incidence_automatic_memory_matches_native_root_rounds() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_automatic_native.json"
+    ));
+}
+
+#[test]
+fn mixed_incidence_full_memory_matches_two_native_rounds() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_multiround_full_native.json"
+    ));
+}
+
+#[test]
+fn mixed_incidence_inherits_native_active_cut_memory() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_mixed_active_memory_native.json"
+    ));
+}
+
+#[test]
+fn mixed_incidence_excludes_inactive_cut_memory_like_native() {
+    for capture in [
+        include_str!("../fixtures/cuts/rank_one_two_graph_mixed_inactive_memory_native.json"),
+        include_str!("../fixtures/cuts/rank_one_two_graph_mixed_selective_memory_native.json"),
+    ] {
+        check_mixed_incidence_separation_capture(capture);
+    }
+}
+
+#[test]
+fn rank_one_separation_matches_native_arc_head_overlap() {
+    for capture in [
+        include_str!("../fixtures/cuts/rank_one_two_graph_overlap_packing_native.json"),
+        include_str!("../fixtures/cuts/rank_one_two_graph_overlap_covering_native.json"),
+    ] {
+        check_mixed_incidence_separation_capture(capture);
+    }
+}
+
+#[test]
+fn empty_packing_set_sequence_columns_match_native() {
+    use baldes::cuts::separation::ColumnInfo;
+
+    let cases: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/rank_one_set_sequence_zero_native.json"
+    ))
+    .unwrap();
+    for case in cases.as_array().unwrap() {
+        let sequence: Vec<_> = case["sequence"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_i64().unwrap() as i32)
+            .collect();
+        let column = ColumnInfo::from_set_sequence(0, 0.5, &sequence, 0);
+        assert!(column.packing_set_count.is_empty());
+        assert_eq!(column.elementary, case["elementary"].as_i64().unwrap() != 0);
+        assert_eq!(column.enumerated, case["enumerated"].as_i64().unwrap() != 0);
+    }
+}
+
+#[test]
+fn rank_one_separation_matches_native_multiple_sets_on_one_arc() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_multiple_sets_native.json"
+    ));
+}
+
+#[test]
+fn rank_one_separation_matches_native_multiple_sets_on_one_vertex() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_multiple_vertex_sets_native.json"
+    ));
+}
+
+#[test]
+fn rank_one_separation_matches_native_duplicate_memberships() {
+    for capture in [
+        include_str!("../fixtures/cuts/rank_one_two_graph_duplicate_vertex_sets_native.json"),
+        include_str!("../fixtures/cuts/rank_one_two_graph_duplicate_arc_sets_native.json"),
+    ] {
+        check_mixed_incidence_separation_capture(capture);
+    }
+}
+
+#[test]
+fn rank_one_separation_matches_native_unsorted_vertex_registration() {
+    check_mixed_incidence_separation_capture(include_str!(
+        "../fixtures/cuts/rank_one_two_graph_unsorted_vertex_sets_native.json"
+    ));
+}
+
+#[test]
+fn rank_one_multiple_set_coefficients_and_pricing_match_native_control() {
+    for capture in [
+        include_str!("../fixtures/cuts/rank_one_two_graph_four_sets_native.json"),
+        include_str!("../fixtures/cuts/rank_one_two_graph_four_sets_feasible_native.json"),
+    ] {
+        check_mixed_incidence_separation_capture(capture);
+    }
+}
+
 fn check_mixed_incidence_separation_capture(capture: &str) {
     use baldes::cuts::separation::{
         prepare_incidence, ArcData, GraphData, Input, Parameters, Separation, Solution, VertexData,
@@ -972,22 +1446,32 @@ fn check_mixed_incidence_separation_capture(capture: &str) {
     assert_eq!(capture["controlled_covering_seed"], 1);
     let number = |value: &serde_json::Value| value.as_i64().unwrap() as i32;
     let complete_incidence = capture["complete_incidence"].as_bool().unwrap_or(false);
+    let num_sets = capture["num_sets"].as_i64().unwrap_or(6) as i32;
     let make_graph = |id, arcs: &str| GraphData {
         id,
         source: 0,
-        sink: 7,
-        elem_set_count: 6,
-        packing_set_count: 6,
-        covering_set_count: 6,
-        vertices: (0..8)
+        sink: num_sets + 1,
+        elem_set_count: num_sets,
+        packing_set_count: num_sets,
+        covering_set_count: num_sets,
+        vertices: (0..num_sets + 2)
             .map(|vertex| {
-                let sets = if vertex == 1 {
-                    vec![1]
-                } else if (3..=6).contains(&vertex) {
+                let mut sets = if vertex == 1 {
+                    if capture["multi_vertex_set"].is_number() {
+                        vec![1, number(&capture["multi_vertex_set"])]
+                    } else {
+                        vec![1]
+                    }
+                } else if vertex == 2 && capture["multi_vertex_set"].is_number() {
+                    vec![0]
+                } else if (3..=num_sets).contains(&vertex) {
                     vec![vertex - 1]
                 } else {
                     vec![]
                 };
+                if vertex == 1 && capture["duplicate_vertex_set"] == true {
+                    sets.insert(1, 1);
+                }
                 let rows = if !complete_incidence && id == 8 && vertex == 6 {
                     vec![]
                 } else {
@@ -1009,16 +1493,54 @@ fn check_mixed_incidence_separation_capture(capture: &str) {
                 let tail = number(&arc["tail"]);
                 let head = number(&arc["head"]);
                 let mut sets = vec![];
-                if head == 1 && tail != 4 && tail != 5 {
+                if head == 1 && tail != 4 && tail != 5 && !capture["multi_vertex_set"].is_number() {
                     sets.push(0);
+                }
+                let mut elem = sets.clone();
+                let mut packing = sets.clone();
+                let mut covering = sets;
+                if tail == 4 && head == 1 {
+                    match capture["overlap_kind"].as_str() {
+                        Some("packing") => {
+                            elem.push(1);
+                            packing.push(1);
+                        }
+                        Some("covering") => {
+                            elem.push(1);
+                            covering.push(1);
+                        }
+                        _ => {}
+                    }
+                }
+                if tail == 2 && head == 1 {
+                    if capture["duplicate_arc_set"] == true {
+                        elem.push(0);
+                        packing.push(0);
+                        covering.push(0);
+                    }
+                    if let Some(set) = capture["multi_arc_set"].as_i64() {
+                        elem.push(set as i32);
+                        packing.push(set as i32);
+                        covering.push(set as i32);
+                    }
+                }
+                if tail == 3 && head == 1 {
+                    if let Some(extra) = capture["multi_arc_sets"].as_array() {
+                        for set in extra {
+                            let set = number(set);
+                            elem.push(set);
+                            packing.push(set);
+                            covering.push(set);
+                        }
+                    }
                 }
                 ArcData {
                     id: number(&arc["id"]),
                     tail,
                     head,
-                    elem_sets: sets.clone(),
-                    packing_sets: sets.clone(),
-                    covering_sets: sets,
+                    elem_sets: elem,
+                    packing_sets: packing,
+                    covering_sets: covering,
                     ..Default::default()
                 }
             })
@@ -1026,7 +1548,7 @@ fn check_mixed_incidence_separation_capture(capture: &str) {
         ..Default::default()
     };
     let (g7, g8) = (make_graph(7, "arcs7"), make_graph(8, "arcs8"));
-    if complete_incidence {
+    if complete_incidence && capture["skip_master_entry_validation"] != true {
         for (graph, entries) in [(&g7, "master_entries7"), (&g8, "master_entries8")] {
             let incidence = prepare_incidence(graph).unwrap();
             let rows = capture[entries].as_array().unwrap();
@@ -1055,13 +1577,12 @@ fn check_mixed_incidence_separation_capture(capture: &str) {
             }
         }
     }
-    let call = &capture["call"];
     let params = Parameters {
         max_num_rows: 5,
-        max_num_per_round: 20,
-        memory_type: 1,
+        max_num_per_round: capture["max_num_per_round"].as_i64().unwrap_or(20) as i32,
+        memory_type: capture["parameter_memory_type"].as_i64().unwrap_or(1) as i32,
         arc_memory_type: 2,
-        sp_dependent_memory: false,
+        sp_dependent_memory: capture["sp_dependent_memory"].as_bool().unwrap_or(false),
         ls_num_iterations: 1000,
         neighbourhood_size: 16,
         max_num_triplets: 10000,
@@ -1078,130 +1599,764 @@ fn check_mixed_incidence_separation_capture(capture: &str) {
             (8, prepare_incidence(&g8).unwrap())
         ]
     ));
-    assert!(call["neighbours"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .all(|x| x.as_array().unwrap().is_empty()));
-    let columns: Vec<_> = call["columns"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|column| Solution {
-            graph_id: number(&column["graph"]),
-            enumerated: number(&column["enumerated"]) != 0,
-            arc_ids: column["arc_ids"]
+    if let Some(controls) = capture["quad_controls"].as_array() {
+        use baldes::cuts::separation::SeparatedCut;
+        for control in controls {
+            let kind = number(&control["kind"]);
+            let memory: BTreeMap<_, _> = [&g7, &g8]
+                .into_iter()
+                .map(|graph| (graph.id, graph.arcs.iter().map(|arc| arc.id).collect()))
+                .collect();
+            let cut = SeparatedCut {
+                kind,
+                num_rows: 5,
+                denominator: number(&control["denominator"]),
+                numerators: control["numerators"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(number)
+                    .collect(),
+                set_ids: control["ids"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(number)
+                    .collect(),
+                memory_type: 1,
+                memory,
+                ..Default::default()
+            };
+            let arc_ids: Vec<_> = control["arcs"]
                 .as_array()
                 .unwrap()
                 .iter()
                 .map(number)
-                .collect(),
-        })
-        .collect();
-    let input = Input {
-        solutions: columns.iter().collect(),
-        values: call["columns"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|c| c["value"].as_f64().unwrap())
-            .collect(),
-        cut_memory_type: number(&call["memory_type"]),
-        solutions_are_set_sequences: number(&call["set_sequences"]) != 0,
-        separation_phase: number(&call["phase"]),
-        active_cuts: vec![],
-    };
-    let cuts = separator.separate(&input).unwrap();
-    let native = call["cuts"].as_array().unwrap();
-    assert_eq!(cuts.len(), native.len());
-    let mut registry = baldes::cuts::CutRegistry::default();
-    let registered = integrated
-        .separate_and_register(&mut registry, &input)
-        .unwrap();
-    assert_eq!(registered.len(), cuts.len());
-    for ((index, actual), expected) in registered.iter().zip(&cuts) {
-        assert_eq!(actual, expected);
-        assert_eq!(registry.cuts[*index].id, *index as i32);
+                .collect();
+            let route: Vec<_> = arc_ids
+                .iter()
+                .map(|&id| {
+                    let arc = g7.arcs.iter().find(|arc| arc.id == id).unwrap();
+                    (arc.tail as usize, arc.head as usize, id)
+                })
+                .collect();
+            let mut local = baldes::cuts::CutRegistry::default();
+            let index = local.register_separated_cut(&[&g7, &g8], &cut).unwrap();
+            let expected = control["coefficient"].as_f64().unwrap();
+            for enumerated in [false, true] {
+                let solution = Solution {
+                    graph_id: 7,
+                    enumerated,
+                    arc_ids: arc_ids.clone(),
+                };
+                assert_eq!(separator.coefficient(&solution, &cut), expected);
+                assert_eq!(
+                    f64::from(
+                        baldes::cuts::coefficient(&local.cuts[index], 7, &route, enumerated)
+                            .unwrap()
+                    ),
+                    expected
+                );
+            }
+            let mut solver = baldes::pricing::Solver::<2>::new(8, 0).unwrap();
+            solver.graph.graph_id = 7;
+            for &(tail, head, id) in &route {
+                solver.graph.add_arc_with_id(id, tail, head, 0.).unwrap();
+            }
+            local.cuts[index].dual = if kind == 0 { -1. } else { 1. };
+            solver.cuts = local;
+            let priced = solver.price_phase(0, 10, false).unwrap();
+            assert_eq!(priced.columns.len(), 1);
+            let charge = if kind == 0 { expected } else { -expected };
+            assert_eq!(priced.columns[0].cost, charge);
+            let enumerated = solver.enumerate(100.).unwrap();
+            assert_eq!(enumerated.len(), 1);
+            assert_eq!(enumerated[0].cost, charge);
+        }
     }
-    for (cut, expected) in cuts.iter().zip(native) {
-        let item = &expected["descriptor"];
-        let list = |name: &str| {
-            item[name]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(number)
-                .collect::<Vec<_>>()
-        };
-        assert_eq!(
-            (
-                cut.kind,
-                cut.num_rows,
-                cut.class,
-                cut.denominator,
-                &cut.numerators,
-                &cut.set_ids
-            ),
-            (
-                number(&item["kind"]),
-                number(&item["rows"]),
-                number(&item["class"]),
-                number(&item["denominator"]),
-                &list("numerators"),
-                &list("set_ids")
-            ),
-            "cut {}",
-            cut.id
-        );
-        assert_eq!(cut.id, number(&item["id"]));
-        assert_eq!(cut.rhs, item["rhs"].as_f64().unwrap());
-        assert_eq!(cut.memory_type, number(&expected["memory_type"]));
-        let memory: BTreeMap<i32, BTreeSet<i32>> = expected["memory"]
+    let calls: Vec<_> = match capture["calls"].as_array() {
+        Some(calls) => calls.iter().collect(),
+        None => vec![&capture["call"]],
+    };
+    let mut registry = baldes::cuts::CutRegistry::default();
+    let mut prior_cuts: Vec<baldes::cuts::separation::SeparatedCut> = Vec::new();
+    let branch_parents = capture["branch_parents"].as_object();
+    let mut snapshots: Vec<(
+        Separation,
+        baldes::cuts::IncidenceCutSeparator,
+        baldes::cuts::CutRegistry,
+        Vec<baldes::cuts::separation::SeparatedCut>,
+    )> = vec![];
+    for (round, call) in calls.into_iter().enumerate() {
+        if capture["registry_reset_round"].as_u64() == Some(round as u64) {
+            registry = baldes::cuts::CutRegistry::default();
+            prior_cuts.clear();
+        }
+        if let Some(parent) = branch_parents
+            .and_then(|parents| parents.get(&round.to_string()))
+            .and_then(serde_json::Value::as_u64)
+        {
+            let (parent_separator, parent_integrated, parent_registry, parent_cuts) = snapshots
+                .get(parent as usize)
+                .expect("missing captured parent state");
+            if capture["shared_separator_history"] != true {
+                separator = parent_separator.clone();
+                integrated = parent_integrated.clone();
+            }
+            registry = parent_registry.clone();
+            prior_cuts = parent_cuts.clone();
+        }
+        assert!(call["neighbours"]
             .as_array()
             .unwrap()
             .iter()
-            .map(|entry| {
+            .all(|x| x.as_array().unwrap().is_empty()));
+        let columns: Vec<_> = call["columns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|column| Solution {
+                graph_id: number(&column["graph"]),
+                enumerated: number(&column["enumerated"]) != 0,
+                arc_ids: column["arc_ids"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(number)
+                    .collect(),
+            })
+            .collect();
+        let active_cuts = call["active_cuts"]
+            .as_array()
+            .map(|active| {
+                active
+                    .iter()
+                    .map(|entry| {
+                        let descriptor = &entry["cut"];
+                        let cut = prior_cuts
+                            .iter()
+                            .find(|cut| cut.id == number(&descriptor["id"]))
+                            .expect("captured active cut was generated in a prior round");
+                        let expected_sets: Vec<_> = descriptor["set_ids"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(number)
+                            .collect();
+                        let expected_memory: BTreeMap<i32, BTreeSet<i32>> = entry["memory"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(|item| {
+                                (
+                                    number(&item["graph"]),
+                                    item["values"]
+                                        .as_array()
+                                        .unwrap()
+                                        .iter()
+                                        .map(number)
+                                        .collect(),
+                                )
+                            })
+                            .collect();
+                        assert_eq!(cut.set_ids, expected_sets);
+                        let mut active = cut.clone();
+                        if capture["controlled_active_memory"].as_bool() == Some(true)
+                            && number(&call["phase"]) == 5
+                            && active.id == 2
+                        {
+                            assert!(active.memory.get_mut(&7).unwrap().insert(0));
+                        }
+                        assert_eq!(active.memory, expected_memory);
+                        assert_eq!(active.memory_type, number(&entry["memory_type"]));
+                        active
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let input = Input {
+            solutions: columns.iter().collect(),
+            values: call["columns"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|c| c["value"].as_f64().unwrap())
+                .collect(),
+            cut_memory_type: number(&call["memory_type"]),
+            solutions_are_set_sequences: number(&call["set_sequences"]) != 0,
+            separation_phase: number(&call["phase"]),
+            active_cuts,
+        };
+        if capture["retire_absent_active"].as_bool() == Some(true) {
+            for (index, cut) in prior_cuts.iter().enumerate() {
+                if !input.active_cuts.iter().any(|active| active.id == cut.id) {
+                    registry.retire(index);
+                }
+            }
+            if let Some(expected) = capture["retired_counts"][round.to_string()].as_u64() {
+                assert_eq!(registry.retired.len(), expected as usize);
+            }
+        }
+        let mut sibling = integrated.clone();
+        let mut sibling_registry = registry.clone();
+        let cuts = separator.separate(&input).unwrap();
+        let native = call["cuts"].as_array().unwrap();
+        assert_eq!(cuts.len(), native.len());
+        let registered = integrated
+            .separate_and_register(&mut registry, &input)
+            .unwrap();
+        assert_eq!(registered.len(), cuts.len());
+        let sibling_cuts = sibling
+            .separate_and_register(&mut sibling_registry, &input)
+            .unwrap();
+        assert_eq!(sibling_cuts, registered);
+        assert_eq!(sibling_registry.cuts, registry.cuts);
+        if let Some((index, _)) = sibling_cuts.first() {
+            sibling_registry.cuts[*index].dual += 1.;
+            assert_ne!(
+                sibling_registry.cuts[*index].dual,
+                registry.cuts[*index].dual
+            );
+        }
+        for ((index, actual), expected) in registered.iter().zip(&cuts) {
+            assert_eq!(actual, expected);
+            assert_eq!(registry.cuts[*index].id, *index as i32);
+        }
+        if let Some(regenerated) = capture["regenerated_cuts"].as_array() {
+            for entry in regenerated {
+                let [expected_round, old, new] = entry.as_array().unwrap().as_slice() else {
+                    panic!("invalid regenerated cut capture");
+                };
+                if number(expected_round) != round as i32 {
+                    continue;
+                }
+                let old_id = number(old);
+                let new_id = number(new);
+                let old_cut = prior_cuts.iter().find(|cut| cut.id == old_id).unwrap();
+                let new_cut = cuts.iter().find(|cut| cut.id == new_id).unwrap();
+                let mut expected = old_cut.clone();
+                expected.id = new_id;
+                assert_eq!(*new_cut, expected);
+                let old_index = registry
+                    .cuts
+                    .iter()
+                    .position(|cut| cut.id == old_id)
+                    .unwrap();
+                let new_index = registry
+                    .cuts
+                    .iter()
+                    .position(|cut| cut.id == new_id)
+                    .unwrap();
+                assert!(registry.retired.contains(&old_index));
+                assert!(!registry.retired.contains(&new_index));
+                let mut sibling = registry.clone();
+                sibling.retire(new_index);
+                assert!(sibling.retired.contains(&new_index));
+                assert!(!registry.retired.contains(&new_index));
+                assert_eq!(registry.cuts[new_index], sibling.cuts[new_index]);
+            }
+        }
+        for (cut, expected) in cuts.iter().zip(native) {
+            let item = &expected["descriptor"];
+            let list = |name: &str| {
+                item[name]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(number)
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(
                 (
-                    number(&entry["graph"]),
-                    entry["values"]
+                    cut.kind,
+                    cut.num_rows,
+                    cut.class,
+                    cut.denominator,
+                    &cut.numerators,
+                    &cut.set_ids
+                ),
+                (
+                    number(&item["kind"]),
+                    number(&item["rows"]),
+                    number(&item["class"]),
+                    number(&item["denominator"]),
+                    &list("numerators"),
+                    &list("set_ids")
+                ),
+                "cut {}",
+                cut.id
+            );
+            assert_eq!(cut.id, number(&item["id"]));
+            assert_eq!(cut.rhs, item["rhs"].as_f64().unwrap());
+            assert_eq!(cut.memory_type, number(&expected["memory_type"]));
+            let memory: BTreeMap<i32, BTreeSet<i32>> = expected["memory"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| {
+                    (
+                        number(&entry["graph"]),
+                        entry["values"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(number)
+                            .collect(),
+                    )
+                })
+                .collect();
+            assert_eq!(cut.memory, memory, "cut {}", cut.id);
+            let index = registered
+                .iter()
+                .find(|(_, descriptor)| descriptor.id == cut.id)
+                .unwrap()
+                .0;
+            for column in &columns {
+                let graph = if column.graph_id == 7 { &g7 } else { &g8 };
+                let route: Vec<_> = column
+                    .arc_ids
+                    .iter()
+                    .map(|&id| {
+                        let arc = graph.arcs.iter().find(|arc| arc.id == id).unwrap();
+                        (arc.tail as usize, arc.head as usize, id)
+                    })
+                    .collect();
+                for enumerated in [false, true] {
+                    let solution = Solution {
+                        graph_id: column.graph_id,
+                        enumerated,
+                        arc_ids: column.arc_ids.clone(),
+                    };
+                    assert_eq!(
+                        f64::from(
+                            baldes::cuts::coefficient(
+                                &registry.cuts[index],
+                                column.graph_id,
+                                &route,
+                                enumerated
+                            )
+                            .unwrap()
+                        ),
+                        separator.coefficient(&solution, cut)
+                    );
+                }
+            }
+        }
+        prior_cuts.extend(cuts);
+        if branch_parents.is_some() {
+            snapshots.push((
+                separator.clone(),
+                integrated.clone(),
+                registry.clone(),
+                prior_cuts.clone(),
+            ));
+        }
+    }
+    if let Some(prices) = capture["pricing_control"].as_array() {
+        // Give retired rows stale nonzero duals to verify they cannot reenter
+        // the pricing input after the captured cleanup sequence.
+        for cut in &mut registry.cuts {
+            cut.dual = -1.;
+        }
+        for entry in prices {
+            let id = number(&entry["id"]) as usize;
+            let price = entry["price"].as_f64().unwrap();
+            registry.cuts[id].dual = -price;
+        }
+        let cached = capture["cached_cut_control"].as_array().unwrap();
+        registry.pricing_order = cached
+            .iter()
+            .map(|entry| number(&entry["id"]) as usize)
+            .collect();
+        registry.round_duals = true;
+        let expected: Vec<_> = cached
+            .iter()
+            .map(|entry| entry["price"].as_f64().unwrap())
+            .collect();
+        for graph in [&g7, &g8] {
+            let mut pricing_graph =
+                baldes::graph::Graph::<2>::new(num_sets as usize + 2, 0).unwrap();
+            pricing_graph.graph_id = graph.id;
+            for arc in &graph.arcs {
+                pricing_graph
+                    .add_arc(arc.tail as usize, arc.head as usize, 0.)
+                    .unwrap();
+            }
+            let (limited, kpath, full, full_kpath) =
+                baldes::cuts::state::build_inputs(&registry, &pricing_graph);
+            assert!(kpath.is_empty() && full_kpath.is_empty());
+            for (input, entry) in limited.iter().zip(cached) {
+                let id = number(&entry["id"]);
+                let captured = capture["calls"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .flat_map(|call| call["cuts"].as_array().unwrap())
+                    .find(|cut| number(&cut["descriptor"]["id"]) == id)
+                    .unwrap();
+                let descriptor = &captured["descriptor"];
+                assert_eq!(input.denominator, number(&descriptor["denominator"]));
+                let memory = captured["memory"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|memory| number(&memory["graph"]) == graph.id)
+                    .unwrap()["values"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(number)
+                    .collect();
+                assert_eq!(input.memory_arcs, memory);
+            }
+            for actual in [
+                limited.iter().map(|input| input.dual).collect::<Vec<_>>(),
+                full.iter().map(|input| input.dual).collect::<Vec<_>>(),
+            ] {
+                assert_eq!(actual.len(), expected.len());
+                for (actual, price) in actual.iter().zip(&expected) {
+                    assert_eq!(actual.to_bits(), price.to_bits());
+                }
+            }
+            if let Some(case) = capture["route_controls"]
+                .as_array()
+                .and_then(|cases| cases.iter().find(|case| number(&case["graph"]) == graph.id))
+            {
+                let mut solver = Solver::<2>::new(num_sets as usize + 2, 1).unwrap();
+                solver.graph.graph_id = graph.id;
+                for vertex in 0..num_sets as usize + 2 {
+                    solver.graph.set_bounds(vertex, 0, 0., 2.).unwrap();
+                }
+                let membership = (0..num_sets as usize + 2)
+                    .map(|v| {
+                        if (1..=num_sets as usize).contains(&v) {
+                            vec![v - 1]
+                        } else {
+                            vec![]
+                        }
+                    })
+                    .collect();
+                solver
+                    .graph
+                    .configure_ng(
+                        num_sets as usize,
+                        membership,
+                        vec![(0..num_sets as usize).collect(); num_sets as usize + 2],
+                    )
+                    .unwrap();
+                for (arc, cost) in graph
+                    .arcs
+                    .iter()
+                    .zip(case["cached_arc_costs"].as_array().unwrap())
+                {
+                    let id = solver
+                        .graph
+                        .add_arc(arc.tail as usize, arc.head as usize, 0.)
+                        .unwrap();
+                    let edge = solver.graph.arc_mut(id).unwrap();
+                    edge.consumption[0] = if arc.head as usize == num_sets as usize + 1 {
+                        0.
+                    } else {
+                        1.
+                    };
+                    edge.reduced_cost = cost.as_f64().unwrap();
+                }
+                solver.cuts = registry.clone();
+                let result = solver.price_phase(0, 1000, false).unwrap();
+                assert!(result.exact);
+                if capture["covering_vertex_divergence"] == true {
+                    assert_eq!(result.columns.len(), 64);
+                    let mut different = 0;
+                    for route in &result.columns {
+                        let path: Vec<_> = route
+                            .arcs
+                            .iter()
+                            .map(|&id| {
+                                let arc = &graph.arcs[id as usize];
+                                (arc.tail as usize, arc.head as usize, id)
+                            })
+                            .collect();
+                        let mut expected: f64 = route
+                            .arcs
+                            .iter()
+                            .map(|&id| case["cached_arc_costs"][id as usize].as_f64().unwrap())
+                            .sum();
+                        let mut native_expected = expected;
+                        for entry in cached {
+                            let id = number(&entry["id"]) as usize;
+                            let charge = entry["price"].as_f64().unwrap()
+                                * f64::from(
+                                    baldes::cuts::coefficient(
+                                        &registry.cuts[id],
+                                        graph.id,
+                                        &path,
+                                        false,
+                                    )
+                                    .unwrap(),
+                                );
+                            expected += charge;
+                            if id != 3 {
+                                native_expected += charge;
+                            }
+                        }
+                        assert!((route.cost - expected).abs() < 1e-8);
+                        let native = case["recorded_costs"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .find(|native| native["arcs"] == serde_json::json!(route.arcs))
+                            .unwrap();
+                        assert!((native["cost"].as_f64().unwrap() - native_expected).abs() < 1e-8);
+                        if (expected - native_expected).abs() > 1e-8 {
+                            different += 1;
+                        }
+                    }
+                    assert!(different > 0);
+                    if graph.id == 7 {
+                        let arcs = [45, 53, 64];
+                        let actual = result.columns.iter().find(|r| r.arcs == arcs).unwrap();
+                        let native = case["recorded_costs"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .find(|r| r["arcs"] == serde_json::json!(arcs))
+                            .unwrap();
+                        let path: Vec<_> = arcs
+                            .iter()
+                            .map(|&id| {
+                                let arc = &graph.arcs[id as usize];
+                                (arc.tail as usize, arc.head as usize, id)
+                            })
+                            .collect();
+                        for id in [0, 3] {
+                            assert_eq!(
+                                baldes::cuts::coefficient(
+                                    &registry.cuts[id],
+                                    graph.id,
+                                    &path,
+                                    false
+                                )
+                                .unwrap(),
+                                case["witness_native_coefficients"][id.to_string()]
+                                    .as_f64()
+                                    .unwrap() as i32
+                            );
+                        }
+                        let arc_cost: f64 = arcs
+                            .iter()
+                            .map(|&id| case["cached_arc_costs"][id as usize].as_f64().unwrap())
+                            .sum();
+                        assert_eq!(arc_cost, 0.0);
+                        assert_eq!(actual.cost, 0.0);
+                        assert_eq!(native["cost"].as_f64().unwrap(), 0.1);
+                        for (phase, key) in [
+                            (1, "phase_one_recorded_costs"),
+                            (2, "phase_two_recorded_costs"),
+                        ] {
+                            let priced = solver.price_phase(phase, 1000, false).unwrap();
+                            let route = priced.columns.iter().find(|r| r.arcs == arcs).unwrap();
+                            let native = case[key]
+                                .as_array()
+                                .unwrap()
+                                .iter()
+                                .find(|r| r["arcs"] == serde_json::json!(arcs))
+                                .unwrap();
+                            assert_eq!(route.cost, 0.0);
+                            assert_eq!(native["cost"].as_f64().unwrap(), 0.1);
+                        }
+                    } else {
+                        let arcs = [26, 18, 7];
+                        for (phase, key) in [
+                            (0, "recorded_costs"),
+                            (1, "phase_one_recorded_costs"),
+                            (2, "phase_two_recorded_costs"),
+                        ] {
+                            let priced = solver.price_phase(phase, 1000, false).unwrap();
+                            let route = priced.columns.iter().find(|r| r.arcs == arcs).unwrap();
+                            let native = case[key]
+                                .as_array()
+                                .unwrap()
+                                .iter()
+                                .find(|r| r["arcs"] == serde_json::json!(arcs))
+                                .unwrap();
+                            assert!((route.cost - 0.03).abs() < 1e-12);
+                            assert!((native["cost"].as_f64().unwrap() - 0.13).abs() < 1e-12);
+                        }
+                    }
+                    continue;
+                }
+                for native in case["recorded_costs"].as_array().unwrap() {
+                    let arcs: Vec<_> = native["arcs"]
                         .as_array()
                         .unwrap()
                         .iter()
                         .map(number)
-                        .collect(),
-                )
-            })
-            .collect();
-        assert_eq!(cut.memory, memory, "cut {}", cut.id);
-        let index = cut.id as usize;
-        for column in &columns {
-            let graph = if column.graph_id == 7 { &g7 } else { &g8 };
-            let route: Vec<_> = column
-                .arc_ids
-                .iter()
-                .map(|&id| {
-                    let arc = graph.arcs.iter().find(|arc| arc.id == id).unwrap();
-                    (arc.tail as usize, arc.head as usize, id)
-                })
-                .collect();
-            for enumerated in [false, true] {
-                let solution = Solution {
-                    graph_id: column.graph_id,
-                    enumerated,
-                    arc_ids: column.arc_ids.clone(),
-                };
-                assert_eq!(
-                    f64::from(
-                        baldes::cuts::coefficient(
-                            &registry.cuts[index],
-                            column.graph_id,
-                            &route,
-                            enumerated
-                        )
-                        .unwrap()
-                    ),
-                    separator.coefficient(&solution, cut)
+                        .collect();
+                    let route = result
+                        .columns
+                        .iter()
+                        .find(|route| route.arcs == arcs)
+                        .unwrap();
+                    assert_eq!(
+                        route.cost.to_bits(),
+                        native["cost"].as_f64().unwrap().to_bits(),
+                        "graph {} arcs {:?}",
+                        graph.id,
+                        arcs
+                    );
+                }
+                let mut actual_costs: Vec<_> =
+                    result.columns.iter().map(|route| route.cost).collect();
+                let mut native_costs: Vec<_> = case["candidate_costs"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|cost| cost.as_f64().unwrap())
+                    .collect();
+                actual_costs.sort_by(f64::total_cmp);
+                native_costs.sort_by(f64::total_cmp);
+                assert_eq!(actual_costs.len(), native_costs.len());
+                for (actual, native) in actual_costs.iter().zip(&native_costs) {
+                    assert!((actual - native).abs() < 1e-8);
+                }
+                for route in &result.columns {
+                    let mut expected_cost = route
+                        .arcs
+                        .iter()
+                        .map(|&id| case["cached_arc_costs"][id as usize].as_f64().unwrap())
+                        .sum::<f64>();
+                    let path: Vec<_> = route
+                        .arcs
+                        .iter()
+                        .map(|&id| {
+                            let arc = &graph.arcs[id as usize];
+                            (arc.tail as usize, arc.head as usize, id)
+                        })
+                        .collect();
+                    for entry in prices {
+                        let id = number(&entry["id"]) as usize;
+                        expected_cost += entry["price"].as_f64().unwrap()
+                            * f64::from(
+                                baldes::cuts::coefficient(
+                                    &registry.cuts[id],
+                                    graph.id,
+                                    &path,
+                                    false,
+                                )
+                                .unwrap(),
+                            );
+                    }
+                    assert!((route.cost - expected_cost).abs() < 1e-8);
+                }
+                assert!(
+                    (result.minimum_reduced_cost - case["bound"].as_f64().unwrap()).abs() < 1e-8,
+                    "graph {}",
+                    graph.id
                 );
+                let mut actual: Vec<_> = result
+                    .columns
+                    .iter()
+                    .map(|route| route.arcs.clone())
+                    .collect();
+                let mut expected: Vec<Vec<i32>> = case["routes"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|route| route.as_array().unwrap().iter().map(number).collect())
+                    .collect();
+                assert_eq!(actual, expected);
+                for (route, native) in result
+                    .columns
+                    .iter()
+                    .zip(case["recorded_costs"].as_array().unwrap())
+                {
+                    assert_eq!(
+                        route.cost.to_bits(),
+                        native["cost"].as_f64().unwrap().to_bits()
+                    );
+                }
+                actual.sort();
+                expected.sort();
+                assert_eq!(expected.len(), 64);
+                assert_eq!(actual, expected);
+                let relaxed = solver.price_phase(1, 20, false).unwrap();
+                assert!(!relaxed.exact);
+                for native in case["phase_one_recorded_costs"].as_array().unwrap() {
+                    let arcs: Vec<_> = native["arcs"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(number)
+                        .collect();
+                    let route = relaxed
+                        .columns
+                        .iter()
+                        .find(|route| route.arcs == arcs)
+                        .unwrap();
+                    assert_eq!(
+                        route.cost.to_bits(),
+                        native["cost"].as_f64().unwrap().to_bits()
+                    );
+                }
+                assert!(
+                    (relaxed.minimum_reduced_cost - case["phase_one_bound"].as_f64().unwrap())
+                        .abs()
+                        < 1e-8
+                );
+                let mut actual: Vec<_> = relaxed
+                    .columns
+                    .iter()
+                    .map(|route| route.arcs.clone())
+                    .collect();
+                let mut expected: Vec<Vec<i32>> = case["phase_one_routes"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|route| route.as_array().unwrap().iter().map(number).collect())
+                    .collect();
+                assert_eq!(actual, expected);
+                actual.sort();
+                expected.sort();
+                assert_eq!(actual, expected);
+                let restricted = solver.price_phase(2, 16, false).unwrap();
+                assert!(!restricted.exact);
+                for native in case["phase_two_recorded_costs"].as_array().unwrap() {
+                    let arcs: Vec<_> = native["arcs"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(number)
+                        .collect();
+                    let route = restricted
+                        .columns
+                        .iter()
+                        .find(|route| route.arcs == arcs)
+                        .unwrap();
+                    assert_eq!(
+                        route.cost.to_bits(),
+                        native["cost"].as_f64().unwrap().to_bits()
+                    );
+                }
+                assert!(
+                    (restricted.minimum_reduced_cost - case["phase_two_bound"].as_f64().unwrap())
+                        .abs()
+                        < 1e-8
+                );
+                let mut actual: Vec<_> = restricted
+                    .columns
+                    .iter()
+                    .map(|route| route.arcs.clone())
+                    .collect();
+                let mut expected: Vec<Vec<i32>> = case["phase_two_routes"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|route| route.as_array().unwrap().iter().map(number).collect())
+                    .collect();
+                assert_eq!(actual, expected);
+                actual.sort();
+                expected.sort();
+                assert_eq!(actual, expected);
             }
         }
     }
@@ -2356,5 +3511,209 @@ fn symmetric_join_subtracts_the_source_initial_value() {
             "init={init}: {:?}",
             result.columns
         );
+    }
+}
+
+#[test]
+fn rank_one_incidence_accepts_sets_on_terminal_arcs() {
+    use baldes::cuts::separation::{prepare_incidence, ArcData, GraphData, Parameters, VertexData};
+    let graph = GraphData {
+        id: 7,
+        source: 0,
+        sink: 2,
+        elem_set_count: 2,
+        packing_set_count: 2,
+        covering_set_count: 2,
+        vertices: (0..3)
+            .map(|id| VertexData {
+                id,
+                ..Default::default()
+            })
+            .collect(),
+        arcs: [(0, 0, 1), (1, 1, 2)]
+            .into_iter()
+            .map(|(id, tail, head)| ArcData {
+                id,
+                tail,
+                head,
+                elem_sets: vec![id],
+                packing_sets: vec![id],
+                covering_sets: vec![id],
+            })
+            .collect(),
+        ..Default::default()
+    };
+    let incidence = prepare_incidence(&graph).unwrap();
+    assert_eq!(incidence.arc_packing_sets, [vec![0], vec![1]]);
+    assert_eq!(incidence.arc_covering_sets, [vec![0], vec![1]]);
+    let params = Parameters {
+        max_num_rows: 3,
+        max_num_per_round: 2,
+        memory_type: 1,
+        arc_memory_type: 2,
+        neighbourhood_size: 16,
+        violation_tolerance: 0.02,
+        ..Default::default()
+    };
+    assert!(baldes::cuts::IncidenceCutSeparator::new(params, &[&graph]).is_ok());
+}
+
+#[test]
+fn covering_vertex_separator_matches_native_across_rounds() {
+    check_covering_vertex_rounds(
+        include_str!("../fixtures/cuts/rank_one_covering_vertex_multiround_native.json"),
+        1000,
+        false,
+    );
+}
+
+#[test]
+fn covering_vertex_short_search_retains_native_random_state() {
+    check_covering_vertex_rounds(
+        include_str!("../fixtures/cuts/rank_one_covering_vertex_short_search_native.json"),
+        1,
+        false,
+    );
+}
+
+#[test]
+fn covering_vertex_two_search_steps_retain_native_random_state() {
+    check_covering_vertex_rounds(
+        include_str!("../fixtures/cuts/rank_one_covering_vertex_two_search_native.json"),
+        2,
+        false,
+    );
+}
+
+#[test]
+fn mixed_vertex_default_separator_matches_native_rounds() {
+    check_covering_vertex_rounds(
+        include_str!("../fixtures/cuts/rank_one_vertex_mixed_short_native.json"),
+        1,
+        true,
+    );
+}
+
+fn check_covering_vertex_rounds(fixture: &str, iterations: i32, mixed: bool) {
+    use baldes::cuts::{CandidateMode, CutClass, CutRegistry, FractionalColumn, MemoryType};
+    use baldes::graph::Graph;
+    let capture: serde_json::Value = serde_json::from_str(fixture).unwrap();
+    assert_eq!(
+        capture["reference_sha256"],
+        "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6"
+    );
+    let number = |value: &serde_json::Value| value.as_i64().unwrap() as i32;
+    let mut graph = Graph::<2>::new(11, 0).unwrap();
+    graph.graph_id = 7;
+    let arcs = capture["arcs"].as_array().unwrap();
+    for arc in arcs {
+        graph
+            .add_arc_with_id(
+                number(&arc["id"]),
+                number(&arc["tail"]) as usize,
+                number(&arc["head"]) as usize,
+                0.,
+            )
+            .unwrap();
+    }
+    let mut registry = CutRegistry::default();
+    registry.parameters.graph_id = 7;
+    registry.parameters.covering = true;
+    registry.parameters.memory_type = MemoryType::Vertex;
+    registry.parameters.max_cuts = 1;
+    registry.parameters.max_rank = 5;
+    registry.parameters.mode = CandidateMode::LocalSearch;
+    registry.parameters.local_search_rounds = iterations;
+    registry.parameters.violation_epsilon = 0.02;
+    registry.covering_sets_present = mixed;
+    let mut options = baldes::core::options::Options::default();
+    for (name, value) in [
+        ("BALDESrankOneCutsMaxNumRows", 5.),
+        ("BALDESrankOneCutsMaxNumPerRound", 1.),
+        ("BALDESrankOneCutsLSnumIterations", iterations as f64),
+        ("BALDESrankOneCutsMemoryType", 2.),
+    ] {
+        options.set(name, value).unwrap();
+    }
+    for call in capture["calls"].as_array().unwrap() {
+        registry.parameters.start_rank = number(&call["phase"]);
+        registry.separation_phase = number(&call["phase"]);
+        let columns: Vec<_> = call["columns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|column| {
+                let ids: Vec<_> = column["arc_ids"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(number)
+                    .collect();
+                let vertices = ids
+                    .iter()
+                    .take(ids.len().saturating_sub(1))
+                    .map(|&id| number(&arcs[id as usize]["head"]) as usize)
+                    .collect();
+                FractionalColumn {
+                    vertices,
+                    arc_ids: Some(ids),
+                    value: column["value"].as_f64().unwrap(),
+                    graph_id: 7,
+                    enumerated: number(&column["enumerated"]) != 0,
+                }
+            })
+            .collect();
+        let before = registry.cuts.len();
+        let mut sibling = registry.clone();
+        for target in [&mut registry, &mut sibling] {
+            if mixed {
+                target
+                    .separate_default(&graph, &options, &(1..=9).collect::<Vec<_>>(), &columns)
+                    .unwrap();
+            } else {
+                target
+                    .separate(&graph, &(1..=9).collect::<Vec<_>>(), &columns)
+                    .unwrap();
+            }
+        }
+        assert_eq!(registry.cuts, sibling.cuts);
+        let actual = &registry.cuts[before..];
+        let expected = call["cuts"].as_array().unwrap();
+        assert_eq!(actual.len(), expected.len());
+        for (cut, expected) in actual.iter().zip(expected) {
+            let descriptor = &expected["descriptor"];
+            let support: Vec<_> = descriptor["set_ids"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .zip(descriptor["numerators"].as_array().unwrap())
+                .map(|(set, numerator)| (number(set) as usize + 1, number(numerator).abs()))
+                .collect();
+            assert_eq!(
+                cut.class,
+                if number(&descriptor["kind"]) == 1 {
+                    CutClass::Covering
+                } else {
+                    CutClass::Packing
+                }
+            );
+            assert_eq!(cut.kind, number(&descriptor["class"]));
+            assert_eq!(cut.id, number(&descriptor["id"]));
+            assert_eq!(cut.ordered_support.as_ref().unwrap(), &support);
+            let memory: Vec<_> = cut.graph_memories[&7]
+                .iter()
+                .enumerate()
+                .filter_map(|(vertex, &present)| present.then_some(vertex as i32))
+                .collect();
+            let expected_memory: Vec<_> = expected["memory"][0]["values"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(number)
+                .collect();
+            assert_eq!(memory, expected_memory);
+            assert_eq!(cut.denominator, number(&descriptor["denominator"]).abs());
+            assert_eq!(cut.rhs, descriptor["rhs"].as_f64().unwrap() as i32);
+        }
     }
 }

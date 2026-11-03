@@ -1840,6 +1840,133 @@ fn paired_fractional_rate_backward_suffix_recorder_matches_native_zero_wait_capt
 }
 
 #[test]
+fn paired_feasibility_waiting_recorder_reports_native_sentinel_mismatch() {
+    use baldes::graph::coupled::descriptor::{
+        FrontierBudget, FrontierOutcome, FrontierUnknown, MachineRootInput, PreparedSlopeFunction,
+        RawAffine,
+    };
+    use baldes::graph::coupled::{MachineArcFunctionInput, PairedResourceMode};
+
+    let native: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/coupled/feasibility_wait_recorded_native.json"
+    ))
+    .unwrap();
+    for case in native["synthetic_matrix"].as_array().unwrap() {
+        let rates = [
+            case["rates"][0].as_f64().unwrap(),
+            case["rates"][1].as_f64().unwrap(),
+        ];
+        let mut graph = Graph::<2>::new(3, 0).unwrap();
+        graph.add_arc(0, 1, 0.).unwrap();
+        graph.add_arc(1, 2, 0.).unwrap();
+        graph
+            .set_coupled_resources(&[CoupledResource::PairedFront {
+                mode: PairedResourceMode::Feasibility,
+            }])
+            .unwrap();
+        let windows = [
+            Window::new(0., 1.).unwrap(),
+            Window::new(3., 7.).unwrap(),
+            Window::new(4., 8.).unwrap(),
+        ];
+        let base: Vec<_> = windows[..2]
+            .iter()
+            .map(|w| {
+                PreparedSlopeFunction::from_prepared_pairs(vec![(1., w.lower), (0., w.upper)])
+                    .unwrap()
+            })
+            .collect();
+        let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+        let inputs: Vec<_> = (0..2)
+            .map(|arc| MachineArcFunctionInput {
+                physical_arc: arc,
+                tail_bounds: windows[arc],
+                waiting_bounds: windows[arc + 1],
+                waiting_rate: rates[arc] as i32,
+                base: &base[arc],
+                dependent: affine(1.),
+                dependent_lower: affine(0.),
+                dependent_upper: affine(8.),
+            })
+            .collect();
+        let budget = FrontierBudget::default();
+        assert!(matches!(
+            graph.prepare_paired_front_program_with_rates(
+                0,
+                &inputs,
+                affine(0.),
+                windows[0],
+                windows[2],
+                &rates,
+                budget
+            ),
+            FrontierOutcome::Complete(())
+        ));
+        for expected in case["records"].as_array().unwrap() {
+            let split = expected["split"].as_u64().unwrap() as usize;
+            let kernel = graph.coupled_kernel().unwrap();
+            let (mut forward, mut backward) = (kernel.root(true), kernel.root(false));
+            for arc in 0..split {
+                forward = kernel.extend(&forward, arc, true).unwrap().unwrap().0;
+            }
+            for arc in (split..2).rev() {
+                backward = kernel.extend(&backward, arc, false).unwrap().unwrap().0;
+            }
+            let result = graph.reconstruct_paired_machine_join(0, &forward, &backward, budget);
+            let FrontierOutcome::Complete(record) = result else {
+                panic!("split {split}: {result:?}");
+            };
+            let values = |key: &str| -> Vec<f64> {
+                expected[key]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_f64().unwrap())
+                    .collect()
+            };
+            assert_eq!(record.path.base, values("base"));
+            assert_eq!(record.path.dependent, values("dependent"));
+            let waiting = values("waiting");
+            assert_eq!(record.initial_waiting, waiting[0]);
+            assert_eq!(record.path.waiting, waiting[1..]);
+            {
+                assert_eq!(case["diagnostic"]["1"]["records"], 2);
+                assert_eq!(case["diagnostic"]["2"]["records"], 0);
+                assert_eq!(case["diagnostic"]["1"]["exit"], 1);
+                assert_eq!(case["diagnostic"]["2"]["exit"], 1);
+                assert!(matches!(
+                    graph.reconstruct_paired_machine_join_with_debug(
+                        0, &forward, &backward, 1, budget
+                    ),
+                    FrontierOutcome::Complete(_)
+                ));
+                assert!(matches!(
+                    graph.reconstruct_paired_machine_join_with_debug(
+                        0, &forward, &backward, 2, budget
+                    ),
+                    FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                        "machine joined recorded consumption differs from selection"
+                    ))
+                ));
+            }
+        }
+        let mut solver = baldes::pricing::Solver::<2>::new(3, 0).unwrap();
+        solver.graph = graph;
+        let routes = solver.enumerate(100.).unwrap();
+        assert_eq!(routes.len(), 1);
+        assert_eq!(native["unmodified_exit"], 1);
+        assert_eq!(native["recorder_join"]["mode"], 4);
+        assert_eq!(native["recorder_join"]["after"][1], 1e12);
+        assert!(matches!(
+            solver.reconstruct_enumerated_front_program(&routes[0].arcs, budget),
+            FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "machine joined recorded consumption differs from selection"
+            ))
+        ));
+    }
+}
+
+#[test]
 fn paired_fractional_rate_nonzero_suffix_wait_matches_native_recording() {
     use baldes::graph::coupled::descriptor::{
         FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
@@ -1853,6 +1980,7 @@ fn paired_fractional_rate_nonzero_suffix_wait_matches_native_recording() {
         .map(|row| row.split_whitespace().collect::<Vec<_>>())
         .collect();
     let mut breakpoint_differences = 0;
+    let mut split_values = Vec::new();
     for (case, row) in include_str!("../fixtures/coupled/fractional_waiting_recorder_native.txt")
         .lines()
         .enumerate()
@@ -1910,6 +2038,151 @@ fn paired_fractional_rate_nonzero_suffix_wait_matches_native_recording() {
             matches!(prepared, FrontierOutcome::Complete(())),
             "{prepared:?}"
         );
+        if split == 2 {
+            let mut solver = baldes::pricing::Solver::<2>::new(3, 0).unwrap();
+            solver.graph = graph.clone();
+            let routes = solver.enumerate(100.).unwrap();
+            assert_eq!(routes.len(), 1);
+            let FrontierOutcome::Complete(retained) =
+                solver.reconstruct_enumerated_front_program(&routes[0].arcs, budget)
+            else {
+                panic!("retained paired recorder unavailable")
+            };
+            let recorded = *retained.path.dependent.last().unwrap();
+            // Reference pricing joins at the sink; enumeration may retain a
+            // different split of the same path with a different recorder value.
+            let reference = baldes::labeling::reference_price(&graph, &Default::default()).unwrap();
+            assert_eq!(reference.columns.len(), 1);
+            assert_eq!(reference.columns[0].coupled_values, [(0, values[12])]);
+            assert_eq!(reference.columns[0].original_cost, values[12]);
+            if rates == [1.25, 0.25] {
+                assert_eq!(recorded, 4.75);
+                let FrontierOutcome::Complete(raw) =
+                    solver.machine_enumeration_paired_selection(&routes[0].arcs, None, budget)
+                else {
+                    panic!("retained paired selection unavailable")
+                };
+                assert_eq!(raw.dependent, Some(4.));
+                assert_eq!(routes[0].cost, 4.);
+                let mut sibling = solver.fork_for_node();
+                solver
+                    .graph
+                    .update_reduced_costs(&[0., 0.], &[0., 2., 0.], false)
+                    .unwrap();
+                let shifted = solver.price_phase(0, 10, false).unwrap();
+                assert_eq!(shifted.columns.len(), 1);
+                assert_eq!(shifted.columns[0].cost, 2.);
+                assert_eq!(shifted.columns[0].original_cost, 4.75);
+                assert_eq!(shifted.columns[0].coupled_values, [(0, 4.75)]);
+                let sibling_result = sibling.price_phase(0, 10, false).unwrap();
+                assert_eq!(sibling_result.columns.len(), 1);
+                assert_eq!(sibling_result.columns[0].cost, 4.);
+                assert_eq!(sibling_result.columns[0].original_cost, 4.75);
+                assert_eq!(sibling_result.columns[0].coupled_values, [(0, 4.75)]);
+                solver
+                    .graph
+                    .update_reduced_costs(&[0., 0.], &[0., 0., 0.], false)
+                    .unwrap();
+
+                let mut weighted = baldes::pricing::Solver::<2>::new(3, 0).unwrap();
+                weighted.graph = graph.clone();
+                weighted.graph.arc_mut(0).unwrap().cost = 0.5;
+                weighted.graph.arc_mut(1).unwrap().cost = -0.25;
+                weighted
+                    .graph
+                    .set_coupled_objective_coefficients(&[(0, 2.)])
+                    .unwrap();
+                for coefficient in [-2., 0., 2.] {
+                    let mut reference_graph = weighted.graph.clone();
+                    reference_graph
+                        .set_coupled_objective_coefficients(&[(0, coefficient)])
+                        .unwrap();
+                    let reference =
+                        baldes::labeling::reference_price(&reference_graph, &Default::default())
+                            .unwrap();
+                    assert_eq!(reference.columns[0].coupled_values, [(0, 6.)]);
+                    assert_eq!(reference.columns[0].original_cost, 0.25 + coefficient * 6.);
+                    assert_eq!(reference.columns[0].cost, 6.);
+                }
+                let weighted_routes = weighted.enumerate(100.).unwrap();
+                assert_eq!(weighted_routes.len(), 1);
+                assert_eq!(weighted_routes[0].coupled_values, [(0, 4.75)]);
+                assert_eq!(weighted_routes[0].original_cost, 9.75);
+
+                let mut bound_solver = baldes::pricing::Solver::<2>::new(3, 1).unwrap();
+                for (vertex, window) in windows.iter().enumerate() {
+                    bound_solver
+                        .graph
+                        .set_bounds(vertex, 0, window.lower, window.upper)
+                        .unwrap();
+                }
+                for (tail, head) in [(0, 1), (1, 2)] {
+                    let arc = bound_solver.graph.add_arc(tail, head, 0.).unwrap();
+                    bound_solver.graph.arc_mut(arc).unwrap().consumption[0] = 1.;
+                }
+                bound_solver
+                    .graph
+                    .set_coupled_resources(&[CoupledResource::PairedFront {
+                        mode: PairedResourceMode::CostBounded,
+                    }])
+                    .unwrap();
+                assert!(matches!(
+                    bound_solver.graph.prepare_paired_front_program_with_rates(
+                        0,
+                        &inputs,
+                        affine(0.),
+                        windows[0],
+                        windows[2],
+                        &rates,
+                        budget,
+                    ),
+                    FrontierOutcome::Complete(())
+                ));
+                bound_solver
+                    .graph
+                    .set_paired_waiting_windows_from_resource(0, 0)
+                    .unwrap();
+                let reference =
+                    baldes::labeling::reference_price(&bound_solver.graph, &Default::default())
+                        .unwrap();
+                assert_eq!(reference.columns[0].resources, [values[5]]);
+                assert_eq!(reference.columns[0].coupled_values, [(0, values[12])]);
+                assert_eq!(reference.columns[0].original_cost, values[12]);
+                assert_eq!(
+                    reference.columns[0]
+                        .resource_profile
+                        .iter()
+                        .map(|q| q[0])
+                        .collect::<Vec<_>>(),
+                    values[3..6]
+                );
+                let bound_routes = bound_solver.enumerate(100.).unwrap();
+                assert_eq!(bound_routes.len(), 1);
+                let FrontierOutcome::Complete(bound_record) = bound_solver
+                    .reconstruct_enumerated_front_program(&bound_routes[0].arcs, budget)
+                else {
+                    panic!("bound paired recorder unavailable")
+                };
+                assert_eq!(bound_routes[0].coupled_values, [(0, 4.75)]);
+                assert_eq!(bound_routes[0].original_cost, 4.75);
+                assert_eq!(bound_routes[0].resources, [6.]);
+                assert_eq!(
+                    bound_routes[0]
+                        .resource_profile
+                        .iter()
+                        .map(|q| q[0])
+                        .collect::<Vec<_>>(),
+                    bound_record.path.base
+                );
+            }
+            assert_eq!(routes[0].coupled_values, [(0, recorded)], "rates={rates:?}");
+            assert_eq!(routes[0].original_cost, recorded);
+            let repriced = solver.price_phase(0, 10, false).unwrap();
+            assert_eq!(repriced.columns.len(), 1, "rates={rates:?}");
+            assert_eq!(repriced.columns[0].coupled_values, routes[0].coupled_values);
+            assert_eq!(repriced.columns[0].original_cost, routes[0].original_cost);
+            assert_eq!(repriced.columns[0].cost, routes[0].cost);
+        }
         let kernel = graph.coupled_kernel().unwrap();
         let (mut forward, mut backward) = (kernel.root(true), kernel.root(false));
         for arc in 0..split {
@@ -1952,11 +2225,43 @@ fn paired_fractional_rate_nonzero_suffix_wait_matches_native_recording() {
             record.path.dependent[2], values[12],
             "rates={rates:?}, split={split}"
         );
+        if split == 0 {
+            split_values.push(Vec::new());
+        }
+        split_values
+            .last_mut()
+            .unwrap()
+            .push(record.path.dependent[2]);
         if (dependent + 1e-6).floor() != (record.path.dependent[2] + 1e-6).floor() {
             breakpoint_differences += 1;
         }
     }
     assert_eq!(breakpoint_differences, 41);
+    assert_eq!(split_values.len(), 36);
+    assert!(split_values.iter().all(|values| values[0] != values[2]));
+    // The same arc sequence and raw join cost 3 produce different recorded
+    // values across splits. A breakpoint at 4 distinguishes the first split.
+    assert!(joins[0][2..5]
+        .iter()
+        .all(|value| u64::from_str_radix(value, 16).unwrap() == 3.0f64.to_bits()));
+    assert_eq!(split_values[0], [4., 3.5, 3.]);
+    let cut = baldes::cuts::knapsack::RouteLoadKnapsackCut {
+        kind: baldes::cuts::knapsack::KnapsackKind::Rounding,
+        numerator: 1,
+        denominator: 1,
+        rhs: 1,
+        lhs: 0.,
+        violation: 0.,
+        thresholds: vec![],
+        coefficients: std::collections::BTreeMap::from([(0, 0), (4, 1)]),
+    };
+    assert_eq!(
+        split_values[0]
+            .iter()
+            .map(|&value| cut.coefficient((value + 1e-6).floor() as i32))
+            .collect::<Vec<_>>(),
+        [1, 0, 0]
+    );
 }
 
 #[test]

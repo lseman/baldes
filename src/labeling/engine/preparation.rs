@@ -56,6 +56,7 @@ impl<const D: usize> LabelingEngine<D> {
         phase.validate()?;
         if controls.partial_dominance {
             controls.paired_split_strategy = 2;
+            controls.filter_other_buckets = false;
         }
         // The symmetry test reads only grid bounds, so build the backward grid
         // afterwards and only when the symmetric forward-only path is not taken.

@@ -96,8 +96,21 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                     .time_limit
                     .min(self.deadline.saturating_duration_since(Instant::now()));
                 let mut node = entry.node.fork()?;
+                if self.options.threads == 1 {
+                    if let Some(history) = &self.mapped_history.incidence_history {
+                        node.set_incidence_separator_history(history);
+                    }
+                }
                 node.reset_evaluation_artificials()?;
-                Ok(node.solve_forked(options))
+                let result = node.solve_forked(options);
+                if self.options.threads == 1 {
+                    if let Ok(output) = &result {
+                        if let Some(history) = output.snapshot.incidence_separator_history() {
+                            self.mapped_history.incidence_history = Some(history);
+                        }
+                    }
+                }
+                Ok(result)
             })
             .collect()
     }

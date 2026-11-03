@@ -114,9 +114,6 @@ impl KnapsackPricing {
             if !cut.dual.is_finite() || cut.dual > 0. || !scale.is_finite() || scale <= 0. {
                 return Err(invalid("exact knapsack dual or scale"));
             }
-            let &slot = resource_indices
-                .get(&resource)
-                .ok_or_else(|| invalid("exact knapsack resource mapping"))?;
             let mut previous = 0;
             for &coefficient in cut.cut.coefficients.values() {
                 if coefficient < previous {
@@ -126,7 +123,12 @@ impl KnapsackPricing {
                 }
                 previous = coefficient;
             }
-            if cut.dual != 0. {
+            // A zero price or identically zero coefficient contributes nothing
+            // even when the resource is outside the scalar label coordinates.
+            if cut.dual != 0. && previous != 0 {
+                let &slot = resource_indices
+                    .get(&resource)
+                    .ok_or_else(|| invalid("exact knapsack resource mapping"))?;
                 next.active = true;
                 next.exact_terms
                     .push((slot, scale, cut.cut.clone(), -cut.dual));

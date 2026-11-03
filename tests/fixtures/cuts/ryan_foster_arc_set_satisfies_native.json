@@ -1,0 +1,2793 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "sets": [
+    0,
+    2
+  ],
+  "cases": [
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        3,
+        19
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 2
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        8,
+        64
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        47,
+        1
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        6,
+        46
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        4,
+        28
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        7,
+        55
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        5,
+        37
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        1
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        2,
+        10
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        19
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        28
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        37
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        46
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        55
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        64
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        10
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        68,
+        52
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 2
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        24,
+        70
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        63,
+        7
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        65,
+        25
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        67,
+        43
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        64,
+        16
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        66,
+        34
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        70
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        69,
+        61
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        52
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        43
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        34
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        25
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        16
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        7
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        61
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        29,
+        1
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        41,
+        28
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        52,
+        55
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        62,
+        64
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        51,
+        37
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        49,
+        19
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        61,
+        46
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        66,
+        10
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        42,
+        70
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        30,
+        43
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        19,
+        16
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        9,
+        7
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        20,
+        34
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        22,
+        52
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        10,
+        25
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        5,
+        61
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        35,
+        64
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        33,
+        46
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        36,
+        7
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        38,
+        25
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        25,
+        55
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        23,
+        37
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        71,
+        55
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        69,
+        37
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        67,
+        19
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        53,
+        64
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        26,
+        64
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        59,
+        28
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        15,
+        46
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        20,
+        1
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 2
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        43,
+        55
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        24,
+        46
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        40,
+        19
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        65,
+        1
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        70,
+        46
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        13,
+        28
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        39,
+        10
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        50,
+        28
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        44,
+        64
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        22,
+        28
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        38,
+        1
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        68,
+        28
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        60,
+        37
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        58,
+        19
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        34,
+        55
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        42,
+        46
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        32,
+        37
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        31,
+        19
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        30,
+        10
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        57,
+        10
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        16,
+        55
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        14,
+        37
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        12,
+        19
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        56,
+        1
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        48,
+        10
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        17,
+        64
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        21,
+        10
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        11,
+        1
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        46,
+        16
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        48,
+        34
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        18,
+        7
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        0,
+        16
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        2,
+        34
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        4,
+        52
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        45,
+        7
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        12,
+        43
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        51,
+        70
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 2
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        56,
+        25
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        28,
+        16
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        47,
+        25
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        31,
+        52
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        6,
+        70
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        1,
+        25
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        58,
+        43
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        21,
+        43
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        32,
+        61
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        27,
+        7
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        49,
+        43
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        33,
+        70
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        3,
+        43
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        37,
+        16
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        29,
+        25
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        39,
+        34
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        11,
+        34
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        40,
+        52
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        13,
+        52
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        41,
+        61
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        14,
+        61
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        55,
+        16
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        57,
+        34
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        59,
+        52
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        23,
+        61
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        15,
+        70
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        54,
+        7
+      ],
+      "together": true,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        50,
+        61
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        60,
+        70
+      ],
+      "together": true,
+      "accepted": false,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        3,
+        19
+      ],
+      "together": false,
+      "accepted": false,
+      "native_count": 2
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        8,
+        64
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        47,
+        1
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        6,
+        46
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        4,
+        28
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        7,
+        55
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        5,
+        37
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        1
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        0,
+        2,
+        10
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        19
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        28
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        37
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        46
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        55
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        64
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        10
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        68,
+        52
+      ],
+      "together": false,
+      "accepted": false,
+      "native_count": 2
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        24,
+        70
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        63,
+        7
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        65,
+        25
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        67,
+        43
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        64,
+        16
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        66,
+        34
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        70
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        71,
+        69,
+        61
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        52
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        43
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        34
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        25
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        16
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        7
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        61
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        29,
+        1
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        41,
+        28
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        52,
+        55
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        62,
+        64
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        51,
+        37
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        49,
+        19
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        61,
+        46
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        66,
+        10
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        42,
+        70
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        30,
+        43
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        19,
+        16
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        9,
+        7
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        20,
+        34
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        22,
+        52
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        10,
+        25
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        5,
+        61
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        35,
+        64
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        33,
+        46
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        36,
+        7
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        38,
+        25
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        25,
+        55
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        23,
+        37
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        71,
+        55
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        69,
+        37
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        67,
+        19
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        53,
+        64
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        26,
+        64
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        59,
+        28
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        15,
+        46
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        20,
+        1
+      ],
+      "together": false,
+      "accepted": false,
+      "native_count": 2
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        43,
+        55
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        24,
+        46
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        40,
+        19
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        65,
+        1
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        70,
+        46
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        13,
+        28
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        39,
+        10
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        50,
+        28
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        44,
+        64
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        22,
+        28
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        38,
+        1
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        63,
+        68,
+        28
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        60,
+        37
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        58,
+        19
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        34,
+        55
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        36,
+        42,
+        46
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        32,
+        37
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        31,
+        19
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        27,
+        30,
+        10
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        57,
+        10
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        16,
+        55
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        14,
+        37
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        12,
+        19
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        54,
+        56,
+        1
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        45,
+        48,
+        10
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        17,
+        64
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        18,
+        21,
+        10
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 7,
+      "arcs": [
+        9,
+        11,
+        1
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        46,
+        16
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        48,
+        34
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        18,
+        7
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        0,
+        16
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        2,
+        34
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        4,
+        52
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        45,
+        7
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        12,
+        43
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        51,
+        70
+      ],
+      "together": false,
+      "accepted": false,
+      "native_count": 2
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        56,
+        25
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        28,
+        16
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        47,
+        25
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        31,
+        52
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        6,
+        70
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        1,
+        25
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        58,
+        43
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        21,
+        43
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        32,
+        61
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        27,
+        7
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        49,
+        43
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        33,
+        70
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        8,
+        3,
+        43
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        37,
+        16
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        35,
+        29,
+        25
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        39,
+        34
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        11,
+        34
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        40,
+        52
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        13,
+        52
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        44,
+        41,
+        61
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        14,
+        61
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        55,
+        16
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        57,
+        34
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        59,
+        52
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        26,
+        23,
+        61
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        17,
+        15,
+        70
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        54,
+        7
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 0
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        53,
+        50,
+        61
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    },
+    {
+      "graph": 8,
+      "arcs": [
+        62,
+        60,
+        70
+      ],
+      "together": false,
+      "accepted": true,
+      "native_count": 1
+    }
+  ]
+}

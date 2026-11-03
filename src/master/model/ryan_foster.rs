@@ -9,6 +9,7 @@
 //! ties in pair order, and the together child is the upper child.
 use super::model_strong::{Proposal, Restriction};
 use super::*;
+use crate::pricing::restrictions::ArcSetConstraint;
 use crate::pricing::restrictions::RyanFosterConstraint;
 use std::collections::BTreeSet;
 
@@ -20,11 +21,18 @@ pub struct RyanFosterMember {
     pub second: usize,
 }
 
+#[derive(Clone, Debug)]
+pub(super) struct ArcSetMember {
+    network: i32,
+    first: Vec<i32>,
+    second: Vec<i32>,
+}
+
 /// Register packing-set Ryan–Foster branching. `sets` labels vertices with
 /// packing-set indices per network; when empty, the packing-assignment
-/// registration is used, and otherwise a single network's vertices other
-/// than source and sink are sets in vertex order. A pair is a candidate only
-/// when, in each network, both sets are single vertices or both are absent.
+/// registration is used. When neither is present, explicit rank-one
+/// incidence supplies the sets, or a single network's customer vertices are
+/// used in vertex order.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RyanFosterBranching {
@@ -41,6 +49,7 @@ struct Prepared {
     labels: BTreeMap<i32, Vec<Option<usize>>>,
     /// Per network: set -> its single vertex, or None if it has several.
     vertices: BTreeMap<i32, HashMap<usize, Option<usize>>>,
+    arc_sets: Option<BTreeMap<i32, BTreeMap<i32, Vec<usize>>>>,
     width: usize,
 }
 
@@ -57,11 +66,55 @@ impl RyanFosterBranching {
         &mut self,
         graphs: impl Iterator<Item = (i32, &'a Graph<D>)>,
         packing: Option<&PackingBranching>,
+        incidence: Option<&super::RankOneIncidenceConfig>,
     ) -> Result<()> {
         if !self.priority.is_finite() {
             return Err(invalid("Ryan–Foster branching requires finite priority"));
         }
         let graphs: Vec<_> = graphs.collect();
+        if self.sets.is_empty() && packing.is_none_or(|p| p.networks.is_empty()) {
+            if let Some(incidence) = incidence {
+                let mut prepared = Prepared::default();
+                let mut arc_sets = BTreeMap::new();
+                if incidence.graphs.len() != graphs.len() {
+                    return Err(invalid("Ryan–Foster incidence graph count"));
+                }
+                for &(network, physical) in &graphs {
+                    let graph = incidence
+                        .graphs
+                        .iter()
+                        .find(|g| g.id == network)
+                        .ok_or_else(|| invalid("unknown Ryan–Foster incidence network"))?;
+                    if graph.packing_set_count != incidence.rows.len() as i32 {
+                        return Err(invalid("Ryan–Foster incidence set count"));
+                    }
+                    let data = crate::cuts::separation::prepare_incidence(graph)
+                        .ok_or_else(|| invalid("invalid Ryan–Foster incidence"))?;
+                    let mut arcs = BTreeMap::new();
+                    for arc in &physical.arcs {
+                        let index = usize::try_from(arc.id)
+                            .map_err(|_| invalid("invalid Ryan–Foster incidence arc"))?;
+                        if data.arc_tail.get(index) != Some(&(arc.tail as i32))
+                            || data.arc_head.get(index) != Some(&(arc.head as i32))
+                        {
+                            return Err(invalid("Ryan–Foster incidence arc mismatch"));
+                        }
+                        arcs.insert(
+                            arc.id,
+                            data.arc_packing_sets[index]
+                                .iter()
+                                .map(|&s| s as usize)
+                                .collect(),
+                        );
+                    }
+                    arc_sets.insert(network, arcs);
+                }
+                prepared.width = incidence.rows.len().saturating_sub(1).to_string().len();
+                prepared.arc_sets = Some(arc_sets);
+                self.prepared = prepared;
+                return Ok(());
+            }
+        }
         let registrations: Vec<(i32, Vec<(usize, usize)>)> = if !self.sets.is_empty() {
             self.sets
                 .iter()
@@ -160,18 +213,35 @@ impl RyanFosterBranching {
             if quantity == 0. {
                 continue;
             }
-            let Some(labels) = self.prepared.labels.get(&route.network) else {
-                continue;
-            };
             let oracle = node
                 .state
                 .oracles
                 .iter()
                 .find(|o| o.network.id == route.network)
                 .ok_or_else(|| invalid("unknown Ryan–Foster route network"))?;
-            let sets: BTreeSet<usize> = path_vertices(oracle, &route.route)?
-                .filter_map(|v| labels.get(v).copied().flatten())
-                .collect();
+            let sets: BTreeSet<usize> = if let Some(networks) = &self.prepared.arc_sets {
+                let labels = networks
+                    .get(&route.network)
+                    .ok_or_else(|| invalid("unknown Ryan–Foster route network"))?;
+                let mut sets = BTreeSet::new();
+                for arc in &route.route.arcs {
+                    sets.extend(
+                        labels
+                            .get(arc)
+                            .ok_or_else(|| invalid("unknown Ryan–Foster route arc"))?
+                            .iter()
+                            .copied(),
+                    );
+                }
+                sets
+            } else {
+                let Some(labels) = self.prepared.labels.get(&route.network) else {
+                    continue;
+                };
+                path_vertices(oracle, &route.route)?
+                    .filter_map(|v| labels.get(v).copied().flatten())
+                    .collect()
+            };
             let sets: Vec<_> = sets.into_iter().collect();
             for (i, &a) in sets.iter().enumerate() {
                 for &b in &sets[i + 1..] {
@@ -185,8 +255,31 @@ impl RyanFosterBranching {
             if !(value > 1e-6 && value < 0.999999) {
                 continue;
             }
-            let Some(members) = self.members(a, b) else {
-                continue;
+            let restriction = if let Some(networks) = &self.prepared.arc_sets {
+                let members = networks
+                    .iter()
+                    .filter_map(|(&network, arcs)| {
+                        let first: Vec<_> = arcs
+                            .iter()
+                            .filter_map(|(&arc, sets)| sets.contains(&a).then_some(arc))
+                            .collect();
+                        let second: Vec<_> = arcs
+                            .iter()
+                            .filter_map(|(&arc, sets)| sets.contains(&b).then_some(arc))
+                            .collect();
+                        (!first.is_empty() || !second.is_empty()).then_some(ArcSetMember {
+                            network,
+                            first,
+                            second,
+                        })
+                    })
+                    .collect();
+                Restriction::ArcSetRyanFoster { members }
+            } else {
+                let Some(members) = self.members(a, b) else {
+                    continue;
+                };
+                Restriction::RyanFoster { members }
             };
             // Zero padding keeps the name tie-break in native pair order.
             let name = format!("PS_{a:0width$}_{b:0width$}");
@@ -195,7 +288,7 @@ impl RyanFosterBranching {
                 name,
                 priority: self.priority,
                 value,
-                restriction: Restriction::RyanFoster { members },
+                restriction,
                 history_eligible: true,
                 fresh: true,
                 origin: Some(super::model_strong::ProducerFamily::PackingRyanFoster),
@@ -230,19 +323,72 @@ pub(super) fn entries<const D: usize>(
     oracle: &Oracle<D>,
     route: &Route,
 ) -> Result<Vec<(usize, f64)>> {
-    if oracle.ryan_foster_rows.is_empty() {
+    if oracle.ryan_foster_rows.is_empty() && oracle.arc_set_branch_rows.is_empty() {
         return Ok(vec![]);
     }
     let vertices: Vec<_> = path_vertices(oracle, route)?.collect();
-    Ok(oracle
+    let mut result: Vec<_> = oracle
         .ryan_foster_rows
         .iter()
         .filter(|(_, c)| !c.satisfied_by(vertices.iter().copied()))
         .map(|&(row, _)| (row, 1.))
-        .collect())
+        .collect();
+    result.extend(
+        oracle
+            .arc_set_branch_rows
+            .iter()
+            .filter(|(_, c)| !c.satisfied_by(route.arcs.iter().copied()))
+            .map(|(row, _)| (*row, 1.)),
+    );
+    Ok(result)
 }
 
 impl<const D: usize> NodeSnapshot<D> {
+    pub(super) fn with_arc_set_branch(
+        &self,
+        members: &[ArcSetMember],
+        together: bool,
+    ) -> Result<Self> {
+        if members.is_empty() {
+            return Err(invalid("Ryan–Foster branch requires a network member"));
+        }
+        let shared = self.state.shared_rows.len();
+        let mut node = self.with_row(
+            Row {
+                sense: RowSense::LessEqual,
+                rhs: 0.,
+            },
+            &[],
+        )?;
+        for member in members {
+            let oracle = node
+                .state
+                .oracles
+                .iter_mut()
+                .find(|o| o.network.id == member.network)
+                .ok_or_else(|| invalid("unknown Ryan–Foster network"))?;
+            oracle.arc_set_branch_rows.push((
+                shared,
+                ArcSetConstraint {
+                    first: member.first.clone(),
+                    second: member.second.clone(),
+                    together,
+                },
+            ));
+            oracle.solver.set_arc_set_branches(
+                oracle
+                    .arc_set_branch_rows
+                    .iter()
+                    .map(|(_, c)| c.clone())
+                    .collect(),
+            )?;
+        }
+        node = super::nonlinear::refresh_row(node, shared)?;
+        node.state.correction = None;
+        node.state.gradient = None;
+        node.warm.stabilization = None;
+        Ok(node)
+    }
     /// Branch on whether two packing sets are served together by the same
     /// path (`together`) or never by the same path. Existing columns keep
     /// their bounds; violating columns get coefficient one in a new `<= 0`

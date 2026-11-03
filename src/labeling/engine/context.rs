@@ -512,9 +512,20 @@ impl<'a, const D: usize> Context<'a, D> {
         } else {
             physical.tail
         };
-        if BRANCHING && !self.branching.can_visit(from.branch_state(), vertex) {
-            return None;
-        }
+        let arc_branch_state = if BRANCHING && !self.branching.arcs.is_empty() {
+            let mut state = from.branch_state().clone();
+            if !self.branching.traverse_arc(&mut state, arc.physical)
+                || !self.branching.can_visit(&state, vertex)
+            {
+                return None;
+            }
+            Some(state)
+        } else {
+            if BRANCHING && !self.branching.can_visit(from.branch_state(), vertex) {
+                return None;
+            }
+            None
+        };
         let mut q = crate::graph::ResourceValues::<D>::from_slice(from.resources());
         if self.phase.jump_arcs {
             if let Some(jump) = arc.jump {
@@ -661,7 +672,7 @@ impl<'a, const D: usize> Context<'a, D> {
                 ng,
                 // Like NG state, a crossing label excludes its meeting vertex.
                 branch_state: if BRANCHING {
-                    from.branch_state().clone()
+                    arc_branch_state.unwrap_or_else(|| from.branch_state().clone())
                 } else {
                     None
                 },

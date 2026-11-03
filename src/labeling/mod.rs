@@ -371,6 +371,8 @@ fn reconstruct<const D: usize>(
     for &a in &arcs {
         nodes.push(g.arcs[a].head as i32);
     }
+    let mut resources = terminal.resources[..g.resources.len()].to_vec();
+    let mut original_cost = terminal.original_cost;
     let paired_values = if let Some(kernel) = g
         .coupled_kernel()
         .filter(|kernel| kernel.machine_paired_join_complete())
@@ -390,10 +392,55 @@ fn reconstruct<const D: usize>(
             &backward,
             FrontierBudget::default(),
         ) {
-            FrontierOutcome::Complete(selection) => selection
-                .dependent
-                .map(|value| vec![(resource, value)])
-                .unwrap_or_default(),
+            FrontierOutcome::Complete(selection) => {
+                if selection.dependent.is_some() {
+                    let record = match g.reconstruct_paired_machine_join_for_path(
+                        resource,
+                        forward,
+                        &backward,
+                        &arcs,
+                        0,
+                        FrontierBudget::default(),
+                    ) {
+                        FrontierOutcome::Complete(record) => record,
+                        FrontierOutcome::Empty => {
+                            return Err(incomplete("paired terminal recorder is infeasible"))
+                        }
+                        FrontierOutcome::Unknown(reason) => {
+                            return Err(incomplete(format!(
+                                "paired terminal recorder unavailable: {reason:?}"
+                            )))
+                        }
+                    };
+                    let value = record.path.dependent.last().copied().ok_or_else(|| {
+                        incomplete("paired terminal recorder has no terminal value")
+                    })?;
+                    if let Some(slot) = kernel.bound_paired_base_resource(g) {
+                        if record.path.base.len() != resource_profile.len() {
+                            return Err(incomplete(
+                                "paired terminal recorder profile length mismatch",
+                            ));
+                        }
+                        for (profile, &base) in resource_profile.iter_mut().zip(&record.path.base) {
+                            profile[slot] = base;
+                        }
+                        resources[slot] = *record.path.base.last().unwrap();
+                    }
+                    original_cost = forward
+                        .scalar_original_cost()
+                        .ok_or_else(|| incomplete("paired terminal scalar cost unavailable"))?
+                        + backward
+                            .scalar_original_cost()
+                            .ok_or_else(|| incomplete("paired terminal scalar cost unavailable"))?
+                        + kernel.recorded_paired_original_objective(value)?;
+                    if !original_cost.is_finite() {
+                        return Err(incomplete("paired terminal objective is nonfinite"));
+                    }
+                    vec![(resource, value)]
+                } else {
+                    Vec::new()
+                }
+            }
             FrontierOutcome::Empty => return Err(incomplete("paired terminal join is infeasible")),
             FrontierOutcome::Unknown(reason) => {
                 return Err(incomplete(format!(
@@ -409,8 +456,8 @@ fn reconstruct<const D: usize>(
         nodes,
         arcs: arcs.iter().map(|&a| g.arcs[a].id).collect(),
         cost: terminal.cost,
-        original_cost: terminal.original_cost,
-        resources: terminal.resources[..g.resources.len()].to_vec(),
+        original_cost,
+        resources,
         resource_profile,
     })
 }

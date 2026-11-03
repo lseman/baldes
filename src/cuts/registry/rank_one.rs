@@ -1,6 +1,12 @@
 use super::*;
 
 impl CutRegistry {
+    #[cfg(feature = "clp")]
+    pub(crate) fn inherit_rank_one_search(&mut self, source: &Self) {
+        self.covering_search_rng
+            .clone_from(&source.covering_search_rng);
+    }
+
     /// Separates with the current parameters and registers every emitted cut.
     pub fn separate<const D: usize>(
         &mut self,
@@ -183,6 +189,9 @@ impl CutRegistry {
             ..Default::default()
         };
         let mut state = Separation::new(params);
+        state
+            .covering_search_rng
+            .clone_from(&self.covering_search_rng);
         let refs: Vec<&GraphData> = graphs.iter().collect();
         if !state.prepare(&refs, incidences) {
             return Err(invalid("native rank-one separation preparation failed"));
@@ -309,6 +318,7 @@ impl CutRegistry {
             .separate(&input)
             .ok_or_else(|| invalid("native rank-one separation failed"))?;
         self.separation_phase = state.current_max_rank;
+        self.covering_search_rng = state.covering_search_rng;
         let added = generated.len();
         for native in generated {
             let mut cut = RankOneCut {

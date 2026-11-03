@@ -365,6 +365,21 @@ impl ClpMaster {
         Ok(unsafe { Clp_getRowStatus(model.as_ptr(), row as i32) } == 1)
     }
 
+    pub(crate) fn row_cleanup_candidate(&self, row: usize) -> Result<bool> {
+        if row >= self.rhs.len() {
+            return Err(invalid("master row index"));
+        }
+        if self.solver != MasterSolver::Clp {
+            return self.row_is_basic(row);
+        }
+        let model = self
+            .model
+            .ok_or_else(|| invalid("Clp basis requires a solved master"))?;
+        // Clp row statuses are converted to slack statuses with upper and
+        // lower exchanged. The cleanup record excludes only slack at lower.
+        Ok(unsafe { Clp_getRowStatus(model.as_ptr(), row as i32) } != 2)
+    }
+
     /// Cut cleanup with default threshold 1
     /// and retention ratio 0.66. The normalization divides by the SIGNED RHS
     /// when |rhs| > 1: a slack packing cut with rhs < -1 is retained.

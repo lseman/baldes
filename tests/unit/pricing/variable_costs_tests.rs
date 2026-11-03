@@ -51,6 +51,27 @@ fn heuristic_functor_uses_cached_costs_but_exact_phase_finds_raw_minimum() {
 }
 
 #[test]
+fn capped_cached_search_can_omit_the_raw_minimum_witness() {
+    let mut solver = model();
+    solver.cache_variable_costs(&[1e-9]).unwrap();
+    let cached = solver.price_phase(0, 1, false).unwrap();
+    let exact = solver.price_functor_phase(0, 1).unwrap();
+    assert_eq!(cached.columns.len(), 1);
+    assert_eq!(cached.columns[0].arcs, [0, 1]);
+    assert_eq!(exact.columns.len(), 1);
+    assert_eq!(exact.columns[0].arcs, [2, 3]);
+    assert_eq!(exact.minimum_reduced_cost, 0.05);
+    assert!(
+        (solver
+            .corrected_bound(cached.columns[0].cost, &cached.columns[0])
+            .unwrap()
+            - 0.1)
+            .abs()
+            < 1e-12
+    );
+}
+
+#[test]
 fn functor_searches_only_the_raw_objective_and_advances_one_round() {
     let mut solver = model();
     solver.cache_variable_costs(&[1e-9]).unwrap();

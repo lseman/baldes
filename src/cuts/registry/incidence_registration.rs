@@ -21,9 +21,8 @@ fn arc_sets(arc: &ArcData, kind: i32) -> &[i32] {
 impl CutRegistry {
     /// Register a separated rank-one cut on its physical graphs.
     ///
-    /// Packing/covering membership may be attached to an arc or a vertex. The
-    /// current representation accepts at most one membership of each kind per
-    /// arc and vertex, as supplied by the ordinary set-registration API.
+    /// Packing/covering membership may be attached to an arc or a vertex.
+    /// Each arc and vertex may carry several distinct memberships of each kind.
     /// Graph and arc IDs are local to each graph. Graphs missing from the cut's
     /// memory contribute zero to ordinary columns but remain available for
     /// enumerated columns.
@@ -107,17 +106,23 @@ impl CutRegistry {
             if !(0..1024).contains(&set_count) {
                 return Err(invalid("separated cut graph set count"));
             }
-            let valid_sets = |sets: &[i32]| {
-                sets.len() <= 1 && sets.iter().all(|&id| (0..set_count).contains(&id))
-            };
+            let valid_sets = |sets: &[i32]| sets.iter().all(|&id| (0..set_count).contains(&id));
             let mut support = vec![];
             for vertex in &graph.vertices {
                 let sets = vertex_sets(vertex, separated.kind);
                 if !valid_sets(sets) {
                     return Err(invalid("separated cut vertex set incidence"));
                 }
-                if let Some(weight) = sets.first().and_then(|set| weights.get(set)) {
-                    support.push((vertex.id as usize, *weight));
+                let weight = sets
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, set)| !sets[..*index].contains(set))
+                    .map(|(_, set)| set)
+                    .filter_map(|set| weights.get(set))
+                    .try_fold(0i32, |total, &weight| total.checked_add(weight))
+                    .ok_or_else(|| invalid("separated cut vertex weight overflow"))?;
+                if weight != 0 {
+                    support.push((vertex.id as usize, weight));
                 }
             }
             support.sort_unstable();
@@ -141,10 +146,17 @@ impl CutRegistry {
                 // The separator uses the union of arc and head sets. Avoid
                 // counting the same set twice when translating that union.
                 let head_sets = vertex_sets(vertices[head].unwrap(), separated.kind);
-                if let Some(set) = sets.first().filter(|set| !head_sets.contains(set)) {
-                    if let Some(&weight) = weights.get(set) {
-                        arc_weights.insert(arc.id, weight);
-                    }
+                let weight = sets
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, set)| !sets[..*index].contains(set))
+                    .map(|(_, set)| set)
+                    .filter(|set| !head_sets.contains(set))
+                    .filter_map(|set| weights.get(set))
+                    .try_fold(0i32, |total, &weight| total.checked_add(weight))
+                    .ok_or_else(|| invalid("separated cut arc weight overflow"))?;
+                if weight != 0 {
+                    arc_weights.insert(arc.id, weight);
                 }
             }
             if let Some(memory) = separated.memory.get(&graph.id) {

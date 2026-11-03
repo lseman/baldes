@@ -38,14 +38,6 @@ impl IncidenceCutSeparator {
                 || !ids.insert(graph.id)
                 || graph.arcs.iter().any(|arc| arc.id == i32::MAX)
                 || graph.vertices.iter().any(|vertex| vertex.id == i32::MAX)
-                || graph
-                    .vertices
-                    .iter()
-                    .any(|vertex| vertex.packing_sets.len() > 1 || vertex.covering_sets.len() > 1)
-                || graph
-                    .arcs
-                    .iter()
-                    .any(|arc| arc.packing_sets.len() > 1 || arc.covering_sets.len() > 1)
             {
                 return Err(invalid("incidence separator graph"));
             }
@@ -61,6 +53,11 @@ impl IncidenceCutSeparator {
             graphs: graphs.iter().map(|g| (*g).clone()).collect(),
             state,
         })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn generated_cut_count(&self) -> i32 {
+        self.state.next_cut_id
     }
 
     /// Current rank reached by the separator's most recent round.

@@ -83,14 +83,14 @@ pub struct Solution {
     pub arc_ids: Vec<i32>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct VertexData {
     pub id: i32,
     pub elem_sets: Vec<i32>,
     pub packing_sets: Vec<i32>,
     pub covering_sets: Vec<i32>,
 }
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ArcData {
     pub id: i32,
     pub tail: i32,
@@ -100,7 +100,7 @@ pub struct ArcData {
     pub covering_sets: Vec<i32>,
 }
 /// The GraphData fields rank-one separation reads.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct GraphData {
     pub id: i32,
     pub source: i32,
@@ -124,34 +124,24 @@ pub struct Incidence {
     pub arc_tail: Vec<i32>,
     pub arc_head: Vec<i32>,
 }
-fn sorted_unique(ids: &[i32], count: i32) -> bool {
-    let mut previous = -1;
-    for &id in ids {
-        if id <= previous || id >= count {
-            return false;
-        }
-        previous = id;
-    }
-    true
+fn valid_sets(ids: &[i32], count: i32) -> bool {
+    ids.iter().all(|&id| id >= 0 && id < count)
 }
 fn union(a: &[i32], b: &[i32]) -> Vec<i32> {
-    let mut out = Vec::with_capacity(a.len() + b.len());
-    let (mut i, mut j) = (0, 0);
-    while i < a.len() && j < b.len() {
-        if a[i] < b[j] {
-            out.push(a[i]);
-            i += 1;
-        } else if b[j] < a[i] {
-            out.push(b[j]);
-            j += 1;
-        } else {
-            out.push(a[i]);
-            i += 1;
-            j += 1;
-        }
+    if a.len() <= 1 && b.len() <= 1 {
+        return match (a.first(), b.first()) {
+            (None, None) => vec![],
+            (Some(&id), None) | (None, Some(&id)) => vec![id],
+            (Some(&left), Some(&right)) if left == right => vec![left],
+            (Some(&left), Some(&right)) if left < right => vec![left, right],
+            (Some(&left), Some(&right)) => vec![right, left],
+        };
     }
-    out.extend_from_slice(&a[i..]);
-    out.extend_from_slice(&b[j..]);
+    let mut out = Vec::with_capacity(a.len() + b.len());
+    out.extend_from_slice(a);
+    out.extend_from_slice(b);
+    out.sort_unstable();
+    out.dedup();
     out
 }
 /// Cut incidence of a graph.
@@ -174,10 +164,12 @@ pub fn prepare_incidence(g: &GraphData) -> Option<Incidence> {
     };
     for v in &g.vertices {
         if v.id < 0
+            || ((v.id == g.source || v.id == g.sink)
+                && (!v.packing_sets.is_empty() || !v.covering_sets.is_empty()))
             || vertices.insert(v.id, v).is_some()
-            || !sorted_unique(&v.elem_sets, g.elem_set_count)
-            || !sorted_unique(&v.packing_sets, g.packing_set_count)
-            || !sorted_unique(&v.covering_sets, g.covering_set_count)
+            || !valid_sets(&v.elem_sets, g.elem_set_count)
+            || !valid_sets(&v.packing_sets, g.packing_set_count)
+            || !valid_sets(&v.covering_sets, g.covering_set_count)
         {
             return None;
         }
@@ -192,9 +184,9 @@ pub fn prepare_incidence(g: &GraphData) -> Option<Incidence> {
             || !ids.insert(a.id)
             || !vertices.contains_key(&a.tail)
             || !vertices.contains_key(&a.head)
-            || !sorted_unique(&a.elem_sets, g.elem_set_count)
-            || !sorted_unique(&a.packing_sets, g.packing_set_count)
-            || !sorted_unique(&a.covering_sets, g.covering_set_count)
+            || !valid_sets(&a.elem_sets, g.elem_set_count)
+            || !valid_sets(&a.packing_sets, g.packing_set_count)
+            || !valid_sets(&a.covering_sets, g.covering_set_count)
         {
             return None;
         }
@@ -234,7 +226,7 @@ pub struct SeparatedCut {
 }
 
 /// Rank-one separator parameters.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Parameters {
     pub max_num_rows: i32,
     pub max_num_per_round: i32,
@@ -322,7 +314,13 @@ impl ColumnInfo {
             && !c.covering_set_count.iter().any(|&x| x >= 2);
         c
     }
-    /// From a packing-set sequence, which is only counted.
+    /// From a packing-set sequence, which is only counted. Nonnegative IDs at
+    /// or above `n_pack` are ignored.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `n_pack` or any sequence ID is negative. Use
+    /// [`Separation::separate`] for checked sequence input.
     pub fn from_set_sequence(graph_id: i32, value: f64, sequence: &[i32], n_pack: i32) -> Self {
         let mut c = Self {
             graph_id,

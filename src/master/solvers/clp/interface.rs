@@ -138,6 +138,9 @@ impl LpMaster for ClpMaster {
     fn row_is_basic(&self, row: usize) -> Result<bool> {
         Self::row_is_basic(self, row)
     }
+    fn row_cleanup_candidate(&self, row: usize) -> Result<bool> {
+        Self::row_cleanup_candidate(self, row)
+    }
     fn cleanup_cut_rows(&self, initial_rows: usize) -> Result<Vec<usize>> {
         Self::cleanup_cut_rows(self, initial_rows)
     }

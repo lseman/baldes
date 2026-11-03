@@ -4,14 +4,43 @@ use crate::cuts::knapsack::{KnapsackParameters, KnapsackRow};
 use crate::cuts::kpath::{GeneralKPathSeparator, KPathGraph, KPathParameters, KPathSeparator};
 
 /// Explicit set incidence and its corresponding unit equality master rows.
-#[derive(Clone, Debug)]
+/// A retained node may disable or reuse this configuration, but cannot replace it.
+#[derive(Clone, Debug, PartialEq)]
 pub struct RankOneIncidenceConfig {
     /// Set ID `i` represents shared master row `rows[i]`.
     pub rows: Vec<usize>,
     /// One physical incidence graph for each pricing network.
     pub graphs: Vec<crate::cuts::separation::GraphData>,
-    /// Separator controls; use an explicit vertex or arc memory mode.
+    /// Separator controls, including automatic, arc, or vertex memory.
     pub parameters: crate::cuts::separation::Parameters,
+}
+impl RankOneIncidenceConfig {
+    pub(super) fn same_as(&self, other: &Self) -> bool {
+        self.rows == other.rows
+            && self.parameters == other.parameters
+            && self.graphs.len() == other.graphs.len()
+            && self.graphs.iter().zip(&other.graphs).all(|(a, b)| {
+                a.id == b.id
+                    && a.source == b.source
+                    && a.sink == b.sink
+                    && a.elem_set_count == b.elem_set_count
+                    && a.packing_set_count == b.packing_set_count
+                    && a.covering_set_count == b.covering_set_count
+                    && a.vertices == b.vertices
+                    && a.arcs == b.arcs
+                    && a.packing_neighbourhood == b.packing_neighbourhood
+                    && a.elem_set_distances.len() == b.elem_set_distances.len()
+                    && a.elem_set_distances.iter().zip(&b.elem_set_distances).all(
+                        |(left, right)| {
+                            left.len() == right.len()
+                                && left
+                                    .iter()
+                                    .zip(right)
+                                    .all(|(x, y)| x == y || x.to_bits() == y.to_bits())
+                        },
+                    )
+            })
+    }
 }
 
 /// Rank-one cut controls of the root driver.

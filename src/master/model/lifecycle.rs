@@ -41,6 +41,7 @@ fn appended_row_value<const D: usize>(
         || !oracle.activity_rows.is_empty()
         || !oracle.resource_groups.is_empty()
         || !oracle.ryan_foster_rows.is_empty()
+        || !oracle.arc_set_branch_rows.is_empty()
     {
         return Ok(entries(oracle, route, offset)?
             .into_iter()
@@ -150,6 +151,7 @@ impl<const D: usize> State<D> {
                     activity_rows: o.activity_rows.clone(),
                     resource_groups: o.resource_groups.clone(),
                     ryan_foster_rows: o.ryan_foster_rows.clone(),
+                    arc_set_branch_rows: o.arc_set_branch_rows.clone(),
                     synchronized_windows: o.synchronized_windows.clone(),
                     proved_zero_arcs: o.proved_zero_arcs.clone(),
                     proved_multiplicity_upper: o.proved_multiplicity_upper,
@@ -189,6 +191,19 @@ impl<const D: usize> State<D> {
 }
 
 impl<const D: usize> NodeSnapshot<D> {
+    pub(crate) fn incidence_separator_history(&self) -> Option<crate::cuts::IncidenceCutSeparator> {
+        self.state.cuts.as_ref()?.incidence_history()
+    }
+
+    pub(crate) fn set_incidence_separator_history(
+        &mut self,
+        history: &crate::cuts::IncidenceCutSeparator,
+    ) {
+        if let Some(cuts) = &mut self.state.cuts {
+            cuts.set_incidence_history(history);
+        }
+    }
+
     /// Simplex pivots recorded on this retained master since its last fork.
     /// Forks reset the counter; discarded trial/checkpoint masters are excluded.
     pub fn master_simplex_iterations(&self) -> usize {

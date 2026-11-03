@@ -783,6 +783,7 @@ fn solve_split<const D: usize>(
             Start::Fresh(problem, _) => ryan_foster.prepare(
                 problem.networks.iter().map(|n| (n.id, &n.graph)),
                 options.branching_registry.packing.as_ref(),
+                options.node.separation.rank_one_incidence.as_ref(),
             )?,
             Start::Snapshot(node) => ryan_foster.prepare(
                 node.state
@@ -790,6 +791,17 @@ fn solve_split<const D: usize>(
                     .iter()
                     .map(|o| (o.network.id, o.network.graph.as_ref())),
                 options.branching_registry.packing.as_ref(),
+                options
+                    .node
+                    .separation
+                    .rank_one_incidence
+                    .as_ref()
+                    .or_else(|| {
+                        node.state
+                            .cuts
+                            .as_ref()
+                            .and_then(|cuts| cuts.incidence_config())
+                    }),
             )?,
         }
     }
@@ -1031,6 +1043,7 @@ fn solve_split<const D: usize>(
     );
     let mut unresolved = None;
     let mut mapped_history = model_strong::History::default();
+    mapped_history.incidence_history = root.snapshot.incidence_separator_history();
     let mut selected_nodes = 0;
     let workers = parallel::workers(options.threads)?;
     let stop = crate::master::tree::run(

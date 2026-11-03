@@ -332,6 +332,7 @@ pub(in crate::master::model) fn components<const D: usize>(
         .iter()
         .map(|(row, _)| *row)
         .chain(oracle.ryan_foster_rows.iter().map(|(row, _)| *row))
+        .chain(oracle.arc_set_branch_rows.iter().map(|(row, _)| *row))
     {
         push(&mut rows, offset + row, Interval { lo: 0., hi: 1. })?;
     }

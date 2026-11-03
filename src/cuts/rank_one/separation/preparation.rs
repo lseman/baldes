@@ -22,11 +22,15 @@ impl Separation {
             ..Default::default()
         };
         for v in &g.vertices {
-            for &p in &v.packing_sets {
-                gi.packing_set_vertices[p as usize].push(v.id);
+            for (index, &p) in v.packing_sets.iter().enumerate() {
+                if !v.packing_sets[..index].contains(&p) {
+                    gi.packing_set_vertices[p as usize].push(v.id);
+                }
             }
-            for &q in &v.covering_sets {
-                gi.covering_set_vertices[q as usize].push(v.id);
+            for (index, &q) in v.covering_sets.iter().enumerate() {
+                if !v.covering_sets[..index].contains(&q) {
+                    gi.covering_set_vertices[q as usize].push(v.id);
+                }
             }
         }
         if all_vertices_memory {
@@ -41,11 +45,15 @@ impl Separation {
             gi.arcs_between = vec![vec![vec![]; n]; n];
         }
         for a in &g.arcs {
-            for &p in &a.packing_sets {
-                gi.packing_set_arcs[p as usize].push(a.id);
+            for (index, &p) in a.packing_sets.iter().enumerate() {
+                if !a.packing_sets[..index].contains(&p) {
+                    gi.packing_set_arcs[p as usize].push(a.id);
+                }
             }
-            for &q in &a.covering_sets {
-                gi.covering_set_arcs[q as usize].push(a.id);
+            for (index, &q) in a.covering_sets.iter().enumerate() {
+                if !a.covering_sets[..index].contains(&q) {
+                    gi.covering_set_arcs[q as usize].push(a.id);
+                }
             }
             if !build_arc_lists {
                 continue;
@@ -60,8 +68,7 @@ impl Separation {
                 gi.arcs_between[t][g.sink as usize].push(a.id);
             }
         }
-        let includes =
-            |big: &[i32], small: &[i32]| small.iter().all(|x| big.binary_search(x).is_ok());
+        let includes = |big: &[i32], small: &[i32]| small.iter().all(|x| big.contains(x));
         for v in &g.vertices {
             if !includes(&v.elem_sets, &v.packing_sets) || !includes(&v.elem_sets, &v.covering_sets)
             {

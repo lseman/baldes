@@ -69,6 +69,203 @@ fn default_network_branching_uses_the_recovered_native_count_first_policy() {
 }
 
 #[test]
+fn sequential_tree_evaluation_carries_incidence_history_to_siblings() {
+    use crate::cuts::separation::{Input, Solution};
+    use crate::master::tree::{Model, QueuedNode, TreeFrontier as Queue};
+
+    let (problem, config) = crate::master::model::separation::mixed_arc_problem_and_config();
+    let mut options = ModelTreeOptions::default();
+    options.node.cg.stabilize = false;
+    options.node.preprocessing.enabled = false;
+    options.node.separation.rank_one_incidence = Some(config);
+    let root = solve_with_master_variables(problem, vec![], options.node.clone()).unwrap();
+    let initial = root.snapshot.incidence_separator_history().unwrap();
+    let initial_count = initial.generated_cut_count();
+    let mut history = initial;
+    let capture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../fixtures/cuts/rank_one_two_graph_mixed_complete_separation_native.json"
+    ))
+    .unwrap();
+    let call = &capture["call"];
+    let columns: Vec<_> = call["columns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|column| Solution {
+            graph_id: column["graph"].as_i64().unwrap() as i32,
+            enumerated: column["enumerated"].as_i64().unwrap() != 0,
+            arc_ids: column["arc_ids"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|id| id.as_i64().unwrap() as i32)
+                .collect(),
+        })
+        .collect();
+    let input = Input {
+        solutions: columns.iter().collect(),
+        values: call["columns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|column| column["value"].as_f64().unwrap())
+            .collect(),
+        cut_memory_type: 1,
+        solutions_are_set_sequences: false,
+        separation_phase: 1,
+        active_cuts: vec![],
+    };
+    let mut registry = crate::cuts::CutRegistry::default();
+    assert!(!history
+        .separate_and_register(&mut registry, &input)
+        .unwrap()
+        .is_empty());
+    let advanced = history.generated_cut_count();
+    assert!(advanced > initial_count);
+    let mut result = ModelTreeOutput {
+        status: TreeStatus::Incomplete,
+        bound_mode: cg::BoundMode::Certified,
+        bound: f64::NEG_INFINITY,
+        incumbent: f64::INFINITY,
+        routes: vec![],
+        master_values: vec![],
+        nodes: 0,
+        processed_nodes: 0,
+        parallel_batches: 0,
+        strong_branching_trials: 0,
+        mapped_history_ranked: 0,
+        mapped_branch_evaluations: vec![],
+        open_nodes: 0,
+        iterations: 0,
+        pricing_calls: 0,
+        oracle_calls: vec![],
+        enumerated_mip_calls: 0,
+        enumerated_mip_nodes: 0,
+        enumerated_mip_failures: 0,
+        enumeration_reports: vec![],
+        diving_nodes: 0,
+        greedy_nodes: 0,
+        restricted_mip_calls: 0,
+    };
+    let mut subtree_history = None;
+    let mut mapped_history = model_strong::History::default();
+    mapped_history.incidence_history = Some(history);
+    let mut selected_nodes = 0;
+    let mut unresolved = None;
+    let mut search = super::super::adapter::NetworkSearch {
+        options: &options,
+        result: &mut result,
+        deadline: Instant::now() + std::time::Duration::from_secs(10),
+        windows: &[],
+        base_depth: 0,
+        subtree_history: &mut subtree_history,
+        mapped_history: &mut mapped_history,
+        selected_nodes: &mut selected_nodes,
+        unresolved: &mut unresolved,
+        workers: None,
+        local_search_rng: crate::rng::GnuRand::new(1),
+    };
+    let mut queue = Queue::new(
+        options.tree_search,
+        options.open_node_limit,
+        options.strategy2_bound_rounding,
+    );
+    for serial in 0..2 {
+        let mut entry = QueuedNode {
+            node: root.snapshot.fork().unwrap(),
+            evaluated: None,
+            serial,
+            branch_order: 0,
+            parent_branch_order: 0,
+            strategy2_dual_bound: 0.,
+        };
+        let output = search
+            .evaluate(std::slice::from_mut(&mut entry), &mut queue)
+            .unwrap()
+            .remove(0)
+            .unwrap();
+        assert!(
+            output
+                .snapshot
+                .incidence_separator_history()
+                .unwrap()
+                .generated_cut_count()
+                >= advanced
+        );
+        assert!(
+            search
+                .mapped_history
+                .incidence_history
+                .as_ref()
+                .unwrap()
+                .generated_cut_count()
+                >= advanced
+        );
+        assert_eq!(
+            entry
+                .node
+                .incidence_separator_history()
+                .unwrap()
+                .generated_cut_count(),
+            initial_count
+        );
+    }
+    assert_eq!(
+        root.snapshot
+            .incidence_separator_history()
+            .unwrap()
+            .generated_cut_count(),
+        initial_count
+    );
+    let advanced_history = search.mapped_history.incidence_history.clone().unwrap();
+    drop(search);
+    let mut strong_options = options.clone();
+    let mut strong = crate::master::tree::StrongBranchingOptions::default();
+    strong.phases = vec![crate::master::tree::StrongPhase {
+        candidates: 1,
+        subtree_ratio: 0.,
+        reduced_cost_fixing: false,
+        ..Default::default()
+    }];
+    strong_options.branching_registry.strong_branching = Some(strong);
+    let mut trial_history = model_strong::History::default();
+    trial_history.incidence_history = Some(advanced_history);
+    let selection = model_strong::choose_proposals(
+        &root,
+        &strong_options,
+        &mut trial_history,
+        f64::INFINITY,
+        Instant::now() + std::time::Duration::from_secs(10),
+        vec![model_strong::Proposal {
+            name: "paths:7".into(),
+            history_key: "paths:7".into(),
+            priority: 1.,
+            value: 1.5,
+            restriction: model_strong::Restriction::Multiplicity { network: 7 },
+            history_eligible: false,
+            fresh: true,
+            origin: None,
+            component_admission: None,
+        }],
+    )
+    .unwrap()
+    .unwrap();
+    assert!(trial_history.trials > 0);
+    let evaluated: Vec<_> = selection.evaluated.iter().flatten().collect();
+    assert!(!evaluated.is_empty());
+    for result in evaluated {
+        assert!(
+            result
+                .snapshot
+                .incidence_separator_history()
+                .unwrap()
+                .generated_cut_count()
+                >= advanced
+        );
+    }
+}
+
+#[test]
 fn registered_tree_pairs_network_identities_sides_ranks_and_feasible_node_bounds() {
     use crate::master::tree::{Decision, Limits, Model, QueuedNode, Stop, TreeFrontier as Queue};
     use serde_json::{json, Value};

@@ -37,6 +37,7 @@ pub struct Solver<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub graph: Graph<D>,
     pub(crate) forbidden_arcs: Vec<bool>,
     pub(crate) ryan_foster: Vec<restrictions::RyanFosterConstraint>,
+    pub(crate) arc_set_branches: Vec<restrictions::ArcSetConstraint>,
     pub controls: Controls,
     pub options: Options,
     pub phases: Vec<phases::Phase>,

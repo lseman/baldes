@@ -319,17 +319,14 @@ pub(in crate::master) fn tree_depth_score_less(a: (f64, usize), b: (f64, usize))
         a.0 - (1e-6 + magnitude * 1e-10) > b.0
     }
 }
-// The product-score phase keeps the first candidate for equivalent sorted
-// child estimates before applying the next phase's quota. This is a ranking
-// reduction only; no node is pruned by an equivalent trial estimate.
-pub(in crate::master) fn retain_distinct_trials<T, V: AsRef<[f64]> + AsMut<[f64]>>(
+// Compare child estimates in their original order, across candidate families.
+pub(in crate::master) fn retain_distinct_trials<T, V: AsRef<[f64]>>(
     candidates: &mut Vec<T>,
     values: impl Fn(&T) -> (f64, V),
 ) {
     let mut retained: Vec<(f64, V)> = vec![];
     candidates.retain(|candidate| {
-        let (candidate_score, mut estimates) = values(candidate);
-        estimates.as_mut().sort_by(f64::total_cmp);
+        let (candidate_score, estimates) = values(candidate);
         let duplicate = retained.iter().rev().any(|(score, previous)| {
             *score <= candidate_score + 1e-6
                 && previous.as_ref().len() == estimates.as_ref().len()

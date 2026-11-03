@@ -111,6 +111,7 @@ fn paired_bucket_pieces_preserve_route_and_cost_and_partial_mode_forces_bucket_s
             let engine = candidate.engine.as_ref().unwrap();
             assert_eq!(engine.controls.paired_split_strategy, 2);
             assert_eq!(engine.controls.partial_dominance, partial);
+            assert_eq!(engine.controls.filter_other_buckets, !partial);
             assert!(result.statistics.generated > reference.statistics.generated);
             let mut child = candidate.fork_for_node();
             let replay = child.price_phase(0, 10, false).unwrap();

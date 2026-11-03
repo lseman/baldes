@@ -203,6 +203,7 @@ pub(super) fn prepare_with_seed_routes<const D: usize>(
             activity_rows,
             resource_groups: vec![],
             ryan_foster_rows: vec![],
+            arc_set_branch_rows: vec![],
             synchronized_windows: vec![],
             proved_zero_arcs: vec![],
             proved_multiplicity_upper: None,
@@ -456,7 +457,11 @@ pub(super) fn run<const D: usize>(
                 .cuts
                 .as_ref()
                 .is_some_and(|c| c.resolved_memory_type.is_none())
-            && policy.memory_type == crate::cuts::MemoryType::Automatic
+            && (state
+                .cuts
+                .as_ref()
+                .is_some_and(|c| c.automatic_incidence_memory())
+                || policy.memory_type == crate::cuts::MemoryType::Automatic)
     } else {
         false
     };
@@ -502,7 +507,11 @@ pub(super) fn run<const D: usize>(
         return Ok(output);
     }
     let mut pass2_options = options.clone();
-    state.cuts.as_mut().unwrap().resolved_memory_type = Some(crate::cuts::MemoryType::Vertex);
+    state
+        .cuts
+        .as_mut()
+        .unwrap()
+        .resolve_rank_one_memory(crate::cuts::MemoryType::Vertex);
     for oracle in &mut state.oracles {
         oracle.solver.set_option(
             "BALDESrankOneCutsMemoryType",
@@ -544,6 +553,16 @@ pub(super) fn run<const D: usize>(
         output: mut ckpt_output,
         state: mut ckpt_state,
     } = auto.pre_rank_one.unwrap();
+    for (target, source) in ckpt_state
+        .oracles
+        .iter_mut()
+        .zip(&pass1.snapshot.state.oracles)
+    {
+        target
+            .solver
+            .cuts
+            .inherit_rank_one_search(&source.solver.cuts);
+    }
     if let Some(witness) = &pass1.snapshot.state.pricing_witness {
         if ckpt_state
             .pricing_witness
@@ -554,7 +573,10 @@ pub(super) fn run<const D: usize>(
         }
     }
     if let Some(cuts) = ckpt_state.cuts.as_mut() {
-        cuts.resolved_memory_type = Some(crate::cuts::MemoryType::Arc);
+        if let Some(previous) = pass1.snapshot.state.cuts.as_ref() {
+            cuts.inherit_incidence_search(previous);
+        }
+        cuts.resolve_rank_one_memory(crate::cuts::MemoryType::Arc);
         cuts.stopped_by_tailing_off = false;
     }
     for oracle in &mut ckpt_state.oracles {
@@ -594,6 +616,24 @@ pub(super) fn run<const D: usize>(
         {
             pass1.snapshot.state.pricing_witness = Some(witness.clone());
         }
+    }
+    for (target, source) in pass1
+        .snapshot
+        .state
+        .oracles
+        .iter_mut()
+        .zip(&pass2.snapshot.state.oracles)
+    {
+        target
+            .solver
+            .cuts
+            .inherit_rank_one_search(&source.solver.cuts);
+    }
+    if let (Some(previous), Some(latest)) = (
+        pass1.snapshot.state.cuts.as_mut(),
+        pass2.snapshot.state.cuts.as_ref(),
+    ) {
+        previous.inherit_incidence_search(latest);
     }
     if pass2.snapshot.state.phase_one_infeasible {
         return Ok(pass2);

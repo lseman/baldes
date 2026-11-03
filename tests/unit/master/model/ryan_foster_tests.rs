@@ -18,7 +18,11 @@ fn options() -> Options {
 fn prepared(problem: &Problem) -> RyanFosterBranching {
     let mut branching = RyanFosterBranching::new(2.);
     branching
-        .prepare(problem.networks.iter().map(|n| (n.id, &n.graph)), None)
+        .prepare(
+            problem.networks.iter().map(|n| (n.id, &n.graph)),
+            None,
+            None,
+        )
         .unwrap();
     branching
 }
@@ -78,20 +82,20 @@ fn several_networks_require_packing_sets_and_customer_vertices() {
     problem.networks.push(second);
     let graphs = || problem.networks.iter().map(|n| (n.id, &n.graph));
     assert!(RyanFosterBranching::new(2.)
-        .prepare(graphs(), None)
+        .prepare(graphs(), None, None)
         .is_err());
     let mut labelled = RyanFosterBranching::new(2.);
     labelled.sets = vec![
         NetworkPackingAssignment::new(0, vec![(1, 0), (2, 1)]),
         NetworkPackingAssignment::new(1, vec![(1, 0)]),
     ];
-    labelled.prepare(graphs(), None).unwrap();
+    labelled.prepare(graphs(), None, None).unwrap();
     // Set 1 is absent from network 1 while set 0 is present there.
     assert!(labelled.members(0, 1).is_none());
     labelled.sets = vec![NetworkPackingAssignment::new(0, vec![(0, 0)])];
-    assert!(labelled.prepare(graphs(), None).is_err());
+    assert!(labelled.prepare(graphs(), None, None).is_err());
     assert!(RyanFosterBranching::new(f64::NAN)
-        .prepare(graphs().take(1), None)
+        .prepare(graphs().take(1), None, None)
         .is_err());
 }
 
@@ -116,4 +120,189 @@ fn ryan_foster_tree_reaches_the_default_branching_optimum() {
         default.incumbent,
         paired.incumbent
     );
+}
+
+#[test]
+fn explicit_incidence_candidates_install_arc_sensitive_children() {
+    let (problem, config) = super::super::separation::mixed_arc_problem_and_config();
+    let mut branching = RyanFosterBranching::new(2.);
+    branching
+        .prepare(
+            problem.networks.iter().map(|n| (n.id, &n.graph)),
+            None,
+            Some(&config),
+        )
+        .unwrap();
+    let mut root = solve_with_master_variables(problem, vec![], options()).unwrap();
+    let mut route = root.routes[0].route.clone();
+    route.arcs = vec![0, 3, 15];
+    root.routes = vec![NetworkRoute { network: 7, route }];
+    root.values = vec![0.5];
+    let proposals = branching.proposals(&root).unwrap();
+    let proposal = proposals.iter().find(|p| p.name == "PS_0_2").unwrap();
+    let Restriction::ArcSetRyanFoster { members } = &proposal.restriction else {
+        panic!("expected arc-set branch")
+    };
+    assert_eq!(members.len(), 2);
+    for together in [false, true] {
+        let child = root
+            .snapshot
+            .with_arc_set_branch(members, together)
+            .unwrap();
+        let row = child.state.shared_rows.len() - 1;
+        for oracle in &child.state.oracles {
+            let constraint = &oracle.arc_set_branch_rows.last().unwrap().1;
+            for original in root
+                .snapshot
+                .state
+                .routes
+                .iter()
+                .filter(|r| r.network == oracle.network.id)
+            {
+                let entries = super::entries(oracle, &original.route).unwrap();
+                let coefficient = entries.iter().any(|&(r, _)| r == row);
+                assert_eq!(
+                    coefficient,
+                    !constraint.satisfied_by(original.route.arcs.iter().copied())
+                );
+            }
+        }
+        let solved = child.solve(options()).unwrap();
+        for (route, &value) in solved.routes.iter().zip(&solved.values) {
+            if value > 1e-8 {
+                let oracle = solved
+                    .snapshot
+                    .state
+                    .oracles
+                    .iter()
+                    .find(|o| o.network.id == route.network)
+                    .unwrap();
+                let constraint = &oracle.arc_set_branch_rows.last().unwrap().1;
+                assert!(constraint.satisfied_by(route.route.arcs.iter().copied()));
+            }
+        }
+        assert!(root
+            .snapshot
+            .state
+            .oracles
+            .iter()
+            .all(|o| o.arc_set_branch_rows.is_empty()));
+    }
+}
+
+#[test]
+fn explicit_incidence_candidate_values_match_native_capture() {
+    use crate::cuts::separation::{ArcData, GraphData, Parameters, VertexData};
+    let capture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../fixtures/cuts/ryan_foster_candidate_values_native.json"
+    ))
+    .unwrap();
+    let case: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../fixtures/cuts/ryan_foster_candidate_model_native.json"
+    ))
+    .unwrap();
+    let problem = crate::master::model::format::Model::from_json(&case["model"].to_string())
+        .unwrap()
+        .problem::<2>()
+        .unwrap();
+    let graphs = problem
+        .networks
+        .iter()
+        .map(|network| {
+            let graph = &network.graph;
+            let vertices = (0..10)
+                .map(|id| {
+                    let sets = if id == 1 {
+                        vec![1]
+                    } else if (3..=8).contains(&id) {
+                        vec![id - 1]
+                    } else {
+                        vec![]
+                    };
+                    VertexData {
+                        id,
+                        elem_sets: sets.clone(),
+                        packing_sets: sets.clone(),
+                        covering_sets: sets,
+                    }
+                })
+                .collect();
+            let arcs = graph
+                .arcs
+                .iter()
+                .map(|arc| {
+                    let sets = if arc.head == 1 && arc.tail != 4 && arc.tail != 5 {
+                        vec![0]
+                    } else {
+                        vec![]
+                    };
+                    ArcData {
+                        id: arc.id,
+                        tail: arc.tail as i32,
+                        head: arc.head as i32,
+                        elem_sets: sets.clone(),
+                        packing_sets: sets.clone(),
+                        covering_sets: sets,
+                    }
+                })
+                .collect();
+            GraphData {
+                id: network.id,
+                source: 0,
+                sink: 9,
+                elem_set_count: 8,
+                packing_set_count: 8,
+                covering_set_count: 8,
+                vertices,
+                arcs,
+                ..Default::default()
+            }
+        })
+        .collect();
+    let config = RankOneIncidenceConfig {
+        rows: (0..8).collect(),
+        graphs,
+        parameters: Parameters::default(),
+    };
+    let mut branching = RyanFosterBranching::new(2.);
+    branching
+        .prepare(
+            problem.networks.iter().map(|n| (n.id, &n.graph)),
+            None,
+            Some(&config),
+        )
+        .unwrap();
+    let mut output = solve_with_master_variables(problem, vec![], options()).unwrap();
+    let template = output.routes[0].route.clone();
+    assert!(output.snapshot.state.fixed_routes.is_empty());
+    assert_eq!(capture["exit_code"], 0);
+    for hit in capture["hits"].as_array().unwrap() {
+        output.routes.clear();
+        output.values.clear();
+        for captured in hit["routes"].as_array().unwrap() {
+            let mut route = template.clone();
+            route.arcs = captured["arcs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_i64().unwrap() as i32)
+                .collect();
+            output.routes.push(NetworkRoute {
+                network: captured["graph"].as_i64().unwrap() as i32,
+                route,
+            });
+            output.values.push(captured["quantity"].as_f64().unwrap());
+        }
+        let name = format!("PS_{}_{}", hit["pair"][0], hit["pair"][1]);
+        let expected = hit["value"].as_f64().unwrap();
+        let proposals = branching.proposals(&output).unwrap();
+        let actual = proposals
+            .iter()
+            .find(|p| p.name == name)
+            .map_or(0., |p| p.value);
+        assert!(
+            (actual - expected).abs() < 1e-9,
+            "{name}: {actual} != {expected}"
+        );
+    }
 }

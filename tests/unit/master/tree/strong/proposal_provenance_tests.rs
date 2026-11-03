@@ -90,6 +90,7 @@ fn real_ryan_foster_family_ignores_colliding_mapped_selection_metadata() {
                 .iter()
                 .map(|o| (o.network.id, o.network.graph.as_ref())),
             None,
+            None,
         )
         .unwrap();
         options.branching_registry.ryan_foster = Some(rf);

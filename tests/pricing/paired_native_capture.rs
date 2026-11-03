@@ -4,6 +4,15 @@ use baldes::{Graph, Window};
 
 #[cfg(feature = "clp")]
 fn install_capture_front(graph: &mut Graph<2>, dependent_increment: f64) {
+    install_capture_front_with_preprocessing(graph, dependent_increment, false);
+}
+
+#[cfg(feature = "clp")]
+fn install_capture_front_with_preprocessing(
+    graph: &mut Graph<2>,
+    dependent_increment: f64,
+    preprocess: bool,
+) {
     use baldes::graph::coupled::descriptor::{
         FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
     };
@@ -37,6 +46,21 @@ fn install_capture_front(graph: &mut Graph<2>, dependent_increment: f64) {
             mode: PairedResourceMode::CostUnbounded,
         }])
         .unwrap();
+    if preprocess {
+        graph
+            .set_paired_waiting_windows_from_resource(0, 0)
+            .unwrap();
+        let domains =
+            match graph.preprocess_paired_base_domains(0, &inputs, FrontierBudget::default()) {
+                FrontierOutcome::Complete(value) => value,
+                other => panic!("{other:?}"),
+            };
+        assert!(matches!(
+            domains.install_front_program(graph, &inputs, affine(0.), FrontierBudget::default()),
+            FrontierOutcome::Complete(())
+        ));
+        return;
+    }
     let outcome = graph.prepare_paired_front_program(
         0,
         &inputs,
@@ -52,6 +76,1681 @@ fn install_capture_front(graph: &mut Graph<2>, dependent_increment: f64) {
     graph
         .set_paired_waiting_windows_from_resource(0, 0)
         .unwrap();
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn preprocessed_paired_bucket_components_match_native_model() {
+    use baldes::graph::buckets::BucketGraph;
+    use std::collections::BTreeMap;
+
+    let capture: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/coupled/bucket_tarjan_paired_model.json"
+    ))
+    .unwrap();
+    let mut graph = Graph::<2>::new(11, 1).unwrap();
+    for vertex in 0..11 {
+        graph.set_bounds(vertex, 0, 0., 2.5).unwrap();
+    }
+    for arc in capture["arcs"].as_array().unwrap() {
+        let tail = arc[0].as_u64().unwrap() as usize;
+        let head = arc[1].as_u64().unwrap() as usize;
+        let id = graph.add_arc(tail, head, 0.).unwrap();
+        graph.arc_mut(id).unwrap().consumption[0] = arc[2].as_f64().unwrap();
+    }
+    install_capture_front_with_preprocessing(&mut graph, 1., true);
+    let cases = std::iter::once((1., &capture["components"], &capture["buckets"])).chain(
+        capture["variants"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|variant| {
+                (
+                    variant["step"].as_f64().unwrap(),
+                    &variant["components"],
+                    &variant["buckets"],
+                )
+            }),
+    );
+    for (step, components, buckets) in cases {
+        let grid = BucketGraph::prepare(&graph, [step, 0.], 100, true).unwrap();
+        for (index, direction) in [&grid.forward, &grid.backward].iter().enumerate() {
+            let actual: Vec<_> = direction
+                .buckets
+                .iter()
+                .flatten()
+                .map(|bucket| bucket.component.map(|value| value as i32).unwrap_or(-1))
+                .collect();
+            let expected: Vec<_> = components[index]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|value| value.as_i64().unwrap() as i32)
+                .collect();
+            assert_eq!(actual, expected, "step {step}, direction {index}");
+            let actual_arcs: BTreeMap<_, Vec<_>> = direction
+                .buckets
+                .iter()
+                .flatten()
+                .filter(|bucket| bucket.reachable)
+                .map(|bucket| {
+                    let arcs = bucket
+                        .arcs
+                        .iter()
+                        .map(|arc| {
+                            (
+                                graph.arcs[arc.physical].id,
+                                arc.jump.map(|id| id as i32).unwrap_or(-1),
+                            )
+                        })
+                        .collect();
+                    ((bucket.id.vertex, bucket.id.bucket), arcs)
+                })
+                .collect();
+            let name = if index == 0 { "forward" } else { "backward" };
+            let expected_arcs: BTreeMap<_, Vec<_>> = buckets[name]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|bucket| {
+                    let key = (
+                        bucket["vertex"].as_u64().unwrap() as usize,
+                        bucket["bucket"].as_u64().unwrap() as usize,
+                    );
+                    let arcs = bucket["arcs"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|arc| {
+                            (
+                                arc[0].as_i64().unwrap() as i32,
+                                arc[1].as_i64().unwrap() as i32,
+                            )
+                        })
+                        .collect();
+                    (key, arcs)
+                })
+                .collect();
+            assert_eq!(actual_arcs, expected_arcs, "step {step}, direction {index}");
+        }
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn paired_jump_regeneration_matches_native_fixed_bucket_arcs() {
+    use baldes::graph::buckets::BucketGraph;
+    use std::collections::BTreeMap;
+
+    let capture: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/coupled/bucket_paired_regeneration_native.json"
+    ))
+    .unwrap();
+    let mut graph = Graph::<2>::new(7, 1).unwrap();
+    for vertex in 0..7 {
+        graph.set_bounds(vertex, 0, 0., 2.5).unwrap();
+    }
+    for arc in capture["arcs"].as_array().unwrap() {
+        let id = graph
+            .add_arc(
+                arc[0].as_u64().unwrap() as usize,
+                arc[1].as_u64().unwrap() as usize,
+                0.,
+            )
+            .unwrap();
+        graph.arc_mut(id).unwrap().consumption[0] = arc[2].as_f64().unwrap();
+    }
+    install_capture_front_with_preprocessing(&mut graph, 0., true);
+    let decode = |buckets: &serde_json::Value| -> BTreeMap<(usize, usize), Vec<(i32, i32)>> {
+        buckets
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|bucket| {
+                let key = (
+                    bucket["vertex"].as_u64().unwrap() as usize,
+                    bucket["bucket"].as_u64().unwrap() as usize,
+                );
+                let arcs = bucket["arcs"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|arc| {
+                        (
+                            arc[0].as_i64().unwrap() as i32,
+                            arc[1].as_i64().unwrap() as i32,
+                        )
+                    })
+                    .collect();
+                (key, arcs)
+            })
+            .collect()
+    };
+    for case in capture["cases"].as_array().unwrap() {
+        let step = case["step"].as_f64().unwrap();
+        for captured in case["captures"].as_array().unwrap() {
+            let forward = captured["forward"].as_bool().unwrap();
+            let mut grid = BucketGraph::prepare(&graph, [step, 0.], 100, true).unwrap();
+            let before = decode(&captured["before"]);
+            let direction = if forward {
+                &mut grid.forward
+            } else {
+                &mut grid.backward
+            };
+            for bucket in direction
+                .buckets
+                .iter_mut()
+                .flatten()
+                .filter(|b| b.reachable)
+            {
+                let expected = &before[&(bucket.id.vertex, bucket.id.bucket)];
+                bucket
+                    .arcs
+                    .retain(|arc| expected.contains(&(graph.arcs[arc.physical].id, -1)));
+                let actual: Vec<_> = bucket
+                    .arcs
+                    .iter()
+                    .map(|arc| (graph.arcs[arc.physical].id, -1))
+                    .collect();
+                assert_eq!(&actual, expected, "before step {step}, forward {forward}");
+            }
+            grid.regenerate_jumps(&graph, forward);
+            let direction = if forward {
+                &grid.forward
+            } else {
+                &grid.backward
+            };
+            let actual: BTreeMap<_, Vec<_>> = direction
+                .buckets
+                .iter()
+                .flatten()
+                .filter(|b| b.reachable)
+                .map(|bucket| {
+                    let arcs = bucket
+                        .arcs
+                        .iter()
+                        .map(|arc| {
+                            (
+                                graph.arcs[arc.physical].id,
+                                arc.jump.map(|v| v as i32).unwrap_or(-1),
+                            )
+                        })
+                        .collect();
+                    ((bucket.id.vertex, bucket.id.bucket), arcs)
+                })
+                .collect();
+            assert_eq!(
+                actual,
+                decode(&captured["buckets"]),
+                "after step {step}, forward {forward}"
+            );
+        }
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn packing_supported_arc_outside_memory_is_charged_in_pricing() {
+    use baldes::cuts::{CutClass, MemoryKind, RankOneCut};
+    use std::collections::{BTreeMap, BTreeSet};
+    let mut solver = baldes::pricing::Solver::<2>::new(5, 0).unwrap();
+    solver.graph.graph_id = 7;
+    let supported = solver.graph.add_arc(0, 1, -3.).unwrap();
+    let remembered = solver.graph.add_arc(1, 2, 0.).unwrap();
+    let terminal = solver.graph.add_arc(2, 4, 0.).unwrap();
+    let unreachable = solver.graph.add_arc(3, 1, 0.).unwrap();
+    solver.cuts.cuts.push(RankOneCut {
+        weights: vec![0; 5],
+        graph_support: BTreeMap::new(),
+        graph_pricing_support: BTreeMap::new(),
+        general_kpath_support: None,
+        memory: vec![false; 5],
+        graph_dependent_memory: false,
+        graph_memories: BTreeMap::new(),
+        memory_kind: MemoryKind::Arc,
+        arc_memory: BTreeSet::from([remembered, terminal, unreachable]),
+        graph_arc_memories: BTreeMap::new(),
+        arc_weights: BTreeMap::from([(supported, 1), (remembered, 1)]),
+        graph_arc_weights: BTreeMap::new(),
+        visit_once: false,
+        type2: false,
+        denominator: 2,
+        dual: -1.,
+        class: CutClass::Packing,
+        rhs: 1,
+        kind: -1,
+        id: 0,
+        ordered_support: None,
+    });
+    let priced = solver.price_phase(0, 10, false).unwrap();
+    assert_eq!(priced.columns.len(), 1);
+    assert_eq!(
+        priced.columns[0].arcs,
+        vec![supported, remembered, terminal]
+    );
+    assert_eq!(priced.columns[0].cost, -2.);
+    let enumerated = solver.enumerate(100.).unwrap();
+    assert_eq!(enumerated.len(), 1);
+    assert_eq!(enumerated[0].cost, -2.);
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn packing_arc_memory_pricing_matches_controlled_native_bound() {
+    use baldes::cuts::{CutClass, MemoryKind, RankOneCut};
+    use std::collections::{BTreeMap, BTreeSet};
+    let cases: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/packing_arc_pricing_native.json"
+    ))
+    .unwrap();
+    for (case_index, case) in cases.as_array().unwrap().iter().enumerate() {
+        let mut solver = baldes::pricing::Solver::<2>::new(8, 1).unwrap();
+        solver.graph.graph_id = case["graph_id"].as_i64().unwrap() as i32;
+        for vertex in 0..8 {
+            solver.graph.set_bounds(vertex, 0, 0., 2.).unwrap();
+        }
+        let mut weights = BTreeMap::new();
+        for (index, arc) in case["arcs"].as_array().unwrap().iter().enumerate() {
+            let tail = arc["tail"].as_u64().unwrap() as usize;
+            let head = arc["head"].as_u64().unwrap() as usize;
+            let id = solver.graph.add_arc(tail, head, 0.).unwrap();
+            let edge = solver.graph.arc_mut(id).unwrap();
+            edge.consumption[0] = if head == 7 { 0. } else { 1. };
+            edge.reduced_cost = case["costs"][index].as_f64().unwrap();
+            if head == 1 && tail != 4 && tail != 5 {
+                weights.insert(id, 1);
+            }
+        }
+        for captured in case["cuts"].as_array().unwrap() {
+            let mut vertex_weights = vec![0; 8];
+            for set in captured["sets"].as_array().unwrap() {
+                let set = set.as_u64().unwrap() as usize;
+                if set != 0 {
+                    vertex_weights[set + 1] += 1;
+                }
+            }
+            solver.cuts.cuts.push(RankOneCut {
+                weights: vertex_weights,
+                graph_support: BTreeMap::new(),
+                graph_pricing_support: BTreeMap::new(),
+                general_kpath_support: None,
+                memory: vec![false; 8],
+                graph_dependent_memory: false,
+                graph_memories: BTreeMap::new(),
+                memory_kind: MemoryKind::Arc,
+                arc_memory: captured["memory"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_i64().unwrap() as i32)
+                    .collect::<BTreeSet<_>>(),
+                graph_arc_memories: BTreeMap::new(),
+                arc_weights: weights.clone(),
+                graph_arc_weights: BTreeMap::new(),
+                visit_once: false,
+                type2: false,
+                denominator: captured["denominator"].as_i64().unwrap() as i32,
+                dual: -captured["price"].as_f64().unwrap(),
+                class: CutClass::Packing,
+                rhs: 1,
+                kind: -1,
+                id: captured["id"].as_i64().unwrap() as i32,
+                ordered_support: None,
+            });
+        }
+        let phase = case["phase"].as_u64().unwrap() as usize;
+        let initial_phase_routes: Option<BTreeSet<_>> = if phase == 0 {
+            None
+        } else {
+            Some(
+                solver
+                    .price_phase(phase, 100, false)
+                    .unwrap()
+                    .columns
+                    .into_iter()
+                    .map(|r| r.arcs)
+                    .collect(),
+            )
+        };
+        let result = solver.price_phase(0, 100, false).unwrap();
+        let rust_routes: BTreeSet<_> = result.columns.iter().map(|r| r.arcs.clone()).collect();
+        let native_routes: BTreeSet<Vec<i32>> = case["native_routes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|route| {
+                route
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|arc| arc.as_i64().unwrap() as i32)
+                    .collect()
+            })
+            .collect();
+        let recorded: BTreeMap<Vec<i32>, f64> = case["recorded_routes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|route| {
+                (
+                    route["arcs"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|arc| arc.as_i64().unwrap() as i32)
+                        .collect(),
+                    route["value"].as_f64().unwrap(),
+                )
+            })
+            .collect();
+        assert!(native_routes.is_subset(&rust_routes));
+        if case["phase"].as_u64().unwrap() == 0 {
+            assert_eq!(native_routes, rust_routes);
+            for route in &result.columns {
+                assert!((route.cost - recorded[&route.arcs]).abs() < 1e-9);
+            }
+            let mut expected: Vec<_> = case["candidate_values"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|candidate| candidate["value"].as_f64().unwrap())
+                .collect();
+            let mut actual: Vec<_> = result.columns.iter().map(|route| route.cost).collect();
+            expected.sort_by(f64::total_cmp);
+            actual.sort_by(f64::total_cmp);
+            assert_eq!(expected.len(), actual.len());
+            for (a, b) in actual.iter().zip(expected) {
+                assert!(
+                    (a - b).abs() < 1e-9,
+                    "case {case_index}: Rust {a}, native {b}"
+                );
+            }
+            for candidate in case["candidate_values"].as_array().unwrap() {
+                let arc = candidate["label_arc"].as_i64().unwrap() as i32;
+                let matches: Vec<_> = result
+                    .columns
+                    .iter()
+                    .filter(|r| r.arcs.contains(&arc))
+                    .collect();
+                let route = if matches.len() == 1 {
+                    matches[0]
+                } else {
+                    matches.iter().copied().find(|r| r.arcs.len() == 2).unwrap()
+                };
+                assert!(
+                    (route.cost - candidate["value"].as_f64().unwrap()).abs() < 1e-9,
+                    "case {case_index}, candidate arc {arc}"
+                );
+            }
+        } else {
+            let phased = solver.price_phase(phase, 100, false).unwrap();
+            let phased_routes: BTreeSet<_> =
+                phased.columns.iter().map(|r| r.arcs.clone()).collect();
+            assert_eq!(initial_phase_routes.unwrap(), phased_routes);
+            assert!((phased.minimum_reduced_cost - case["bound"].as_f64().unwrap()).abs() < 1e-9);
+            assert_eq!(native_routes, phased_routes, "case {case_index}");
+            for route in &phased.columns {
+                assert!((route.cost - recorded[&route.arcs]).abs() < 1e-9);
+            }
+            let mut expected: Vec<_> = case["candidate_values"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|candidate| candidate["value"].as_f64().unwrap())
+                .collect();
+            let mut actual: Vec<_> = phased.columns.iter().map(|route| route.cost).collect();
+            expected.sort_by(f64::total_cmp);
+            actual.sort_by(f64::total_cmp);
+            assert_eq!(expected.len(), actual.len());
+            for (a, b) in actual.iter().zip(expected) {
+                assert!(
+                    (a - b).abs() < 1e-9,
+                    "case {case_index}: Rust {a}, native {b}"
+                );
+            }
+            let mut native_by_arc = BTreeMap::<i32, Vec<f64>>::new();
+            for candidate in case["candidate_values"].as_array().unwrap() {
+                native_by_arc
+                    .entry(candidate["label_arc"].as_i64().unwrap() as i32)
+                    .or_default()
+                    .push(candidate["value"].as_f64().unwrap());
+            }
+            let mut rust_by_arc = BTreeMap::<i32, Vec<f64>>::new();
+            for route in &phased.columns {
+                rust_by_arc
+                    .entry(*route.arcs.last().unwrap())
+                    .or_default()
+                    .push(route.cost);
+            }
+            assert_eq!(native_by_arc.len(), rust_by_arc.len());
+            for (arc, mut expected) in native_by_arc {
+                let mut actual = rust_by_arc.remove(&arc).unwrap();
+                expected.sort_by(f64::total_cmp);
+                actual.sort_by(f64::total_cmp);
+                assert_eq!(expected.len(), actual.len());
+                for (a, b) in actual.iter().zip(expected) {
+                    assert!((a - b).abs() < 1e-9, "case {case_index}, arc {arc}");
+                }
+            }
+            if let Some(zero) = case["native_zero_routes"].as_array() {
+                let zero_routes: BTreeSet<Vec<i32>> = zero
+                    .iter()
+                    .map(|route| {
+                        route
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(|v| v.as_i64().unwrap() as i32)
+                            .collect()
+                    })
+                    .collect();
+                for cut in &mut solver.cuts.cuts {
+                    cut.dual = 0.;
+                }
+                let zero_priced = solver.price_phase(phase, 100, false).unwrap();
+                let rust_zero: BTreeSet<_> =
+                    zero_priced.columns.iter().map(|r| r.arcs.clone()).collect();
+                assert_eq!(zero_routes, rust_zero);
+                if case_index == 6 {
+                    solver.cuts.cuts[0].dual = -1.;
+                    let incomplete = solver.price_phase(phase, 100, false).unwrap();
+                    let incomplete_routes: BTreeSet<_> =
+                        incomplete.columns.iter().map(|r| r.arcs.clone()).collect();
+                    assert_ne!(native_routes, incomplete_routes);
+                }
+            }
+        }
+        if let Some(routes) = case["native_routes_with_phase_flag_2"].as_array() {
+            let native_flag_routes: BTreeSet<Vec<i32>> = routes
+                .iter()
+                .map(|route| {
+                    route
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|arc| arc.as_i64().unwrap() as i32)
+                        .collect()
+                })
+                .collect();
+            assert_eq!(native_flag_routes, rust_routes);
+        }
+        assert!(
+            (result.minimum_reduced_cost - case["bound"].as_f64().unwrap()).abs() < 1e-9,
+            "graph {}: Rust {}, native {}",
+            solver.graph.graph_id,
+            result.minimum_reduced_cost,
+            case["bound"]
+        );
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn covering_arc_preparation_matches_controlled_native_tables() {
+    use baldes::cuts::state::{
+        change_along_arc, prepare_arcs, prepare_vertices, CutResourceInfo, LimitedInput,
+        LimitedPreparation, LIMITED_WORDS,
+    };
+    use std::collections::{BTreeMap, BTreeSet};
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/covering_arc_preparation_native.json"
+    ))
+    .unwrap();
+    for graph in fixture["graphs"].as_array().unwrap() {
+        let mut solver = baldes::pricing::Solver::<2>::new(8, 1).unwrap();
+        let mut coefficients = BTreeMap::new();
+        for arc in graph["arcs"].as_array().unwrap() {
+            let tail = arc["tail"].as_u64().unwrap() as usize;
+            let head = arc["head"].as_u64().unwrap() as usize;
+            let id = solver.graph.add_arc(tail, head, 0.).unwrap();
+            assert_eq!(id, arc["id"].as_i64().unwrap() as i32);
+            if head == 1 && tail != 4 && tail != 5 {
+                coefficients.insert(id, graph["arc_increment"].as_i64().unwrap_or(-1) as i32);
+            }
+        }
+        let packing = graph["packing"].as_bool().unwrap_or(false);
+        let cut = LimitedInput {
+            covering: !packing,
+            type2: false,
+            arc_memory: graph.get("arc_memory").is_some(),
+            denominator: if packing { 2 } else { -2 },
+            dual: if packing { 1. } else { -1. },
+            vertex_coefficient: if packing {
+                vec![0, 0, 0, 0, 1, 0, 1, 0]
+            } else {
+                vec![0, 0, 0, 0, -1, 0, -1, 0]
+            },
+            arc_coefficient: coefficients,
+            memory_vertices: graph["memory"].as_array().map_or_else(
+                || (1..=6).collect(),
+                |values| {
+                    values
+                        .iter()
+                        .map(|v| v.as_u64().unwrap() as usize)
+                        .collect()
+                },
+            ),
+            memory_arcs: graph["arc_memory"]
+                .as_array()
+                .map_or_else(BTreeSet::new, |values| {
+                    values.iter().map(|v| v.as_i64().unwrap() as i32).collect()
+                }),
+        };
+        let mut info = CutResourceInfo::default();
+        let mut prep = LimitedPreparation::default();
+        assert!(prepare_vertices(
+            &mut info,
+            &mut prep,
+            &solver.graph,
+            std::slice::from_ref(&cut),
+            &[]
+        ));
+        for forward in [true, false] {
+            prepare_arcs(
+                &mut info,
+                &mut prep,
+                &solver.graph,
+                std::slice::from_ref(&cut),
+                &[],
+                forward,
+            );
+            let table = if forward {
+                &info.forward
+            } else {
+                &info.backward
+            };
+            let mut actual = Vec::new();
+            for (arc, row) in table.iter().enumerate() {
+                for t in &row.ordinary {
+                    actual.push((
+                        arc,
+                        vec![
+                            t.mask as i32,
+                            t.denominator,
+                            t.source_word,
+                            t.source_shift,
+                            t.target_word,
+                            t.target_shift,
+                            t.increment,
+                        ],
+                        t.covering,
+                        t.overflow_cost.to_bits(),
+                    ));
+                }
+            }
+            let field = if forward {
+                "prepared"
+            } else {
+                "backward_prepared"
+            };
+            let mut expected: Vec<_> = graph[field]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|t| {
+                    (
+                        t["arc"].as_u64().unwrap() as usize,
+                        t["descriptor"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(|x| x.as_i64().unwrap() as i32)
+                            .collect::<Vec<_>>(),
+                        t["covering"].as_bool().unwrap(),
+                        t["cost"].as_f64().unwrap().to_bits(),
+                    )
+                })
+                .collect();
+            actual.sort();
+            expected.sort();
+            assert_eq!(actual, expected);
+        }
+        for (field, table) in [("chain", &info.forward), ("backward_chain", &info.backward)] {
+            let Some(chain) = graph[field].as_array() else {
+                continue;
+            };
+            let mut words = [0; LIMITED_WORDS];
+            let mut cost = 0.;
+            for step in chain {
+                change_along_arc(
+                    &mut words,
+                    &mut cost,
+                    &table[step["arc"].as_u64().unwrap() as usize].ordinary,
+                );
+                let expected: Vec<_> = step["after_words"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_u64().unwrap() as u32)
+                    .collect();
+                assert_eq!(words.as_slice(), expected);
+                assert_eq!(cost.to_bits(), step["cost"].as_f64().unwrap().to_bits());
+            }
+        }
+        for probe in graph["executions"].as_array().unwrap() {
+            let mut words = [0; LIMITED_WORDS];
+            words[0] = probe["before"].as_u64().unwrap() as u32;
+            let mut cost = probe["initial"].as_f64().unwrap();
+            let table = if probe["forward"].as_bool().unwrap() {
+                &info.forward
+            } else {
+                &info.backward
+            };
+            change_along_arc(
+                &mut words,
+                &mut cost,
+                &table[probe["arc"].as_u64().unwrap() as usize].ordinary,
+            );
+            let expected: Vec<_> = probe["after_words"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_u64().unwrap() as u32)
+                .collect();
+            assert_eq!(words.as_slice(), expected);
+            assert_eq!(cost.to_bits(), probe["cost"].as_f64().unwrap().to_bits());
+        }
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn covering_full_memory_support_matches_controlled_native_capture() {
+    use baldes::cuts::state::{
+        apply_vertex_support, change_full_memory_along_arc, prepare_full_memory, CutResourceInfo,
+        FullInput, FullPreparation, FULL_WORDS,
+    };
+    use std::collections::BTreeMap;
+    let probes: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/covering_full_support_native.json"
+    ))
+    .unwrap();
+    let arcs: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/covering_limited_arcs_native.json"
+    ))
+    .unwrap();
+    let mut solver = baldes::pricing::Solver::<2>::new(11, 1).unwrap();
+    for arc in arcs["arcs"].as_array().unwrap() {
+        solver
+            .graph
+            .add_arc(
+                arc["tail"].as_u64().unwrap() as usize,
+                arc["head"].as_u64().unwrap() as usize,
+                0.,
+            )
+            .unwrap();
+    }
+    let cut = FullInput {
+        ordered_support: vec![(1, -1), (2, -1), (3, -1)],
+        denominator: -2,
+        covering: true,
+        dual: -1.,
+        vertex_coefficient: vec![0, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0],
+        arc_coefficient: BTreeMap::new(),
+    };
+    let mut info = CutResourceInfo::default();
+    let mut prep = FullPreparation::default();
+    assert!(prepare_full_memory(
+        &mut info,
+        &mut prep,
+        &solver.graph,
+        &[cut],
+        &[],
+        true
+    ));
+    for probe in probes.as_array().unwrap() {
+        let mut words = [0; FULL_WORDS];
+        words[0] = probe["before"].as_u64().unwrap() as u32;
+        let mut cost = probe["initial"].as_f64().unwrap();
+        apply_vertex_support(
+            &mut words,
+            &mut cost,
+            &info.vertices[probe["vertex"].as_u64().unwrap() as usize].full_memory_support,
+        );
+        let expected: Vec<_> = probe["after_words"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as u32)
+            .collect();
+        assert_eq!(words.as_slice(), expected);
+        assert_eq!(cost.to_bits(), probe["cost"].as_f64().unwrap().to_bits());
+    }
+    let arc_probes: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/covering_full_arcs_native.json"
+    ))
+    .unwrap();
+    for probe in arc_probes.as_array().unwrap() {
+        let mut words = [0; FULL_WORDS];
+        words[0] = probe["before"].as_u64().unwrap() as u32;
+        let mut cost = probe["initial"].as_f64().unwrap();
+        let table = if probe["forward"].as_bool().unwrap() {
+            &info.forward
+        } else {
+            &info.backward
+        };
+        change_full_memory_along_arc(
+            &mut words,
+            &mut cost,
+            &table[probe["arc"].as_u64().unwrap() as usize].full_memory,
+        );
+        let expected: Vec<_> = probe["after_words"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as u32)
+            .collect();
+        assert_eq!(words.as_slice(), expected);
+        assert_eq!(cost.to_bits(), probe["cost"].as_f64().unwrap().to_bits());
+    }
+    let cut = FullInput {
+        ordered_support: vec![(11, -1)],
+        denominator: -2,
+        covering: true,
+        dual: -1.,
+        vertex_coefficient: vec![0; 11],
+        arc_coefficient: BTreeMap::from([(0, -1)]),
+    };
+    let mut info = CutResourceInfo::default();
+    let mut prep = FullPreparation::default();
+    assert!(prepare_full_memory(
+        &mut info,
+        &mut prep,
+        &solver.graph,
+        &[cut],
+        &[],
+        true
+    ));
+    let probes: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/covering_full_arc_charge_native.json"
+    ))
+    .unwrap();
+    for probe in probes.as_array().unwrap() {
+        let mut words = [0; FULL_WORDS];
+        words[0] = probe["before"].as_u64().unwrap() as u32;
+        let mut cost = probe["initial"].as_f64().unwrap();
+        let table = if probe["forward"].as_bool().unwrap() {
+            &info.forward
+        } else {
+            &info.backward
+        };
+        change_full_memory_along_arc(
+            &mut words,
+            &mut cost,
+            &table[probe["arc"].as_u64().unwrap() as usize].full_memory,
+        );
+        let expected: Vec<_> = probe["after_words"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as u32)
+            .collect();
+        assert_eq!(words.as_slice(), expected);
+        assert_eq!(cost.to_bits(), probe["cost"].as_f64().unwrap().to_bits());
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn covering_limited_arc_transitions_match_controlled_native_capture() {
+    use baldes::cuts::state::{
+        change_along_arc, prepare_arcs, prepare_vertices, ArcTransition, CutResourceInfo,
+        LimitedInput, LimitedPreparation, LIMITED_WORDS,
+    };
+    use std::collections::{BTreeMap, BTreeSet};
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/covering_limited_arcs_native.json"
+    ))
+    .unwrap();
+    let mut solver = baldes::pricing::Solver::<2>::new(11, 1).unwrap();
+    for arc in fixture["arcs"].as_array().unwrap() {
+        let id = solver
+            .graph
+            .add_arc(
+                arc["tail"].as_u64().unwrap() as usize,
+                arc["head"].as_u64().unwrap() as usize,
+                0.,
+            )
+            .unwrap();
+        assert_eq!(id, arc["id"].as_i64().unwrap() as i32);
+    }
+    let cut = LimitedInput {
+        covering: true,
+        type2: false,
+        arc_memory: false,
+        denominator: -2,
+        dual: -1.,
+        vertex_coefficient: vec![0, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0],
+        arc_coefficient: BTreeMap::new(),
+        memory_vertices: vec![1, 2, 3],
+        memory_arcs: BTreeSet::new(),
+    };
+    let mut info = CutResourceInfo::default();
+    let mut prep = LimitedPreparation::default();
+    assert!(prepare_vertices(
+        &mut info,
+        &mut prep,
+        &solver.graph,
+        std::slice::from_ref(&cut),
+        &[]
+    ));
+    for forward in [true, false] {
+        prepare_arcs(
+            &mut info,
+            &mut prep,
+            &solver.graph,
+            std::slice::from_ref(&cut),
+            &[],
+            forward,
+        );
+    }
+    for probe in fixture["probes"].as_array().unwrap() {
+        let mut words = [0; LIMITED_WORDS];
+        words[0] = probe["before"].as_u64().unwrap() as u32;
+        let mut cost = probe["initial"].as_f64().unwrap();
+        let table = if probe["forward"].as_bool().unwrap() {
+            &info.forward
+        } else {
+            &info.backward
+        };
+        change_along_arc(
+            &mut words,
+            &mut cost,
+            &table[probe["arc"].as_u64().unwrap() as usize].ordinary,
+        );
+        let expected: Vec<_> = probe["after_words"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as u32)
+            .collect();
+        assert_eq!(words.as_slice(), expected);
+        assert_eq!(cost.to_bits(), probe["cost"].as_f64().unwrap().to_bits());
+    }
+    let probes: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/covering_limited_arc_charge_native.json"
+    ))
+    .unwrap();
+    for probe in probes.as_array().unwrap() {
+        let mut words = [0; LIMITED_WORDS];
+        words[0] = probe["before"].as_u64().unwrap() as u32;
+        let mut cost = probe["initial"].as_f64().unwrap();
+        let transition = ArcTransition {
+            mask: 1,
+            denominator: -2,
+            source_word: 0,
+            source_shift: 0,
+            target_word: probe["destination"].as_i64().unwrap() as i32,
+            target_shift: 0,
+            increment: -1,
+            covering: true,
+            overflow_cost: -1.,
+        };
+        change_along_arc(&mut words, &mut cost, &[transition]);
+        let expected: Vec<_> = probe["after_words"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as u32)
+            .collect();
+        assert_eq!(words.as_slice(), expected);
+        assert_eq!(cost.to_bits(), probe["cost"].as_f64().unwrap().to_bits());
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn standard_cut_active_enumeration_matches_controlled_native_routes() {
+    use baldes::cuts::{CutClass, MemoryKind, RankOneCut};
+    use std::collections::{BTreeMap, BTreeSet};
+
+    let graph: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/coupled/bucket_paired_regeneration_native.json"
+    ))
+    .unwrap();
+    let cases: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/standard_rank_one_forced_enumeration_native.json"
+    ))
+    .unwrap();
+    for case in cases.as_array().unwrap() {
+        let mut solver = baldes::pricing::Solver::<2>::new(7, 1).unwrap();
+        for vertex in 0..7 {
+            solver
+                .graph
+                .set_bounds(vertex, 0, 0., case["capacity"].as_f64().unwrap_or(2.))
+                .unwrap();
+        }
+        let membership = (0..7)
+            .map(|v| {
+                if (1..=5).contains(&v) {
+                    vec![v - 1]
+                } else {
+                    vec![]
+                }
+            })
+            .collect();
+        solver
+            .graph
+            .configure_ng(5, membership, vec![(0..5).collect(); 7])
+            .unwrap();
+        for (index, arc) in graph["arcs"].as_array().unwrap().iter().enumerate() {
+            let id = solver
+                .graph
+                .add_arc(
+                    arc[0].as_u64().unwrap() as usize,
+                    arc[1].as_u64().unwrap() as usize,
+                    0.,
+                )
+                .unwrap();
+            let edge = solver.graph.arc_mut(id).unwrap();
+            edge.consumption[0] = arc[2].as_f64().unwrap();
+            edge.reduced_cost = case["costs"][index].as_f64().unwrap();
+        }
+        let support: Vec<_> = case["support"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as usize)
+            .collect();
+        let mut weights = vec![0; 7];
+        for &v in &support {
+            weights[v] = 1;
+        }
+        let mut memory = vec![false; 7];
+        for v in case["memory"].as_array().unwrap() {
+            memory[v.as_u64().unwrap() as usize] = true;
+        }
+        if let Some(transitions) = case["transitions"].as_array() {
+            use baldes::cuts::state::{
+                apply_vertex_support, change_along_arc, prepare_arcs, prepare_vertices,
+                CutResourceInfo, LimitedInput, LimitedPreparation, LIMITED_WORDS,
+            };
+            let cut = LimitedInput {
+                covering: false,
+                type2: false,
+                arc_memory: false,
+                denominator: 2,
+                dual: case["price"].as_f64().unwrap(),
+                vertex_coefficient: weights.clone(),
+                arc_coefficient: BTreeMap::new(),
+                memory_vertices: (0..7).filter(|&v| memory[v]).collect(),
+                memory_arcs: BTreeSet::new(),
+            };
+            let mut info = CutResourceInfo::default();
+            let mut prep = LimitedPreparation::default();
+            assert!(prepare_vertices(
+                &mut info,
+                &mut prep,
+                &solver.graph,
+                std::slice::from_ref(&cut),
+                &[]
+            ));
+            for captured in case["support_transitions"].as_array().unwrap() {
+                let mut words: Vec<_> = captured["before"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| x.as_u64().unwrap() as u32)
+                    .collect();
+                let expected: Vec<_> = captured["after"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| x.as_u64().unwrap() as u32)
+                    .collect();
+                let mut cost = captured["before_cost"].as_f64().unwrap();
+                apply_vertex_support(
+                    &mut words,
+                    &mut cost,
+                    &info.vertices[captured["vertex"].as_u64().unwrap() as usize].support,
+                );
+                assert_eq!(words, expected);
+                assert_eq!(
+                    cost.to_bits(),
+                    captured["after_cost"].as_f64().unwrap().to_bits()
+                );
+            }
+            let second = LimitedInput {
+                covering: false,
+                type2: false,
+                arc_memory: false,
+                denominator: 2,
+                dual: 0.25,
+                vertex_coefficient: vec![0, 0, 0, 1, 1, 1, 0],
+                arc_coefficient: BTreeMap::new(),
+                memory_vertices: vec![3, 4, 5],
+                memory_arcs: BTreeSet::new(),
+            };
+            let mut multiple = CutResourceInfo::default();
+            let mut multiple_prep = LimitedPreparation::default();
+            assert!(prepare_vertices(
+                &mut multiple,
+                &mut multiple_prep,
+                &solver.graph,
+                &[cut.clone(), second.clone()],
+                &[]
+            ));
+            for captured in case["multicut_support"].as_array().unwrap() {
+                let mut words: Vec<_> = captured["before"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| x.as_u64().unwrap() as u32)
+                    .collect();
+                let expected: Vec<_> = captured["after"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| x.as_u64().unwrap() as u32)
+                    .collect();
+                let mut cost = captured["before_cost"].as_f64().unwrap();
+                apply_vertex_support(
+                    &mut words,
+                    &mut cost,
+                    &multiple.vertices[captured["vertex"].as_u64().unwrap() as usize].support,
+                );
+                assert_eq!(words, expected);
+                assert_eq!(
+                    cost.to_bits(),
+                    captured["after_cost"].as_f64().unwrap().to_bits()
+                );
+            }
+            for forward in [true, false] {
+                prepare_arcs(
+                    &mut multiple,
+                    &mut multiple_prep,
+                    &solver.graph,
+                    &[cut.clone(), second.clone()],
+                    &[],
+                    forward,
+                );
+            }
+            for captured in case["multicut_arcs"].as_array().unwrap() {
+                let mut words = [0; LIMITED_WORDS];
+                for (dst, value) in words.iter_mut().zip(captured["before"].as_array().unwrap()) {
+                    *dst = value.as_u64().unwrap() as u32;
+                }
+                let expected: Vec<_> = captured["after"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| x.as_u64().unwrap() as u32)
+                    .collect();
+                let mut cost = captured["before_cost"].as_f64().unwrap();
+                let table = if captured["forward"].as_bool().unwrap() {
+                    &multiple.forward
+                } else {
+                    &multiple.backward
+                };
+                change_along_arc(
+                    &mut words,
+                    &mut cost,
+                    &table[captured["arc"].as_u64().unwrap() as usize].ordinary,
+                );
+                assert_eq!(words.as_slice(), expected);
+                assert_eq!(
+                    cost.to_bits(),
+                    captured["after_cost"].as_f64().unwrap().to_bits()
+                );
+            }
+            prepare_arcs(
+                &mut info,
+                &mut prep,
+                &solver.graph,
+                std::slice::from_ref(&cut),
+                &[],
+                true,
+            );
+            prepare_arcs(&mut info, &mut prep, &solver.graph, &[cut], &[], false);
+            for (forward, transitions) in [
+                (true, transitions),
+                (false, case["backward_transitions"].as_array().unwrap()),
+            ] {
+                let mut words = [0; LIMITED_WORDS];
+                let mut cost = 0.;
+                for captured in transitions {
+                    let arc = captured["arc"].as_u64().unwrap() as usize;
+                    let before: Vec<_> = captured["before"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|x| x.as_u64().unwrap() as u32)
+                        .collect();
+                    let after: Vec<_> = captured["after"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|x| x.as_u64().unwrap() as u32)
+                        .collect();
+                    assert_eq!(words.as_slice(), before);
+                    assert_eq!(cost, captured["before_cost"].as_f64().unwrap());
+                    let table = if forward {
+                        &info.forward
+                    } else {
+                        &info.backward
+                    };
+                    change_along_arc(&mut words, &mut cost, &table[arc].ordinary);
+                    assert_eq!(words.as_slice(), after);
+                    assert_eq!(cost, captured["after_cost"].as_f64().unwrap());
+                    apply_vertex_support(
+                        &mut words,
+                        &mut cost,
+                        &info.vertices[if forward {
+                            solver.graph.arcs[arc].head
+                        } else {
+                            solver.graph.arcs[arc].tail
+                        }]
+                        .support,
+                    );
+                }
+            }
+        }
+        solver.cuts.cuts.push(RankOneCut {
+            weights,
+            graph_support: BTreeMap::new(),
+            graph_pricing_support: BTreeMap::new(),
+            general_kpath_support: None,
+            memory,
+            graph_dependent_memory: false,
+            graph_memories: BTreeMap::new(),
+            memory_kind: MemoryKind::Vertex,
+            arc_memory: BTreeSet::new(),
+            graph_arc_memories: BTreeMap::new(),
+            arc_weights: BTreeMap::new(),
+            graph_arc_weights: BTreeMap::new(),
+            visit_once: false,
+            type2: false,
+            denominator: 2,
+            dual: -case["price"].as_f64().unwrap(),
+            class: CutClass::Packing,
+            rhs: (support.len() / 2) as i32,
+            kind: -1,
+            id: 1,
+            ordered_support: Some(support.into_iter().map(|v| (v, 1)).collect()),
+        });
+        if let Some(second) = case.get("second_cut") {
+            let mut cut = solver.cuts.cuts[0].clone();
+            cut.weights.fill(0);
+            let support: Vec<_> = second["support"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_u64().unwrap() as usize)
+                .collect();
+            for &v in &support {
+                cut.weights[v] = 1;
+            }
+            cut.memory.fill(false);
+            for v in second["memory"].as_array().unwrap() {
+                cut.memory[v.as_u64().unwrap() as usize] = true;
+            }
+            cut.dual = -second["price"].as_f64().unwrap();
+            cut.id = 2;
+            cut.ordered_support = Some(support.into_iter().map(|v| (v, 1)).collect());
+            solver.cuts.cuts.push(cut);
+        }
+        solver.bucket_steps[0] = 0.5;
+        let cutoff = case["cutoff"].as_f64().unwrap();
+        let mut expected: Vec<Vec<i32>> = case["routes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|route| {
+                route
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|id| id.as_i64().unwrap() as i32)
+                    .collect()
+            })
+            .collect();
+        expected.sort();
+        if case["capacity"].as_f64() == Some(3.)
+            && case["price"].as_f64() == Some(0.5)
+            && case.get("second_cut").is_none()
+        {
+            // Visits support vertex 3, forgets at vertex 4, then re-enters at 1.
+            assert!(expected.contains(&vec![12, 16, 20, 1]));
+        }
+        let mut before: Vec<_> = solver
+            .enumerate(cutoff)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.arcs)
+            .collect();
+        before.sort();
+        assert_eq!(before, expected, "before fixing, price {}", case["price"]);
+        solver.complete_labels(true).unwrap();
+        solver.fix(cutoff).unwrap();
+        let grid = &solver.engine.as_ref().unwrap().grid;
+        for native in case["captures"].as_array().unwrap() {
+            let forward = native["forward"].as_bool().unwrap();
+            let direction = if forward {
+                &grid.forward
+            } else {
+                &grid.backward
+            };
+            let actual: BTreeMap<_, Vec<_>> = direction
+                .buckets
+                .iter()
+                .flatten()
+                .filter(|b| b.reachable)
+                .map(|b| {
+                    (
+                        (b.id.vertex, b.id.bucket),
+                        b.arcs
+                            .iter()
+                            .map(|a| {
+                                (
+                                    solver.graph.arcs[a.physical].id,
+                                    a.jump.map(|v| v as i32).unwrap_or(-1),
+                                )
+                            })
+                            .collect(),
+                    )
+                })
+                .collect();
+            let expected_arcs: BTreeMap<_, Vec<_>> = native["buckets"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|b| {
+                    (
+                        (
+                            b["vertex"].as_u64().unwrap() as usize,
+                            b["bucket"].as_u64().unwrap() as usize,
+                        ),
+                        b["arcs"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(|a| (a[0].as_i64().unwrap() as i32, a[1].as_i64().unwrap() as i32))
+                            .collect(),
+                    )
+                })
+                .collect();
+            assert_eq!(
+                actual, expected_arcs,
+                "price {} cutoff {cutoff} forward {forward}",
+                case["price"]
+            );
+        }
+        let mut after: Vec<_> = solver
+            .enumerate(cutoff)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.arcs)
+            .collect();
+        after.sort();
+        assert_eq!(after, expected, "after fixing, price {}", case["price"]);
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn paired_fixing_matches_native_bucket_arc_survivors() {
+    use std::collections::BTreeMap;
+
+    let capture: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/coupled/bucket_paired_regeneration_native.json"
+    ))
+    .unwrap();
+    for case in capture["cases"].as_array().unwrap() {
+        let mut solver = baldes::pricing::Solver::<2>::new(7, 1).unwrap();
+        for vertex in 0..7 {
+            solver.graph.set_bounds(vertex, 0, 0., 2.5).unwrap();
+        }
+        let membership = (0..7)
+            .map(|v| {
+                if (1..=5).contains(&v) {
+                    vec![v - 1]
+                } else {
+                    vec![]
+                }
+            })
+            .collect();
+        solver
+            .graph
+            .configure_ng(5, membership, vec![(0..5).collect(); 7])
+            .unwrap();
+        let costs = case["fixing"]["costs"].as_array().unwrap();
+        for (index, arc) in capture["arcs"].as_array().unwrap().iter().enumerate() {
+            let id = solver
+                .graph
+                .add_arc(
+                    arc[0].as_u64().unwrap() as usize,
+                    arc[1].as_u64().unwrap() as usize,
+                    0.,
+                )
+                .unwrap();
+            let edge = solver.graph.arc_mut(id).unwrap();
+            edge.consumption[0] = arc[2].as_f64().unwrap();
+            edge.reduced_cost = costs[index].as_f64().unwrap();
+        }
+        install_capture_front_with_preprocessing(
+            &mut solver.graph,
+            case["increment"].as_f64().unwrap_or(0.),
+            true,
+        );
+        if let Some(row) = case.get("rank_one") {
+            use baldes::cuts::{CutClass, MemoryKind, RankOneCut};
+            use std::collections::BTreeSet;
+            let mut weights = vec![0; 7];
+            let support: Vec<_> = row["sets"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .zip(row["numerators"].as_array().unwrap())
+                .map(|(set, weight)| {
+                    let vertex = set.as_u64().unwrap() as usize + 1;
+                    let weight = weight.as_i64().unwrap() as i32;
+                    weights[vertex] = weight;
+                    (vertex, weight)
+                })
+                .collect();
+            let mut memory = vec![false; 7];
+            for vertex in row["memory"][0]["values"].as_array().unwrap() {
+                memory[vertex.as_u64().unwrap() as usize] = true;
+            }
+            solver.cuts.cuts.push(RankOneCut {
+                weights,
+                graph_support: BTreeMap::new(),
+                graph_pricing_support: BTreeMap::new(),
+                general_kpath_support: None,
+                memory,
+                graph_dependent_memory: false,
+                graph_memories: BTreeMap::new(),
+                memory_kind: MemoryKind::Vertex,
+                arc_memory: BTreeSet::new(),
+                graph_arc_memories: BTreeMap::new(),
+                arc_weights: BTreeMap::new(),
+                graph_arc_weights: BTreeMap::new(),
+                visit_once: false,
+                type2: false,
+                denominator: row["denominator"].as_i64().unwrap() as i32,
+                dual: -row["dual"].as_f64().unwrap(),
+                class: CutClass::Packing,
+                rhs: 2,
+                kind: -1,
+                id: row["id"].as_i64().unwrap() as i32,
+                ordered_support: Some(support),
+            });
+        }
+        let step = case["step"].as_f64().unwrap();
+        solver.bucket_steps[0] = step;
+        solver.complete_labels(true).unwrap();
+        if let Some(source_keys) = case["native_source_keys"].as_array() {
+            let engine = solver.engine.as_ref().unwrap();
+            let mut multiplicities = 0;
+            let mut above_cutoff = 0;
+            for captured in source_keys {
+                let forward = captured["forward"].as_bool().unwrap();
+                let storage = if forward {
+                    &engine.forward
+                } else {
+                    &engine.backward
+                };
+                let vertex = captured["vertex"].as_u64().unwrap() as usize;
+                let bucket = captured["bucket"].as_u64().unwrap() as usize;
+                let hot = &storage.buckets[vertex][bucket].hot;
+                let actual_labels: Vec<_> = hot
+                    .key
+                    .iter()
+                    .copied()
+                    .zip(hot.ng.iter().map(|&mask| mask as u64))
+                    .collect();
+                if let Some(full_ng) = captured["full_ng_labels"].as_array() {
+                    let mut expected: Vec<_> = full_ng
+                        .iter()
+                        .map(|pair| (pair[0].as_f64().unwrap(), pair[1].as_u64().unwrap()))
+                        .collect();
+                    let mut actual = actual_labels.clone();
+                    let order = |a: &(f64, u64), b: &(f64, u64)| {
+                        a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1))
+                    };
+                    expected.sort_by(order);
+                    actual.sort_by(order);
+                    assert_eq!(actual, expected, "{forward} {vertex} {bucket}");
+                }
+                for (key, mask) in captured["keys"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .zip(captured["masks"].as_array().unwrap())
+                {
+                    assert!(
+                        actual_labels.contains(&(key.as_f64().unwrap(), mask.as_u64().unwrap()))
+                    );
+                }
+                let mut actual = storage.buckets[vertex][bucket].hot.key.clone();
+                let mut native: Vec<_> = captured["keys"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_f64().unwrap())
+                    .collect();
+                actual.sort_by(f64::total_cmp);
+                native.sort_by(f64::total_cmp);
+                if actual != native {
+                    assert_eq!(actual.len(), 4);
+                    let masks: std::collections::BTreeSet<_> = hot.ng.iter().copied().collect();
+                    assert_eq!(masks.len(), 4);
+                    actual.dedup();
+                    if native.is_empty() {
+                        assert!(!forward);
+                        assert!(actual
+                            .iter()
+                            .all(|key| *key >= case["fixing"]["cutoff"].as_f64().unwrap()));
+                        above_cutoff += 1;
+                    } else {
+                        assert_eq!(actual, native);
+                        multiplicities += 1;
+                    }
+                }
+            }
+            if case["name"] == "forced_price_2" {
+                assert_eq!((multiplicities, above_cutoff), (5, 5));
+            } else {
+                assert_eq!((multiplicities, above_cutoff), (10, 0));
+            }
+        }
+        let cutoff = case["fixing"]["cutoff"].as_f64().unwrap();
+        let before_routes = if case.get("rank_one").is_some() {
+            let mut baseline = solver.fork_for_node();
+            Some(baseline.enumerate(cutoff).unwrap())
+        } else {
+            None
+        };
+        solver.fix(cutoff).unwrap();
+        let grid = &solver.engine.as_ref().unwrap().grid;
+        if let Some(ng_captures) = case.get("ng_captures") {
+            // The diagnostic native run changes insertion to unlimited,
+            // NG-aware dominance while leaving the fixing cutoff unchanged.
+            assert_eq!(&case["captures"], ng_captures);
+        }
+        for native in case["captures"].as_array().unwrap() {
+            let forward = native["forward"].as_bool().unwrap();
+            let direction = if forward {
+                &grid.forward
+            } else {
+                &grid.backward
+            };
+            let actual: BTreeMap<_, Vec<_>> = direction
+                .buckets
+                .iter()
+                .flatten()
+                .filter(|b| b.reachable)
+                .map(|bucket| {
+                    let arcs = bucket
+                        .arcs
+                        .iter()
+                        .filter(|a| a.jump.is_none())
+                        .map(|arc| solver.graph.arcs[arc.physical].id)
+                        .collect();
+                    ((bucket.id.vertex, bucket.id.bucket), arcs)
+                })
+                .collect();
+            let expected: BTreeMap<_, Vec<_>> = native["before"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|bucket| {
+                    let key = (
+                        bucket["vertex"].as_u64().unwrap() as usize,
+                        bucket["bucket"].as_u64().unwrap() as usize,
+                    );
+                    let arcs = bucket["arcs"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .filter(|a| a[1].as_i64().unwrap() == -1)
+                        .map(|arc| arc[0].as_i64().unwrap() as i32)
+                        .collect();
+                    (key, arcs)
+                })
+                .collect();
+            if case.get("rank_one").is_some() {
+                let mut extras = 0;
+                for (key, rust) in &actual {
+                    let native = &expected[key];
+                    let retained: Vec<_> = rust
+                        .iter()
+                        .copied()
+                        .filter(|a| native.contains(a))
+                        .collect();
+                    assert_eq!(&retained, native, "native survivor missing: {key:?}");
+                    extras += rust.len() - native.len();
+                }
+                assert_eq!(actual.len(), expected.len());
+                let price = case["rank_one"]["dual"].as_f64().unwrap();
+                let expected_extra = if let Some(expected) = case["expected_extra"].as_array() {
+                    expected[usize::from(!forward)].as_u64().unwrap() as usize
+                } else if price >= 2. {
+                    if forward {
+                        60
+                    } else {
+                        40
+                    }
+                } else if forward {
+                    20
+                } else {
+                    0
+                };
+                assert_eq!(
+                    extras, expected_extra,
+                    "case {} direction {}",
+                    case["name"], forward
+                );
+            } else {
+                assert_eq!(actual, expected, "step {step}, forward {forward}");
+            }
+            let actual_jumps: BTreeMap<_, Vec<_>> = direction
+                .buckets
+                .iter()
+                .flatten()
+                .filter(|b| b.reachable)
+                .map(|bucket| {
+                    let arcs = bucket
+                        .arcs
+                        .iter()
+                        .map(|arc| {
+                            (
+                                solver.graph.arcs[arc.physical].id,
+                                arc.jump.map(|v| v as i32).unwrap_or(-1),
+                            )
+                        })
+                        .collect();
+                    ((bucket.id.vertex, bucket.id.bucket), arcs)
+                })
+                .collect();
+            let expected_jumps: BTreeMap<_, Vec<_>> = native["buckets"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|bucket| {
+                    let key = (
+                        bucket["vertex"].as_u64().unwrap() as usize,
+                        bucket["bucket"].as_u64().unwrap() as usize,
+                    );
+                    let arcs = bucket["arcs"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|arc| {
+                            (
+                                arc[0].as_i64().unwrap() as i32,
+                                arc[1].as_i64().unwrap() as i32,
+                            )
+                        })
+                        .collect();
+                    (key, arcs)
+                })
+                .collect();
+            if case.get("rank_one").is_some() {
+                let mut extra = 0;
+                let mut missing = 0;
+                for (key, native) in &expected_jumps {
+                    let rust = &actual_jumps[key];
+                    extra += rust.iter().filter(|a| !native.contains(a)).count();
+                    missing += native.iter().filter(|a| !rust.contains(a)).count();
+                }
+                let price = case["rank_one"]["dual"].as_f64().unwrap();
+                let expected_extra = if let Some(expected) = case["expected_extra"].as_array() {
+                    expected[usize::from(!forward)].as_u64().unwrap() as usize
+                } else if price >= 2. {
+                    if forward {
+                        60
+                    } else {
+                        40
+                    }
+                } else if forward {
+                    20
+                } else {
+                    0
+                };
+                assert_eq!(
+                    (extra, missing),
+                    (expected_extra, 0),
+                    "case {} direction {}",
+                    case["name"],
+                    forward
+                );
+            } else {
+                assert_eq!(
+                    actual_jumps, expected_jumps,
+                    "regenerated step {step}, forward {forward}"
+                );
+            }
+        }
+        if let Some(before) = before_routes {
+            let mut expected: Vec<_> = before.into_iter().map(|route| route.arcs).collect();
+            let mut actual: Vec<_> = solver
+                .enumerate(cutoff)
+                .unwrap()
+                .into_iter()
+                .map(|route| route.arcs)
+                .collect();
+            expected.sort();
+            actual.sort();
+            assert!(!expected.is_empty());
+            assert_eq!(actual, expected);
+            if let Some(routes) = case["native_routes"].as_array() {
+                let mut native: Vec<Vec<i32>> = routes
+                    .iter()
+                    .map(|route| {
+                        route
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(|id| id.as_i64().unwrap() as i32)
+                            .collect()
+                    })
+                    .collect();
+                native.sort();
+                assert_eq!(actual, native);
+            }
+        }
+    }
 }
 
 #[cfg(feature = "clp")]
@@ -1223,9 +2922,33 @@ fn paired_front_dependent_knapsack_cut_reports_missing_resource_mapping() {
             thresholds: vec![],
             coefficients: BTreeMap::from([(0, 0), (3, 1), (6, 2), (9, 3), (12, 4)]),
         },
-        dual: -2.,
+        dual: 0.,
     });
     solver.knapsack_exact_coefficients = true;
+    let zero_dual = solver.price_phase(0, 10, false).unwrap();
+    assert_eq!(
+        zero_dual.minimum_reduced_cost,
+        baseline.minimum_reduced_cost
+    );
+    assert_eq!(zero_dual.columns.len(), baseline.columns.len());
+    solver.cuts.knapsack_cuts[0].dual = -2.;
+    let error = solver.price_phase(0, 10, false).unwrap_err();
+    assert!(
+        format!("{error:?}").contains("exact knapsack resource mapping"),
+        "{error:?}"
+    );
+    let coefficients = solver.cuts.knapsack_cuts[0].cut.coefficients.clone();
+    solver.cuts.knapsack_cuts[0].cut.coefficients = BTreeMap::from([(0, 0), (3, 0)]);
+    let zero_coefficient = solver.price_phase(0, 10, false).unwrap();
+    assert_eq!(
+        zero_coefficient.minimum_reduced_cost,
+        baseline.minimum_reduced_cost
+    );
+    assert_eq!(zero_coefficient.columns.len(), baseline.columns.len());
+    assert!(!solver.enumerate(100.).unwrap().is_empty());
+    let retained = solver.price_phase(0, 10, false).unwrap();
+    assert_eq!(retained.minimum_reduced_cost, baseline.minimum_reduced_cost);
+    solver.cuts.knapsack_cuts[0].cut.coefficients = coefficients;
     let error = solver.price_phase(0, 10, false).unwrap_err();
     assert!(
         format!("{error:?}").contains("exact knapsack resource mapping"),

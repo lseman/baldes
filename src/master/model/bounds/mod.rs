@@ -56,6 +56,7 @@ fn arc_cost_lower_bounds<const D: usize>(
         .iter()
         .map(|(row, _)| *row)
         .chain(oracle.ryan_foster_rows.iter().map(|(row, _)| *row))
+        .chain(oracle.arc_set_branch_rows.iter().map(|(row, _)| *row))
         .any(|row| duals[offset + row] > 0.)
     {
         return None;

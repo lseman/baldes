@@ -302,6 +302,7 @@ struct Oracle<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     /// Packing-set Ryan–Foster branch rows: coefficient one exactly for paths
     /// violating the constraint, which pricing also excludes.
     ryan_foster_rows: Vec<(usize, crate::pricing::restrictions::RyanFosterConstraint)>,
+    arc_set_branch_rows: Vec<(usize, crate::pricing::restrictions::ArcSetConstraint)>,
     synchronized_windows: Vec<(usize, usize, Window)>,
     proved_zero_arcs: Vec<bool>,
     proved_multiplicity_upper: Option<f64>,

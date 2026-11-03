@@ -1,0 +1,553 @@
+{
+  "calls": [
+    {
+      "columns": [
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            0,
+            1
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            0,
+            2
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            1,
+            2
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            21,
+            27,
+            36
+          ],
+          "value": 0.0
+        }
+      ],
+      "phase": 1,
+      "cut": {
+        "descriptor": {
+          "id": 0,
+          "rhs": 1.0,
+          "kind": 0,
+          "rows": 3,
+          "class": -1,
+          "denominator": 2,
+          "numerators": [
+            1,
+            1,
+            1
+          ],
+          "set_ids": [
+            0,
+            1,
+            2
+          ]
+        },
+        "memory_type": 1,
+        "memory": []
+      },
+      "active": []
+    },
+    {
+      "columns": [
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            0,
+            1
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            0,
+            2
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            1,
+            2
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            21,
+            27,
+            36
+          ],
+          "value": 0.0
+        }
+      ],
+      "phase": 4,
+      "cut": {
+        "descriptor": {
+          "id": 1,
+          "rhs": 1.0,
+          "kind": 0,
+          "rows": 3,
+          "class": -1,
+          "denominator": 2,
+          "numerators": [
+            1,
+            1,
+            1
+          ],
+          "set_ids": [
+            0,
+            1,
+            2
+          ]
+        },
+        "memory_type": 1,
+        "memory": []
+      },
+      "active": [
+        {
+          "descriptor": {
+            "id": 0,
+            "rhs": 1.0,
+            "kind": 0,
+            "rows": 3,
+            "class": -1,
+            "denominator": 2,
+            "numerators": [
+              1,
+              1,
+              1
+            ],
+            "set_ids": [
+              0,
+              1,
+              2
+            ]
+          },
+          "memory_type": 1,
+          "memory": []
+        }
+      ]
+    },
+    {
+      "columns": [
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            0,
+            1
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            0,
+            2
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            1,
+            2
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            21,
+            27,
+            36
+          ],
+          "value": 0.0
+        }
+      ],
+      "phase": 5,
+      "cut": {
+        "descriptor": {
+          "id": 2,
+          "rhs": 1.0,
+          "kind": 0,
+          "rows": 3,
+          "class": -1,
+          "denominator": 2,
+          "numerators": [
+            1,
+            1,
+            1
+          ],
+          "set_ids": [
+            0,
+            1,
+            2
+          ]
+        },
+        "memory_type": 1,
+        "memory": []
+      },
+      "active": [
+        {
+          "descriptor": {
+            "id": 0,
+            "rhs": 1.0,
+            "kind": 0,
+            "rows": 3,
+            "class": -1,
+            "denominator": 2,
+            "numerators": [
+              1,
+              1,
+              1
+            ],
+            "set_ids": [
+              0,
+              1,
+              2
+            ]
+          },
+          "memory_type": 1,
+          "memory": []
+        },
+        {
+          "descriptor": {
+            "id": 1,
+            "rhs": 1.0,
+            "kind": 0,
+            "rows": 3,
+            "class": -1,
+            "denominator": 2,
+            "numerators": [
+              1,
+              1,
+              1
+            ],
+            "set_ids": [
+              0,
+              1,
+              2
+            ]
+          },
+          "memory_type": 1,
+          "memory": []
+        }
+      ]
+    },
+    {
+      "columns": [
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            0,
+            1
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            0,
+            2
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            1,
+            2
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            21,
+            27,
+            36
+          ],
+          "value": 0.0
+        }
+      ],
+      "phase": 5,
+      "cut": {
+        "descriptor": {
+          "id": 3,
+          "rhs": 1.0,
+          "kind": 0,
+          "rows": 3,
+          "class": -1,
+          "denominator": 2,
+          "numerators": [
+            1,
+            1,
+            1
+          ],
+          "set_ids": [
+            0,
+            1,
+            2
+          ]
+        },
+        "memory_type": 1,
+        "memory": []
+      },
+      "active": [
+        {
+          "descriptor": {
+            "id": 0,
+            "rhs": 1.0,
+            "kind": 0,
+            "rows": 3,
+            "class": -1,
+            "denominator": 2,
+            "numerators": [
+              1,
+              1,
+              1
+            ],
+            "set_ids": [
+              0,
+              1,
+              2
+            ]
+          },
+          "memory_type": 1,
+          "memory": []
+        },
+        {
+          "descriptor": {
+            "id": 1,
+            "rhs": 1.0,
+            "kind": 0,
+            "rows": 3,
+            "class": -1,
+            "denominator": 2,
+            "numerators": [
+              1,
+              1,
+              1
+            ],
+            "set_ids": [
+              0,
+              1,
+              2
+            ]
+          },
+          "memory_type": 1,
+          "memory": []
+        },
+        {
+          "descriptor": {
+            "id": 2,
+            "rhs": 1.0,
+            "kind": 0,
+            "rows": 3,
+            "class": -1,
+            "denominator": 2,
+            "numerators": [
+              1,
+              1,
+              1
+            ],
+            "set_ids": [
+              0,
+              1,
+              2
+            ]
+          },
+          "memory_type": 1,
+          "memory": []
+        }
+      ]
+    },
+    {
+      "columns": [
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            0,
+            1
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            0,
+            2
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            1,
+            2
+          ],
+          "value": 0.5
+        },
+        {
+          "graph": 7,
+          "enumerated": 0,
+          "arc_ids": [
+            21,
+            27,
+            36
+          ],
+          "value": 0.0
+        }
+      ],
+      "phase": 5,
+      "cut": {
+        "descriptor": {
+          "id": 4,
+          "rhs": 1.0,
+          "kind": 0,
+          "rows": 3,
+          "class": -1,
+          "denominator": 2,
+          "numerators": [
+            1,
+            1,
+            1
+          ],
+          "set_ids": [
+            0,
+            1,
+            2
+          ]
+        },
+        "memory_type": 1,
+        "memory": []
+      },
+      "active": [
+        {
+          "descriptor": {
+            "id": 0,
+            "rhs": 1.0,
+            "kind": 0,
+            "rows": 3,
+            "class": -1,
+            "denominator": 2,
+            "numerators": [
+              1,
+              1,
+              1
+            ],
+            "set_ids": [
+              0,
+              1,
+              2
+            ]
+          },
+          "memory_type": 1,
+          "memory": []
+        },
+        {
+          "descriptor": {
+            "id": 1,
+            "rhs": 1.0,
+            "kind": 0,
+            "rows": 3,
+            "class": -1,
+            "denominator": 2,
+            "numerators": [
+              1,
+              1,
+              1
+            ],
+            "set_ids": [
+              0,
+              1,
+              2
+            ]
+          },
+          "memory_type": 1,
+          "memory": []
+        },
+        {
+          "descriptor": {
+            "id": 2,
+            "rhs": 1.0,
+            "kind": 0,
+            "rows": 3,
+            "class": -1,
+            "denominator": 2,
+            "numerators": [
+              1,
+              1,
+              1
+            ],
+            "set_ids": [
+              0,
+              1,
+              2
+            ]
+          },
+          "memory_type": 1,
+          "memory": []
+        },
+        {
+          "descriptor": {
+            "id": 3,
+            "rhs": 1.0,
+            "kind": 0,
+            "rows": 3,
+            "class": -1,
+            "denominator": 2,
+            "numerators": [
+              1,
+              1,
+              1
+            ],
+            "set_ids": [
+              0,
+              1,
+              2
+            ]
+          },
+          "memory_type": 1,
+          "memory": []
+        }
+      ]
+    }
+  ]
+}

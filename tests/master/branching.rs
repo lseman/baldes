@@ -77,6 +77,83 @@ fn ryan_foster_pricing_and_enumeration_obey_both_children() {
     }
 }
 
+#[test]
+fn arc_set_branches_rebuild_coalesced_paths_and_isolate_siblings() {
+    use baldes::pricing::restrictions::ArcSetConstraint;
+    for mode in [0., 1., 2.] {
+        let mut parent = Solver::<2>::new(4, 0).unwrap();
+        parent
+            .set_option("BALDESuseBidirectionalSearch", mode)
+            .unwrap();
+        let first = parent.graph.add_arc(0, 1, 0.).unwrap();
+        let last = parent.graph.add_arc(1, 3, 0.).unwrap();
+        let alternative = parent.graph.add_arc(0, 1, 1.).unwrap();
+        assert_eq!(
+            parent
+                .price_phase(0, 150, false)
+                .unwrap()
+                .minimum_reduced_cost,
+            0.
+        );
+        assert!(!parent.enumerate(10.).unwrap().is_empty());
+        let mut child = parent.fork_for_node();
+        let apart = ArcSetConstraint {
+            first: vec![first],
+            second: vec![last],
+            together: false,
+        };
+        child.set_arc_set_branches(vec![apart.clone()]).unwrap();
+        assert!(child.enumeration.is_none());
+        assert_eq!(
+            child
+                .price_phase(0, 150, false)
+                .unwrap()
+                .minimum_reduced_cost,
+            1.
+        );
+        let paths = child.enumerate(10.).unwrap();
+        assert_eq!(paths.len(), 1);
+        assert_eq!(paths[0].arcs, vec![alternative, last]);
+        assert!(parent.enumeration.is_some());
+        let mut sibling = child.fork_for_node();
+        sibling
+            .set_arc_set_branches(vec![ArcSetConstraint {
+                together: true,
+                ..apart
+            }])
+            .unwrap();
+        assert_eq!(
+            sibling
+                .price_phase(0, 150, false)
+                .unwrap()
+                .minimum_reduced_cost,
+            0.
+        );
+        let bad = ArcSetConstraint {
+            first: vec![999],
+            second: vec![last],
+            together: false,
+        };
+        assert!(child.set_arc_set_branches(vec![bad]).is_err());
+        assert!(child.enumeration.is_some());
+        assert_eq!(
+            child
+                .price_phase(0, 150, false)
+                .unwrap()
+                .minimum_reduced_cost,
+            1.
+        );
+        child.set_arc_set_branches(vec![]).unwrap();
+        assert_eq!(
+            child
+                .price_phase(0, 150, false)
+                .unwrap()
+                .minimum_reduced_cost,
+            0.
+        );
+    }
+}
+
 #[cfg(feature = "clp")]
 fn triangle_problem() -> baldes::master::model::Problem<2> {
     use baldes::inputs::{Instance, Rounding};
@@ -524,4 +601,187 @@ fn resource_boundary_belongs_to_both_sides_and_empty_intersections_forbid_only_t
                 .any(|r| r.arcs.first() == Some(&arc)));
         }
     }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn ryan_foster_equal_trial_scores_advance_like_native() {
+    use baldes::cuts::separation::{ArcData, GraphData, Parameters, VertexData};
+    use baldes::master::model::{
+        format::Model, BranchingRegistration, MappedEvaluationKind, RankOneIncidenceConfig,
+        RyanFosterBranching,
+    };
+    use baldes::master::tree::{
+        self, ModelTreeOptions, NetworkBranchingPolicy, StrongBranchingOptions,
+    };
+    let capture: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/ryan_foster_strong_root_native.json"
+    ))
+    .unwrap();
+    let case: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/cuts/ryan_foster_candidate_model_native.json"
+    ))
+    .unwrap();
+    assert_eq!(capture["exit_code"], 0);
+    let native = capture["hits"].as_array().unwrap();
+    assert_eq!(native[0]["score"], native[2]["score"]);
+    let mut problem = Model::from_json(&case["model"].to_string())
+        .unwrap()
+        .problem::<2>()
+        .unwrap();
+    let mut graphs = vec![];
+    for network in &mut problem.networks {
+        let graph = &mut network.graph;
+        graph.elementary = true;
+        let membership: Vec<Vec<usize>> = (0..10)
+            .map(|v| {
+                if v == 1 {
+                    vec![1]
+                } else if (3..=8).contains(&v) {
+                    vec![v - 1]
+                } else {
+                    vec![]
+                }
+            })
+            .collect();
+        graph
+            .configure_ng(8, membership, vec![(0..8).collect(); 10])
+            .unwrap();
+        for arc in &mut graph.arcs {
+            arc.elements = if arc.head == 1 && arc.tail != 4 && arc.tail != 5 {
+                vec![0]
+            } else {
+                vec![]
+            };
+            arc.memory = (0..8).collect();
+        }
+        let vertices = (0..10)
+            .map(|id| {
+                let sets = if id == 1 {
+                    vec![1]
+                } else if (3..=8).contains(&id) {
+                    vec![id - 1]
+                } else {
+                    vec![]
+                };
+                VertexData {
+                    id,
+                    elem_sets: sets.clone(),
+                    packing_sets: sets.clone(),
+                    covering_sets: sets,
+                }
+            })
+            .collect();
+        let arcs = graph
+            .arcs
+            .iter()
+            .map(|arc| {
+                let sets = if arc.head == 1 && arc.tail != 4 && arc.tail != 5 {
+                    vec![0]
+                } else {
+                    vec![]
+                };
+                ArcData {
+                    id: arc.id,
+                    tail: arc.tail as i32,
+                    head: arc.head as i32,
+                    elem_sets: sets.clone(),
+                    packing_sets: sets.clone(),
+                    covering_sets: sets,
+                }
+            })
+            .collect();
+        graphs.push(GraphData {
+            id: network.id,
+            source: 0,
+            sink: 9,
+            elem_set_count: 8,
+            packing_set_count: 8,
+            covering_set_count: 8,
+            vertices,
+            arcs,
+            ..Default::default()
+        });
+    }
+    let mut options = ModelTreeOptions::default();
+    options.node.cg.stabilize = false;
+    options.node.preprocessing.enabled = false;
+    options.node.separation.rank_one_incidence = Some(RankOneIncidenceConfig {
+        rows: (0..8).collect(),
+        graphs,
+        parameters: Parameters {
+            max_num_rows: 5,
+            max_num_per_round: 1,
+            memory_type: 1,
+            arc_memory_type: 2,
+            ls_num_iterations: 0,
+            violation_tolerance: 1_000_000.,
+            ..Default::default()
+        },
+    });
+    options.node_limit = 50;
+    options
+        .branching_registry
+        .register(BranchingRegistration::Policy(
+            NetworkBranchingPolicy::Phased,
+        ))
+        .unwrap();
+    options
+        .branching_registry
+        .register(BranchingRegistration::RyanFoster(RyanFosterBranching::new(
+            100.,
+        )))
+        .unwrap();
+    options
+        .branching_registry
+        .register(BranchingRegistration::StrongBranching(Some(
+            StrongBranchingOptions::default(),
+        )))
+        .unwrap();
+    let root = baldes::master::model::solve(problem.clone(), options.node.clone()).unwrap();
+    assert_eq!(root.cuts, 0);
+    assert!((root.master.lp - 3.7).abs() < 1e-8);
+    let result = tree::solve(problem, options).unwrap();
+    for expected in &native[..5] {
+        let name = expected["name"].as_str().unwrap();
+        let mut actual: Vec<_> = result
+            .mapped_branch_evaluations
+            .iter()
+            .filter(|e| {
+                e.depth == 0
+                    && e.stage == 1
+                    && e.kind == MappedEvaluationKind::RestrictedMaster
+                    && e.name == name
+            })
+            .map(|e| e.estimate)
+            .collect();
+        let mut bounds: Vec<_> = expected["bounds"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_f64().unwrap())
+            .collect();
+        actual.sort_by(f64::total_cmp);
+        bounds.sort_by(f64::total_cmp);
+        assert_eq!(actual.len(), 2, "{name}");
+        assert!(
+            actual.iter().zip(bounds).all(|(a, b)| (a - b).abs() < 1e-8),
+            "{name}: {actual:?}"
+        );
+    }
+    let mut next = vec![];
+    for evaluation in &result.mapped_branch_evaluations {
+        if evaluation.depth == 0
+            && evaluation.stage == 2
+            && evaluation.kind == MappedEvaluationKind::HeuristicPricing
+            && !next.contains(&evaluation.name)
+        {
+            next.push(evaluation.name.clone());
+        }
+    }
+    let expected: Vec<_> = native[5..8]
+        .iter()
+        .map(|h| h["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(next, expected);
 }

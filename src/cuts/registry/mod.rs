@@ -271,6 +271,8 @@ pub struct CutRegistry {
     pub parameters: SeparationParameters,
     pub separation_phase: i32,
     pub covering_sets_present: bool,
+    /// Retained covering-search stream for successive separation rounds.
+    covering_search_rng: crate::rng::GnuRand,
     /// Cached endpoint lookup and the exact arc identity it describes.
     ends: std::cell::RefCell<(
         usize,
@@ -335,6 +337,9 @@ pub fn coefficient(
     if route.is_empty() {
         return Ok(0);
     }
+    if input.denominator <= 0 {
+        return Err(invalid("cut denominator must be positive"));
+    }
     // The usual rank-one packing row needs only dense vertex weights and
     // vertex memory. Keep the general arc/support policies out of its loop.
     if !input.visit_once
@@ -367,8 +372,8 @@ pub fn coefficient(
             if weight != 0 {
                 state += weight;
                 if input.denominator <= state {
-                    count += 1;
-                    state -= input.denominator;
+                    count += state / input.denominator;
+                    state %= input.denominator;
                 }
             }
         }
@@ -472,12 +477,13 @@ pub fn coefficient(
             state += increment;
             if packing_like {
                 if denominator <= state {
-                    count += 1;
-                    state -= denominator;
+                    count += state / denominator;
+                    state %= denominator;
                 }
             } else if state < 0 {
-                count += 1;
-                state -= denominator;
+                let crossings = (state + 1) / denominator + 1;
+                count += crossings;
+                state -= crossings * denominator;
             }
         };
         let w = input.weight_for_graph(graph, head);
@@ -512,6 +518,7 @@ impl Default for CutRegistry {
             parameters: SeparationParameters::default(),
             separation_phase: 1,
             covering_sets_present: false,
+            covering_search_rng: Default::default(),
             ends: Default::default(),
         }
     }

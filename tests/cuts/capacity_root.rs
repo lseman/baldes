@@ -6,6 +6,59 @@ use baldes::master::{
 };
 
 #[test]
+fn cleanup_keeps_lowest_slack_basic_cut_when_none_are_protected() {
+    use baldes::master::{clp::ClpMaster, RowSense};
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::Equal, 1., &[]).unwrap();
+    master.add_row(RowSense::LessEqual, 1.5, &[]).unwrap();
+    master.add_row(RowSense::LessEqual, 1.25, &[]).unwrap();
+    master.add_row(RowSense::LessEqual, 1., &[]).unwrap();
+    master.add_row(RowSense::LessEqual, 1., &[]).unwrap();
+    master
+        .add_column(1., &[(0, 1.), (1, 1.), (2, 1.), (3, 1.), (4, 1.)])
+        .unwrap();
+    assert!(master.solve());
+    for row in 1..5 {
+        assert!(master.row_is_basic(row).unwrap());
+    }
+    assert_eq!(master.cleanup_cut_rows(1).unwrap(), vec![1, 2, 4]);
+}
+
+#[test]
+fn cleanup_considers_nonbasic_lower_bound_cut_rows() {
+    use baldes::master::{clp::ClpMaster, LpMaster, RowSense};
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::GreaterEqual, 0., &[]).unwrap();
+    master.add_row(RowSense::GreaterEqual, 1., &[]).unwrap();
+    master.add_row(RowSense::GreaterEqual, 1., &[]).unwrap();
+    master.add_column(1., &[(0, 1.), (1, 1.), (2, 1.)]).unwrap();
+    assert!(master.solve());
+    let nonbasic = (1..3)
+        .find(|&row| !master.row_is_basic(row).unwrap())
+        .expect("one duplicate binding cut must be nonbasic");
+    assert!(master.row_cleanup_candidate(nonbasic).unwrap());
+    assert_eq!(master.cleanup_cut_rows(1).unwrap(), vec![2]);
+}
+
+#[test]
+fn cleanup_protects_nonbasic_upper_bound_cut_rows() {
+    use baldes::master::{clp::ClpMaster, LpMaster, RowSense};
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::GreaterEqual, 0., &[]).unwrap();
+    master.add_row(RowSense::LessEqual, 1., &[]).unwrap();
+    master.add_row(RowSense::LessEqual, 1., &[]).unwrap();
+    master
+        .add_column(-1., &[(0, 1.), (1, 1.), (2, 1.)])
+        .unwrap();
+    assert!(master.solve());
+    let nonbasic = (1..3)
+        .find(|&row| !master.row_is_basic(row).unwrap())
+        .expect("one duplicate binding cut must be nonbasic");
+    assert!(!master.row_cleanup_candidate(nonbasic).unwrap());
+    assert!(!master.cleanup_cut_rows(1).unwrap().contains(&nonbasic));
+}
+
+#[test]
 fn cleanup_retains_basic_capacity_rows_with_negative_normalized_slack() {
     use baldes::master::{clp::ClpMaster, RowSense};
     let mut master = ClpMaster::new().unwrap();

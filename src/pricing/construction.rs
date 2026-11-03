@@ -17,6 +17,7 @@ impl<const D: usize> Solver<D> {
             graph: Graph::new(vertices, resources)?,
             forbidden_arcs: vec![],
             ryan_foster: vec![],
+            arc_set_branches: vec![],
             controls: Controls::default(),
             options: Options::default(),
             phases: phases::initialize(0, &[])?,
@@ -81,6 +82,7 @@ impl<const D: usize> Solver<D> {
             graph: self.graph.clone(),
             forbidden_arcs: self.forbidden_arcs.clone(),
             ryan_foster: self.ryan_foster.clone(),
+            arc_set_branches: self.arc_set_branches.clone(),
             controls: self.controls.clone(),
             options: self.options.clone(),
             phases: self.phases.clone(),
@@ -101,7 +103,8 @@ impl<const D: usize> Solver<D> {
                 None
             },
             enumeration_preserve_arc_paths: self.enumeration_preserve_arc_paths
-                || !self.ryan_foster.is_empty(),
+                || !self.ryan_foster.is_empty()
+                || !self.arc_set_branches.is_empty(),
             cutoff: self.cutoff,
             prepared: if keep_cost_state {
                 self.prepared.clone()

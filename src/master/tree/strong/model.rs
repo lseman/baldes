@@ -61,6 +61,7 @@ pub(super) struct BranchHistoryOrigin {
 #[derive(Default)]
 pub(super) struct History {
     pub column_pool: column_pool::Pool,
+    pub incidence_history: Option<crate::cuts::IncidenceCutSeparator>,
     pub evaluations: Vec<MappedBranchEvaluation>,
     pub trials: usize,
     /// Native processed-node work excludes restricted/heuristic screens.
@@ -285,6 +286,9 @@ pub(super) enum Restriction {
     RyanFoster {
         members: Vec<super::RyanFosterMember>,
     },
+    ArcSetRyanFoster {
+        members: Vec<super::ryan_foster::ArcSetMember>,
+    },
 }
 
 pub(super) struct Proposal {
@@ -454,6 +458,10 @@ impl Proposal {
                 .into_iter()
                 .map(|together| node.with_ryan_foster(members, together))
                 .collect(),
+            Restriction::ArcSetRyanFoster { members } => [false, true]
+                .into_iter()
+                .map(|together| node.with_arc_set_branch(members, together))
+                .collect(),
         }?;
         component::inherit_branch_rows(node, &mut children);
         Ok(children)
@@ -463,7 +471,9 @@ impl Proposal {
     fn unsupported_resource(&self) -> bool {
         matches!(
             self.restriction,
-            Restriction::Resource(_) | Restriction::RyanFoster { .. }
+            Restriction::Resource(_)
+                | Restriction::RyanFoster { .. }
+                | Restriction::ArcSetRyanFoster { .. }
         )
     }
 }
@@ -569,6 +579,7 @@ fn family_direction(
         proposal.restriction,
         Restriction::Aggregate { .. }
             | Restriction::RyanFoster { .. }
+            | Restriction::ArcSetRyanFoster { .. }
             | Restriction::PathCount { .. }
     )
     .then_some(NetworkBranchDirection::UpperFirst)
@@ -1246,6 +1257,9 @@ pub(super) fn choose_proposals<const D: usize>(
     deadline: Instant,
     mut proposals: Vec<Proposal>,
 ) -> Result<Option<Selection<D>>> {
+    if options.threads == 1 && history.incidence_history.is_none() {
+        history.incidence_history = output.snapshot.incidence_separator_history();
+    }
     let declaration = super::family_registration::registration_order(options)?;
     let resolved_families = if let Some(config) = &options.branching_registry().strong_branching {
         let mut scope_budget = fresh_budget(output, config, history);
@@ -1723,8 +1737,20 @@ pub(super) fn choose_proposals<const D: usize>(
                         .checked_add(remaining)
                         .unwrap_or(end)
                         .min(end);
+                    if options.threads == 1 {
+                        if let Some(incidence) = &history.incidence_history {
+                            child.set_incidence_separator_history(incidence);
+                        }
+                    }
                     match child.solve_forked(node) {
                         Ok(result) => {
+                            if options.threads == 1 {
+                                if let Some(incidence) =
+                                    result.snapshot.incidence_separator_history()
+                                {
+                                    history.incidence_history = Some(incidence);
+                                }
+                            }
                             if options.share_inactive_columns {
                                 history.column_pool.absorb(&result.snapshot);
                             }

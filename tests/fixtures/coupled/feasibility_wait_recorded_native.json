@@ -1,0 +1,2260 @@
+{
+  "controlled_record": {
+    "branch": "entry",
+    "forward_count": 3,
+    "backward_count": 1,
+    "return": 1,
+    "waiting": [
+      1.0,
+      1.0,
+      0.0
+    ],
+    "coordinates": [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        3.0,
+        1.0
+      ],
+      [
+        4.0,
+        2.0
+      ]
+    ],
+    "resources": [
+      0.0,
+      2.0
+    ],
+    "arcs": [
+      1,
+      2
+    ]
+  },
+  "unmodified_exit": 1,
+  "recorder_join": {
+    "mode": 4,
+    "caller": "bool bcp_rcsp::recordBestSolution<12ul>(bool, bcp_rcsp::ResourceType<bcp_rcsp::BaseDepResourcePair<12ul> > const&, bcp_rcsp::PathStates<bcp_rcsp::BaseDepResourcePair<12ul> > const&, int, bcp_rcsp::Solution&)",
+    "caller_return_elf": "0x725064",
+    "before": [
+      -1000000000000.0,
+      1000000000000.0
+    ],
+    "returned": true,
+    "after": [
+      4.0,
+      1000000000000.0
+    ]
+  },
+  "synthetic_suffix_records": [
+    {
+      "split": 0,
+      "base": [
+        0,
+        3,
+        4
+      ],
+      "dependent": [
+        0,
+        2.5,
+        3.5
+      ],
+      "waiting": [
+        0,
+        2,
+        0
+      ]
+    },
+    {
+      "split": 1,
+      "base": [
+        1,
+        3,
+        4
+      ],
+      "dependent": [
+        0,
+        1,
+        2
+      ],
+      "waiting": [
+        1,
+        1,
+        0
+      ]
+    }
+  ],
+  "synthetic_matrix": [
+    {
+      "rates": [
+        0.25,
+        0.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.5,
+            2.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.0,
+            2.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          0.25,
+          0.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        0.25,
+        0.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.5,
+            2.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.0,
+            2.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          0.25,
+          0.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        0.25,
+        1.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.5,
+            2.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.0,
+            2.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          0.25,
+          1.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        0.25,
+        1.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.5,
+            2.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.0,
+            2.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          0.25,
+          1.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        0.25,
+        2.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.5,
+            2.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.0,
+            2.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          0.25,
+          2.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        0.25,
+        2.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.5,
+            2.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.0,
+            2.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          0.25,
+          2.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        0.75,
+        0.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.5,
+            3.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.0,
+            2.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          0.75,
+          0.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        0.75,
+        0.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.5,
+            3.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.0,
+            2.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          0.75,
+          0.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        0.75,
+        1.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.5,
+            3.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.0,
+            2.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          0.75,
+          1.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        0.75,
+        1.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.5,
+            3.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.0,
+            2.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          0.75,
+          1.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        0.75,
+        2.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.5,
+            3.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.0,
+            2.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          0.75,
+          2.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        0.75,
+        2.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.5,
+            3.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            1.0,
+            2.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          0.75,
+          2.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        1.25,
+        0.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.5,
+            4.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.0,
+            3.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          1.25,
+          0.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        1.25,
+        0.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.5,
+            4.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.0,
+            3.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          1.25,
+          0.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        1.25,
+        1.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.5,
+            4.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.0,
+            3.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          1.25,
+          1.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        1.25,
+        1.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.5,
+            4.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.0,
+            3.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          1.25,
+          1.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        1.25,
+        2.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.5,
+            4.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.0,
+            3.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          1.25,
+          2.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        1.25,
+        2.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.5,
+            4.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.0,
+            3.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          1.25,
+          2.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        1.75,
+        0.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            4.5,
+            5.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.0,
+            3.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          1.75,
+          0.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        1.75,
+        0.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            4.5,
+            5.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.0,
+            3.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          1.75,
+          0.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        1.75,
+        1.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            4.5,
+            5.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.0,
+            3.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          1.75,
+          1.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        1.75,
+        1.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            4.5,
+            5.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.0,
+            3.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          1.75,
+          1.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        1.75,
+        2.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            4.5,
+            5.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.0,
+            3.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          1.75,
+          2.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        1.75,
+        2.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            4.5,
+            5.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            2.0,
+            3.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          1.75,
+          2.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        2.25,
+        0.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            5.5,
+            6.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          2.25,
+          0.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        2.25,
+        0.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            5.5,
+            6.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          2.25,
+          0.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        2.25,
+        1.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            5.5,
+            6.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          2.25,
+          1.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        2.25,
+        1.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            5.5,
+            6.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          2.25,
+          1.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        2.25,
+        2.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            5.5,
+            6.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          2.25,
+          2.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        2.25,
+        2.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            5.5,
+            6.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          2.25,
+          2.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        2.75,
+        0.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            6.5,
+            7.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          2.75,
+          0.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        2.75,
+        0.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            6.5,
+            7.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          2.75,
+          0.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        2.75,
+        1.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            6.5,
+            7.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          2.75,
+          1.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        2.75,
+        1.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            6.5,
+            7.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          2.75,
+          1.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        2.75,
+        2.25
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            6.5,
+            7.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          2.75,
+          2.25
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    },
+    {
+      "rates": [
+        2.75,
+        2.75
+      ],
+      "records": [
+        {
+          "split": 0,
+          "base": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            6.5,
+            7.5
+          ],
+          "waiting": [
+            0.0,
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "split": 1,
+          "base": [
+            1.0,
+            3.0,
+            4.0
+          ],
+          "dependent": [
+            0.0,
+            3.0,
+            4.0
+          ],
+          "waiting": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "diagnostic": {
+        "rates": [
+          2.75,
+          2.75
+        ],
+        "1": {
+          "exit": 1,
+          "records": 2,
+          "sentinel": true
+        },
+        "2": {
+          "exit": 1,
+          "records": 0,
+          "sentinel": true
+        }
+      }
+    }
+  ],
+  "diagnostic": {
+    "1": {
+      "exit": 1,
+      "completed_splits": 2
+    },
+    "2": {
+      "exit": 1,
+      "completed_splits": 0
+    }
+  }
+}

@@ -484,3 +484,66 @@ fn synchronized_walk_service_counts_distinct_copies_instead_of_repeated_visits()
         .filter(|(_, value)| **value > 0.)
         .all(|(route, _)| route.route.nodes.iter().filter(|&&v| v == 1).count() == 1));
 }
+
+#[test]
+fn bounded_walks_reject_explicit_incidence_without_hard_elementarity() {
+    use crate::cuts::separation::{ArcData, GraphData, Parameters, VertexData};
+    let mut problem = problem(5, false);
+    let network = &mut problem.networks[0];
+    network.route_entries.clear();
+    network.arc_entries[0].push((0, 1.));
+    let graph = GraphData {
+        id: 7,
+        source: 0,
+        sink: 3,
+        elem_set_count: 1,
+        packing_set_count: 1,
+        covering_set_count: 1,
+        vertices: (0..4)
+            .map(|id| VertexData {
+                id,
+                ..Default::default()
+            })
+            .collect(),
+        arcs: network
+            .graph
+            .arcs
+            .iter()
+            .enumerate()
+            .map(|(index, arc)| ArcData {
+                id: arc.id,
+                tail: arc.tail as i32,
+                head: arc.head as i32,
+                elem_sets: if index == 0 { vec![0] } else { vec![] },
+                packing_sets: if index == 0 { vec![0] } else { vec![] },
+                covering_sets: if index == 0 { vec![0] } else { vec![] },
+                ..Default::default()
+            })
+            .collect(),
+        ..Default::default()
+    };
+    let parameters = Parameters {
+        max_num_rows: 3,
+        max_num_per_round: 1,
+        memory_type: 2,
+        ..Default::default()
+    };
+    crate::cuts::IncidenceCutSeparator::new(parameters.clone(), &[&graph]).unwrap();
+    let mut options = options(cg::BoundMode::Numerical);
+    options.separation.rank_one_incidence = Some(crate::master::model::RankOneIncidenceConfig {
+        rows: vec![0],
+        graphs: vec![graph],
+        parameters,
+    });
+    let mut simple = problem.clone();
+    simple.networks[0]
+        .graph
+        .set_route_domain(RouteDomain::PhysicalSimple)
+        .unwrap();
+    simple.networks[0].graph.elementary = true;
+    assert!(super::solve(simple, options.clone()).is_ok());
+    let error = super::solve(problem, options).err().unwrap();
+    assert!(error
+        .message
+        .contains("bounded-walk separators require hard elementarity"));
+}
