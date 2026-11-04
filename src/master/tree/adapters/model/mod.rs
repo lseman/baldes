@@ -258,6 +258,8 @@ impl Default for ModelTreeOptions {
 pub struct ModelTreeOutput {
     pub status: TreeStatus,
     pub bound_mode: cg::BoundMode,
+    /// Selected-channel lower bound, including proofs of gap-closed nodes.
+    /// `Optimal` within the requested gap does not imply equality to the incumbent.
     pub bound: f64,
     pub incumbent: f64,
     /// Integer route quantities, retaining their network identities.
@@ -1041,6 +1043,7 @@ fn solve_split<const D: usize>(
         options.strategy2_bound_rounding,
     );
     let mut unresolved = None;
+    let mut closed_bound = f64::INFINITY;
     let mut mapped_history = model_strong::History::default();
     mapped_history.incidence_history = root.snapshot.incidence_separator_history();
     let mut selected_nodes = 0;
@@ -1056,6 +1059,7 @@ fn solve_split<const D: usize>(
             mapped_history: &mut mapped_history,
             selected_nodes: &mut selected_nodes,
             unresolved: &mut unresolved,
+            closed_bound: &mut closed_bound,
             workers: workers.as_ref(),
             local_search_rng: crate::rng::GnuRand::new(
                 options
@@ -1095,6 +1099,9 @@ fn solve_split<const D: usize>(
         let keep =
             !node.proven_infeasible() && !options.closes(node.node.tree_bound(), result.incumbent);
         if !keep {
+            if !node.proven_infeasible() {
+                closed_bound = closed_bound.min(node.node.tree_bound());
+            }
             if let Some(history) = &mut subtree_history {
                 history.close(node.node.state.mapped_lineage);
             }
@@ -1106,6 +1113,7 @@ fn solve_split<const D: usize>(
         .iter()
         .map(|node| node.node.tree_bound())
         .chain(unresolved)
+        .chain(std::iter::once(closed_bound))
         .fold(result.incumbent, f64::min);
     if result.open_nodes == 0 {
         result.status = if result.incumbent.is_finite() {

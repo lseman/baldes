@@ -126,6 +126,57 @@ fn session() -> MultiImport<2> {
 }
 
 #[test]
+fn tolerance_closed_import_bounds_survive_finalization_and_immutable_resume() {
+    let session = session()
+        .collect(&ImportOptions::default(), |_, _| {
+            Ok(ColumnBatch {
+                columns: vec![],
+                complete: true,
+            })
+        })
+        .unwrap()
+        .session;
+    for mode in [cg::BoundMode::Numerical, cg::BoundMode::Certified] {
+        let mut initial = session.begin_tree();
+        initial.retain_solution(
+            1.,
+            vec![],
+            Values {
+                original: vec![(0, 1.)],
+                columns: [7, 42]
+                    .into_iter()
+                    .map(|subproblem| crate::master::model::imported::ColumnValue {
+                        subproblem,
+                        column: 0,
+                        value: 1.,
+                    })
+                    .collect(),
+            },
+        );
+        let proof = 1. - 5e-7;
+        initial.pending[0].bound = proof;
+        initial.bound_mode = Some(mode);
+        let mut oracle = Oracle::default();
+        let first = initial
+            .run_with_oracle(&options(mode), &ImportOptions::default(), &mut oracle)
+            .unwrap();
+        assert_eq!(first.status, TreeStatus::Optimal);
+        assert_eq!(first.open_nodes, 0);
+        assert_eq!(first.bound, proof);
+        assert_eq!(first.incumbent, 1.);
+        assert!(oracle.trace.is_empty());
+        let resumed = first
+            .tree
+            .run_with_oracle(&options(mode), &ImportOptions::default(), &mut oracle)
+            .unwrap();
+        assert_eq!(resumed.bound, proof);
+        assert_eq!(resumed.open_nodes, 0);
+        assert_eq!(initial.pending.len(), 1);
+        assert_eq!(initial.closed_bound, f64::INFINITY);
+    }
+}
+
+#[test]
 fn imported_oracle_records_before_branching_and_restores_independent_siblings_and_resumes() {
     let initial = session().begin_tree();
     let mut oracle = Oracle::default();

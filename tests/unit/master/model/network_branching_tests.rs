@@ -152,6 +152,7 @@ fn sequential_tree_evaluation_carries_incidence_history_to_siblings() {
     mapped_history.incidence_history = Some(history);
     let mut selected_nodes = 0;
     let mut unresolved = None;
+    let mut closed_bound = f64::INFINITY;
     let mut search = super::super::adapter::NetworkSearch {
         options: &options,
         result: &mut result,
@@ -162,6 +163,7 @@ fn sequential_tree_evaluation_carries_incidence_history_to_siblings() {
         mapped_history: &mut mapped_history,
         selected_nodes: &mut selected_nodes,
         unresolved: &mut unresolved,
+        closed_bound: &mut closed_bound,
         workers: None,
         local_search_rng: crate::rng::GnuRand::new(1),
     };
@@ -391,6 +393,7 @@ fn registered_tree_pairs_network_identities_sides_ranks_and_feasible_node_bounds
         let mut mapped_history = model_strong::History::default();
         let mut selected_nodes = 0;
         let mut unresolved = None;
+        let mut closed_bound = f64::INFINITY;
         let inner = super::super::adapter::NetworkSearch {
             options: &options,
             result: &mut result,
@@ -401,6 +404,7 @@ fn registered_tree_pairs_network_identities_sides_ranks_and_feasible_node_bounds
             mapped_history: &mut mapped_history,
             selected_nodes: &mut selected_nodes,
             unresolved: &mut unresolved,
+            closed_bound: &mut closed_bound,
             workers: None,
             local_search_rng: crate::rng::GnuRand::new(1),
         };

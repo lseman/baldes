@@ -29,35 +29,31 @@ impl<const D: usize> NodeSnapshot<D> {
                 coefficients,
             );
         }
-        // Validate coefficients even for an unrestricted activity, using a
-        // discarded child rather than allowing malformed definitions through.
-        if !bounds.lower.is_finite() && !bounds.upper.is_finite() {
-            self.with_row(
-                Row {
-                    sense: RowSense::LessEqual,
-                    rhs: 0.,
-                },
-                coefficients,
-            )?;
-            return self.fork();
-        }
+        // An unrestricted activity still validates its declared expression.
+        self.validate_row_coefficients(coefficients)?;
         let mut node = self.fork()?;
         if bounds.lower.is_finite() {
-            node = node.with_row(
+            node = node.with_row_class_owned(
                 Row {
                     sense: RowSense::GreaterEqual,
                     rhs: bounds.lower,
                 },
                 coefficients,
+                cg::CurvatureRowClass::Ordinary,
+                None,
+                &[],
             )?;
         }
         if bounds.upper.is_finite() {
-            node = node.with_row(
+            node = node.with_row_class_owned(
                 Row {
                     sense: RowSense::LessEqual,
                     rhs: bounds.upper,
                 },
                 coefficients,
+                cg::CurvatureRowClass::Ordinary,
+                None,
+                &[],
             )?;
         }
         Ok(node)

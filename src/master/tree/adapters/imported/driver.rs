@@ -87,7 +87,13 @@ where
     }
     fn prune(&mut self, frontier: &mut TreeFrontier<Self::Node, Self::Output>) {
         let cutoff = self.tree.incumbent() - self.options.tolerance;
-        frontier.retain(|node| node.bound < cutoff);
+        frontier.retain(|node| {
+            let keep = node.bound < cutoff;
+            if !keep {
+                self.tree.closed_bound = self.tree.closed_bound.min(node.bound);
+            }
+            keep
+        });
     }
     fn admit(&mut self, _entry: &mut QueuedNode<Self::Node, Self::Output>) -> bool {
         self.nodes += 1;
@@ -167,7 +173,11 @@ where
                         );
                     }
                     match result.status {
-                        TreeStatus::Optimal | TreeStatus::Infeasible => break,
+                        TreeStatus::Optimal => {
+                            tree.closed_bound = tree.closed_bound.min(result.bound);
+                            break;
+                        }
+                        TreeStatus::Infeasible => break,
                         other => {
                             pending.bound = pending.bound.max(result.bound);
 
@@ -235,6 +245,7 @@ where
                         );
                     }
                     if pending.bound >= tree.incumbent() - options.tolerance {
+                        tree.closed_bound = tree.closed_bound.min(pending.bound);
                         break;
                     }
                     if let Some(children) =
@@ -286,6 +297,7 @@ where
                     }
                 }
                 if pending.bound >= tree.incumbent() - options.tolerance {
+                    tree.closed_bound = tree.closed_bound.min(pending.bound);
                     break;
                 }
                 if let Some(status) = collected.status {
@@ -360,7 +372,6 @@ where
             self.status = Some(status);
             Ok(Decision::Stop {
                 reason: Stop::Requested,
-                restore_ready: false,
             })
         } else {
             Ok(Decision::Continue)
@@ -430,8 +441,13 @@ where
         .map(|entry| entry.node)
         .collect();
     let incumbent = tree.incumbent();
-    tree.pending
-        .retain(|n| n.bound < incumbent - options.tolerance);
+    tree.pending.retain(|node| {
+        let keep = node.bound < incumbent - options.tolerance;
+        if !keep {
+            tree.closed_bound = tree.closed_bound.min(node.bound);
+        }
+        keep
+    });
     let status = if tree.pending.is_empty() {
         if incumbent.is_finite() {
             TreeStatus::Optimal
@@ -445,7 +461,7 @@ where
         .pending
         .iter()
         .map(|n| n.bound)
-        .fold(incumbent, f64::min);
+        .fold(incumbent.min(tree.closed_bound), f64::min);
     Ok(ImportTreeProgress {
         open_nodes: tree.pending.len(),
         bound_mode: options.node.cg.bound_mode,

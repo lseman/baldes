@@ -26,6 +26,24 @@ impl<const D: usize> NodeSnapshot<D> {
 }
 
 impl<const D: usize> SnapshotTransfer<D> {
+    fn fork(node: &NodeSnapshot<D>) -> Result<Self> {
+        // Export from the borrowed master directly. Constructing a native LP
+        // clone just to export and destroy it would duplicate the whole matrix.
+        let mut master = node.master.export_for_worker()?;
+        master.reset_iterations();
+        let mut warm = node.warm.clone();
+        let mut state = node.state.fork_state();
+        NodeSnapshot::reset_fork_state(&mut warm, &mut state);
+        for oracle in &mut state.oracles {
+            oracle.solver.detach_step_versions();
+        }
+        Ok(Self {
+            master,
+            warm,
+            state,
+        })
+    }
+
     fn restore(self) -> Result<NodeSnapshot<D>> {
         Ok(NodeSnapshot {
             master: self.master.restore()?,
@@ -98,17 +116,22 @@ pub(super) fn evaluate<const D: usize>(
     workers: &rayon::ThreadPool,
     nodes: &[&NodeSnapshot<D>],
     options: &Options,
+    deadline: Instant,
 ) -> Result<Vec<Result<Output<D>>>> {
+    let deadline = Instant::now()
+        .checked_add(options.cg.time_limit)
+        .ok_or_else(|| invalid("parallel node time limit"))?
+        .min(deadline);
     let jobs = nodes
         .iter()
-        .map(|node| node.fork()?.into_transfer())
+        .map(|node| SnapshotTransfer::fork(node))
         .collect::<Result<Vec<_>>>()?;
     let results: Vec<Result<OutputTransfer<D>>> = workers.install(|| {
         jobs.into_par_iter()
             .map(|job| {
                 let mut node = job.restore()?;
                 node.prepare_evaluation()?;
-                node.solve_forked(options.clone())
+                node.solve_forked_until(options.clone(), deadline)
                     .and_then(Output::into_transfer)
             })
             .collect()

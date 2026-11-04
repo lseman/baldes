@@ -50,6 +50,7 @@ fn transferred_snapshots_resolve_to_the_same_lp() {
         &workers,
         &[&output.snapshot, &output.snapshot],
         &Options::default(),
+        Instant::now() + Duration::from_secs(10),
     )
     .unwrap();
     for result in results {
@@ -58,4 +59,60 @@ fn transferred_snapshots_resolve_to_the_same_lp() {
         // The restored output is usable by the coordinator.
         resolved.snapshot.fork().unwrap();
     }
+}
+
+#[test]
+fn expired_parallel_deadline_does_not_start_node_lp_solves() {
+    let workers = workers(2).unwrap().unwrap();
+    for backend in [
+        crate::master::clp::MasterSolver::Clp,
+        crate::master::clp::MasterSolver::Ipm,
+    ] {
+        let mut options = Options::default();
+        options.master_solver = backend;
+        let output = crate::master::model::solve(rc101(3), options.clone()).unwrap();
+        let results = evaluate(
+            &workers,
+            &[&output.snapshot, &output.snapshot, &output.snapshot],
+            &options,
+            Instant::now(),
+        )
+        .unwrap();
+        assert_eq!(results.len(), 3);
+        for result in results {
+            let stopped = result.unwrap();
+            assert_eq!(stopped.master.status, cg::Status::TimeLimit);
+            assert_eq!(stopped.master.iterations, 0);
+            assert_eq!(stopped.snapshot.master_simplex_iterations(), 0);
+            assert_eq!(stopped.snapshot.master_ipm_iterations(), 0);
+            assert_eq!(
+                stopped.snapshot.master.values,
+                output.snapshot.master.values
+            );
+        }
+        assert!(output.snapshot.master.solved);
+    }
+}
+
+#[test]
+fn worker_forks_clear_incumbent_fixing_authority_without_mutating_the_parent() {
+    let mut output = crate::master::model::solve(rc101(3), Options::default()).unwrap();
+    let parent = &mut output.snapshot;
+    parent.state.tree_incumbent = 123.;
+    parent.state.objective_fixed = true;
+    parent.state.gap_pool_cutoff = Some(123.);
+    parent.state.tree_bound_floor = 1.;
+    for _ in 0..2 {
+        let fork = SnapshotTransfer::fork(parent).unwrap().restore().unwrap();
+        assert_eq!(fork.state.tree_incumbent, f64::INFINITY);
+        assert!(!fork.state.objective_fixed);
+        assert_eq!(fork.state.gap_pool_cutoff, None);
+        assert_eq!(fork.state.tree_bound_floor, 1.);
+        assert_eq!(fork.warm.bound, f64::NEG_INFINITY);
+        assert_eq!(fork.warm.numerical_bound, f64::NEG_INFINITY);
+        assert_eq!(fork.warm.certified_bound, f64::NEG_INFINITY);
+    }
+    assert_eq!(parent.state.tree_incumbent, 123.);
+    assert!(parent.state.objective_fixed);
+    assert_eq!(parent.state.gap_pool_cutoff, Some(123.));
 }

@@ -14,7 +14,7 @@ pub(crate) enum Stop {
 
 pub(crate) enum Decision {
     Continue,
-    Stop { reason: Stop, restore_ready: bool },
+    Stop { reason: Stop },
 }
 
 pub(crate) struct Limits {
@@ -106,55 +106,51 @@ pub(crate) fn run<M: Model>(
                     batch.push(entry);
                 }
             }
-            if batch.iter().all(|entry| entry.evaluated.is_none()) {
-                if !batch.is_empty() {
-                    let outputs = model.evaluate(&mut batch, frontier)?;
-                    if outputs.len() != batch.len() {
-                        return Err(invalid("tree evaluation batch dimensions"));
-                    }
-                    ready.extend(batch.into_iter().zip(outputs).map(|(entry, output)| Ready {
+            // Dispatch every fresh entry together, even when prepared results
+            // occupy other selection slots. Consume in the original order.
+            let mut slots = Vec::with_capacity(batch.len());
+            let mut fresh = Vec::with_capacity(batch.len());
+            for mut entry in batch {
+                if let Some(output) = entry.evaluated.take() {
+                    slots.push(Some(Ready {
                         entry: Some(entry),
-                        output,
-                        reused: false,
+                        output: Ok(output),
+                        reused: true,
                     }));
-                }
-            } else {
-                // Prepared entries keep their treatment rank and never incur
-                // a second evaluation. Mixed batches preserve selection order.
-                for mut entry in batch {
-                    let reused = entry.evaluated.is_some();
-                    let output = if let Some(output) = entry.evaluated.take() {
-                        Ok(output)
-                    } else {
-                        let mut outputs =
-                            model.evaluate(std::slice::from_mut(&mut entry), frontier)?;
-                        if outputs.len() != 1 {
-                            return Err(invalid("tree evaluation batch dimensions"));
-                        }
-                        outputs.pop().unwrap()
-                    };
-                    ready.push_back(Ready {
-                        entry: Some(entry),
-                        output,
-                        reused,
-                    });
+                } else {
+                    slots.push(None);
+                    fresh.push(entry);
                 }
             }
+            let outputs = if fresh.is_empty() {
+                vec![]
+            } else {
+                model.evaluate(&mut fresh, frontier)?
+            };
+            if outputs.len() != fresh.len() {
+                return Err(invalid("tree evaluation batch dimensions"));
+            }
+            let mut evaluated = fresh.into_iter().zip(outputs).map(|(entry, output)| Ready {
+                entry: Some(entry),
+                output,
+                reused: false,
+            });
+            ready.extend(slots.into_iter().map(|slot| {
+                slot.unwrap_or_else(|| evaluated.next().expect("validated fresh batch dimensions"))
+            }));
         }
         let Some(next) = ready.pop_front() else {
             continue;
         };
         match model.consume(next.entry, next.output, next.reused, frontier)? {
             Decision::Continue => {}
-            Decision::Stop {
-                reason,
-                restore_ready,
-            } => {
-                if restore_ready {
-                    for next in ready {
-                        if let Some(entry) = next.entry {
-                            frontier.push_evaluated(entry.node, entry.parent_branch_order, None)?;
-                        }
+            Decision::Stop { reason } => {
+                // Selection removes nodes from the frontier before consumption.
+                // Every unconsumed sibling remains open on any early stop,
+                // regardless of how the adapter accounts for the current node.
+                for next in ready {
+                    if let Some(entry) = next.entry {
+                        frontier.push_evaluated(entry.node, entry.parent_branch_order, None)?;
                     }
                 }
                 return Ok(reason);

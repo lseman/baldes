@@ -32,12 +32,15 @@ pub struct ImportTree<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pending: Vec<Pending<D>>,
     solution: Option<ImportTreeSolution>,
     bound_mode: Option<cg::BoundMode>,
+    /// Proofs of tolerance-closed nodes remain valid across immutable resumes.
+    closed_bound: f64,
 }
 #[derive(Debug)]
 pub struct ImportTreeProgress<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub tree: ImportTree<D>,
     pub status: TreeStatus,
     pub bound_mode: cg::BoundMode,
+    /// Selected-channel lower bound, retaining tolerance-closed node proofs on resume.
     pub bound: f64,
     pub incumbent: f64,
     pub open_nodes: usize,
@@ -62,6 +65,7 @@ impl<const D: usize> MultiImport<D> {
             }],
             solution: None,
             bound_mode: None,
+            closed_bound: f64::INFINITY,
         }
     }
 }

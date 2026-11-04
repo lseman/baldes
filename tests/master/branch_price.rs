@@ -51,7 +51,10 @@ fn customers_of(route: &baldes::master::model::FixedRoute) -> Vec<i32> {
 #[test]
 fn parallel_tree_matches_exhaustive_routes_in_both_bound_modes() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
-        for backend in [MasterSolver::Clp, MasterSolver::Ipm] {
+        for backend in [MasterSolver::Clp, MasterSolver::Ipm]
+            .into_iter()
+            .chain(cfg!(feature = "highs").then_some(MasterSolver::Highs))
+        {
             for threads in [1, 2, 4] {
                 let instance = triangle();
                 let problem = RoutingContext::set_partitioning(
@@ -151,10 +154,55 @@ fn tolerance_closed_tree_keeps_its_lower_certificate() {
     assert!(output.incumbent <= 2., "{output:?}");
     assert!(output.bound <= 1. + 1e-6, "{output:?}");
 }
+
+#[test]
+fn gap_closed_tree_does_not_publish_the_suboptimal_initial_incumbent_as_a_bound() {
+    let mut graph = baldes::Graph::<2>::new(4, 1).unwrap();
+    for vertex in 0..4 {
+        graph.set_bounds(vertex, 0, 0., 10.).unwrap();
+    }
+    for (tail, head, cost) in [(0, 1, 0.), (1, 3, 1.), (0, 2, 0.), (2, 3, 1.), (1, 2, 0.)] {
+        graph.add_arc(tail, head, cost).unwrap();
+    }
+    let problem = RoutingContext::set_partitioning(graph, 2.).unwrap();
+    let root = baldes::master::model::solve(problem.clone(), options().node).unwrap();
+    let singletons: Vec<_> = root
+        .routes
+        .iter()
+        .filter(|route| route.route.nodes.len() == 3)
+        .map(|route| baldes::master::model::FixedRoute {
+            route: route.clone(),
+            quantity: 1.,
+        })
+        .collect();
+    assert_eq!(singletons.len(), 2);
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        for threads in [1, 4] {
+            for (absolute_gap, relative_gap) in [(3., 0.), (0., 0.75)] {
+                let mut controls = options();
+                controls.node.cg.bound_mode = mode;
+                controls.threads = threads;
+                controls.absolute_gap = absolute_gap;
+                controls.relative_gap = relative_gap;
+                controls.initial_solution = Some((2., singletons.clone()));
+                let output = tree::solve(problem.clone(), controls).unwrap();
+                assert_eq!(output.status, TreeStatus::Optimal, "{output:?}");
+                assert_eq!(output.incumbent, 2.);
+                assert_eq!(output.open_nodes, 0);
+                // The pair route costs one. Gap closure may retain the more
+                // expensive incumbent, but must retain the root's proof too.
+                assert!(output.bound.is_finite() && output.bound <= 1., "{output:?}");
+            }
+        }
+    }
+}
 #[test]
 fn tree_closes_fractional_root_with_and_without_integer_heuristic() {
     let instance = triangle();
-    for (mip, fleet) in [(0, 2.), (0, 3.), (10000, 2.), (10000, 3.)] {
+    for (mip, fleet) in [(0, 2.), (0, 3.), (10000, 2.), (10000, 3.)]
+        .into_iter()
+        .filter(|(mip, _)| *mip == 0 || cfg!(feature = "highs"))
+    {
         let problem =
             RoutingContext::set_partitioning(instance.graph(1, Rounding::None).unwrap(), fleet)
                 .unwrap();
@@ -330,6 +378,7 @@ fn singleton_skips_ranking_phases_but_keeps_exact_trials_and_bounds() {
         assert_eq!(out.mapped_history_ranked, 0);
     }
 }
+#[cfg(feature = "highs")]
 #[test]
 fn node_limit_preserves_open_bound_and_never_certifies_restricted_mip() {
     let problem =

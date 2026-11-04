@@ -235,7 +235,7 @@ impl<const D: usize> NodeSnapshot<D> {
         ] {
             if rhs.is_finite() {
                 let physical = node.master.rhs.len();
-                node = node.with_master_row(Row { sense, rhs }, &[], &[(id, 1.)])?;
+                node = node.with_master_row_owned(Row { sense, rhs }, &[], &[(id, 1.)])?;
                 node.state.master_variable_bound_rows.insert(physical);
             }
         }
@@ -353,8 +353,18 @@ impl<const D: usize> NodeSnapshot<D> {
         networks: &[RowCoefficients],
         masters: &[(i32, f64)],
     ) -> Result<Self> {
+        self.fork()?.with_master_row_owned(row, networks, masters)
+    }
+
+    pub(super) fn with_master_row_owned(
+        self,
+        row: Row,
+        networks: &[RowCoefficients],
+        masters: &[(i32, f64)],
+    ) -> Result<Self> {
         let shared = self.state.shared_rows.len();
-        let mut node = self.with_row(row, networks)?;
+        let mut node =
+            self.with_row_class_owned(row, networks, cg::CurvatureRowClass::Ordinary, None, &[])?;
         node.attach_master_coefficients(shared, masters)?;
         Ok(node)
     }

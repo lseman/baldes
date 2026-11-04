@@ -17,6 +17,14 @@ pub(crate) struct MasterTransfer {
     objective_offset: f64,
     basis: Option<Vec<u8>>,
     solved: bool,
+    duals: Vec<f64>,
+    values: Vec<f64>,
+    reduced_costs: Vec<f64>,
+    objective: f64,
+    status: i32,
+    native_row_basic: Vec<bool>,
+    simplex_iterations: usize,
+    ipm_iterations: usize,
 }
 
 impl ClpMaster {
@@ -53,11 +61,24 @@ impl ClpMaster {
             objective_offset: self.objective_offset,
             basis,
             solved: self.solved,
+            duals: self.duals.clone(),
+            values: self.values.clone(),
+            reduced_costs: self.reduced_costs.clone(),
+            objective: self.objective,
+            status: self.status,
+            native_row_basic: self.native_row_basic.clone(),
+            simplex_iterations: self.simplex_iterations,
+            ipm_iterations: self.ipm_iterations,
         })
     }
 }
 
 impl MasterTransfer {
+    pub(crate) fn reset_iterations(&mut self) {
+        self.simplex_iterations = 0;
+        self.ipm_iterations = 0;
+    }
+
     pub(crate) fn restore(self) -> Result<ClpMaster> {
         let mut master = ClpMaster::new()?;
         master.set_clp_options(self.options);
@@ -94,12 +115,23 @@ impl MasterTransfer {
         master.objective_offset = self.objective_offset;
         master.set_solver(self.solver);
         master.set_backend_threads(self.threads)?;
-        // A solved source carries an optimal basis; re-solving from it restores
-        // the cached primal/dual solution without pivots, so the receiver can
-        // read values and branch on the node.
-        if self.solved && !master.solve() {
-            return Err(invalid("transferred master no longer solves to optimality"));
-        }
+        // Cached values belong to this exact matrix and objective. Transport
+        // them unchanged: restoring a result must neither solve outside the
+        // tree deadline nor replace an IPM/degenerate LP point with another one.
+        // The receiver's next solve rebuilds backend workspaces as needed.
+        master.duals = self.duals;
+        master.values = self.values;
+        master.reduced_costs = self.reduced_costs;
+        master.objective = self.objective;
+        master.status = self.status;
+        master.native_row_basic = self.native_row_basic;
+        master.solved = self.solved;
+        master.simplex_iterations = self.simplex_iterations;
+        master.ipm_iterations = self.ipm_iterations;
         Ok(master)
     }
 }
+
+#[cfg(test)]
+#[path = "../../../../tests/unit/master/solvers/clp/transfer_tests.rs"]
+mod tests;

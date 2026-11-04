@@ -1742,7 +1742,7 @@ pub(super) fn choose_proposals<const D: usize>(
                             child.set_incidence_separator_history(incidence);
                         }
                     }
-                    match child.solve_forked(node) {
+                    match child.solve_forked_until(node, end) {
                         Ok(result) => {
                             if options.threads == 1 {
                                 if let Some(incidence) =

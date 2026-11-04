@@ -452,6 +452,22 @@ fn certificate_inner<const D: usize>(
     duals: &[f64],
     allow_projection: bool,
 ) -> Option<f64> {
+    if duals.len() != master.senses.len() || duals.iter().any(|value| !value.is_finite()) {
+        return None;
+    }
+    // An approximate LP solve can leave an inactive inequality multiplier on
+    // the wrong side of zero. Certify a valid dual point by projecting those
+    // coordinates, then recompute both the base and every network correction
+    // at that same point. Never reuse numerical pricing minima after projection.
+    let mut projected = std::borrow::Cow::Borrowed(duals);
+    for (row, (&dual, sense)) in duals.iter().zip(&master.senses).enumerate() {
+        if (*sense == RowSense::LessEqual && dual > 0.)
+            || (*sense == RowSense::GreaterEqual && dual < 0.)
+        {
+            projected.to_mut()[row] = 0.;
+        }
+    }
+    let duals = projected.as_ref();
     if state.has_unpriced_paired_terms(duals) {
         return None;
     }

@@ -605,23 +605,21 @@ impl MappedBranchVariable {
             })
             .collect();
         let mut child = node.fork()?;
-        let append = |node: &NodeSnapshot<D>, row, residual_rhs| {
-            if let Some(rhs) = residual_rhs {
-                node.with_residual_activity_row(row, &coefficients, &activities, rhs)
-            } else if activities.is_empty() {
-                node.with_master_row(row, &coefficients, &self.masters)
-            } else {
-                node.with_accumulated_activity_master_row(
-                    row,
-                    &activities,
-                    &coefficients,
-                    &self.masters,
-                )
-            }
+        let append = |node: NodeSnapshot<D>, row, residual_rhs| -> Result<NodeSnapshot<D>> {
+            let shared = node.state.shared_rows.len();
+            let mut node = node.with_row_class_owned(
+                row,
+                &coefficients,
+                cg::CurvatureRowClass::Ordinary,
+                residual_rhs,
+                &activities,
+            )?;
+            node.attach_master_coefficients(shared, &self.masters)?;
+            Ok(node)
         };
         if bounds.lower == bounds.upper {
             return append(
-                &child,
+                child,
                 Row {
                     sense: RowSense::Equal,
                     rhs: bounds.lower,
@@ -638,7 +636,7 @@ impl MappedBranchVariable {
             (RowSense::LessEqual, bounds.upper, residual.map(|b| b.upper)),
         ] {
             if rhs.is_finite() {
-                child = append(&child, Row { sense, rhs }, residual_rhs)?;
+                child = append(child, Row { sense, rhs }, residual_rhs)?;
             }
         }
         Ok(child)

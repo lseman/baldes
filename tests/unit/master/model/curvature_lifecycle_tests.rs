@@ -127,7 +127,11 @@ fn consumed_trial_fork_matches_reusable_snapshot_solve_and_preserves_parent() {
             .unwrap();
         let child_rhs = child.master.rhs.clone();
         let expected = child.solve(options.clone()).unwrap();
-        let actual = child.fork().unwrap().solve_forked(options.clone()).unwrap();
+        let actual = child
+            .fork()
+            .unwrap()
+            .solve_forked_until(options.clone(), Instant::now() + options.cg.time_limit)
+            .unwrap();
         assert_eq!(actual.master.status, expected.master.status);
         assert_eq!(actual.master.lp, expected.master.lp);
         assert_eq!(

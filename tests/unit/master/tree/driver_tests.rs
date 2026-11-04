@@ -7,7 +7,7 @@ struct Node {
 }
 impl NodeInfo for Node {
     fn depth(&self) -> usize {
-        0
+        self.id
     }
     fn numerical_bound(&self) -> f64 {
         self.bound
@@ -22,24 +22,32 @@ impl Evaluation for Output {
 struct Hooks {
     selected: usize,
     evaluated: Vec<usize>,
+    batches: Vec<Vec<usize>>,
     consumed: Vec<usize>,
     deadline: Instant,
     limit: usize,
     time_first: bool,
     spawn: bool,
     suspend: bool,
+    requeue_current: bool,
+    unresolved: Option<f64>,
+    batch_size: usize,
 }
 impl Hooks {
     fn new() -> Self {
         Self {
             selected: 0,
             evaluated: vec![],
+            batches: vec![],
             consumed: vec![],
             deadline: Instant::now() + std::time::Duration::from_secs(10),
             limit: 10,
             time_first: false,
             spawn: false,
             suspend: false,
+            requeue_current: true,
+            unresolved: None,
+            batch_size: 2,
         }
     }
 }
@@ -50,7 +58,7 @@ impl Model for Hooks {
         Limits {
             deadline: self.deadline,
             remaining_nodes: self.limit.saturating_sub(self.selected),
-            batch_size: 2,
+            batch_size: self.batch_size,
             time_first: self.time_first,
         }
     }
@@ -63,6 +71,8 @@ impl Model for Hooks {
         entries: &mut [QueuedNode<Node, Output>],
         _frontier: &mut TreeFrontier<Node, Output>,
     ) -> Result<Vec<Result<Output>>> {
+        self.batches
+            .push(entries.iter().map(|entry| entry.node.id).collect());
         Ok(entries
             .iter()
             .map(|entry| {
@@ -84,10 +94,13 @@ impl Model for Hooks {
         }
         if self.suspend {
             let entry = entry.unwrap();
-            frontier.push_evaluated(entry.node, entry.parent_branch_order, None)?;
+            if self.requeue_current {
+                frontier.push_evaluated(entry.node, entry.parent_branch_order, None)?;
+            } else {
+                self.unresolved = Some(entry.node.bound);
+            }
             return Ok(Decision::Stop {
                 reason: Stop::Requested,
-                restore_ready: true,
             });
         }
         self.consumed.push(output.0);
@@ -97,6 +110,65 @@ impl Model for Hooks {
         }
         Ok(Decision::Continue)
     }
+}
+
+#[test]
+fn mixed_prepared_batch_dispatches_fresh_siblings_together_in_selection_order() {
+    let mut hooks = Hooks::new();
+    hooks.batch_size = 4;
+    let mut frontier = TreeFrontier::exact_best_bound();
+    for id in 0..4 {
+        frontier
+            .push_evaluated(
+                Node {
+                    id,
+                    bound: id as f64,
+                },
+                1,
+                (id % 2 == 0).then_some(Output(id)),
+            )
+            .unwrap();
+    }
+    assert_eq!(
+        run(&mut hooks, &mut frontier, None).unwrap(),
+        Stop::Exhausted
+    );
+    assert_eq!(hooks.batches, vec![vec![1, 3]]);
+    assert_eq!(hooks.evaluated, vec![1, 3]);
+    assert_eq!(hooks.consumed, vec![0, 1, 2, 3]);
+    assert_eq!(hooks.selected, 4);
+}
+
+#[test]
+fn adapter_owned_unresolved_node_does_not_discard_a_lower_bound_ready_sibling() {
+    let mut hooks = Hooks::new();
+    hooks.suspend = true;
+    hooks.requeue_current = false;
+    let mut frontier = TreeFrontier::new(
+        super::super::TreeSearchPolicy::Default,
+        100,
+        super::super::IntegerBoundRounding::Unrounded,
+    );
+    // Depth-first selection consumes the bound-ten node before its shallower
+    // bound-one sibling. The adapter retains only the consumed node's bound.
+    for (id, bound) in [(1, 10.), (0, 1.)] {
+        frontier
+            .push_evaluated(Node { id, bound }, 1, None)
+            .unwrap();
+    }
+    assert_eq!(
+        run(&mut hooks, &mut frontier, None).unwrap(),
+        Stop::Requested
+    );
+    assert_eq!(hooks.unresolved, Some(10.));
+    assert_eq!(frontier.len(), 1);
+    let global_bound = frontier
+        .iter()
+        .map(|entry| entry.node.bound)
+        .chain(hooks.unresolved)
+        .fold(20., f64::min);
+    assert_eq!(global_bound, 1.);
+    assert_eq!(hooks.selected, 2);
 }
 
 #[test]

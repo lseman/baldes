@@ -12,6 +12,8 @@ pub(super) struct NetworkSearch<'a, const D: usize> {
     pub mapped_history: &'a mut model_strong::History,
     pub selected_nodes: &'a mut usize,
     pub unresolved: &'a mut Option<f64>,
+    /// Lowest selected-channel bound among nodes closed within the allowed gap.
+    pub closed_bound: &'a mut f64,
     pub workers: Option<&'a rayon::ThreadPool>,
     pub local_search_rng: crate::rng::GnuRand,
 }
@@ -40,6 +42,9 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                 .options
                 .closes(entry.node.tree_bound(), self.result.incumbent)
         {
+            if !entry.proven_infeasible() {
+                *self.closed_bound = self.closed_bound.min(entry.node.tree_bound());
+            }
             if let Some(history) = self.subtree_history.as_mut() {
                 history.close(entry.node.state.mapped_lineage);
             }
@@ -74,7 +79,7 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                 .min(self.deadline.saturating_duration_since(Instant::now()));
             let nodes: Vec<_> = entries.iter().map(|entry| &entry.node).collect();
             self.result.parallel_batches += 1;
-            return parallel::evaluate(workers, &nodes, &options);
+            return parallel::evaluate(workers, &nodes, &options, self.deadline);
         }
         entries
             .iter_mut()
@@ -102,7 +107,7 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                     }
                 }
                 node.prepare_evaluation()?;
-                let result = node.solve_forked(options);
+                let result = node.solve_forked_until(options, self.deadline);
                 if self.options.threads == 1 {
                     if let Ok(output) = &result {
                         if let Some(history) = output.snapshot.incidence_separator_history() {
@@ -145,6 +150,7 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
         let mapped_history = &mut *self.mapped_history;
         let selected_nodes = &mut *self.selected_nodes;
         let unresolved = &mut *self.unresolved;
+        let closed_bound = &mut *self.closed_bound;
         if !reused {
             result.nodes += 1;
             result.iterations += output.master.iterations;
@@ -257,6 +263,9 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                         // becomes a directed-arithmetic publication certificate.
                         if options.node.cg.bound_mode == cg::BoundMode::Numerical {
                             if mip.mip.status == MipStatus::Infeasible {
+                                // A cutoff-restricted universe proves only
+                                // that no improving solution remains.
+                                *closed_bound = closed_bound.min(result.incumbent);
                                 if let Some(history) = &mut subtree_history {
                                     history.close(lineage);
                                 }
@@ -268,6 +277,7 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                             ) && result.incumbent.is_finite()
                                 && options.closes(mip.mip.bound, result.incumbent)
                             {
+                                *closed_bound = closed_bound.min(mip.mip.bound);
                                 if let Some(history) = &mut subtree_history {
                                     history.close(lineage);
                                 }
@@ -296,6 +306,7 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
             && bound.is_finite()
             && options.closes(bound, result.incumbent)
         {
+            *closed_bound = closed_bound.min(bound);
             if let Some(history) = &mut subtree_history {
                 history.close(lineage);
             }
@@ -310,11 +321,11 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
             *unresolved = Some(bound);
             return Ok(Decision::Stop {
                 reason: Stop::Requested,
-                restore_ready: false,
             });
         }
         primal_callbacks::run(&output, options, result, deadline)?;
         if options.closes(bound, result.incumbent) {
+            *closed_bound = closed_bound.min(bound);
             if let Some(history) = &mut subtree_history {
                 history.close(lineage);
             }
@@ -329,6 +340,7 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                 result.master_values = master_values;
             }
             if options.closes(bound, result.incumbent) {
+                *closed_bound = closed_bound.min(bound);
                 if let Some(history) = &mut subtree_history {
                     history.close(lineage);
                 }
@@ -363,6 +375,7 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
             }
             // The dive's own bounds are heuristic; only this node's bound prunes.
             if options.closes(bound, result.incumbent) {
+                *closed_bound = closed_bound.min(bound);
                 if let Some(history) = &mut subtree_history {
                     history.close(lineage);
                 }
@@ -411,6 +424,7 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
             // Neighborhood bounds cover only that private dive. The node's
             // selected-channel bound remains the sole pruning authority.
             if options.closes(bound, result.incumbent) {
+                *closed_bound = closed_bound.min(bound);
                 if let Some(history) = &mut subtree_history {
                     history.close(lineage);
                 }
@@ -444,6 +458,7 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                 }
             }
             if options.closes(bound, result.incumbent) {
+                *closed_bound = closed_bound.min(bound);
                 if let Some(history) = &mut subtree_history {
                     history.close(lineage);
                 }
@@ -463,7 +478,6 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
             *unresolved = Some(bound);
             return Ok(Decision::Stop {
                 reason: Stop::Requested,
-                restore_ready: false,
             });
         }
         let upper_first =
@@ -542,7 +556,6 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
             *unresolved = Some(bound);
             return Ok(Decision::Stop {
                 reason: Stop::Requested,
-                restore_ready: false,
             });
         }
         Ok(Decision::Continue)

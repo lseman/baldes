@@ -242,26 +242,31 @@ impl<const D: usize> NodeSnapshot<D> {
             warm: self.warm.clone(),
             state: self.state.fork_state(),
         };
+        Self::reset_fork_state(&mut node.warm, &mut node.state);
+        Ok(node)
+    }
+
+    /// Reset fork authority independently of how its LP is copied or transported.
+    pub(super) fn reset_fork_state(warm: &mut RetainedWarmStart, state: &mut State<D>) {
         // Incumbents are supplied by each solve's owner, never inherited as
         // authority from a reusable snapshot.
-        node.state.tree_incumbent = f64::INFINITY;
-        if node.state.objective_fixed {
+        state.tree_incumbent = f64::INFINITY;
+        if state.objective_fixed {
             // The old incumbent may not be feasible for a new branch, or the
             // caller may resume this snapshot as an LP without an incumbent.
             // Drop only cost-dependent bucket fixings; graph restrictions and
             // dynamically strengthened relaxations remain in the solver.
-            for oracle in &mut node.state.oracles {
+            for oracle in &mut state.oracles {
                 oracle.solver.restore_arcs();
             }
-            node.state.objective_fixed = false;
-            node.state.gap_pool_cutoff = None;
-            node.warm.bound = f64::NEG_INFINITY;
-            node.warm.numerical_bound = f64::NEG_INFINITY;
-            node.warm.certified_bound = f64::NEG_INFINITY;
-            node.warm.stabilization = None;
-            node.warm.clear_proximal();
+            state.objective_fixed = false;
+            state.gap_pool_cutoff = None;
+            warm.bound = f64::NEG_INFINITY;
+            warm.numerical_bound = f64::NEG_INFINITY;
+            warm.certified_bound = f64::NEG_INFINITY;
+            warm.stabilization = None;
+            warm.clear_proximal();
         }
-        Ok(node)
     }
 
     /// Actual branch depth; resumes and row additions preserve this value.
@@ -328,8 +333,13 @@ impl<const D: usize> NodeSnapshot<D> {
     /// Consume an independent node fork already prepared by a tree worker or
     /// strong-branching trial. Its owner has performed the normal fork reset;
     /// copying the LP, graph and warm column pool again would be redundant.
-    pub(crate) fn solve_forked(self, mut options: Options) -> Result<Output<D>> {
-        let deadline = self.resume_deadline(&mut options)?;
+    pub(super) fn solve_forked_until(
+        self,
+        mut options: Options,
+        deadline: Instant,
+    ) -> Result<Output<D>> {
+        let deadline = self.resume_deadline(&mut options)?.min(deadline);
+        options.cg.time_limit = deadline.saturating_duration_since(Instant::now());
         self.solve_forked_at(options, deadline)
     }
 
@@ -388,25 +398,6 @@ impl<const D: usize> NodeSnapshot<D> {
         self.with_row_class(row, coefficients, cg::CurvatureRowClass::Dynamic, None, &[])
     }
 
-    /// Install a full-coordinate witness row with an independently established
-    /// residual RHS. Activity descriptors must be present before coefficients
-    /// and artificial columns are installed.
-    pub(super) fn with_residual_activity_row(
-        &self,
-        row: Row,
-        linear: &[RowCoefficients],
-        activities: &[AccumulatedActivityCoefficients],
-        residual_rhs: f64,
-    ) -> Result<Self> {
-        self.with_row_class(
-            row,
-            linear,
-            cg::CurvatureRowClass::Ordinary,
-            Some(residual_rhs),
-            activities,
-        )
-    }
-
     fn with_row_class(
         &self,
         row: Row,
@@ -415,9 +406,11 @@ impl<const D: usize> NodeSnapshot<D> {
         residual_rhs: Option<f64>,
         activities: &[AccumulatedActivityCoefficients],
     ) -> Result<Self> {
-        if !row.rhs.is_finite() || residual_rhs.is_some_and(|rhs| !rhs.is_finite()) {
-            return Err(invalid("network row RHS"));
-        }
+        self.fork()?
+            .with_row_class_owned(row, coefficients, class, residual_rhs, activities)
+    }
+
+    pub(super) fn validate_row_coefficients(&self, coefficients: &[RowCoefficients]) -> Result<()> {
         let mut seen = HashSet::new();
         for c in coefficients {
             let oracle = self
@@ -434,7 +427,24 @@ impl<const D: usize> NodeSnapshot<D> {
                 return Err(invalid("network row coefficients"));
             }
         }
-        let mut node = self.fork()?;
+        Ok(())
+    }
+
+    /// Append to an already independent child. Errors discard this owned
+    /// snapshot, leaving the reusable parent and siblings untouched.
+    pub(super) fn with_row_class_owned(
+        self,
+        row: Row,
+        coefficients: &[RowCoefficients],
+        class: cg::CurvatureRowClass,
+        residual_rhs: Option<f64>,
+        activities: &[AccumulatedActivityCoefficients],
+    ) -> Result<Self> {
+        if !row.rhs.is_finite() || residual_rhs.is_some_and(|rhs| !rhs.is_finite()) {
+            return Err(invalid("network row RHS"));
+        }
+        self.validate_row_coefficients(coefficients)?;
+        let mut node = self;
         let shared = node.state.shared_rows.len();
         let physical = node.master.rhs.len();
         activity_rows::install(&mut node.state, shared, activities)?;
