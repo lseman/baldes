@@ -84,6 +84,13 @@ it. See the <a href="solve.html">unified solve guide</a> for normalization and s
 Routing input returns an LP relaxation; network model input also supports
 <code>tree=True</code>. A root <code>Optimal</code> status describes LP convergence, not an integer
 routing optimum. The <a href="../pybaldes/index.html">handbook</a> documents each input contract.</p>
+<p>Network tree solves accept <code>tree_threads=1</code>, <code>absolute_gap=1e-6</code>,
+<code>relative_gap=1e-9</code>, <code>integer_objective=False</code>, and optional <code>diving</code> configuration.
+These are forwarded to the shared Rust solve options for validation.</p>
+<p>Routing distance defaults differ between frontends: the CLI uses truncated
+tenths, while Python follows the instance metric. Specify <code>--rounding none</code>
+(CLI) and <code>rounding=&quot;none&quot;</code> (Python), or another matching mode, when comparing
+results. An empty rounding string is invalid.</p>
 </article>
 <nav class="page-turn" aria-label="Adjacent guides"><a href="../pybaldes/troubleshooting.html"><small>Previous guide</small>pyBaldes troubleshooting and reproducibility <span aria-hidden="true">↗</span></a><a href="../solver/feasibility.html"><small>Next guide</small>Routing feasibility recovery <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
