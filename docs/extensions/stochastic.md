@@ -98,6 +98,37 @@ alias. `--dynamic-ng-mode -1|0|1`, `--rank-one-cut-limit`, `--log-cg`, and
 `--no-load-completion-bound` configure the routing path. Flags for the removed
 stochastic pricing implementation are rejected.
 
+The example also accepts `--diving`, `--local-search`, and `--greedy` to
+enable the existing tree primal heuristics. They are disabled by default.
+`--heuristic-seconds 2` limits each dive (including each local-search child
+dive), and `--heuristic-depth 0` schedules diving and local search at the root
+only. Increasing the depth schedules them at additional shallow nodes. Local
+search fixes a fraction selected by `--local-search-fixed-ratio` (default 0.8).
+For small route plans, a lower ratio such as 0.5 can avoid fixing the entire
+incumbent and leaving no neighborhood to explore. Local
+search performs an initial feasibility dive followed by up to three partial
+incumbent dives, so its total work can exceed one per-dive limit. All heuristic
+work shares the overall solve deadline. JSON reports the enabled options and
+the combined diving/local-search node count. Use `--hgs-seconds 3` as well to
+supply a validated initial route plan. Heuristic improvements establish upper
+bounds; proving optimality still requires closing the tree's lower-bound gap.
+
+`--strong-branching` enables the existing phased candidate evaluation without
+changing the branching-family policy. `--strong-seconds 10` caps each selection
+and `--strong-trial-seconds 1` caps each child trial, within the overall solve
+deadline. The default schedule screens up to 100 candidates on restricted
+masters, retains up to three for heuristic pricing and one for exact pricing.
+The JSON `strong_branching_trials` count records evaluations actually performed;
+trial ranking estimates alone never certify a lower bound.
+
+`--tree-threads 4` enables four workers for concurrent evaluation of open tree
+nodes; the default is one. The tree owns a separate worker pool, so this option
+works even with `RAYON_NUM_THREADS=1`. Set OMP/BLAS pools to one when benchmarking
+tree parallelism to avoid nested numerical workers. JSON reports `tree_threads`
+and `parallel_batches` (batches that actually evaluated multiple fresh nodes).
+Root processing and heuristic dives can consume the budget before such a batch
+is available; a configured worker count alone does not prove parallel work ran.
+
 The result retains the best incumbent and numerical bound on interruption.
 `TreeStatus::Optimal` describes termination at the configured floating-point
 tolerances, not an outward-rounded arithmetic certificate. The routing tree

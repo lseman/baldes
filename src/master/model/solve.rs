@@ -404,7 +404,7 @@ pub(super) fn run<const D: usize>(
     }
     separation::prepare(&mut state, &options)?;
     options.separation.configure(&mut options.cg);
-    if options.cg.warm_start.is_none() && separation::supports_row_cleanup(&state) {
+    if separation::supports_row_cleanup(&state) {
         options.cg.remove_basic_cuts = true;
     }
     state.scheduler.max_promising = options.network_promising_limit;

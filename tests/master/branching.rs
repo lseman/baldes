@@ -78,6 +78,44 @@ fn ryan_foster_pricing_and_enumeration_obey_both_children() {
 }
 
 #[test]
+fn together_branch_excludes_cheaper_violating_route_from_exact_pricing() {
+    use baldes::pricing::restrictions::ArcSetConstraint;
+
+    for mode in [0., 1., 2.] {
+        let mut solver = Solver::<2>::new(4, 0).unwrap();
+        solver
+            .set_option("BALDESuseBidirectionalSearch", mode)
+            .unwrap();
+        let violating = solver.graph.add_arc(0, 1, -0.3).unwrap();
+        let tail = solver.graph.add_arc(1, 3, 0.).unwrap();
+        let first = solver.graph.add_arc(0, 2, 0.5).unwrap();
+        let second = solver.graph.add_arc(2, 1, 0.).unwrap();
+        solver.graph.add_arc(0, 3, 0.).unwrap();
+        let branch = ArcSetConstraint {
+            first: vec![first],
+            second: vec![violating, second],
+            together: true,
+        };
+
+        let unrestricted = solver.price_functor_phase(0, 8).unwrap();
+        assert!(unrestricted.exact);
+        assert_eq!(unrestricted.minimum_reduced_cost, -0.3);
+        assert_eq!(unrestricted.columns[0].arcs, vec![violating, tail]);
+        assert!(!branch.satisfied_by(unrestricted.columns[0].arcs.iter().copied()));
+
+        solver.set_arc_set_branches(vec![branch.clone()]).unwrap();
+        let restricted = solver.price_functor_phase(0, 8).unwrap();
+        assert!(restricted.exact);
+        assert_eq!(restricted.minimum_reduced_cost, 0.);
+        assert!(!restricted.columns.is_empty());
+        assert!(restricted
+            .columns
+            .iter()
+            .all(|route| branch.satisfied_by(route.arcs.iter().copied())));
+    }
+}
+
+#[test]
 fn arc_set_branches_rebuild_coalesced_paths_and_isolate_siblings() {
     use baldes::pricing::restrictions::ArcSetConstraint;
     for mode in [0., 1., 2.] {

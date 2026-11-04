@@ -1296,7 +1296,10 @@ fn exact_root_pricing_preserves_raw_costs_when_native_rounding_ties_routes() {
     assert_eq!(cached_arcs, native);
     let exact = solver.price_functor_phase(0, 1000).unwrap();
     assert!(exact.exact);
+    assert_eq!(exact.columns[0].arcs, vec![54, 62, 64]);
+    assert_eq!(native[0], vec![27, 35, 64]);
     let cost = |arcs: &[i32]| exact.columns.iter().find(|r| r.arcs == arcs).unwrap().cost;
+    assert!(cost(&exact.columns[0].arcs) < cost(&native[0]));
     assert!(cost(&second) < cost(&first));
     let mut reordered: Vec<_> = exact.columns.iter().collect();
     reordered.sort_by(|a, b| {
@@ -1320,6 +1323,57 @@ fn exact_root_pricing_preserves_raw_costs_when_native_rounding_ties_routes() {
             .count(),
         32
     );
+    let raw_by_path: BTreeMap<_, _> = exact
+        .columns
+        .iter()
+        .map(|route| (route.arcs.clone(), route))
+        .collect();
+    assert_eq!(raw_by_path.len(), exact.columns.len());
+    let ranked: Vec<_> = cached
+        .columns
+        .iter()
+        .filter_map(|route| raw_by_path.get(&route.arcs).copied())
+        .collect();
+    assert_eq!(ranked.len(), exact.columns.len());
+    assert_eq!(
+        ranked.iter().map(|route| &route.arcs).collect::<Vec<_>>(),
+        native.iter().collect::<Vec<_>>()
+    );
+    assert_eq!(
+        ranked
+            .iter()
+            .map(|route| route.cost)
+            .min_by(f64::total_cmp)
+            .unwrap()
+            .to_bits(),
+        exact.minimum_reduced_cost.to_bits()
+    );
+    for maximum in [1, 2, 8, 16, 32, 64] {
+        let cached = solver.price_phase(0, maximum, false).unwrap();
+        let exact = solver.price_functor_phase(0, maximum).unwrap();
+        let raw_by_path: BTreeMap<_, _> = exact
+            .columns
+            .iter()
+            .map(|route| (route.arcs.clone(), route))
+            .collect();
+        let ranked: Vec<_> = cached
+            .columns
+            .iter()
+            .filter_map(|route| raw_by_path.get(&route.arcs).copied())
+            .collect();
+        assert_eq!(ranked.len(), exact.columns.len(), "maximum={maximum}");
+        assert_eq!(
+            ranked.iter().map(|route| &route.arcs).collect::<Vec<_>>(),
+            native.iter().take(maximum).collect::<Vec<_>>(),
+            "maximum={maximum}"
+        );
+        assert!(
+            ranked
+                .iter()
+                .any(|route| { route.cost.to_bits() == exact.minimum_reduced_cost.to_bits() }),
+            "maximum={maximum}"
+        );
+    }
 }
 
 #[test]

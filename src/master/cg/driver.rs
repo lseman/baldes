@@ -986,9 +986,8 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             lp_at_separation = out.lp;
             if !stop_cuts {
                 let mut rows_remapped = false;
-                // A pass closed by its existing bound has not run pricing.
-                // Keep its solved model; cleanup is enabled by a completed
-                // exact pricing pass, not merely by entering separation.
+                // A bound-closed pass did not run pricing. Keep the solved
+                // relaxation intact rather than remove cuts and reprice it.
                 if options.remove_basic_cuts && separated_once && !converged {
                     let protected = controller.protected_rows();
                     let rows: Vec<_> = master

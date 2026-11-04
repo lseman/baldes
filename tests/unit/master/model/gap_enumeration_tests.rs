@@ -63,13 +63,18 @@ fn committed_gap_pool_is_dropped_on_an_independent_node_fork() {
     assert!(universe(state, &duals, 0.).unwrap().is_some());
     finish(state, true);
     assert!(state.objective_fixed);
-    let child = output.snapshot.fork().unwrap();
+    let mut child = output.snapshot.fork().unwrap();
     assert!(child.state.oracles[0].solver.enumeration.is_none());
     assert!(output.snapshot.state.oracles[0]
         .solver
         .enumeration
         .is_some());
     assert_eq!(child.state.tree_incumbent, f64::INFINITY);
+    assert_eq!(child.state.previous_fixing_gap, 2.);
+    child.state.tree_incumbent = 2.;
+    assert!(!begin(&mut child.state, 0.).unwrap());
+    assert!(begin(&mut child.state, 1.).unwrap());
+    finish(&mut child.state, false);
 }
 
 #[test]

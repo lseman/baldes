@@ -68,7 +68,13 @@ cargo build --release --features clp,ng-memory-63 --example stochastic_instance
 
 The destination must be new/empty. Each solver runs as a separate process on
 identical input bytes. Run order alternates. Gurobi threads and Rayon/OMP/BLAS
-thread environment variables share the requested count. Reports contain input
+thread environment variables share the requested `--threads` count.
+`--tree-threads 4` separately enables four
+BALDES tree workers (default one), records the requested count in metadata, and
+passes it to the example runner. The solver JSON reports actual multi-node
+`parallel_batches`. Use the same resource allowance on both solvers when making
+timing comparisons; four BALDES tree workers versus one Gurobi thread is not an
+equal-thread speed comparison. Reports also contain input
 and binary/source hashes, solver versions, commands, build description, bounds,
 gaps, statuses and both **process wall time** and **internal solve time**.
 

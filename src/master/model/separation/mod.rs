@@ -333,8 +333,6 @@ pub(super) fn supports_row_cleanup<const D: usize>(state: &State<D>) -> bool {
                 && oracle.presence_rows.is_empty()
                 && oracle.knapsack_rows.is_empty()
                 && oracle.resource_groups.is_empty()
-                && oracle.ryan_foster_rows.is_empty()
-                && oracle.arc_set_branch_rows.is_empty()
         })
 }
 
@@ -383,6 +381,20 @@ pub(super) fn remap_rows<const D: usize>(
         })
         .collect();
     for oracle in &mut state.oracles {
+        for (row, _) in &mut oracle.ryan_foster_rows {
+            *row = shared_map
+                .get(*row)
+                .copied()
+                .flatten()
+                .ok_or_else(|| invalid("removed protected Ryan-Foster row"))?;
+        }
+        for (row, _) in &mut oracle.arc_set_branch_rows {
+            *row = shared_map
+                .get(*row)
+                .copied()
+                .flatten()
+                .ok_or_else(|| invalid("removed protected arc-set branch row"))?;
+        }
         for entries in Arc::make_mut(&mut oracle.network.arc_entries) {
             entries.retain_mut(|(row, _)| match shared_map.get(*row).copied().flatten() {
                 Some(next) => {

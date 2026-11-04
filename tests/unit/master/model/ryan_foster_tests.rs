@@ -15,6 +15,179 @@ fn options() -> Options {
     options
 }
 
+#[test]
+fn cut_row_remapping_preserves_both_ryan_foster_branch_rows() {
+    let problem = rc101(25);
+    let mut configured = options();
+    configured.separation.rank_one.enabled = true;
+    let root = solve_with_master_variables(problem, vec![], configured.clone()).unwrap();
+    let root_state = &root.snapshot.state;
+    let protected = super::super::separation::protected_rows(root_state);
+    let cut_row = (0..root_state.shared_rows.len())
+        .find(|row| !protected.contains(&(root_state.shared_offset + row)))
+        .expect("expected a removable cut row");
+    let graph = &root.snapshot.state.oracles[0].network.graph;
+    let witness = &root.snapshot.state.routes[0].route;
+    let arc_member = ArcSetMember {
+        network: 0,
+        first: vec![witness.arcs[0]],
+        second: vec![
+            graph
+                .arcs
+                .iter()
+                .find(|arc| !witness.arcs.contains(&arc.id))
+                .unwrap()
+                .id,
+        ],
+    };
+    let vertex_member = RyanFosterMember {
+        network: 0,
+        first: 1,
+        second: 2,
+    };
+    let mut child = root
+        .snapshot
+        .with_ryan_foster(&[vertex_member], true)
+        .unwrap()
+        .with_arc_set_branch(&[arc_member], true)
+        .unwrap();
+    let state = &mut child.state;
+    let offset = state.shared_offset;
+    let vertex_row = state.oracles[0].ryan_foster_rows[0].0;
+    let arc_row = state.oracles[0].arc_set_branch_rows[0].0;
+    assert!(cut_row < vertex_row && vertex_row < arc_row);
+    assert!(super::super::separation::supports_row_cleanup(state));
+    let protected = super::super::separation::protected_rows(state);
+    assert!(!protected.contains(&(offset + cut_row)));
+    assert!(protected.contains(&(offset + vertex_row)));
+    assert!(protected.contains(&(offset + arc_row)));
+    let original_entries: Vec<_> = state
+        .routes
+        .iter()
+        .map(|route| super::entries(&state.oracles[0], &route.route).unwrap())
+        .collect();
+    assert!(original_entries
+        .iter()
+        .any(|entries| entries.iter().any(|&(row, _)| row == arc_row)));
+    let mut warm = child.warm.clone().into_owned();
+    let columns: Vec<_> = warm
+        .cut_artificials
+        .iter()
+        .filter_map(|&(row, column)| (row == offset + cut_row).then_some(column))
+        .collect();
+    let (map, column_map) = child.master.remove(&[offset + cut_row], &columns).unwrap();
+    super::super::separation::remap_rows(state, &map).unwrap();
+    assert_eq!(state.oracles[0].ryan_foster_rows[0].0, vertex_row - 1);
+    assert_eq!(state.oracles[0].arc_set_branch_rows[0].0, arc_row - 1);
+    for (route, original) in state.routes.iter().zip(original_entries) {
+        let expected: Vec<_> = original
+            .into_iter()
+            .map(|(row, value)| (map[offset + row].unwrap() - offset, value))
+            .collect();
+        assert_eq!(
+            super::entries(&state.oracles[0], &route.route).unwrap(),
+            expected
+        );
+    }
+    state.cut_artificial_bases = state
+        .cut_artificial_bases
+        .iter()
+        .filter_map(|(&column, &cost)| Some((column_map[column]?, cost)))
+        .collect();
+    warm.columns = warm
+        .columns
+        .into_iter()
+        .zip(&column_map)
+        .filter_map(|(column, mapped)| mapped.map(|_| column))
+        .collect();
+    for column in warm
+        .columns
+        .iter_mut()
+        .flatten()
+        .chain(&mut warm.generated_pool)
+    {
+        column.entries = column
+            .entries
+            .iter()
+            .filter_map(|&(row, value)| map[row].map(|row| (row, value)))
+            .collect();
+    }
+    warm.artificials = warm
+        .artificials
+        .iter()
+        .filter_map(|&column| column_map[column])
+        .collect();
+    warm.cut_artificials = warm
+        .cut_artificials
+        .iter()
+        .filter_map(|&(row, column)| Some((map[row]?, column_map[column]?)))
+        .collect();
+    child.warm = warm.into();
+    let solved = child.solve(configured).unwrap();
+    for (route, &value) in solved.routes.iter().zip(&solved.values) {
+        if value > 1e-8 {
+            let oracle = &solved.snapshot.state.oracles[0];
+            assert!(super::entries(oracle, &route.route).unwrap().is_empty());
+        }
+    }
+}
+
+#[test]
+fn warm_branched_cleanup_retires_generated_cuts_and_preserves_branches() {
+    let (problem, config) = super::super::separation::mixed_arc_problem_and_config();
+    let mut configured = options();
+    configured.preprocessing.enabled = false;
+    configured.separation.rank_one_incidence = Some(config);
+    let mut root_options = configured.clone();
+    root_options.cg.max_cut_rounds = 0;
+    let root = solve_with_master_variables(problem, vec![], root_options).unwrap();
+    let oracle = &root.snapshot.state.oracles[0];
+    let original_cut_count = oracle.solver.cuts.cuts.len();
+    let vertex_member = RyanFosterMember {
+        network: oracle.network.id,
+        first: 1,
+        second: 3,
+    };
+    let arc_member = ArcSetMember {
+        network: oracle.network.id,
+        first: vec![0],
+        second: vec![7],
+    };
+    let child = root
+        .snapshot
+        .with_ryan_foster(&[vertex_member], false)
+        .unwrap()
+        .with_arc_set_branch(&[arc_member], false)
+        .unwrap();
+    let mut uncut_options = configured.clone();
+    uncut_options.cg.max_cut_rounds = 0;
+    let uncut_child = child.fork().unwrap();
+    let solved = child.solve(configured).unwrap();
+    let uncut = uncut_child.solve(uncut_options).unwrap();
+    let oracle = &solved.snapshot.state.oracles[0];
+    assert_eq!(uncut.master.status, crate::master::cg::Status::Optimal);
+    assert_eq!(solved.master.status, crate::master::cg::Status::Optimal);
+    assert!(solved.master.lp >= uncut.master.lp - 1e-6);
+    assert!(solved.master.cut_rounds >= 1);
+    assert!(oracle
+        .solver
+        .cuts
+        .retired
+        .iter()
+        .any(|&cut| cut >= original_cut_count));
+    assert_eq!(oracle.ryan_foster_rows.len(), 1);
+    assert_eq!(oracle.arc_set_branch_rows.len(), 1);
+    let protected = super::super::separation::protected_rows(&solved.snapshot.state);
+    let offset = solved.snapshot.state.shared_offset;
+    assert!(protected.contains(&(offset + oracle.ryan_foster_rows[0].0)));
+    assert!(protected.contains(&(offset + oracle.arc_set_branch_rows[0].0)));
+    for (route, &value) in solved.routes.iter().zip(&solved.values) {
+        if value > 1e-8 && route.network == oracle.network.id {
+            assert!(super::entries(oracle, &route.route).unwrap().is_empty());
+        }
+    }
+}
+
 fn prepared(problem: &Problem) -> RyanFosterBranching {
     let mut branching = RyanFosterBranching::new(2.);
     branching

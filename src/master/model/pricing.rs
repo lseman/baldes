@@ -110,6 +110,7 @@ pub(super) struct NetworkPricingAdapter<'a, const D: usize> {
     pub(super) state: &'a mut State<D>,
     pub(super) tolerance: f64,
 }
+
 impl<const D: usize> crate::master::pricing::Networks<D> for NetworkPricingAdapter<'_, D> {
     fn active(&self) -> Vec<usize> {
         self.state

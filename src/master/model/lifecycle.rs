@@ -204,6 +204,18 @@ impl<const D: usize> NodeSnapshot<D> {
         }
     }
 
+    pub(crate) fn reset_evaluation_incidence_phase(&mut self) {
+        if self
+            .state
+            .cuts
+            .as_ref()
+            .and_then(|cuts| cuts.incidence_config())
+            .is_some()
+        {
+            self.state.oracles[0].solver.cuts.reset_separation_phase();
+        }
+    }
+
     /// Simplex pivots recorded on this retained master since its last fork.
     /// Forks reset the counter; discarded trial/checkpoint masters are excluded.
     pub fn master_simplex_iterations(&self) -> usize {
@@ -235,7 +247,6 @@ impl<const D: usize> NodeSnapshot<D> {
             }
             node.state.objective_fixed = false;
             node.state.gap_pool_cutoff = None;
-            node.state.previous_fixing_gap = 1e12;
             node.warm.bound = f64::NEG_INFINITY;
             node.warm.numerical_bound = f64::NEG_INFINITY;
             node.warm.certified_bound = f64::NEG_INFINITY;

@@ -207,7 +207,7 @@ fn quota_one_records_trials_without_ranking_history_or_weakening_bounds() {
         controls.node.cg.bound_mode = mode;
         arc_flow_only(&problem, &mut controls);
         let mut strong = tree::StrongBranchingOptions::default();
-        strong.phases.truncate(1);
+        strong.phases.retain(|phase| phase.is_exact());
         strong.phases[0].candidates = 1;
         controls
             .branching_registry
@@ -220,7 +220,7 @@ fn quota_one_records_trials_without_ranking_history_or_weakening_bounds() {
         // several ulps even when the requested optimality gap is closed.
         assert!(out.bound <= out.incumbent);
         assert!(out.incumbent - out.bound < 1e-6);
-        assert!(out.strong_branching_trials > 0);
+        assert!(out.strong_branching_trials > 0, "{mode:?}: {out:?}");
         assert!(!out.mapped_branch_evaluations.is_empty());
         assert_eq!(out.mapped_history_ranked, 0);
     }

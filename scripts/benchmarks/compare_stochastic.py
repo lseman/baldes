@@ -52,6 +52,8 @@ def main() -> None:
     parser.add_argument("--policy", choices=["p1", "p3"], default="p3")
     parser.add_argument("--seconds", type=float, default=10.)
     parser.add_argument("--threads", type=int, default=1)
+    parser.add_argument("--tree-threads", type=int, default=1,
+                        help="BALDES tree workers; separate from --threads numerical pools")
     parser.add_argument("--repetitions", type=int, default=1)
     parser.add_argument("--ng-size", type=int, default=8,
                         help="Initial NG neighborhood size (default: 8)")
@@ -59,8 +61,8 @@ def main() -> None:
     parser.add_argument("--hgs-seed", type=int, default=0)
     parser.add_argument("--build-description", default="user-supplied binary; build flags not independently verified")
     args = parser.parse_args()
-    if not math.isfinite(args.seconds) or args.seconds <= 0 or min(args.threads, args.repetitions) < 1:
-        parser.error("need positive finite seconds and positive threads/repetitions")
+    if not math.isfinite(args.seconds) or args.seconds <= 0 or min(args.threads, args.tree_threads, args.repetitions) < 1:
+        parser.error("need positive finite seconds and positive threads/tree-threads/repetitions")
     if args.ng_size < 0:
         parser.error("NG size must be nonnegative")
     if args.hgs_seconds is not None and (not math.isfinite(args.hgs_seconds) or args.hgs_seconds <= 0):
@@ -76,7 +78,7 @@ def main() -> None:
     for name in ["RAYON_NUM_THREADS", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"]:
         environment[name] = str(args.threads)
     metadata = {"policy": args.policy, "time_limit_seconds": args.seconds, "threads": args.threads,
-                "repetitions": args.repetitions,
+                "repetitions": args.repetitions, "tree_threads": args.tree_threads,
                 "ng_size": args.ng_size,
                 "hgs_seconds": args.hgs_seconds, "hgs_seed": args.hgs_seed,
                 "baldes_binary_sha256": digest(binary), "branch_cut_script_sha256": digest(script),
@@ -95,7 +97,7 @@ def main() -> None:
                            "--seconds", str(args.seconds), "--threads", str(args.threads), "--seed", str(repetition)],
                 "baldes": [str(binary), str(path), "--solve", "--json", "--policy", args.policy,
                            "--seconds", str(args.seconds),
-                           "--ng-size", str(args.ng_size)]}
+                           "--ng-size", str(args.ng_size), "--tree-threads", str(args.tree_threads)]}
             if args.hgs_seconds is not None:
                 commands["baldes"] += ["--hgs-seconds", str(args.hgs_seconds), "--hgs-seed", str(args.hgs_seed)]
             record = {"input": str(path), "input_sha256": hashes[str(path)], "repetition": repetition,
@@ -114,7 +116,8 @@ def main() -> None:
             (args.output / "results.json").write_text(json.dumps(all_results, indent=2, allow_nan=False) + "\n")
     with (args.output / "summary.csv").open("w", newline="") as stream:
         fields = ["input", "repetition", "method", "status", "objective", "lower_bound", "gap",
-                  "process_wall_seconds", "build_seconds", "solve_seconds", "nodes", "both_optimal", "objective_agreement"]
+                  "process_wall_seconds", "build_seconds", "solve_seconds", "nodes",
+                  "tree_threads", "parallel_batches", "both_optimal", "objective_agreement"]
         writer = csv.DictWriter(stream, fields)
         writer.writeheader()
         for record in all_results:

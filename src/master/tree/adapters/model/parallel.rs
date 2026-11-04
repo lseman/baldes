@@ -108,6 +108,7 @@ pub(super) fn evaluate<const D: usize>(
             .map(|job| {
                 let mut node = job.restore()?;
                 node.reset_evaluation_artificials()?;
+                node.reset_evaluation_incidence_phase();
                 node.solve_forked(options.clone())
                     .and_then(Output::into_transfer)
             })

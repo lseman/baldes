@@ -832,6 +832,37 @@ pub(crate) fn mixed_arc_problem_and_config(
 }
 
 #[test]
+fn new_evaluation_resets_incidence_phase_without_losing_inherited_state() {
+    let (problem, config) = mixed_arc_problem_and_config();
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    options.preprocessing.enabled = false;
+    options.separation.rank_one_incidence = Some(config);
+    let root = super::super::solve(problem, options).unwrap();
+    let mut parent = root.snapshot.fork().unwrap();
+    parent.state.oracles[0].solver.cuts.separation_phase = 5;
+    let cut_count = parent.state.oracles[0].solver.cuts.cuts.len();
+    let history_count = parent
+        .incidence_separator_history()
+        .unwrap()
+        .generated_cut_count();
+    let mut child = parent.fork().unwrap();
+
+    child.reset_evaluation_incidence_phase();
+
+    assert_eq!(child.state.oracles[0].solver.cuts.separation_phase, 1);
+    assert_eq!(parent.state.oracles[0].solver.cuts.separation_phase, 5);
+    assert_eq!(child.state.oracles[0].solver.cuts.cuts.len(), cut_count);
+    assert_eq!(
+        child
+            .incidence_separator_history()
+            .unwrap()
+            .generated_cut_count(),
+        history_count
+    );
+}
+
+#[test]
 fn incidence_history_handoff_keeps_sibling_rows_independent() {
     use crate::cuts::separation::{Input, Solution};
     let (problem, config) = mixed_arc_problem_and_config();

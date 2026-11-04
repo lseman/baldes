@@ -120,6 +120,19 @@ pub(crate) trait Networks<const D: usize> {
     ) -> Result<Request>;
     /// Record a physical entry and lend the solver to the common invocation.
     fn enter(&mut self, index: usize) -> &mut Solver<D>;
+    fn price(
+        &mut self,
+        index: usize,
+        phase: usize,
+        remaining: std::time::Duration,
+    ) -> Result<crate::PricingResult> {
+        let solver = self.enter(index);
+        let saved = solver.controls.time_limit;
+        solver.controls.time_limit = saved.min(remaining);
+        let result = solver.price_functor_phase(phase, solver.controls.max_columns);
+        solver.controls.time_limit = saved;
+        result
+    }
     fn retained(&mut self, _index: usize, _duals: &[f64]) -> Option<Result<Retained>> {
         None
     }
@@ -312,12 +325,7 @@ pub(crate) fn price<const D: usize>(
             if remaining.is_zero() {
                 return Err(incomplete("network pricing time limit"));
             }
-            let solver = networks.enter(index);
-            let saved = solver.controls.time_limit;
-            solver.controls.time_limit = saved.min(remaining);
-            let result = solver.price_functor_phase(request.phase, solver.controls.max_columns);
-            solver.controls.time_limit = saved;
-            let result = result?;
+            let result = networks.price(index, request.phase, remaining)?;
             if request.exact && !result.exact {
                 return Err(incomplete("network exact pricing did not finish"));
             }
