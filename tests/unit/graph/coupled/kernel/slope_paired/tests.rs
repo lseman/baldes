@@ -314,7 +314,7 @@ fn machine_inputs_require_root_and_reject_changed_arc_identity() {
         graph.install_paired_machine_backward_root(0, bounds, budget),
         descriptor::FrontierOutcome::Complete(())
     ));
-    let paired = &mut graph.coupled.as_mut().unwrap().slope_paired[0];
+    let paired = &mut graph.edit().coupled.as_mut().unwrap().slope_paired[0];
     let installed = paired.machine_backward_root.as_ref().unwrap().clone();
     assert!(matches!(
         paired.set_machine_backward_root(
@@ -363,13 +363,13 @@ fn machine_inputs_require_root_and_reject_changed_arc_identity() {
         .set_paired_machine_root(0, Some(&function(5., 0.)))
         .unwrap();
     assert!(graph.validate().is_ok());
-    graph.sink = 1;
+    graph.edit().sink = 1;
     assert!(matches!(
         graph.prepare_paired_machine_backward_root(0, bounds, budget),
         descriptor::FrontierOutcome::Unknown(_)
     ));
-    graph.sink = 2;
-    graph.arcs[0].id += 10;
+    graph.edit().sink = 2;
+    graph.edit().arcs[0].id += 10;
     assert!(graph.validate().is_err());
     assert!(matches!(
         graph.prepare_paired_machine_backward_root(0, bounds, budget),
@@ -888,7 +888,7 @@ fn joined_machine_reconstruction_preserves_consumptions_and_rejects_replaced_roo
             );
             // This test reconstructs raw consumptions; it must not bypass the
             // still-unproved nonzero backward objective accounting contract.
-            graph.coupled.as_mut().unwrap().suppress_costs();
+            graph.edit().coupled.as_mut().unwrap().suppress_costs();
         }
         let kernel = graph.coupled_kernel().unwrap();
         let forward = kernel

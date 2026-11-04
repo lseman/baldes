@@ -10,7 +10,7 @@ fn acyclic_resource_minima_match_independent_quarter_grid_paths() {
                     for direct in [1, 2, 4] {
                         for costs in [[-3., 2., 1., 4., -2.], [2., -4., 3., -1., 5.]] {
                             let mut graph = Graph::<5>::new(4, 5).unwrap();
-                            graph.resources[4] = kind;
+                            graph.edit().resources[4] = kind;
                             for v in 0..4 {
                                 for r in 0..5 {
                                     graph.set_bounds(v, r, 0., capacity as f64 / 4.).unwrap();
@@ -81,16 +81,16 @@ fn cycles_and_budgets_decline_proofs_but_signed_disposable_dags_are_supported() 
     graph.add_arc(0, 1, 0.).unwrap();
     graph.add_arc(1, 1, -1.).unwrap();
     graph.add_arc(1, 2, 0.).unwrap();
-    graph.arcs[1].consumption[4] = 1.;
+    graph.edit().arcs[1].consumption[4] = 1.;
     let end = Instant::now() + std::time::Duration::from_secs(10);
     let mut work = 1_000_000;
     assert_eq!(minimum(&graph, &[0., -1., 0.], &mut work, end), None);
-    graph.arcs.remove(1);
-    graph.arcs[0].consumption[4] = -1.;
+    graph.edit().arcs.remove(1);
+    graph.edit().arcs[0].consumption[4] = -1.;
     let mut work = 1_000_000;
     // Signed disposable increments wait at the lower window and remain feasible.
     assert_eq!(minimum(&graph, &[0., 0.], &mut work, end), Some(Some(0.)));
-    graph.arcs[0].consumption[4] = 1.;
+    graph.edit().arcs[0].consumption[4] = 1.;
     let mut work = 0;
     assert_eq!(minimum(&graph, &[0., 0.], &mut work, end), None);
     let mut work = 1_000_000;

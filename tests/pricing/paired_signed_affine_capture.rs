@@ -27,8 +27,8 @@ fn prepared_signed_affine_owner_preserves_native_enumerated_paths_after_fixing()
         .collect();
     let mut solver = baldes::pricing::Solver::<2>::new(windows.len(), 1).unwrap();
     let sink = windows.len() - 1;
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[sink].elements.clear();
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[sink].elements.clear();
     for (vertex, window) in windows.iter().enumerate() {
         solver
             .graph

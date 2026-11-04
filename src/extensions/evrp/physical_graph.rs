@@ -72,15 +72,15 @@ impl Problem {
                 .ok_or_else(|| invalid("EV graph size overflow"))?,
             2,
         )?;
-        graph.source = self.depot;
-        graph.sink = n;
-        graph.elementary = true;
-        graph.main_resource = Some(0);
-        for vertex in &mut graph.vertices {
+        graph.edit().source = self.depot;
+        graph.edit().sink = n;
+        graph.edit().elementary = true;
+        graph.edit().main_resource = Some(0);
+        for vertex in &mut graph.edit().vertices {
             vertex.elements.clear();
             vertex.memory.clear();
         }
-        graph.element_count = 0;
+        graph.edit().element_count = 0;
         for (i, location) in self.locations.iter().enumerate() {
             if matches!(location.kind, LocationKind::Customer { .. }) {
                 graph.add_elementarity_set(&[i])?;
@@ -96,7 +96,7 @@ impl Problem {
             )?;
         }
         for r in 0..2 {
-            graph.initial[r] = Some(0.);
+            graph.edit().initial[r] = Some(0.);
             graph.set_bounds(self.depot, r, 0., 0.)?;
         }
         let mut arcs = Vec::new();
@@ -165,7 +165,7 @@ impl Problem {
         // An unavailable initial service start is represented by an empty
         // source adjacency, rather than an invented feasible initial state.
         if departure.max(depot.window.0) > depot.window.1 {
-            graph.arcs.clear();
+            graph.edit().arcs.clear();
             arcs.clear();
             served.clear();
         }

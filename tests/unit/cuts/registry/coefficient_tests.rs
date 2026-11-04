@@ -64,7 +64,7 @@ fn build_memory_policy_and_generated_cut_pricing_agree() {
     assert_eq!(MemoryType::Vertex.for_build(), MemoryType::Vertex);
     assert_eq!(MemoryType::AllVertices.for_build(), MemoryType::AllVertices);
     let mut graph = Graph::<2>::new(6, 1).unwrap();
-    graph.elementary = true;
+    graph.edit().elementary = true;
     for v in 0..6 {
         graph.set_bounds(v, 0, 0., 5.).unwrap();
     }
@@ -229,7 +229,7 @@ fn rank_one_rounds_inherit_only_active_arc_memories() {
     for graph_dependent in [false, true] {
         for retired in [false, true] {
             let mut graph = Graph::<2>::new(6, 1).unwrap();
-            graph.graph_id = 7;
+            graph.edit().graph_id = 7;
             for tail in 0..6 {
                 for head in 0..6 {
                     if tail != head {
@@ -296,7 +296,7 @@ fn vertex_budget_includes_active_cuts_and_releases_retired_cuts() {
         MemoryType::AllVertices,
     ] {
         let mut graph = Graph::<2>::new(5, 1).unwrap();
-        graph.graph_id = 7;
+        graph.edit().graph_id = 7;
         for tail in 0..5 {
             for head in 0..5 {
                 if tail != head {
@@ -382,7 +382,7 @@ fn vertex_budget_option_reaches_default_separator_and_rejects_negative_limits() 
 #[test]
 fn fractional_routes_preserve_parallel_arcs_and_validate_graph_endpoints() {
     let mut graph = Graph::<2>::new(4, 0).unwrap();
-    graph.graph_id = 7;
+    graph.edit().graph_id = 7;
     let first = graph.add_arc(0, 1, 0.).unwrap();
     let parallel = graph.add_arc(0, 1, 0.).unwrap();
     let last = graph.add_arc(1, 3, 0.).unwrap();
@@ -412,7 +412,7 @@ fn fractional_routes_preserve_parallel_arcs_and_validate_graph_endpoints() {
     assert!(registry.fractional_route(&graph, &column, &index).is_err());
 
     let mut other = Graph::<2>::new(4, 0).unwrap();
-    other.graph_id = 8;
+    other.edit().graph_id = 8;
     let other_last = other.add_arc(1, 3, 0.).unwrap();
     let other_first = other.add_arc(0, 1, 0.).unwrap();
     other.add_arc(0, 1, 0.).unwrap();
@@ -429,7 +429,7 @@ fn fractional_routes_preserve_parallel_arcs_and_validate_graph_endpoints() {
 #[test]
 fn rank_one_separation_accepts_exact_parallel_arcs_and_rejects_mismatched_routes() {
     let mut graph = Graph::<2>::new(6, 1).unwrap();
-    graph.graph_id = 7;
+    graph.edit().graph_id = 7;
     for tail in 0..6 {
         for head in 0..6 {
             if tail != head {

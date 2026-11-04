@@ -157,7 +157,7 @@ pub(super) fn prepare_with_seed_routes<const D: usize>(
         let activity_rows = network.activity_entries.clone();
         let mut solver = Solver::new(network.graph.vertices.len(), network.graph.resources.len())?;
         solver.graph = network.graph.clone();
-        solver.graph.graph_id = network.id;
+        solver.graph.edit().graph_id = network.id;
         if !options.bucket_steps.is_empty() {
             let implicit_paired = match network.graph.coupled_kernel() {
                 Some(kernel) => {
@@ -176,7 +176,7 @@ pub(super) fn prepare_with_seed_routes<const D: usize>(
                 solver.bucket_steps[slot] = step;
             }
         }
-        for (index, arc) in solver.graph.arcs.iter_mut().enumerate() {
+        for (index, arc) in solver.graph.edit().arcs.iter_mut().enumerate() {
             arc.cost = 0.;
             arc.variables = vec![(index, 1.)];
         }

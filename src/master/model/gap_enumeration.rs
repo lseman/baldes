@@ -232,26 +232,14 @@ pub(super) fn universe<const D: usize>(
                     .ok_or_else(|| invalid("gap coverage overflow"))?,
             );
         }
-        let saved_time = solver.controls.time_limit;
-        let saved_modes = (
-            solver.cuts.round_duals,
-            solver.exact_cut_duals,
-            solver.knapsack_exact_coefficients,
-        );
-        solver.cuts.round_duals = false;
-        solver.exact_cut_duals = true;
-        solver.knapsack_exact_coefficients = true;
         let saved_fixing_time = solver.options.get("BALDESredCostFixingTimeThreshold")?;
-        solver.controls.time_limit = saved_time.min(remaining);
         solver.options.set(
             "BALDESredCostFixingTimeThreshold",
             saved_fixing_time.min(remaining.as_secs_f64()),
         )?;
-        let fixed = solver.run_fixing_enumeration(mode, 0., cutoff);
-        solver.controls.time_limit = saved_time;
-        solver.cuts.round_duals = saved_modes.0;
-        solver.exact_cut_duals = saved_modes.1;
-        solver.knapsack_exact_coefficients = saved_modes.2;
+        let fixed = solver.with_exact_pricing(remaining, |solver| {
+            solver.run_fixing_enumeration(mode, 0., cutoff)
+        });
         solver
             .options
             .set("BALDESredCostFixingTimeThreshold", saved_fixing_time)?;

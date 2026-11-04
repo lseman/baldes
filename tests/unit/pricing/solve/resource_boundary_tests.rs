@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn full_kpath_repricing_agrees_before_and_after_retained_inspection() {
     let mut solver = Solver::<2>::new(4, 1).unwrap();
-    solver.graph.elementary = true;
+    solver.graph.edit().elementary = true;
     solver.enumeration_preserve_arc_paths = true;
     for (tail, head, cost) in [(0, 1, -4.), (1, 3, 0.), (0, 2, -2.), (2, 3, 0.)] {
         solver.graph.add_arc(tail, head, cost).unwrap();
@@ -28,7 +28,7 @@ fn heuristic_pricing_respects_requested_column_cap_across_join_groups() {
     for phase in [1, 2] {
         for maximum in [1, 2, 3] {
             let mut solver = Solver::<2>::new(6, 1).unwrap();
-            solver.graph.elementary = true;
+            solver.graph.edit().elementary = true;
             for vertex in 0..6 {
                 solver.graph.set_bounds(vertex, 0, 0., 10.).unwrap();
             }
@@ -52,7 +52,7 @@ fn heuristic_pricing_respects_requested_column_cap_across_join_groups() {
 
 fn retained_costs(costs: &[f64]) -> Solver<2> {
     let mut solver = Solver::<2>::new(costs.len() + 2, 1).unwrap();
-    solver.graph.elementary = true;
+    solver.graph.edit().elementary = true;
     solver.enumeration_preserve_arc_paths = true;
     let sink = solver.graph.sink;
     for (index, &cost) in costs.iter().enumerate() {
@@ -128,7 +128,7 @@ fn pricing_forks_share_topology_snapshots_and_isolate_working_graphs_and_paths()
 fn boundary(alternative: bool) -> Solver<2> {
     let mut s = Solver::<2>::new(if alternative { 4 } else { 3 }, 1).unwrap();
     let upper = f64::from_bits(1f64.to_bits() - 1);
-    s.graph.initial[0] = Some(0.);
+    s.graph.edit().initial[0] = Some(0.);
     for v in 0..s.graph.vertices.len() {
         s.graph.set_bounds(v, 0, 0., upper).unwrap();
     }
@@ -234,7 +234,7 @@ fn retained_skip_defers_resource_invalidation_but_partial_stores_cannot_skip() {
 fn raw_functor_retained_skip_does_not_require_or_refresh_objective_cache() {
     let mut solver = retained_costs(&[-2., -1.]);
     solver.restore_arcs();
-    solver.graph.arcs[0].variables = vec![(0, 1.)];
+    solver.graph.edit().arcs[0].variables = vec![(0, 1.)];
     solver.price_phase(0, 10, false).unwrap();
     solver.enumerate(100.).unwrap();
     assert!(solver.variable_costs.is_empty() && solver.raw_pricing.is_none());

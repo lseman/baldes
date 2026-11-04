@@ -179,10 +179,10 @@ impl<const D: usize> Solver<D> {
         let Some((vertices, arcs)) = self.ng_baseline.take() else {
             return false;
         };
-        for (v, memory) in self.graph.vertices.iter_mut().zip(vertices) {
+        for (v, memory) in self.graph.edit().vertices.iter_mut().zip(vertices) {
             v.memory = memory;
         }
-        for (a, memory) in self.graph.arcs.iter_mut().zip(arcs) {
+        for (a, memory) in self.graph.edit().arcs.iter_mut().zip(arcs) {
             a.memory = memory;
         }
         self.restore_arcs();

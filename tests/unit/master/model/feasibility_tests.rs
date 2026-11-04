@@ -71,7 +71,7 @@ fn zero_objective_feasibility_prices_restore_scalar_coupled_and_static_costs() {
     for coupled in [false, true] {
         let mut problem = triangle();
         for network in &mut problem.networks {
-            for arc in &mut network.graph.arcs {
+            for arc in &mut network.graph.edit().arcs {
                 arc.cost *= 1000.;
             }
             if coupled {
@@ -225,7 +225,7 @@ fn failed_phase_one_original_cost_replay_leaves_live_registry_unchanged() {
     let (master, warm) = without_route_columns(&root);
     let mut original = root.snapshot.state.fork_state();
     for oracle in &mut original.oracles {
-        for arc in &mut Arc::make_mut(&mut oracle.network.graph).arcs {
+        for arc in &mut Arc::make_mut(&mut oracle.network.graph).edit().arcs {
             arc.cost = f64::MAX;
         }
     }

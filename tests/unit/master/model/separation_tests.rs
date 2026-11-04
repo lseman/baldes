@@ -79,7 +79,7 @@ fn rc101_networks(customers: usize, copies: i32) -> Problem {
         let mut network = problem.networks[0].clone();
         network.id = id;
         // A heterogeneous copy: every arc costs a little more.
-        for arc in &mut network.graph.arcs {
+        for arc in &mut network.graph.edit().arcs {
             arc.cost *= 1. + 0.05 * id as f64;
         }
         problem.networks.push(network);
@@ -714,8 +714,8 @@ pub(crate) fn mixed_arc_problem_and_config(
         (8, "arcs8", "master_entries8"),
     ] {
         let mut graph = Graph::<2>::new(8, 1).unwrap();
-        graph.graph_id = id;
-        graph.elementary = true;
+        graph.edit().graph_id = id;
+        graph.edit().elementary = true;
         let membership = (0..8)
             .map(|v| match v {
                 1 => vec![1],
@@ -848,7 +848,7 @@ fn new_evaluation_resets_incidence_phase_without_losing_inherited_state() {
         .generated_cut_count();
     let mut child = parent.fork().unwrap();
 
-    child.reset_evaluation_incidence_phase();
+    child.prepare_evaluation().unwrap();
 
     assert_eq!(child.state.oracles[0].solver.cuts.separation_phase, 1);
     assert_eq!(parent.state.oracles[0].solver.cuts.separation_phase, 5);
@@ -1173,7 +1173,7 @@ fn explicit_multiple_arc_sets_close_captured_two_network_root() {
             .position(|arc| arc.tail == 2 && arc.head == 1)
             .unwrap();
         let arc_id = network.graph.arcs[index].id;
-        network.graph.arcs[index].elements.push(5);
+        network.graph.edit().arcs[index].elements.push(5);
         network.arc_entries[index].push((5, 1.));
         let arc = incidence
             .arcs

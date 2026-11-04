@@ -198,7 +198,7 @@ fn optimal<const D: usize>(output: &Output<D>, expected: f64) {
 #[test]
 fn signed_secondary_disposable_resource_waits_from_a_nonzero_start() {
     let mut graph = Graph::<2>::new(3, 2).unwrap();
-    graph.initial[1] = Some(5.);
+    graph.edit().initial[1] = Some(5.);
     for vertex in 0..3 {
         graph.set_bounds(vertex, 0, 0., 2.).unwrap();
     }
@@ -607,7 +607,7 @@ fn phase_one_closes_infeasible_multiplicity_children_and_original_empty_rows() {
 fn child_row_prices_a_route_absent_from_the_parent_registry() {
     let covers = vec![(1., &[0][..]); 200];
     let mut network = network(7, &covers, 1);
-    for (index, arc) in network.graph.arcs.iter_mut().enumerate() {
+    for (index, arc) in network.graph.edit().arcs.iter_mut().enumerate() {
         if index % 2 == 0 {
             arc.cost = 1. + (index / 2) as f64;
             arc.reduced_cost = arc.cost;
@@ -668,7 +668,7 @@ fn resource_aware_bounds_certify_bounded_cycles_and_keep_unrestricted_cycles_unk
         let mut graph = Graph::<2>::new(4, 1).unwrap();
         // Pricing is finite in the control case; the certificate's unrestricted
         // walk relaxation must still decline its zero-consumption negative cycle.
-        graph.elementary = true;
+        graph.edit().elementary = true;
         for vertex in 0..4 {
             graph.set_bounds(vertex, 0, 0., 2.).unwrap();
         }
@@ -1573,7 +1573,7 @@ fn required_network_quantity_gets_a_real_witness_before_box_admission() {
             .problem::<2>()
             .unwrap();
             problem.networks[0].multiplicity.lower = 1.;
-            for arc in &mut problem.networks[0].graph.arcs {
+            for arc in &mut problem.networks[0].graph.edit().arcs {
                 arc.cost = 0.;
             }
             let mut options = Options::default();

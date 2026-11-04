@@ -221,7 +221,7 @@ impl<const D: usize> Graph<D> {
         kernel.identity = std::sync::Arc::new(());
         kernel.pricing_adjustments = ordered.into();
         kernel.pricing_activities = resources.into();
-        self.coupled = Some(Box::new(kernel));
+        self.edit().coupled = Some(Box::new(kernel));
         Ok(())
     }
 

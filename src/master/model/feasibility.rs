@@ -60,7 +60,7 @@ pub(super) fn recover<const D: usize>(
     }
     for oracle in &mut state.oracles {
         Arc::make_mut(&mut oracle.network.graph).suppress_coupled_costs();
-        for arc in &mut Arc::make_mut(&mut oracle.network.graph).arcs {
+        for arc in &mut Arc::make_mut(&mut oracle.network.graph).edit().arcs {
             arc.cost = 0.;
             arc.reduced_cost = 0.;
         }
@@ -87,7 +87,7 @@ pub(super) fn recover<const D: usize>(
         oracle.solver.requires_rollback = false;
         oracle.solver.cutoff = f64::INFINITY;
         oracle.solver.graph.suppress_coupled_costs();
-        for arc in &mut oracle.solver.graph.arcs {
+        for arc in &mut oracle.solver.graph.edit().arcs {
             arc.cost = 0.;
             arc.reduced_cost = 0.;
         }

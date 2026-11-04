@@ -10,11 +10,14 @@ impl<const D: usize> Graph<D> {
     /// path is infeasible in this graph.
     pub fn elementary_route(&self, ids: &[i32]) -> Result<Option<Route>> {
         let g = self;
-        let mut first = std::collections::HashMap::with_capacity(g.arcs.len());
-        for (index, arc) in g.arcs.iter().enumerate() {
-            first.entry(arc.id).or_insert(index);
-        }
-        let position = |id: i32| first.get(&id).copied();
+        let lookup = g.sparse_arc_lookup();
+        let position = |id: i32| {
+            lookup
+                .as_ref()
+                .and_then(|lookup| lookup.get(id))
+                .or_else(|| g.arc_by_id(id))
+                .map(|(position, _)| position)
+        };
         let Some((nodes, positions, cost, resources, resource_profile)) = (|| {
             if ids.len() > g.original_max_arcs() {
                 return None;

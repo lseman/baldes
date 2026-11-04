@@ -26,8 +26,8 @@ fn stored_paired_completion_scans_only_after_labels_are_complete() {
     use crate::graph::Window;
 
     let mut graph = Graph::<2>::new(3, 1).unwrap();
-    graph.vertices[0].elements.clear();
-    graph.vertices[2].elements.clear();
+    graph.edit().vertices[0].elements.clear();
+    graph.edit().vertices[2].elements.clear();
     for vertex in 0..3 {
         graph.set_bounds(vertex, 0, 0., 4.).unwrap();
     }
@@ -478,7 +478,7 @@ fn check_native_completion_cases(capture: &serde_json::Value) {
 
 fn fixing_graph() -> Graph<2> {
     let mut graph = Graph::<2>::new(5, 1).unwrap();
-    graph.elementary = true;
+    graph.edit().elementary = true;
     for v in 0..5 {
         graph.set_bounds(v, 0, 0., 4.).unwrap();
     }
@@ -1035,7 +1035,7 @@ fn fixing_completion_equality_resource_matches_reference_boundaries() {
     assert_eq!(cases.len(), 144);
     for case in cases {
         let mut graph = Graph::<2>::new(3, 2).unwrap();
-        graph.resources[1] = crate::graph::ResourceKind::Equality;
+        graph.edit().resources[1] = crate::graph::ResourceKind::Equality;
         for vertex in 0..3 {
             graph.set_bounds(vertex, 0, 0., 2.).unwrap();
             graph

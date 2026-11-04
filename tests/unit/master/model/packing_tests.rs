@@ -60,7 +60,7 @@ fn adjacent_vertices_in_same_group_contribute_full_arc_coefficient() {
     arc.id = 99;
     arc.tail = 1;
     arc.head = 2;
-    problem.networks[0].graph.arcs.push(arc);
+    problem.networks[0].graph.edit().arcs.push(arc);
     let mut packing = PackingBranching::new(
         1.,
         vec![NetworkPackingAssignment::new(7, vec![(1, 4), (2, 4)])],

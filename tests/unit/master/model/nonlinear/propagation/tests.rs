@@ -153,7 +153,7 @@ fn registered_zero_support_matches_every_path_in_8192_dag_domains() {
             .filter_map(|(i, &e)| (mask & (1 << i) != 0).then_some(e))
             .collect();
         let mut g = graph(5, &selected);
-        for (i, arc) in g.arcs.iter_mut().enumerate() {
+        for (i, arc) in g.edit().arcs.iter_mut().enumerate() {
             arc.id = 7 + 13 * i as i32;
         }
         let a = cut(5, &[1, 2, 3]);

@@ -83,7 +83,7 @@ impl<const D: usize> Enumeration<D> {
                 invalid("nonconservative reduced costs cannot use symmetric enumeration")
             })?;
             let mut transformed = g.clone();
-            for (arc, cost) in transformed.arcs.iter_mut().zip(costs) {
+            for (arc, cost) in transformed.edit().arcs.iter_mut().zip(costs) {
                 arc.reduced_cost = cost;
             }
             let mut result = Self::run_with_concatenation_limit(

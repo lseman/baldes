@@ -16,6 +16,7 @@ pub(super) fn load<const D: usize>(oracle: &Oracle<D>, route: &Route, r: usize) 
         graph = oracle.network.graph.as_ref().clone();
         for &(vertex, resource, window) in &oracle.synchronized_windows {
             let bounds = graph
+                .edit()
                 .vertices
                 .get_mut(vertex)
                 .and_then(|v| v.bounds.get_mut(resource))

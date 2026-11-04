@@ -128,7 +128,7 @@ fn owned_presence_updates_keep_branches_and_physical_exclusions() {
 fn owned_presence_reaches_raw_functor_rebuilds() {
     let (mut g, events) = fixtures(false);
     let raw_costs = vec![0.123456789; g.arcs.len()];
-    for (i, a) in g.arcs.iter_mut().enumerate() {
+    for (i, a) in g.edit().arcs.iter_mut().enumerate() {
         a.variables = vec![(i, 1.)];
     }
     let mut solver = owned_solver(g.clone(), true);
@@ -136,7 +136,7 @@ fn owned_presence_reaches_raw_functor_rebuilds() {
         .set_presence_rows(input(&g, &events, Mode::PairCount, 0.7))
         .unwrap();
     solver.cache_variable_costs(&raw_costs).unwrap();
-    for (a, cost) in g.arcs.iter_mut().zip(&raw_costs) {
+    for (a, cost) in g.edit().arcs.iter_mut().zip(&raw_costs) {
         a.reduced_cost = a.cost + cost;
     }
     let expected = exhaustive(&g, &events, Mode::PairCount, 0.7);

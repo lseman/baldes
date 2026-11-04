@@ -17,8 +17,8 @@ fn covering_cut_keeps_below_cutoff_paths_through_its_support() {
     let arc_count: usize = parse(header.next().unwrap());
     let cutoff: f64 = parse(header.next().unwrap());
     let mut solver = Solver::<2>::new(n, 1).unwrap();
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[n - 1].elements.clear();
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[n - 1].elements.clear();
     for vertex in 0..n {
         solver.graph.set_bounds(vertex, 0, 0., 2.).unwrap();
     }
@@ -45,11 +45,11 @@ fn covering_cut_keeps_below_cutoff_paths_through_its_support() {
         .collect();
     assert_eq!(native_paths.len(), 12);
     solver.bucket_steps[0] = 1.;
-    for (arc, cost) in solver.graph.arcs.iter_mut().zip(before_cut) {
+    for (arc, cost) in solver.graph.edit().arcs.iter_mut().zip(before_cut) {
         arc.reduced_cost = cost;
     }
     solver.fix(1.499999996403).unwrap();
-    for (arc, cost) in solver.graph.arcs.iter_mut().zip(after_cut) {
+    for (arc, cost) in solver.graph.edit().arcs.iter_mut().zip(after_cut) {
         arc.reduced_cost = cost;
     }
     let mut weights = vec![0; n];

@@ -183,18 +183,18 @@ pub fn strengthen<const D: usize>(
                 for &v in &members {
                     neighbourhood[v].insert(e);
                     if controls.mode == 1 && !g.vertices[v].memory.contains(&e) {
-                        g.vertices[v].memory.push(e);
+                        g.edit().vertices[v].memory.push(e);
                     }
                 }
                 if controls.mode != 1 {
                     for &id in &cycle.arcs {
                         if !g.arcs[id].memory.contains(&e) {
-                            g.arcs[id].memory.push(e);
+                            g.edit().arcs[id].memory.push(e);
                         }
                         if let Some(reverse) = &reverse {
                             let r = reverse[id];
                             if !g.arcs[r].memory.contains(&e) {
-                                g.arcs[r].memory.push(e);
+                                g.edit().arcs[r].memory.push(e);
                             }
                         }
                     }
@@ -264,7 +264,7 @@ pub fn initialize_distances<const D: usize>(
         neighbourhood.push(ids);
     }
     let mut changed = false;
-    for vertex in &mut g.vertices {
+    for vertex in &mut g.edit().vertices {
         let mut memory = BTreeSet::new();
         for &e in &vertex.elements {
             memory.extend(&neighbourhood[e]);
@@ -272,7 +272,7 @@ pub fn initialize_distances<const D: usize>(
         vertex.memory = memory.into_iter().collect();
         changed |= !vertex.memory.is_empty();
     }
-    for arc in &mut g.arcs {
+    for arc in &mut g.edit().arcs {
         let mut memory = BTreeSet::new();
         for &e in &arc.elements {
             memory.extend(&neighbourhood[e]);

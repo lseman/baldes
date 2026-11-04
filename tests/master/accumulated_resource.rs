@@ -9,8 +9,8 @@ mod grouped;
 
 fn solver(kind: ResourceKind) -> Solver<5> {
     let mut s = Solver::<5>::new(3, 5).unwrap();
-    s.graph.elementary = true;
-    s.graph.resources[4] = kind;
+    s.graph.edit().elementary = true;
+    s.graph.edit().resources[4] = kind;
     for v in 0..3 {
         for r in 0..5 {
             s.graph.set_bounds(v, r, 0., 3.).unwrap();

@@ -1150,3 +1150,23 @@ def test_greedy_initial_construction_reaches_network_options_and_reports_work():
     assert json.loads(result.to_json())["greedy_nodes"] == result.greedy_nodes
     with pytest.raises(ValueError, match="greedy requires tree"):
         triangle().solve(greedy=True)
+
+
+def test_solve_forwards_tree_controls_to_shared_rust_options(monkeypatch):
+    import importlib
+    frontend = importlib.import_module("pybaldes.solve")
+    captured = {}
+    def capture(problem, options):
+        captured.update(options)
+        return options, None
+    monkeypatch.setattr(frontend._core, "_solve", capture)
+    monkeypatch.setattr(frontend, "_result", lambda options, node: options)
+    problem = NetworkProblem.from_file(FIXTURE)
+    frontend.solve(problem, tree=True, tree_threads=4, absolute_gap=0.25,
+                   relative_gap=0.01, integer_objective=True,
+                   diving={"depth_limit": 0})
+    assert captured["tree_threads"] == 4
+    assert captured["absolute_gap"] == 0.25
+    assert captured["relative_gap"] == 0.01
+    assert captured["integer_objective"] is True
+    assert captured["diving"] == {"depth_limit": 0}

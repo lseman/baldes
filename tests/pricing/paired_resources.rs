@@ -84,9 +84,9 @@ fn program_json(resource: usize) -> serde_json::Value {
 }
 fn fixture(mode: PairedResourceMode, scalar: f64) -> Graph<2> {
     let mut graph = Graph::<2>::new(4, 1).unwrap();
-    graph.elementary = true;
-    graph.vertices[0].elements.clear();
-    graph.vertices[3].elements.clear();
+    graph.edit().elementary = true;
+    graph.edit().vertices[0].elements.clear();
+    graph.edit().vertices[3].elements.clear();
     for v in 0..4 {
         graph.set_bounds(v, 0, 0., 2.).unwrap();
     }
@@ -178,7 +178,7 @@ fn paired_pricing_cut_duals_fixing_retained_enumeration_and_siblings_match_contr
             }
             check_routes(solver.enumerate(100.).unwrap(), &oracle);
             let mut parent = solver.fork_for_node();
-            for (i, arc) in solver.graph.arcs.iter_mut().enumerate() {
+            for (i, arc) in solver.graph.edit().arcs.iter_mut().enumerate() {
                 arc.reduced_cost += (i % 2) as f64;
             }
             let refreshed = expected(&solver.graph, mode, 1.25);
@@ -409,7 +409,7 @@ fn paired_standard_resources_cost_refresh_and_node_forks_keep_their_domains() {
         for direction in [0., 1., 2.] {
             let mut solver = baldes::pricing::Solver::<2>::new(4, 1).unwrap();
             solver.graph = fixture(mode, -10.);
-            for (index, arc) in solver.graph.arcs.iter_mut().enumerate() {
+            for (index, arc) in solver.graph.edit().arcs.iter_mut().enumerate() {
                 arc.variables = vec![(index, 1.)];
             }
             solver

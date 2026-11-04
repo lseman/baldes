@@ -228,19 +228,19 @@ impl Problem {
                 (gj - gi) * demand(i)
             };
         let mut g = Graph::<2>::new(n + 2, 2)?;
-        g.source = i;
-        g.sink = j;
+        g.edit().source = i;
+        g.edit().sink = j;
         // p<=3 paths are already elementary (distinct terminals, no loops,
         // no arcs into source or out of sink). Longer steps use exact cycle
         // exclusion below instead of the core's bounded local NG mask.
-        g.elementary = false;
+        g.edit().elementary = false;
         // Hop equality prevents waiting from fabricating extra arcs. Load
         // windows all have lower bound zero: waiting cannot improve a path,
         // so a cheaper label using less capacity safely dominates. Arc costs
         // use physical demands, independent of any resource waiting.
-        g.resources = vec![ResourceKind::Equality, ResourceKind::Disposable];
-        g.initial[0] = Some(0.0);
-        g.initial[1] = Some(demand(i));
+        g.edit().resources = vec![ResourceKind::Equality, ResourceKind::Disposable];
+        g.edit().initial[0] = Some(0.0);
+        g.edit().initial[1] = Some(demand(i));
         for v in 0..n + 2 {
             g.set_bounds(v, 0, 0.0, p as f64)?;
             g.set_bounds(v, 1, 0.0, self.capacity)?;
@@ -365,6 +365,7 @@ fn elementary_minimum(
         }
         let mut graph = g.clone();
         graph
+            .edit()
             .arcs
             .retain(|a| (a.tail != g.source || a.id == id) && (a.head != head || a.id == id));
         let mut limits = options.clone();
@@ -414,6 +415,7 @@ fn cycle_minimum(
         }
         let mut graph = g.clone();
         graph
+            .edit()
             .arcs
             .retain(|a| forbidden.binary_search(&a.id).is_err());
         let (route, generated) = relaxed_minimum(

@@ -56,7 +56,7 @@ fn forks_share_immutable_inputs_and_routes_but_isolate_row_edits_and_outputs() {
         &root.snapshot.state.routes[0],
         &child.state.routes[0]
     ));
-    child_oracle.solver.graph.vertices[0].bounds[0].upper = 42.;
+    child_oracle.solver.graph.edit().vertices[0].bounds[0].upper = 42.;
     assert_ne!(oracle.solver.graph.vertices[0].bounds[0].upper, 42.);
 
     // Public outputs remain owned values even though private node payloads share.

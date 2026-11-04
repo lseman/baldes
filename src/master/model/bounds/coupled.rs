@@ -38,6 +38,7 @@ pub(super) fn minimum<const D: usize>(
     }
     let mut relaxed = graph.clone();
     relaxed
+        .edit()
         .resources
         .fill(crate::graph::ResourceKind::Disposable);
     relaxed.set_coupled_resources(&[]).ok()?;

@@ -480,7 +480,10 @@ fn weak_or_missing_master_point_for_finite_box_really_prices_the_network() {
     for point in [None, Some((0., 0.))] {
         let mut output = positive_network(0., false);
         let node = &mut output.snapshot;
-        Arc::make_mut(&mut node.state.oracles[0].network.graph).arcs[0].cost = -1.;
+        Arc::make_mut(&mut node.state.oracles[0].network.graph)
+            .edit()
+            .arcs[0]
+            .cost = -1.;
         node.state.pricing_master = point;
         node.state
             .variable_boxes
@@ -584,7 +587,7 @@ fn variable_boxes_reject_unknown_or_unproved_inputs_before_zero_budget_returns()
 fn variable_box_zero_budget_validation_rejects_bad_graph_without_walking_it() {
     let mut graph = Graph::<2>::new(3, 0).unwrap();
     graph.add_arc(0, 1, 1.).unwrap();
-    graph.arcs[0].head = 99;
+    graph.edit().arcs[0].head = 99;
     let problem = Problem {
         rows: vec![],
         networks: vec![Network {

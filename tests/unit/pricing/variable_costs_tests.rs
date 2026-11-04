@@ -322,7 +322,7 @@ fn model() -> Solver<2> {
 
 fn fresh(solver: &Solver<2>) -> PricingResult {
     let mut raw = solver.fork_pricing(false);
-    for arc in &mut raw.graph.arcs {
+    for arc in &mut raw.graph.edit().arcs {
         arc.reduced_cost = arc.variables.iter().fold(arc.cost, |sum, &(id, a)| {
             sum + solver.variable_costs[id] * a
         });
@@ -415,7 +415,7 @@ fn raw_workspace_invalidates_on_topology_restrictions_presence_and_configuration
         .prepared
         .clone()
         .unwrap();
-    solver.graph.arcs[2].cost = 0.03;
+    solver.graph.edit().arcs[2].cost = 0.03;
     matches_fresh(&mut solver, 1e-9);
     assert!(!Arc::ptr_eq(
         &first,
@@ -621,7 +621,7 @@ fn presence_dual_updates_reuse_only_raw_preparation_and_match_fresh_searches() {
     ));
 
     // A topology mutation before a dual-only setter must not be hidden by it.
-    solver.graph.arcs[2].cost = 0.07;
+    solver.graph.edit().arcs[2].cost = 0.07;
     let mut rows = solver.presence_rows().to_vec();
     rows[0].dual = 0.8;
     solver.set_presence_rows(rows).unwrap();
@@ -636,13 +636,13 @@ fn route_correction_handles_sparse_arc_ids_and_reordered_storage() {
     let priced = solver.price_phase(0, 8, false).unwrap();
     let mut route = priced.columns[0].clone();
     let expected = solver.corrected_bound(route.cost, &route).unwrap();
-    for arc in &mut solver.graph.arcs {
+    for arc in &mut solver.graph.edit().arcs {
         arc.id += 100;
     }
     for id in &mut route.arcs {
         *id += 100;
     }
-    solver.graph.arcs.reverse();
+    solver.graph.edit().arcs.reverse();
     assert_eq!(
         solver.corrected_bound(route.cost, &route).unwrap(),
         expected
@@ -658,7 +658,7 @@ fn batch_correction_index_preserves_sparse_and_duplicate_id_lookup() {
     let priced = solver.price_phase(0, 8, false).unwrap();
     assert!(solver.correction_arc_index().is_none());
     let mut routes = priced.columns;
-    for arc in &mut solver.graph.arcs {
+    for arc in &mut solver.graph.edit().arcs {
         arc.id += 100;
     }
     for route in &mut routes {
@@ -666,9 +666,9 @@ fn batch_correction_index_preserves_sparse_and_duplicate_id_lookup() {
             *id += 100;
         }
     }
-    solver.graph.arcs.reverse();
+    solver.graph.edit().arcs.reverse();
     let duplicate = solver.graph.arcs[0].clone();
-    solver.graph.arcs.push(duplicate);
+    solver.graph.edit().arcs.push(duplicate);
     let index = solver.correction_arc_index().unwrap();
     for route in &routes {
         assert_eq!(
@@ -677,5 +677,58 @@ fn batch_correction_index_preserves_sparse_and_duplicate_id_lookup() {
                 .unwrap(),
             solver.corrected_bound(route.cost, route).unwrap()
         );
+    }
+}
+
+#[test]
+fn temporary_pricing_budget_restores_limit_on_success_and_error() {
+    use std::time::Duration;
+    let mut solver = model();
+    solver.controls.time_limit = Duration::from_secs(10);
+    solver
+        .with_pricing_budget(Duration::from_secs(2), |solver| {
+            assert_eq!(solver.controls.time_limit, Duration::from_secs(2));
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(solver.controls.time_limit, Duration::from_secs(10));
+    let result: Result<()> = solver.with_pricing_budget(Duration::from_secs(20), |solver| {
+        assert_eq!(solver.controls.time_limit, Duration::from_secs(10));
+        Err(invalid("test pricing failure"))
+    });
+    assert!(result.is_err());
+    assert_eq!(solver.controls.time_limit, Duration::from_secs(10));
+}
+
+#[test]
+fn exact_pricing_scope_restores_nested_modes_and_failure() {
+    use std::time::Duration;
+    let mut solver = model();
+    for rounded in [false, true] {
+        for exact in [false, true] {
+            solver.cuts.round_duals = rounded;
+            solver.exact_cut_duals = exact;
+            solver.knapsack_exact_coefficients = false;
+            solver.controls.time_limit = Duration::from_secs(10);
+            let result: Result<()> = solver.with_exact_pricing(Duration::from_secs(3), |solver| {
+                assert!(!solver.cuts.round_duals);
+                assert!(solver.exact_cut_duals);
+                assert!(solver.knapsack_exact_coefficients);
+                assert_eq!(solver.controls.time_limit, Duration::from_secs(3));
+                let nested: Result<()> = solver.with_exact_pricing(Duration::from_secs(1), |_| {
+                    Err(invalid("nested pricing failure"))
+                });
+                assert!(nested.is_err());
+                assert!(!solver.cuts.round_duals);
+                assert!(solver.exact_cut_duals && solver.knapsack_exact_coefficients);
+                assert_eq!(solver.controls.time_limit, Duration::from_secs(3));
+                Err(invalid("outer pricing failure"))
+            });
+            assert!(result.is_err());
+            assert_eq!(solver.cuts.round_duals, rounded);
+            assert_eq!(solver.exact_cut_duals, exact);
+            assert!(!solver.knapsack_exact_coefficients);
+            assert_eq!(solver.controls.time_limit, Duration::from_secs(10));
+        }
     }
 }

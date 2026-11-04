@@ -19,11 +19,11 @@ fn event(g: &Graph<2>, arc: usize, second: bool) -> (f64, f64) {
 
 fn mixed_solver(elementary: bool, symmetric: bool, cut: bool, multiple: bool) -> Solver<2> {
     let mut s = solver(symmetric, cut);
-    s.graph.elementary = elementary;
+    s.graph.edit().elementary = elementary;
     for v in 0..s.graph.vertices.len() {
         s.graph.set_ng(v, &[]).unwrap();
     }
-    for arc in &mut s.graph.arcs {
+    for arc in &mut s.graph.edit().arcs {
         arc.reduced_cost = -2.;
     }
     let mut definitions = vec![CoupledResource::Selection {

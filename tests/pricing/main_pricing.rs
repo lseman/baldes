@@ -36,7 +36,7 @@ fn cycle_graph() -> Graph<2> {
 #[test]
 fn designated_main_disposable_resource_requires_monotone_consumption() {
     let mut g = Graph::<2>::new(2, 1).unwrap();
-    g.main_resource = Some(0);
+    g.edit().main_resource = Some(0);
     let arc = g.add_arc(0, 1, -1.).unwrap();
     g.arc_mut(arc).unwrap().consumption[0] = -1.;
     assert!(price(&g, &Controls::default())
@@ -62,7 +62,7 @@ fn ng_memory_and_full_elementarity_prevent_repeated_visits() {
     g.set_ng(2, &[1, 2]).unwrap();
     let result = price(&g, &Controls::default()).unwrap();
     assert_eq!(result.minimum_reduced_cost, -5.);
-    g.elementary = true;
+    g.edit().elementary = true;
     assert_eq!(
         price(&g, &Controls::default()).unwrap().columns[0].nodes,
         [0, 1, 4]
@@ -76,7 +76,7 @@ fn waiting_and_equality_are_different_transitions() {
         price(&g, &Controls::default()).unwrap().columns[0].resources,
         [4.]
     );
-    g.resources[0] = ResourceKind::Equality;
+    g.edit().resources[0] = ResourceKind::Equality;
     assert!(price(&g, &Controls::default()).unwrap().columns.is_empty());
 }
 #[test]
@@ -88,7 +88,7 @@ fn backward_resource_clipping_happens_before_subtraction() {
         extend_resources(&g, &g.arcs[0], [4., 0.], false),
         Some([2., 0.].into())
     );
-    g.resources[0] = ResourceKind::Equality;
+    g.edit().resources[0] = ResourceKind::Equality;
     assert!(extend_resources(&g, &g.arcs[0], [4., 0.], false).is_none());
 }
 #[test]
@@ -259,7 +259,7 @@ fn grouped_elements_forbid_different_vertices_with_the_same_element() {
         ],
     );
     g.add_elementarity_set(&[1, 2]).unwrap();
-    g.elementary = true;
+    g.edit().elementary = true;
     assert_eq!(
         price(&g, &Controls::default()).unwrap().columns[0].nodes,
         [0, 1, 3]
@@ -288,12 +288,12 @@ fn input_validation_precedes_search_and_ignores_no_resources() {
     assert!(Graph::<2>::new(0, 0).is_err());
     assert!(Graph::<2>::new(3, 3).is_err());
     let mut g = graph(2, 1, &[(0, 1, 0., 1.)]);
-    g.arcs[0].consumption[0] = f64::NAN;
+    g.edit().arcs[0].consumption[0] = f64::NAN;
     assert!(price(&g, &Controls::default()).is_err());
-    g.arcs[0].consumption[0] = -1.;
+    g.edit().arcs[0].consumption[0] = -1.;
     assert!(price(&g, &Controls::default()).is_err());
-    g.arcs[0].consumption[0] = 1.;
-    g.source = g.sink;
+    g.edit().arcs[0].consumption[0] = 1.;
+    g.edit().source = g.sink;
     assert!(price(&g, &Controls::default()).is_err());
 }
 
@@ -366,9 +366,9 @@ fn randomized_small_graphs_match_independent_complete_enumeration() {
     for case in 0..160 {
         let mut next = || rng.next() >> 32;
         let mut g = Graph::<2>::new(6, 2).unwrap();
-        g.elementary = case >= 80;
+        g.edit().elementary = case >= 80;
         if case % 3 == 0 {
-            g.resources[1] = ResourceKind::Equality;
+            g.edit().resources[1] = ResourceKind::Equality;
         }
         for v in 0..6 {
             g.set_bounds(v, 0, if v == 0 { 0. } else { (next() % 3) as f64 }, 5.)
@@ -413,7 +413,7 @@ fn randomized_small_graphs_match_independent_complete_enumeration() {
 fn scalar_dimensions_fixture<const D: usize>() -> Graph<D> {
     let dimensions = D;
     let mut g = Graph::<D>::new(6, dimensions).unwrap();
-    g.elementary = true;
+    g.edit().elementary = true;
     for v in 0..6 {
         for r in 0..dimensions {
             g.set_bounds(v, r, 0., 10.).unwrap();
@@ -443,7 +443,7 @@ fn all_scalar_dimensions_participate_in_dominance_and_reconstruction() {
         let dimensions = D;
         let mut g = scalar_dimensions_fixture::<D>();
         for main in [0, dimensions - 1] {
-            g.main_resource = Some(main);
+            g.edit().main_resource = Some(main);
             for bidirectional in [false, true] {
                 let mut engine = LabelingEngine::prepare(
                     &g,
@@ -482,11 +482,11 @@ fn all_scalar_dimensions_participate_in_dominance_and_reconstruction() {
 #[test]
 fn extra_equality_resources_and_arc_windows_are_enforced() {
     let mut g = scalar_dimensions_fixture::<4>();
-    g.resources[3] = ResourceKind::Equality;
+    g.edit().resources[3] = ResourceKind::Equality;
     g.set_bounds(g.sink, 3, 6., 6.).unwrap();
     let result = price(&g, &Controls::default()).unwrap();
     assert_eq!(result.minimum_reduced_cost, -5.);
-    g.arcs.last_mut().unwrap().bounds[3] = Some(baldes::Window::new(7., 8.).unwrap());
+    g.edit().arcs.last_mut().unwrap().bounds[3] = Some(baldes::Window::new(7., 8.).unwrap());
     assert!(price(&g, &Controls::default()).unwrap().columns.is_empty());
 }
 
@@ -619,7 +619,7 @@ fn models_cannot_exceed_their_compiled_capacity() {
     let mut g = Graph::<4>::new(3, 4).unwrap();
     assert!(g.add_resource(ResourceKind::Disposable).is_err());
     // Public metadata is validated before any scalar coordinate is accessed.
-    g.resources.push(ResourceKind::Disposable);
+    g.edit().resources.push(ResourceKind::Disposable);
     assert!(price(&g, &Controls::default()).is_err());
 }
 
@@ -695,8 +695,8 @@ fn signed_extra_equality_resource_joins_at_nonzero_initial_state() {
             g.set_bounds(vertex, r, 0., 10.).unwrap();
         }
     }
-    g.resources[3] = ResourceKind::Equality;
-    g.initial[3] = Some(5.);
+    g.edit().resources[3] = ResourceKind::Equality;
+    g.edit().initial[3] = Some(5.);
     g.set_bounds(0, 3, 5., 5.).unwrap();
     g.set_bounds(1, 3, 3., 3.).unwrap();
     g.set_bounds(3, 3, 4., 4.).unwrap();
@@ -1029,8 +1029,8 @@ fn enumeration_feasibility_distinguishes_parallel_physical_arc_paths() {
     solver.graph.add_arc(0, 1, -3.).unwrap();
     solver.graph.add_arc(0, 1, -1.).unwrap();
     // Public IDs are sparse and reversed relative to physical vector slots.
-    solver.graph.arcs[0].id = 71;
-    solver.graph.arcs[1].id = 19;
+    solver.graph.edit().arcs[0].id = 71;
+    solver.graph.edit().arcs[1].id = 19;
     solver.set_enumeration_feasibility_check(Some(std::sync::Arc::new(RejectFirstArc)));
     let routes = solver.enumerate(0.).unwrap();
     assert_eq!(routes.len(), 1);

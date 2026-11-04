@@ -271,17 +271,17 @@ impl Model {
         let mut networks = vec![];
         for input in self.networks {
             let mut graph = Graph::<D>::new(input.vertices, input.resources.len())?;
-            graph.source = input.source;
+            graph.edit().source = input.source;
             if let Some(sink) = input.sink {
-                graph.sink = sink;
+                graph.edit().sink = sink;
             }
             for (r, resource) in input.resources.into_iter().enumerate() {
-                graph.resources[r] = match resource.kind.as_str() {
+                graph.edit().resources[r] = match resource.kind.as_str() {
                     "disposable" => ResourceKind::Disposable,
                     "equality" => ResourceKind::Equality,
                     _ => return Err(invalid("resource kind must be disposable or equality")),
                 };
-                graph.initial[r] = resource.initial;
+                graph.edit().initial[r] = resource.initial;
                 #[cfg(feature = "multi-time-windows")]
                 if let Some(unions) = resource.time_windows {
                     if unions.len() != input.vertices {
@@ -334,7 +334,7 @@ impl Model {
                 }
                 arc_entries.push(input.entries);
             }
-            graph.elementary = input.elementary;
+            graph.edit().elementary = input.elementary;
             graph.set_route_domain(input.route_domain)?;
             graph.set_coupled_resources(&input.coupled_resources)?;
             for (index, &(resource, base)) in input.paired_waiting_base_resources.iter().enumerate()

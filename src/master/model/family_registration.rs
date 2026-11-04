@@ -4,10 +4,7 @@ use super::*;
 /// The single configuration and prepared lookup state for all branching families.
 #[derive(Clone, Debug)]
 pub struct BranchingRegistry {
-    prepared: bool,
-    declaration: HashMap<BranchFamilyRegistration, usize>,
-    mapped_families: HashMap<String, (BranchFamilyRegistration, usize)>,
-    selection_order: HashMap<String, usize>,
+    prepared: Option<CompiledBranchingRegistry>,
     /// Actual construction order recorded at the single registration entry point.
     creation_order: Vec<BranchFamilyRegistration>,
     pub(super) defaulted_aggregate_admission: HashSet<String>,
@@ -29,13 +26,18 @@ pub struct BranchingRegistry {
     pub(crate) ryan_foster: Option<RyanFosterBranching>,
 }
 
+/// Validated derived lookups are published together and invalidated together.
+#[derive(Clone, Debug)]
+struct CompiledBranchingRegistry {
+    declaration: HashMap<BranchFamilyRegistration, usize>,
+    mapped_families: HashMap<String, (BranchFamilyRegistration, usize)>,
+    selection_order: HashMap<String, usize>,
+}
+
 impl Default for BranchingRegistry {
     fn default() -> Self {
         Self {
-            prepared: false,
-            declaration: HashMap::new(),
-            mapped_families: HashMap::new(),
-            selection_order: HashMap::new(),
+            prepared: None,
             creation_order: vec![],
             defaulted_aggregate_admission: HashSet::new(),
             branching: NetworkBranchingPolicy::default(),
@@ -60,19 +62,20 @@ impl Default for BranchingRegistry {
 
 impl ModelTreeOptions {
     pub(super) fn invalidate_branching_cache(&mut self) {
-        self.branching_registry.prepared = false;
+        self.branching_registry.prepared = None;
     }
 
     pub(super) fn compile_branching_registry(&mut self) -> Result<()> {
-        self.branching_registry.prepared = false;
+        self.branching_registry.prepared = None;
+        validate(self)?;
         let declaration = registration_order(self)?.into_owned();
         let mapped_families = mapped_families(self).into_owned();
         let selection_order = selection_order(self).into_owned();
-        let registry = &mut self.branching_registry;
-        registry.declaration = declaration;
-        registry.mapped_families = mapped_families;
-        registry.selection_order = selection_order;
-        registry.prepared = true;
+        self.branching_registry.prepared = Some(CompiledBranchingRegistry {
+            declaration,
+            mapped_families,
+            selection_order,
+        });
         Ok(())
     }
 
@@ -219,7 +222,7 @@ impl BranchingRegistry {
     pub fn register(&mut self, registration: BranchingRegistration) -> Result<()> {
         use BranchingRegistration::*;
         // A subsequent solve rebuilds the prepared view from these inputs.
-        self.prepared = false;
+        self.prepared = None;
         match registration {
             Policy(value) => self.branching = value,
             Priorities(value) => self.branch_priorities = value,
@@ -394,8 +397,7 @@ pub(super) fn canonical(
 pub(super) fn registration_order(
     options: &ModelTreeOptions,
 ) -> Result<std::borrow::Cow<'_, HashMap<BranchFamilyRegistration, usize>>> {
-    if options.branching_registry.prepared {
-        let registry = &options.branching_registry;
+    if let Some(registry) = &options.branching_registry.prepared {
         return Ok(std::borrow::Cow::Borrowed(&registry.declaration));
     }
     let mut order = HashMap::new();
@@ -539,8 +541,7 @@ pub(super) fn validate_components<'a, const D: usize>(
 pub(super) fn mapped_families(
     options: &ModelTreeOptions,
 ) -> std::borrow::Cow<'_, HashMap<String, (BranchFamilyRegistration, usize)>> {
-    if options.branching_registry.prepared {
-        let registry = &options.branching_registry;
+    if let Some(registry) = &options.branching_registry.prepared {
         return std::borrow::Cow::Borrowed(&registry.mapped_families);
     }
     let registry = options.branching_registry();
@@ -569,8 +570,7 @@ pub(super) fn mapped_families(
 pub(super) fn selection_order(
     options: &ModelTreeOptions,
 ) -> std::borrow::Cow<'_, HashMap<String, usize>> {
-    if options.branching_registry.prepared {
-        let registry = &options.branching_registry;
+    if let Some(registry) = &options.branching_registry.prepared {
         return std::borrow::Cow::Borrowed(&registry.selection_order);
     }
     let registry = options.branching_registry();

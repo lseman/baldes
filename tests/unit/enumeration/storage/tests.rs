@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn resource_dominance_preserves_binary_boundaries_during_enumeration() {
     let mut graph = Graph::<2>::new(3, 1).unwrap();
-    graph.resources[0] = ResourceKind::Equality;
+    graph.edit().resources[0] = ResourceKind::Equality;
     let make = |resource, cost| Label {
         id: 0,
         vertex: 1,
@@ -46,7 +46,7 @@ fn resource_dominance_preserves_binary_boundaries_during_enumeration() {
         assert!(storage.insert(&graph, make(outside, 0.), forward));
         assert_eq!(storage.pending, 2);
     }
-    graph.resources[0] = ResourceKind::Disposable;
+    graph.edit().resources[0] = ResourceKind::Disposable;
     let mut storage = Storage::new(1).unwrap();
     assert!(storage.insert(&graph, make(-EPSILON, -1.), false));
     assert!(!storage.insert(&graph, make(f64::from_bits(1), 0.), false));

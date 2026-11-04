@@ -127,11 +127,9 @@ pub(crate) trait Networks<const D: usize> {
         remaining: std::time::Duration,
     ) -> Result<crate::PricingResult> {
         let solver = self.enter(index);
-        let saved = solver.controls.time_limit;
-        solver.controls.time_limit = saved.min(remaining);
-        let result = solver.price_functor_phase(phase, solver.controls.max_columns);
-        solver.controls.time_limit = saved;
-        result
+        solver.with_pricing_budget(remaining, |solver| {
+            solver.price_functor_phase(phase, solver.controls.max_columns)
+        })
     }
     fn retained(&mut self, _index: usize, _duals: &[f64]) -> Option<Result<Retained>> {
         None

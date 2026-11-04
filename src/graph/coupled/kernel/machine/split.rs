@@ -252,6 +252,7 @@ impl<const D: usize> Graph<D> {
             ));
         }
         let kernel = self
+            .edit()
             .coupled
             .as_mut()
             .ok_or_else(|| invalid("no coupled resources"))?;

@@ -111,7 +111,7 @@ fn registration_sums_multiple_vertex_and_arc_sets_without_double_counting() {
         );
     }
     let mut solver = crate::pricing::Solver::<2>::new(3, 0).unwrap();
-    solver.graph.graph_id = 7;
+    solver.graph.edit().graph_id = 7;
     for &(tail, head, id) in &route {
         solver.graph.add_arc_with_id(id, tail, head, 0.).unwrap();
     }

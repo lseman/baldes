@@ -327,7 +327,7 @@ impl<const D: usize> Graph<D> {
     /// vertices, elementarity or physical arc vector order.
     pub fn set_coupled_resources(&mut self, definitions: &[CoupledResource]) -> Result<()> {
         let kernel = CoupledKernel::prepare(self, definitions)?;
-        self.coupled = (!definitions.is_empty()).then(|| Box::new(kernel));
+        self.edit().coupled = (!definitions.is_empty()).then(|| Box::new(kernel));
         Ok(())
     }
     pub fn coupled_kernel(&self) -> Option<&CoupledKernel> {
@@ -344,6 +344,7 @@ impl<const D: usize> Graph<D> {
         windows: Option<&[Window]>,
     ) -> Result<()> {
         let kernel = self
+            .edit()
             .coupled
             .as_mut()
             .ok_or_else(|| invalid("no coupled resources"))?;
@@ -445,6 +446,7 @@ impl<const D: usize> Graph<D> {
         };
         self.set_paired_waiting_windows(resource, Some(&windows))?;
         let kernel = self
+            .edit()
             .coupled
             .as_mut()
             .ok_or_else(|| invalid("no coupled resources"))?;
@@ -460,7 +462,7 @@ impl<const D: usize> Graph<D> {
     /// Select the ordered front domain for raw resources. Paired resources
     /// always use this domain; it cannot be disabled while one is installed.
     pub fn set_front_program_domain(&mut self, enabled: bool) -> Result<()> {
-        let Some(kernel) = self.coupled.as_mut() else {
+        let Some(kernel) = self.edit().coupled.as_mut() else {
             return if enabled {
                 Err(invalid(
                     "native front program domain requires native raw resources",
@@ -501,7 +503,8 @@ impl<const D: usize> Graph<D> {
     }
     /// Retain selection eliminations at every vertex of violating windows.
     pub(crate) fn strengthen_selection(&mut self, arcs: &[usize]) -> bool {
-        self.coupled
+        self.edit()
+            .coupled
             .as_mut()
             .is_some_and(|kernel| kernel.strengthen_selection(arcs))
     }
@@ -511,7 +514,8 @@ impl<const D: usize> Graph<D> {
         arcs: &[usize],
         max_length: i64,
     ) -> bool {
-        self.coupled
+        self.edit()
+            .coupled
             .as_mut()
             .is_some_and(|kernel| kernel.strengthen_selection_first_windows(arcs, max_length))
     }
@@ -524,7 +528,7 @@ impl<const D: usize> Graph<D> {
     }
     #[cfg(feature = "clp")]
     pub(crate) fn suppress_coupled_costs(&mut self) {
-        if let Some(kernel) = self.coupled.as_mut() {
+        if let Some(kernel) = self.edit().coupled.as_mut() {
             kernel.suppress_costs();
         }
     }

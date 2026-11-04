@@ -180,7 +180,10 @@ fn missing_proofs_work_and_deadlines_never_return_partial_network_plans() {
     )
     .is_none());
     node.state.oracles[1].network.multiplicity.upper = f64::INFINITY;
-    Arc::make_mut(&mut node.state.oracles[1].network.graph).arcs[0].cost = -1.;
+    Arc::make_mut(&mut node.state.oracles[1].network.graph)
+        .edit()
+        .arcs[0]
+        .cost = -1.;
     assert!(cutoff_plan(
         &node.state,
         &node.master,

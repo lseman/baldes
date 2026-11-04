@@ -520,7 +520,7 @@ fn global_limit_and_equality_relaxation_are_explicit() {
             .complete
     );
     let mut equality = problem();
-    equality.networks[1].graph.resources[0] = baldes::graph::ResourceKind::Equality;
+    equality.networks[1].graph.edit().resources[0] = baldes::graph::ResourceKind::Equality;
     for vertex in 0..equality.networks[1].graph.vertices.len() {
         equality.networks[1]
             .graph

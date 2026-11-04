@@ -91,22 +91,10 @@ pub(super) fn apply<const D: usize>(
             continue;
         };
         let solver = &mut staged.oracles[index].solver;
-        let saved_limit = solver.controls.time_limit;
-        let modes = (
-            solver.cuts.round_duals,
-            solver.exact_cut_duals,
-            solver.knapsack_exact_coefficients,
-        );
-        solver.controls.time_limit = budget;
-        solver.cuts.round_duals = false;
-        solver.exact_cut_duals = true;
-        solver.knapsack_exact_coefficients = true;
         attempted = true;
-        let report = solver.run_fixing_enumeration(-1, 0., ceiling);
-        solver.controls.time_limit = saved_limit;
-        solver.cuts.round_duals = modes.0;
-        solver.exact_cut_duals = modes.1;
-        solver.knapsack_exact_coefficients = modes.2;
+        let report = solver.with_exact_pricing(budget, |solver| {
+            solver.run_fixing_enumeration(-1, 0., ceiling)
+        });
         match report {
             Ok(report) => {
                 changed |= report.eliminated > 0;

@@ -229,3 +229,26 @@ fn selection_ties_follow_cross_family_construction_order() {
     let order = selection_order(&options);
     assert!(order["paths:42"] < order["mapped"]);
 }
+
+#[test]
+fn compilation_invalidates_and_atomically_publishes_derived_registration_state() {
+    let mut configured = ModelTreeOptions::default();
+    configured.compile_branching_registry().unwrap();
+    assert!(configured.branching_registry.prepared.is_some());
+    configured
+        .branching_registry
+        .register(BranchingRegistration::History(false))
+        .unwrap();
+    assert!(configured.branching_registry.prepared.is_none());
+    configured.compile_branching_registry().unwrap();
+    assert!(configured.branching_registry.prepared.is_some());
+    configured
+        .branching_registry
+        .register(BranchingRegistration::FamilyOrder(
+            BranchFamilyRegistration::MappedRegistration(99),
+        ))
+        .unwrap();
+    assert!(configured.compile_branching_registry().is_err());
+    assert!(configured.branching_registry.prepared.is_none());
+    assert!(registration_order(&configured).is_err());
+}

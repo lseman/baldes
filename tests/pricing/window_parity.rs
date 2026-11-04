@@ -11,8 +11,8 @@ fn replay_pricing(capture: &str, full_memory: bool) {
     let upper: f64 = take(&mut input);
     let rounds: usize = take(&mut input);
     let mut solver = Solver::<2>::new(11, 1).unwrap();
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[10].elements.clear();
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[10].elements.clear();
     for vertex in 0..11 {
         solver.graph.set_bounds(vertex, 0, 0., upper).unwrap();
     }
@@ -34,7 +34,7 @@ fn replay_pricing(capture: &str, full_memory: bool) {
     }
     for round in 0..rounds {
         let native: f64 = take(&mut input);
-        for arc in &mut solver.graph.arcs {
+        for arc in &mut solver.graph.edit().arcs {
             arc.reduced_cost = take(&mut input);
         }
         let actual = solver.price_phase(0, 150, false).unwrap();

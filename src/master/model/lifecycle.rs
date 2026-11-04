@@ -204,7 +204,15 @@ impl<const D: usize> NodeSnapshot<D> {
         }
     }
 
-    pub(crate) fn reset_evaluation_incidence_phase(&mut self) {
+    /// Prepare a new tree-node evaluation or strong-branching trial. Same-node
+    /// resumes deliberately bypass this reset and retain their current state.
+    pub(crate) fn prepare_evaluation(&mut self) -> Result<()> {
+        self.reset_evaluation_artificials()?;
+        self.reset_evaluation_incidence_phase();
+        Ok(())
+    }
+
+    fn reset_evaluation_incidence_phase(&mut self) {
         if self
             .state
             .cuts
@@ -265,7 +273,7 @@ impl<const D: usize> NodeSnapshot<D> {
     /// artificial costs. Same-node resumes and generic CG continuation do not
     /// call this method. Known separated-row artificials use 1.2 times their
     /// retained creation cost; columns without creation metadata stay unchanged.
-    pub(crate) fn reset_evaluation_artificials(&mut self) -> Result<()> {
+    fn reset_evaluation_artificials(&mut self) -> Result<()> {
         let cost = self.state.ordinary_artificial_cost;
         let separated: HashSet<_> = self
             .warm

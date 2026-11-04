@@ -29,7 +29,7 @@ fn column(id: i32, cost: f64, value: f64) -> Column {
 fn fixture(mode: BoundMode) -> imported::ImportedOutput<2> {
     let mut networks = vec![network(7, &[(5., &[0])], 2), network(99, &[(7., &[1])], 2)];
     for n in &mut networks {
-        n.graph.arcs[0].consumption[0] = 0.5;
+        n.graph.edit().arcs[0].consumption[0] = 0.5;
     }
     let mut opts = options();
     opts.cg.bound_mode = mode;

@@ -113,7 +113,7 @@ impl<const D: usize> Graph<D> {
             kernel.cost_scale,
             &kernel.objective_coefficients,
         );
-        self.coupled = Some(Box::new(kernel));
+        self.edit().coupled = Some(Box::new(kernel));
         Ok(())
     }
 }
@@ -135,6 +135,7 @@ impl<const D: usize> Graph<D> {
     #[cfg(feature = "clp")]
     pub(crate) fn set_paired_associated_costs(&mut self, costs: &[(usize, f64)]) -> Result<()> {
         let kernel = self
+            .edit()
             .coupled
             .as_mut()
             .ok_or_else(|| invalid("paired association requires coupled resources"))?;
@@ -208,7 +209,7 @@ impl<const D: usize> Graph<D> {
         let mut kernel = original.clone();
         kernel.identity = std::sync::Arc::new(());
         kernel.paired_owner_registration_bounds = values.into();
-        self.coupled = Some(Box::new(kernel));
+        self.edit().coupled = Some(Box::new(kernel));
         Ok(())
     }
 }

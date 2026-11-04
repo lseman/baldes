@@ -40,7 +40,7 @@ fn fixtures(symmetric: bool) -> (Graph<2>, Vec<Vec<usize>>) {
     for v in 0..5 {
         g.set_bounds(v, 0, 0., 6.).unwrap();
     }
-    for a in &mut g.arcs {
+    for a in &mut g.edit().arcs {
         a.consumption[0] = 1.;
     }
     (g, events)

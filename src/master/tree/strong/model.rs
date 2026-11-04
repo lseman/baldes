@@ -1666,8 +1666,7 @@ pub(super) fn choose_proposals<const D: usize>(
                     history.column_pool.seed(&mut child, end)?;
                 }
                 child.state.node_depth = output.snapshot.state.node_depth.saturating_add(1);
-                child.reset_evaluation_artificials()?;
-                child.reset_evaluation_incidence_phase();
+                child.prepare_evaluation()?;
                 candidate.stages[side] += 1;
                 history.trials += 1;
                 history.processed_trials += usize::from(exact);

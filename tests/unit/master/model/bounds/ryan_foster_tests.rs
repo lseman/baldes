@@ -42,7 +42,7 @@ fn ryan_foster_walks_exclude_split_or_joined_pairs() {
     assert_eq!(run(&graph, &weights, &[rule(false)]), Some(Some(-1.)));
     // Without the pair arc, the together child has no permitted route.
     let mut split = graph.clone();
-    split.arcs.pop();
+    split.edit().arcs.pop();
     let w: Vec<_> = split.arcs.iter().map(|a| a.cost).collect();
     assert_eq!(run(&split, &w, &[rule(true)]), Some(None));
     // No rows: the caller keeps its own unrestricted bound.

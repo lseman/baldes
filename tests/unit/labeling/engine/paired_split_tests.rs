@@ -31,8 +31,8 @@ fn solver_with_program(
             solver.graph.set_bounds(vertex, 0, 0., 4.).unwrap();
         }
     }
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[2].elements.clear();
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[2].elements.clear();
     solver.graph.add_arc(0, 1, -1.).unwrap();
     solver.graph.add_arc(1, 2, -1.).unwrap();
     solver
@@ -204,7 +204,7 @@ fn paired_bucket_manager_indexes_only_base_and_still_checks_standard_resources()
     for vertex in 0..3 {
         candidate.graph.set_bounds(vertex, 1, 0., 4.).unwrap();
     }
-    for arc in &mut candidate.graph.arcs {
+    for arc in &mut candidate.graph.edit().arcs {
         arc.consumption[1] = 1.;
     }
     candidate.bucket_steps[1] = 1.;

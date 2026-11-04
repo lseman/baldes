@@ -10,25 +10,27 @@ fn fixture(divisor: f64, variant: &str) -> (Problem<2>, Vec<ResourceKnapsackCoef
     ];
     let mut coefficients = vec![];
     for (i, n) in networks.iter_mut().enumerate() {
-        for vertex in &mut n.graph.vertices {
+        for vertex in &mut n.graph.edit().vertices {
             vertex.bounds[0].lower /= divisor;
             vertex.bounds[0].upper /= divisor;
         }
-        n.graph.arcs[0].consumption[0] = 2. / divisor;
-        n.graph.arcs[2].consumption[0] = 1. / divisor;
+        n.graph.edit().arcs[0].consumption[0] = 2. / divisor;
+        n.graph.edit().arcs[2].consumption[0] = 1. / divisor;
         let mut threshold = if i == 0 { 3 } else { 2 };
         if variant != "plain" {
-            n.graph.initial[0] = Some(if i == 0 { 1. / divisor } else { 2. / divisor });
+            n.graph.edit().initial[0] = Some(if i == 0 { 1. / divisor } else { 2. / divisor });
             threshold = if i == 0 { 5 } else { 4 };
         }
         if variant == "vertex_wait" {
-            n.graph.vertices[1].bounds[0] = Window::new(5. / divisor, 10. / divisor).unwrap();
+            n.graph.edit().vertices[1].bounds[0] =
+                Window::new(5. / divisor, 10. / divisor).unwrap();
             threshold = if i == 0 { 9 } else { 5 };
         } else if variant == "arc_wait" {
-            n.graph.arcs[0].bounds[0] = Some(Window::new(5. / divisor, 10. / divisor).unwrap());
+            n.graph.edit().arcs[0].bounds[0] =
+                Some(Window::new(5. / divisor, 10. / divisor).unwrap());
             threshold = if i == 0 { 9 } else { 5 };
         } else if variant == "equality" {
-            n.graph.resources[0] = baldes::graph::ResourceKind::Equality;
+            n.graph.edit().resources[0] = baldes::graph::ResourceKind::Equality;
         }
         coefficients.push(ResourceKnapsackCoefficients {
             network: n.id,

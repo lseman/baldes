@@ -182,7 +182,7 @@ pub(super) fn install_windows<const D: usize>(
         let lower = old.lower.max(window.lower);
         let upper = old.upper.min(window.upper);
         if lower <= upper {
-            graph.vertices[v].bounds[r] = Window { lower, upper };
+            graph.edit().vertices[v].bounds[r] = Window { lower, upper };
         } else {
             blocked.extend(graph.arcs.iter().filter(|a| a.head == v).map(|a| a.id));
         }

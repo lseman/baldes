@@ -38,11 +38,11 @@ impl<const D: usize> Graph<D> {
             }
             merged.push(window);
         }
-        self.vertices[vertex].bounds[resource] = Window {
+        self.edit().vertices[vertex].bounds[resource] = Window {
             lower: merged[0].lower,
             upper: merged.last().unwrap().upper,
         };
-        self.time_windows.insert((vertex, resource), merged);
+        self.edit().time_windows.insert((vertex, resource), merged);
         Ok(())
     }
 
@@ -58,7 +58,7 @@ impl<const D: usize> Graph<D> {
     /// Remove a union, retaining the current ordinary vertex bound.
     #[cfg(feature = "multi-time-windows")]
     pub fn clear_time_windows(&mut self, vertex: usize, resource: usize) {
-        self.time_windows.remove(&(vertex, resource));
+        self.edit().time_windows.remove(&(vertex, resource));
     }
 
     pub(crate) fn has_time_windows(&self) -> bool {

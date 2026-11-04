@@ -248,8 +248,8 @@ fn generated_cut_prices_and_enumerates_with_scaled_resources_in_both_directions(
         .unwrap();
     for bidirectional in [false, true] {
         let mut solver = Solver::<2>::new(4, 2).unwrap();
-        solver.graph.graph_id = 8;
-        solver.graph.elementary = true;
+        solver.graph.edit().graph_id = 8;
+        solver.graph.edit().elementary = true;
         solver.knapsack_resource_indices = BTreeMap::from([(7, 1)]);
         solver
             .set_option("BALDESuseBidirectionalSearch", f64::from(bidirectional))

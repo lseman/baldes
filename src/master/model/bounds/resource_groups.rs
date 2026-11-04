@@ -59,6 +59,7 @@ pub(super) fn minimum<const D: usize>(
     }
     let mut relaxed = graph.clone();
     relaxed
+        .edit()
         .resources
         .fill(crate::graph::ResourceKind::Disposable);
     let paths = CompleteResourceRelaxation::collect(

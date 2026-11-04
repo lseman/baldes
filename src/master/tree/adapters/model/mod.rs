@@ -657,7 +657,6 @@ fn solve_split<const D: usize>(
     {
         return Err(invalid("primal heuristic name must be nonempty"));
     }
-    super::family_registration::validate(&options)?;
     match &start {
         Start::Fresh(problem, _) => super::path_counts::validate(
             &options.branching_registry.paths_per_network,

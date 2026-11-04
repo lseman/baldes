@@ -13,11 +13,13 @@ fn problem(cumulative: bool, ids: &[i32]) -> Problem<2> {
                 [2, 0, 3, 1]
             };
             let mut graph = Graph::<2>::new(4, 1).unwrap();
-            graph.source = permutation[0];
-            graph.sink = permutation[3];
-            graph.elementary = true;
-            graph.vertices[graph.source].elements.clear();
-            graph.vertices[graph.sink].elements.clear();
+            graph.edit().source = permutation[0];
+            graph.edit().sink = permutation[3];
+            graph.edit().elementary = true;
+            let source = graph.source;
+            graph.edit().vertices[source].elements.clear();
+            let sink = graph.sink;
+            graph.edit().vertices[sink].elements.clear();
             for vertex in 0..4 {
                 graph.set_bounds(vertex, 0, 0., 2.).unwrap();
             }

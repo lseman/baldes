@@ -25,7 +25,7 @@ impl<const D: usize> ColumnImport<D> {
         }
         for network in &mut compiled.problem.networks {
             network.graph.suppress_coupled_costs();
-            for arc in &mut network.graph.arcs {
+            for arc in &mut network.graph.edit().arcs {
                 arc.cost = 0.;
             }
         }

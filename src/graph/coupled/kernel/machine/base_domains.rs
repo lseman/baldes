@@ -180,7 +180,7 @@ impl PairedBaseDomains {
                 return unsupported("paired base scalar domain installation failed");
             }
         }
-        for (arc, bounds) in staged.arcs.iter_mut().zip(&self.arc_bounds) {
+        for (arc, bounds) in staged.edit().arcs.iter_mut().zip(&self.arc_bounds) {
             arc.bounds[self.base_resource] = Some(*bounds);
         }
         if staged

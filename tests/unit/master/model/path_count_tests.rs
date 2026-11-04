@@ -127,10 +127,10 @@ fn path_count_registration_rejects_unknown_duplicate_and_ambiguous_domains() {
     for modification in 0..4 {
         let mut graph = original.graph.clone();
         match modification {
-            0 => graph.arcs[0].head = graph.sink,
-            1 => graph.arcs[0].head = graph.source,
-            2 => graph.arcs[0].tail = graph.sink,
-            _ => graph.sink = graph.source,
+            0 => graph.edit().arcs[0].head = graph.sink,
+            1 => graph.edit().arcs[0].head = graph.source,
+            2 => graph.edit().arcs[0].tail = graph.sink,
+            _ => graph.edit().sink = graph.source,
         }
         assert!(validate(&registrations(), std::iter::once((42, &graph))).is_err());
     }

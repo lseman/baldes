@@ -294,7 +294,7 @@ fn packing_supported_arc_outside_memory_is_charged_in_pricing() {
     use baldes::cuts::{CutClass, MemoryKind, RankOneCut};
     use std::collections::{BTreeMap, BTreeSet};
     let mut solver = baldes::pricing::Solver::<2>::new(5, 0).unwrap();
-    solver.graph.graph_id = 7;
+    solver.graph.edit().graph_id = 7;
     let supported = solver.graph.add_arc(0, 1, -3.).unwrap();
     let remembered = solver.graph.add_arc(1, 2, 0.).unwrap();
     let terminal = solver.graph.add_arc(2, 4, 0.).unwrap();
@@ -345,7 +345,7 @@ fn packing_arc_memory_pricing_matches_controlled_native_bound() {
     .unwrap();
     for (case_index, case) in cases.as_array().unwrap().iter().enumerate() {
         let mut solver = baldes::pricing::Solver::<2>::new(8, 1).unwrap();
-        solver.graph.graph_id = case["graph_id"].as_i64().unwrap() as i32;
+        solver.graph.edit().graph_id = case["graph_id"].as_i64().unwrap() as i32;
         for vertex in 0..8 {
             solver.graph.set_bounds(vertex, 0, 0., 2.).unwrap();
         }
@@ -1766,8 +1766,8 @@ fn paired_enumeration_five_customer_native_capture() {
     );
     let costs = captured["physical_arc_costs"].as_array().unwrap();
     let mut solver = baldes::pricing::Solver::<2>::new(7, 1).unwrap();
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[6].elements.clear();
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[6].elements.clear();
     for vertex in 0..7 {
         solver.graph.set_bounds(vertex, 0, 0., 2.5).unwrap();
     }
@@ -1868,8 +1868,8 @@ fn paired_enumeration_nonzero_capture_respects_native_cutoff() {
     );
     let costs = captured["physical_arc_costs"].as_array().unwrap();
     let mut solver = baldes::pricing::Solver::<2>::new(7, 1).unwrap();
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[6].elements.clear();
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[6].elements.clear();
     for vertex in 0..7 {
         solver.graph.set_bounds(vertex, 0, 0., 2.5).unwrap();
     }
@@ -2075,8 +2075,8 @@ fn install_paired_front(
 #[test]
 fn paired_concatenation_timeout_retains_fixed_grid_until_explicit_restoration() {
     let mut solver = baldes::pricing::Solver::<2>::new(3, 1).unwrap();
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[2].elements.clear();
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[2].elements.clear();
     for vertex in 0..3 {
         solver.graph.set_bounds(vertex, 0, 0., 4.).unwrap();
     }
@@ -2127,8 +2127,8 @@ fn paired_concatenation_timeout_retains_fixed_grid_until_explicit_restoration() 
 #[test]
 fn paired_concatenation_timeout_allows_repricing_through_a_retained_crossing() {
     let mut solver = baldes::pricing::Solver::<2>::new(5, 1).unwrap();
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[4].elements.clear();
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[4].elements.clear();
     for vertex in 0..5 {
         solver.graph.set_bounds(vertex, 0, 0., 4.).unwrap();
     }
@@ -2169,8 +2169,8 @@ fn paired_signed_completion_and_fixing_apply_the_strict_local_split_cutoff() {
     use baldes::enumeration::{Controls, Enumeration};
     let seed = 0;
     let mut solver = baldes::pricing::Solver::<2>::new(5, 1).unwrap();
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[4].elements.clear();
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[4].elements.clear();
     for v in 0..5 {
         solver.graph.set_bounds(v, 0, 0., 8.).unwrap();
     }
@@ -2352,8 +2352,8 @@ fn paired_fixing_preserves_enumeration_with_presence_and_branching() {
         for presence in [false, true] {
             for cutoff in [-1., 0., 1., 2.] {
                 let mut solver = baldes::pricing::Solver::<2>::new(5, 1).unwrap();
-                solver.graph.vertices[0].elements.clear();
-                solver.graph.vertices[4].elements.clear();
+                solver.graph.edit().vertices[0].elements.clear();
+                solver.graph.edit().vertices[4].elements.clear();
                 for v in 0..5 {
                     solver.graph.set_bounds(v, 0, 0., 8.).unwrap();
                 }
@@ -2564,8 +2564,8 @@ fn registered_signed_owner_fixing_and_enumeration_match_native() {
         .collect();
     let mut solver = baldes::pricing::Solver::<2>::new(windows.len(), 1).unwrap();
     let sink = windows.len() - 1;
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[sink].elements.clear();
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[sink].elements.clear();
     for (vertex, bounds) in windows.iter().enumerate() {
         solver
             .graph
@@ -2800,8 +2800,8 @@ fn custom_enumeration_registered_capture_preserves_both_orientations() {
     );
     let costs = captured["physical_arc_costs"].as_array().unwrap();
     let mut solver = baldes::pricing::Solver::<2>::new(7, 1).unwrap();
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[6].elements.clear();
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[6].elements.clear();
     for vertex in 0..7 {
         solver.graph.set_bounds(vertex, 0, 0., 2.).unwrap();
     }
@@ -2894,9 +2894,9 @@ fn paired_front_dependent_knapsack_cut_reports_missing_resource_mapping() {
     use std::collections::BTreeMap;
 
     let mut solver = baldes::pricing::Solver::<2>::new(4, 1).unwrap();
-    solver.graph.graph_id = 7;
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[3].elements.clear();
+    solver.graph.edit().graph_id = 7;
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[3].elements.clear();
     for vertex in 0..4 {
         solver.graph.set_bounds(vertex, 0, 0., 2.5).unwrap();
     }
@@ -2973,9 +2973,9 @@ fn paired_front_scalar_knapsack_charges_the_master_coefficient() {
         "2.0 -2.0 18\n"
     );
     let mut solver = baldes::pricing::Solver::<2>::new(4, 2).unwrap();
-    solver.graph.graph_id = 7;
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[3].elements.clear();
+    solver.graph.edit().graph_id = 7;
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[3].elements.clear();
     for vertex in 0..4 {
         for resource in 0..2 {
             solver.graph.set_bounds(vertex, resource, 0., 2.5).unwrap();

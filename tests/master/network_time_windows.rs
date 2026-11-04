@@ -81,8 +81,8 @@ fn instance(n: usize, seed: u64) -> Instance {
 fn problem(inst: &Instance, vehicles: f64) -> Problem<2> {
     let sink = inst.n + 1;
     let mut graph = Graph::<2>::new(inst.n + 2, 1).unwrap();
-    graph.source = 0;
-    graph.sink = sink;
+    graph.edit().source = 0;
+    graph.edit().sink = sink;
     for v in 0..=sink {
         graph.set_bounds(v, 0, 0., 100.).unwrap();
     }

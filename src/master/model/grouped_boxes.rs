@@ -234,6 +234,7 @@ fn visit_relaxed_activity_paths<const D: usize>(
     use crate::enumeration::{CompleteResourceRelaxation, PathDomainLimits};
     let mut relaxed = graph.clone();
     relaxed
+        .edit()
         .resources
         .fill(crate::graph::ResourceKind::Disposable);
     relaxed.set_coupled_resources(&[]).ok()?;

@@ -340,8 +340,8 @@ fn cumulative_costs_remain_invariant_when_original_vertex_ids_are_permuted() {
     // BALDES resource arrays remain in the unchanged physical arc order.
     for (source, sink, interior) in [(0, 3, [1, 2]), (2, 0, [1, 3])] {
         let mut graph = Graph::<2>::new(5, 0).unwrap();
-        graph.source = source;
-        graph.sink = sink;
+        graph.edit().source = source;
+        graph.edit().sink = sink;
         graph.add_arc(4, 4, 0.).unwrap();
         for (tail, head, cost) in [
             (source, interior[0], -20.),

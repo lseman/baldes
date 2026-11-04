@@ -2,6 +2,42 @@
 use super::*;
 
 impl<const D: usize> Solver<D> {
+    /// Run a pricing operation under a temporary tighter budget, restoring it
+    /// before returning either a result or an error.
+    pub(crate) fn with_pricing_budget<T>(
+        &mut self,
+        remaining: std::time::Duration,
+        operation: impl FnOnce(&mut Self) -> Result<T>,
+    ) -> Result<T> {
+        let saved = self.controls.time_limit;
+        self.controls.time_limit = saved.min(remaining);
+        let result = operation(self);
+        self.controls.time_limit = saved;
+        result
+    }
+
+    /// Temporarily require unrounded cut duals and exact knapsack coefficients.
+    /// Nested calls restore the enclosing mode, including after an error.
+    pub(crate) fn with_exact_pricing<T>(
+        &mut self,
+        remaining: std::time::Duration,
+        operation: impl FnOnce(&mut Self) -> Result<T>,
+    ) -> Result<T> {
+        let saved = (
+            self.cuts.round_duals,
+            self.exact_cut_duals,
+            self.knapsack_exact_coefficients,
+        );
+        self.cuts.round_duals = false;
+        self.exact_cut_duals = true;
+        self.knapsack_exact_coefficients = true;
+        let result = self.with_pricing_budget(remaining, operation);
+        self.cuts.round_duals = saved.0;
+        self.exact_cut_duals = saved.1;
+        self.knapsack_exact_coefficients = saved.2;
+        result
+    }
+
     /// Geometry of the objective used by the most recent functor search.
     #[cfg(any(feature = "clp", test))]
     pub(crate) fn pricing_engine(&self) -> Option<&LabelingEngine<D>> {
@@ -75,9 +111,7 @@ impl<const D: usize> Solver<D> {
     }
     pub(super) fn topology(&self) -> Arc<Graph<D>> {
         let mut graph = self.graph.clone();
-        for a in &mut graph.arcs {
-            a.reduced_cost = 0.;
-        }
+        graph.clear_reduced_costs();
         Arc::new(graph)
     }
 }

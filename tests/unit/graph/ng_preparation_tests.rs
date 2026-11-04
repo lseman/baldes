@@ -30,8 +30,8 @@ fn assert_reference(graph: &Graph<2>) {
 #[test]
 fn preparation_preserves_duplicate_and_reordered_arc_and_vertex_elements() {
     let mut graph = Graph::<2>::new(6, 0).unwrap();
-    graph.grouped = true;
-    for vertex in &mut graph.vertices {
+    graph.edit().grouped = true;
+    for vertex in &mut graph.edit().vertices {
         vertex.memory = vec![5, 3, 1, 0, 4, 2, 1];
     }
     for tail in 0..5 {
@@ -45,38 +45,38 @@ fn preparation_preserves_duplicate_and_reordered_arc_and_vertex_elements() {
         }
     }
     assert_reference(&graph);
-    for vertex in &mut graph.vertices {
+    for vertex in &mut graph.edit().vertices {
         vertex.elements.extend(vertex.elements.clone());
         vertex.elements.reverse();
         vertex.memory.reverse();
     }
-    for arc in &mut graph.arcs {
+    for arc in &mut graph.edit().arcs {
         arc.elements.reverse();
         arc.elements.extend(arc.elements.clone());
     }
     assert_reference(&graph);
-    for vertex in &mut graph.vertices {
+    for vertex in &mut graph.edit().vertices {
         let mut duplicates = vec![0; 10_000];
         duplicates.extend(vertex.elements.clone());
         vertex.elements = duplicates;
     }
     assert_reference(&graph);
-    graph.elementary = true;
+    graph.edit().elementary = true;
     assert_reference(&graph);
-    graph.elementary = false;
+    graph.edit().elementary = false;
     let mut ungrouped = graph.clone();
-    ungrouped.grouped = false;
-    for (id, vertex) in ungrouped.vertices.iter_mut().enumerate() {
+    ungrouped.edit().grouped = false;
+    for (id, vertex) in ungrouped.edit().vertices.iter_mut().enumerate() {
         vertex.elements = vec![id];
     }
-    for arc in &mut ungrouped.arcs {
+    for arc in &mut ungrouped.edit().arcs {
         arc.elements.clear();
     }
     ungrouped
         .set_route_domain(crate::graph::RouteDomain::BoundedWalks { max_arcs: 8 })
         .unwrap();
     assert_reference(&ungrouped);
-    graph.grouped = true;
+    graph.edit().grouped = true;
     graph
         .set_route_domain(crate::graph::RouteDomain::BoundedWalks { max_arcs: 8 })
         .unwrap();
@@ -87,8 +87,8 @@ fn preparation_preserves_duplicate_and_reordered_arc_and_vertex_elements() {
 #[test]
 fn preparation_preserves_highest_available_local_memory_bit() {
     let mut graph = Graph::<2>::new(NG_MEMORY_CAPACITY, 0).unwrap();
-    graph.grouped = true;
-    for vertex in &mut graph.vertices {
+    graph.edit().grouped = true;
+    for vertex in &mut graph.edit().vertices {
         vertex.memory = (0..NG_MEMORY_CAPACITY).rev().collect();
     }
     let arc = graph.add_arc(0, NG_MEMORY_CAPACITY - 1, 0.).unwrap();
@@ -101,8 +101,8 @@ fn compact_element_sets_match_reference_across_word_and_domain_boundaries() {
     for universe in [0, 1, 15, 16, 63, 64, 65, 127, 128, 129, 257] {
         for seed in 0..12_usize {
             let mut graph = Graph::<2>::new(6, 0).unwrap();
-            graph.grouped = true;
-            graph.element_count = universe;
+            graph.edit().grouped = true;
+            graph.edit().element_count = universe;
             let mut pool = vec![];
             if universe > 0 {
                 pool.extend([0, universe / 2, universe - 1]);
@@ -112,7 +112,7 @@ fn compact_element_sets_match_reference_across_word_and_domain_boundaries() {
                 pool.sort_unstable();
                 pool.dedup();
             }
-            for (index, vertex) in graph.vertices.iter_mut().enumerate() {
+            for (index, vertex) in graph.edit().vertices.iter_mut().enumerate() {
                 vertex.elements = pool
                     .iter()
                     .enumerate()
@@ -155,9 +155,9 @@ fn compact_element_sets_match_reference_across_word_and_domain_boundaries() {
 fn compact_and_sparse_preparation_preserve_capacity_and_invalid_id_errors() {
     for universe in [128, 129] {
         let mut graph = Graph::<2>::new(4, 0).unwrap();
-        graph.grouped = true;
-        graph.element_count = universe;
-        for vertex in &mut graph.vertices {
+        graph.edit().grouped = true;
+        graph.edit().element_count = universe;
+        for vertex in &mut graph.edit().vertices {
             vertex.memory = (0..=NG_MEMORY_CAPACITY).collect();
         }
         graph.add_arc(0, 3, 0.).unwrap();
@@ -165,7 +165,7 @@ fn compact_and_sparse_preparation_preserve_capacity_and_invalid_id_errors() {
             PreparedNg::new(&graph).err().unwrap().message,
             reference::PreparedNg::new(&graph).err().unwrap().message
         );
-        for vertex in &mut graph.vertices {
+        for vertex in &mut graph.edit().vertices {
             vertex.memory = vec![universe];
         }
         assert_eq!(

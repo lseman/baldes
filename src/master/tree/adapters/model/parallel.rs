@@ -107,8 +107,7 @@ pub(super) fn evaluate<const D: usize>(
         jobs.into_par_iter()
             .map(|job| {
                 let mut node = job.restore()?;
-                node.reset_evaluation_artificials()?;
-                node.reset_evaluation_incidence_phase();
+                node.prepare_evaluation()?;
                 node.solve_forked(options.clone())
                     .and_then(Output::into_transfer)
             })

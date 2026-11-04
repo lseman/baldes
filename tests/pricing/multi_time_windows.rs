@@ -63,7 +63,7 @@ fn bucket_pricing_matches_reference_and_reconstructs_admissible_service_starts()
 #[test]
 fn arc_bounds_intersect_windows_and_never_fill_a_gap() {
     let mut g = chain();
-    g.arcs[0].bounds[0] = Some(Window::new(3., 7.).unwrap());
+    g.edit().arcs[0].bounds[0] = Some(Window::new(3., 7.).unwrap());
     assert!(extend_resources(&g, &g.arcs[0], [0., 0.], true).is_none());
     assert!(extend_resources(&g, &g.arcs[0], [20., 0.], false).is_none());
     assert!(price(&g, &Controls::default()).unwrap().columns.is_empty());
@@ -91,7 +91,7 @@ fn normalization_is_transactional_and_topology_tracks_window_changes() {
     g.set_time_windows(1, 0, &windows(&[(2., 5.), (8., 12.)]))
         .unwrap();
     assert!(!g.same_topology(&before));
-    g.resources[0] = baldes::ResourceKind::Equality;
+    g.edit().resources[0] = baldes::ResourceKind::Equality;
     assert!(price(&g, &Controls::default()).is_err());
 }
 
@@ -105,9 +105,9 @@ fn source_sink_unions_and_later_bound_tightening_are_enforced() {
     let route = &price(&g, &Controls::default()).unwrap().columns[0];
     assert_eq!(route.resource_profile[0], [3.]);
     assert_eq!(route.resources, [22.]);
-    g.initial[0] = Some(5.);
+    g.edit().initial[0] = Some(5.);
     assert!(price(&g, &Controls::default()).is_err());
-    g.initial[0] = None;
+    g.edit().initial[0] = None;
     g.set_bounds(g.source, 0, 5., 7.).unwrap();
     let result = price(&g, &Controls::default()).unwrap();
     assert_eq!(result.columns[0].resource_profile[0], [6.]);
@@ -195,7 +195,7 @@ fn randomized_bucket_pricing_matches_independent_integer_path_search() {
     let mut random = |n: u64| rng.uniform_below(n);
     for case in 0..120 {
         let mut g = Graph::<2>::new(7, 2).unwrap();
-        g.elementary = true;
+        g.edit().elementary = true;
         for v in 0..7 {
             for r in 0..2 {
                 g.set_bounds(v, r, 0., 18.).unwrap();
@@ -287,7 +287,7 @@ fn enumeration_and_canonical_collection_obey_window_unions() {
 #[test]
 fn nonindexed_resource_windows_and_zero_width_endpoints_are_enforced() {
     let mut g = Graph::<3>::new(3, 3).unwrap();
-    g.resources[1] = baldes::ResourceKind::Equality;
+    g.edit().resources[1] = baldes::ResourceKind::Equality;
     for v in 0..3 {
         g.set_bounds(v, 0, 0., 20.).unwrap();
         g.set_bounds(v, 1, 0., 0.).unwrap();
@@ -296,12 +296,12 @@ fn nonindexed_resource_windows_and_zero_width_endpoints_are_enforced() {
     for (u, v) in [(0, 1), (1, 2)] {
         g.add_arc(u, v, -1.).unwrap();
     }
-    g.arcs[0].consumption[2] = 3.;
+    g.edit().arcs[0].consumption[2] = 3.;
     g.set_time_windows(1, 2, &windows(&[(1., 1.), (7., 7.)]))
         .unwrap();
     let result = price(&g, &Controls::default()).unwrap();
     assert_eq!(result.columns[0].resource_profile[1], [0., 0., 7.]);
-    g.arcs[0].bounds[2] = Some(Window::new(0., 6.).unwrap());
+    g.edit().arcs[0].bounds[2] = Some(Window::new(0., 6.).unwrap());
     assert!(price(&g, &Controls::default()).unwrap().columns.is_empty());
 }
 
@@ -324,7 +324,7 @@ fn network_json_loads_and_intersects_unions() {
 #[test]
 fn window_endpoints_are_closed_without_extending_them_by_tolerance() {
     let mut g = chain();
-    g.arcs[0].consumption[0] = 0.;
+    g.edit().arcs[0].consumption[0] = 0.;
     let upper = 2f64;
     let above = f64::from_bits(upper.to_bits() + 1);
     let lower = 8f64;
@@ -344,7 +344,7 @@ fn window_endpoints_are_closed_without_extending_them_by_tolerance() {
     );
     // Restrict the head to the first interval, then reverse to a tail bound
     // lying one representable value below the second interval's lower edge.
-    g.arcs[1].consumption[0] = 0.;
+    g.edit().arcs[1].consumption[0] = 0.;
     assert_eq!(
         extend_resources(&g, &g.arcs[1], [below, 0.], false).unwrap()[0],
         upper
@@ -389,11 +389,11 @@ fn incoming_hull_ending_in_a_sink_gap_keeps_the_correct_backward_root() {
     }
     g.set_time_windows(2, 0, &windows(&[(0., 2.), (8., 10.)]))
         .unwrap();
-    g.arcs[1].bounds[0] = Some(Window::new(0., 7.).unwrap());
+    g.edit().arcs[1].bounds[0] = Some(Window::new(0., 7.).unwrap());
     let result = price(&g, &Controls::default()).unwrap();
     assert_eq!(result.minimum_reduced_cost, -2.);
     assert_eq!(result.columns[0].resources, [2.]);
-    g.arcs[1].bounds[0] = Some(Window::new(3., 7.).unwrap());
+    g.edit().arcs[1].bounds[0] = Some(Window::new(3., 7.).unwrap());
     assert!(price(&g, &Controls::default()).unwrap().columns.is_empty());
 }
 
@@ -410,7 +410,7 @@ fn halfway_continuation_keeps_backward_crossings_inside_a_discontinuous_cell() {
     }
     g.set_time_windows(1, 0, &windows(&[(0., 2.), (18., 18.)]))
         .unwrap();
-    g.arcs[2].bounds[0] = Some(Window::new(0., 17.5).unwrap());
+    g.edit().arcs[2].bounds[0] = Some(Window::new(0., 17.5).unwrap());
     let mut engine = LabelingEngine::prepare(
         &g,
         EngineControls {

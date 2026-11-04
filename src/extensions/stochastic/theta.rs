@@ -126,7 +126,7 @@ impl Problem {
                     "stochastic relaxed graph cannot be reweighted to nonnegative arcs",
                 ));
             }
-            for arc in &mut graph.arcs {
+            for arc in &mut graph.edit().arcs {
                 arc.cost = (arc.cost + potential[arc.tail] - potential[arc.head]).max(0.);
                 arc.reduced_cost = arc.cost;
             }
@@ -149,7 +149,7 @@ impl Problem {
                 .collect();
             graph.set_ng(v, &elements)?;
         }
-        graph.initial[0] = Some(0.);
+        graph.edit().initial[0] = Some(0.);
         Ok(graph)
     }
 

@@ -329,8 +329,8 @@ fn accumulated_resource_windows_cover_schedules_and_restore_pricing() {
         for kind in [ResourceKind::Disposable, ResourceKind::Equality] {
             for upper in [false, true] {
                 let mut s = solver();
-                s.graph.resources[0] = kind;
-                s.graph.elementary = true;
+                s.graph.edit().resources[0] = kind;
+                s.graph.edit().elementary = true;
                 if kind == ResourceKind::Equality {
                     s.graph.set_bounds(4, 0, 3., 3.).unwrap();
                 }
@@ -564,7 +564,7 @@ fn equality_bucket_jumps_cannot_invent_resource_consumption() {
     use baldes::graph::ResourceKind;
     for mode in [0., 1., 2.] {
         let mut s = Solver::<2>::new(3, 1).unwrap();
-        s.graph.resources[0] = ResourceKind::Equality;
+        s.graph.edit().resources[0] = ResourceKind::Equality;
         for v in 0..3 {
             s.graph.set_bounds(v, 0, 0., 3.).unwrap();
         }
@@ -586,7 +586,7 @@ fn resource_boundary_belongs_to_both_sides_and_empty_intersections_forbid_only_t
     for mode in [0., 1., 2.] {
         for upper in [false, true] {
             let mut s = solver();
-            s.graph.elementary = true;
+            s.graph.edit().elementary = true;
             s.set_option("BALDESuseBidirectionalSearch", mode).unwrap();
             let arc = s
                 .graph
@@ -670,7 +670,7 @@ fn ryan_foster_equal_trial_scores_advance_like_native() {
     let mut graphs = vec![];
     for network in &mut problem.networks {
         let graph = &mut network.graph;
-        graph.elementary = true;
+        graph.edit().elementary = true;
         let membership: Vec<Vec<usize>> = (0..10)
             .map(|v| {
                 if v == 1 {
@@ -685,7 +685,7 @@ fn ryan_foster_equal_trial_scores_advance_like_native() {
         graph
             .configure_ng(8, membership, vec![(0..8).collect(); 10])
             .unwrap();
-        for arc in &mut graph.arcs {
+        for arc in &mut graph.edit().arcs {
             arc.elements = if arc.head == 1 && arc.tail != 4 && arc.tail != 5 {
                 vec![0]
             } else {

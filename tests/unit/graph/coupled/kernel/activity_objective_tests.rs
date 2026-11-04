@@ -2,9 +2,9 @@ use super::*;
 
 fn graph() -> Graph<2> {
     let mut graph = Graph::new(4, 1).unwrap();
-    graph.elementary = true;
-    graph.vertices[0].elements.clear();
-    graph.vertices[3].elements.clear();
+    graph.edit().elementary = true;
+    graph.edit().vertices[0].elements.clear();
+    graph.edit().vertices[3].elements.clear();
     for v in 0..4 {
         graph.set_bounds(v, 0, 0., 2.).unwrap();
     }

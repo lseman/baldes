@@ -147,7 +147,7 @@ fn pricing_preserves_canonical_ties_and_reconstructs_only_selected_paths() {
 
     // Deliberately make the unselected path impossible to reconstruct. Ranking
     // can still return the valid selected route without replaying that path.
-    graph.arcs[2].consumption[0] = 2e5;
+    graph.edit().arcs[2].consumption[0] = 2e5;
     assert!(storage.routes(&graph).is_err());
     assert_eq!(
         storage.priced_routes(&graph, 1, false, 0.).unwrap().0.len(),

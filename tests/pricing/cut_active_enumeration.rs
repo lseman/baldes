@@ -68,8 +68,8 @@ fn check_cut_active_enumeration_and_inspection(data: &str, covering: bool) {
     let ncuts: usize = take(&mut t);
     let rounds: usize = take(&mut t);
     let mut s = Solver::<2>::new(n, 1).unwrap();
-    s.graph.vertices[0].elements.clear();
-    s.graph.vertices[n - 1].elements.clear();
+    s.graph.edit().vertices[0].elements.clear();
+    s.graph.edit().vertices[n - 1].elements.clear();
     for v in 0..n {
         s.graph.set_bounds(v, 0, 0., 2.).unwrap();
     }
@@ -103,7 +103,7 @@ fn check_cut_active_enumeration_and_inspection(data: &str, covering: bool) {
         let ncuts: usize = take(&mut t);
         let npaths: usize = take(&mut t);
         s.cuts.cuts = cuts(&mut t, n, ncuts, covering);
-        for a in &mut s.graph.arcs {
+        for a in &mut s.graph.edit().arcs {
             a.reduced_cost = take(&mut t)
         }
         let expected: BTreeMap<Vec<i32>, u64> = (0..npaths)

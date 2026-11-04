@@ -5,7 +5,7 @@ use crate::master::formulation::Row;
 #[test]
 fn uncertain_intrinsic_rows_do_not_authorize_exact_fixed_or_integer_contributions() {
     let mut graph = Graph::<2>::new(4, 0).unwrap();
-    graph.elementary = true;
+    graph.edit().elementary = true;
     for (tail, head, cost) in [(0, 1, -1.), (1, 2, 0.), (2, 3, 0.)] {
         graph.add_arc(tail, head, cost).unwrap();
     }

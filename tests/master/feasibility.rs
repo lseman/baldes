@@ -282,7 +282,7 @@ fn true_infeasibility_requires_a_positive_whole_domain_feasibility_bound() {
 fn rounding_boundary_without_a_directed_proof_stays_unknown_when_certified() {
     let mut graph = Graph::<2>::new(3, 1).unwrap();
     let upper = f64::from_bits(1f64.to_bits() - 1);
-    graph.initial[0] = Some(0.);
+    graph.edit().initial[0] = Some(0.);
     for vertex in 0..3 {
         graph.set_bounds(vertex, 0, 0., upper).unwrap();
     }

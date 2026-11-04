@@ -7,12 +7,12 @@ fn other_bucket_filter_preserves_distinct_presence_and_filters_equal_presence() 
         for equal in [false, true] {
             for branching in [false, true] {
                 let mut graph = Graph::<2>::new(3, 1).unwrap();
-                for v in &mut graph.vertices {
+                for v in &mut graph.edit().vertices {
                     v.bounds[0] = crate::Window::new(0., 10.).unwrap();
                 }
                 graph.add_arc(0, 1, 0.).unwrap();
                 graph.add_arc(1, 2, 0.).unwrap();
-                for arc in &mut graph.arcs {
+                for arc in &mut graph.edit().arcs {
                     arc.consumption[0] = 1.;
                 }
                 let mut engine = LabelingEngine::prepare(

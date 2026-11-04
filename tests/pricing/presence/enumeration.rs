@@ -111,10 +111,10 @@ fn retained_presence_paths_reprice_and_fork_without_losing_coefficients() {
         &child.price_phase(0, 150, false).unwrap().columns,
         &walk_costs(&g, &events, Mode::PairCount, 0.7, 10.),
     );
-    for arc in &mut child.graph.arcs {
+    for arc in &mut child.graph.edit().arcs {
         arc.reduced_cost -= 0.125;
     }
-    for arc in &mut g.arcs {
+    for arc in &mut g.edit().arcs {
         arc.reduced_cost -= 0.125;
     }
     compare_paths(

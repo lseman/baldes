@@ -139,8 +139,8 @@ fn dag_infeasibility_envelopes_never_remove_a_feasible_signed_resource_path() {
             for b in [-2., -1., 0., 0.5, 1., 2.] {
                 for cap in [0., 1., 2.] {
                     let mut graph = Graph::<2>::new(3, 2).unwrap();
-                    graph.resources[1] = kind;
-                    graph.initial[1] = Some(0.);
+                    graph.edit().resources[1] = kind;
+                    graph.edit().initial[1] = Some(0.);
                     graph.set_bounds(0, 1, 0., 0.).unwrap();
                     for v in [1, 2] {
                         graph.set_bounds(v, 1, -1., cap).unwrap();
@@ -182,9 +182,9 @@ fn dag_infeasibility_envelopes_never_remove_a_feasible_signed_resource_path() {
 fn coordinate_minima_remain_a_relaxation_and_cycles_stay_unknown() {
     let mut graph = Graph::<2>::new(5, 2).unwrap();
     graph.add_arc(0, 1, 0.).unwrap();
-    graph.arcs[0].consumption[0] = 1.;
+    graph.edit().arcs[0].consumption[0] = 1.;
     graph.add_arc(0, 2, 0.).unwrap();
-    graph.arcs[1].consumption[1] = 1.;
+    graph.edit().arcs[1].consumption[1] = 1.;
     graph.add_arc(1, 3, 0.).unwrap();
     graph.add_arc(2, 3, 0.).unwrap();
     graph.add_arc(3, 4, 0.).unwrap();
@@ -238,7 +238,7 @@ fn dag_bound_keeps_resource_states_and_path_costs_together() {
 #[test]
 fn dag_bound_relaxes_equality_waiting_instead_of_rejecting_a_lower_enclosure() {
     let mut graph = Graph::<2>::new(3, 2).unwrap();
-    graph.resources[1] = crate::graph::ResourceKind::Equality;
+    graph.edit().resources[1] = crate::graph::ResourceKind::Equality;
     for v in 0..3 {
         graph.set_bounds(v, 0, 0., 3.).unwrap();
     }
@@ -356,7 +356,7 @@ fn counted_positive_arcs_make_single_axis_loop_bounds_exact_and_sound() {
             for vertex in 0..3 {
                 graph.set_bounds(vertex, 0, 0., budget).unwrap();
             }
-            graph.initial[0] = Some(0.);
+            graph.edit().initial[0] = Some(0.);
             graph.add_arc(0, 1, 0.).unwrap();
             let lap = graph.add_arc(1, 1, -1.).unwrap();
             graph.arc_mut(lap).unwrap().consumption[0] = scale;
@@ -387,7 +387,7 @@ fn counted_limit_excludes_an_arc_beyond_a_dyadic_budget() {
     for vertex in 0..3 {
         graph.set_bounds(vertex, 0, 0., 2.).unwrap();
     }
-    graph.initial[0] = Some(0.);
+    graph.edit().initial[0] = Some(0.);
     graph.add_arc(0, 1, 0.).unwrap();
     let lap = graph.add_arc(1, 1, -1.).unwrap();
     graph.arc_mut(lap).unwrap().consumption[0] = 1.;

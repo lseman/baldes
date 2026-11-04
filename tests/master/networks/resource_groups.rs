@@ -515,7 +515,7 @@ fn shared_group_cutoff_views_keep_the_restricted_domain() {
 #[test]
 fn exact_feasible_but_unreconstructible_branch_leaves_parent_unchanged() {
     let mut graph = Graph::<5>::new(5, 5).unwrap();
-    graph.resources[4] = baldes::graph::ResourceKind::Equality;
+    graph.edit().resources[4] = baldes::graph::ResourceKind::Equality;
     for v in 0..5 {
         for r in 0..5 {
             graph
@@ -697,7 +697,7 @@ fn signed_static_terms_cannot_cancel_the_shared_occurrence_proof() {
 fn equality_resources_filter_without_introducing_waiting() {
     let (mut problem, members) = fixture(true);
     for n in &mut problem.networks {
-        n.graph.resources[4] = baldes::graph::ResourceKind::Equality;
+        n.graph.edit().resources[4] = baldes::graph::ResourceKind::Equality;
     }
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let mut configured = options();
@@ -927,7 +927,7 @@ fn sparse_parallel_member_ids_survive_blocking_and_domain_reindexing() {
 #[test]
 fn rounded_compatible_profiles_cannot_hide_an_exact_fixed_resource_contradiction() {
     let mut graph = Graph::<5>::new(4, 5).unwrap();
-    graph.resources[4] = baldes::graph::ResourceKind::Equality;
+    graph.edit().resources[4] = baldes::graph::ResourceKind::Equality;
     for v in 0..4 {
         for r in 0..5 {
             graph

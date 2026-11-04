@@ -314,3 +314,34 @@ General heuristic streams use `DefaultRng`; explicitly named compatibility strea
 retain their specified algorithm. The GNU-based general generator assembles each
 64-bit draw from three isolated GNU libc `rand()` draws so bounded sampling and
 shuffling retain a full-width generator domain. Seeds use their low 32 bits.
+
+### Graph access and mutation
+
+Graph fields are read-only through `Graph`. Read collections through fields
+such as `graph.arcs` or the `arcs()`, `vertices()` and `resources()` accessors.
+Use tracked edits to modify the graph:
+
+```rust
+use baldes::Graph;
+
+let mut graph = Graph::<2>::new(2, 0).unwrap();
+graph.edit().elementary = true;
+let id = graph.add_arc(0, 1, 2.).unwrap();
+graph.edit_arc(id, |arc| arc.memory.clear()).unwrap();
+graph.set_arc_cost(id, 3.).unwrap();
+graph.set_reduced_costs(&[-1.]).unwrap();
+```
+
+`edit()` supports bulk construction and conservatively changes the structural
+revision before lending mutable data. Bulk edits require `validate()` before
+use; solver preparation also validates the graph. `edit_arc()` validates the
+result and restores the original arc on a returned validation error.
+`arc_mut()` provides mutable access to one arc and starts a tracked structural edit.
+
+`set_reduced_costs()` updates only reduced costs without changing the structural
+revision, preserving prepared topology across dual updates. It rejects wrong
+lengths and nonfinite values before changing any costs. Original costs,
+resources, endpoints and memory changes belong to structural edits. Clones
+share a revision until edited; each edit receives a process-unique revision.
+Equal revisions permit constant-time topology reuse checks; unequal revisions
+still use structural equality to recognize equivalent graph values.

@@ -13,8 +13,8 @@ fn problem() -> Problem<2> {
         network(42, &[(1., &[1]), (3., &[1])], 2),
     ];
     for n in &mut networks {
-        n.graph.arcs[0].consumption[0] = 2.;
-        n.graph.arcs[2].consumption[0] = 1.;
+        n.graph.edit().arcs[0].consumption[0] = 2.;
+        n.graph.edit().arcs[2].consumption[0] = 1.;
     }
     Problem {
         rows: vec![
@@ -269,7 +269,7 @@ fn resource_steps_reject_unproved_load_and_row_contracts() {
         )
         .is_err());
     let mut waiting = problem();
-    waiting.networks[0].graph.arcs[0].bounds[0] = Some(Window::new(0.1, 100000.).unwrap());
+    waiting.networks[0].graph.edit().arcs[0].bounds[0] = Some(Window::new(0.1, 100000.).unwrap());
     let root_waiting = model::solve(waiting, options()).unwrap();
     assert!(root_waiting
         .snapshot
@@ -282,7 +282,7 @@ fn resource_steps_reject_unproved_load_and_row_contracts() {
         )
         .is_err());
     let mut p = problem();
-    p.networks[0].graph.arcs[0].consumption[0] = 0.1;
+    p.networks[0].graph.edit().arcs[0].consumption[0] = 0.1;
     let root = model::solve(p, options()).unwrap();
     assert!(root
         .snapshot
@@ -302,20 +302,20 @@ fn scheduled_resource_rows_replay_initial_usage_waiting_and_equality() {
         let mut p = problem();
         let mut c = coefficients();
         for (i, n) in p.networks.iter_mut().enumerate() {
-            n.graph.initial[0] = Some(if i == 0 { 1. } else { 2. });
+            n.graph.edit().initial[0] = Some(if i == 0 { 1. } else { 2. });
             c[i].cut.coefficients.clear();
             let threshold = if i == 0 { 5 } else { 4 };
             c[i].cut.coefficients.insert(threshold, 1);
             if variant == "vertex_wait" {
-                n.graph.vertices[1].bounds[0] = Window::new(5., 10.).unwrap();
+                n.graph.edit().vertices[1].bounds[0] = Window::new(5., 10.).unwrap();
                 c[i].cut.coefficients.clear();
                 c[i].cut.coefficients.insert(if i == 0 { 9 } else { 5 }, 1);
             } else if variant == "arc_wait" {
-                n.graph.arcs[0].bounds[0] = Some(Window::new(5., 10.).unwrap());
+                n.graph.edit().arcs[0].bounds[0] = Some(Window::new(5., 10.).unwrap());
                 c[i].cut.coefficients.clear();
                 c[i].cut.coefficients.insert(if i == 0 { 9 } else { 5 }, 1);
             } else if variant == "equality" {
-                n.graph.resources[0] = baldes::graph::ResourceKind::Equality;
+                n.graph.edit().resources[0] = baldes::graph::ResourceKind::Equality;
             }
         }
         let mut forward = options();
@@ -390,9 +390,9 @@ fn scheduled_resource_rows_replay_initial_usage_waiting_and_equality() {
 fn equality_enumeration_filters_paths_that_only_a_waiting_relaxation_can_use() {
     let mut p = problem();
     for (i, n) in p.networks.iter_mut().enumerate() {
-        n.graph.resources[0] = baldes::graph::ResourceKind::Equality;
-        n.graph.initial[0] = Some(if i == 0 { 1. } else { 2. });
-        n.graph.vertices[1].bounds[0] = Window::new(5., 10.).unwrap();
+        n.graph.edit().resources[0] = baldes::graph::ResourceKind::Equality;
+        n.graph.edit().initial[0] = Some(if i == 0 { 1. } else { 2. });
+        n.graph.edit().vertices[1].bounds[0] = Window::new(5., 10.).unwrap();
     }
     let mut forward = options();
     forward

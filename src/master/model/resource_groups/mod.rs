@@ -63,7 +63,7 @@ pub(super) fn domain_graph<const D: usize>(oracle: &Oracle<D>) -> Result<Cow<'_,
         return Ok(Cow::Borrowed(&oracle.network.graph));
     }
     let (mut graph, blocked) = windows_graph(oracle)?;
-    graph.arcs.retain(|a| !blocked.contains(&a.id));
+    graph.edit().arcs.retain(|a| !blocked.contains(&a.id));
     Ok(Cow::Owned(graph))
 }
 
@@ -74,7 +74,7 @@ pub(super) fn residual_domain_graph<const D: usize>(
 ) -> Result<Cow<'_, Graph<D>>> {
     let mut graph = domain_graph(oracle)?;
     if !oracle.resource_groups.is_empty() && oracle.proved_zero_arcs.iter().any(|&v| v) {
-        graph.to_mut().arcs.retain(|a| {
+        graph.to_mut().edit().arcs.retain(|a| {
             !oracle
                 .proved_zero_arcs
                 .get(oracle.index[&a.id])

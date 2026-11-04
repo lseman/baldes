@@ -168,8 +168,8 @@ fn cycles_charge_presence_once_and_use_only_proved_resource_hop_caps() {
         ),
         None
     );
-    graph.arcs[1].consumption[0] = 1.;
-    for vertex in &mut graph.vertices {
+    graph.edit().arcs[1].consumption[0] = 1.;
+    for vertex in &mut graph.edit().vertices {
         vertex.bounds[0] = crate::graph::Window::new(0., 2.).unwrap();
     }
     let bounded = minimum(

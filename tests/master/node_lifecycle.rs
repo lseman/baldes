@@ -67,7 +67,7 @@ fn fork_keeps_arc_orderings_and_sibling_enumeration_is_independent() {
         let mut left = parent.fork_for_node();
         let mut right = parent.fork_for_node();
         // The more expensive ordering of {1,2} becomes cheaper after a branch dual.
-        left.graph.arcs[1].reduced_cost = 100.;
+        left.graph.edit().arcs[1].reduced_cost = 100.;
         let left_routes = left.inspect_enumeration(10.).unwrap().unwrap();
         assert_eq!(left_routes.len(), 3);
         assert!(left_routes
@@ -123,7 +123,7 @@ fn fork_carries_fixing_options_and_rebuilds_dual_dependent_labels() {
         fixed,
         "runtime budget must preserve fixed arcs"
     );
-    child.graph.arcs[0].reduced_cost = 0.5;
+    child.graph.edit().arcs[0].reduced_cost = 0.5;
     let result = child.price_phase(0, 20, false).unwrap();
     assert!(result.exact);
     assert_eq!(result.minimum_reduced_cost, 1.5);

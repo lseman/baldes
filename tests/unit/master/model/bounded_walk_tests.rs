@@ -4,9 +4,9 @@ use crate::master::{preprocessing::Bounds, tree::TreeStatus};
 
 fn problem(max_arcs: usize, groups: bool) -> Problem<2> {
     let mut graph = Graph::<2>::new(4, 1).unwrap();
-    graph.main_resource = Some(0);
-    graph.initial[0] = Some(0.);
-    for vertex in &mut graph.vertices {
+    graph.edit().main_resource = Some(0);
+    graph.edit().initial[0] = Some(0.);
+    for vertex in &mut graph.edit().vertices {
         vertex.bounds[0] = Window::new(0., 8.).unwrap();
     }
     for (tail, head, cost) in [(0, 1, 0.), (1, 1, -2.), (1, 2, 0.), (2, 3, 0.)] {
@@ -309,7 +309,7 @@ fn coupled_negative_cycle_bounds_cover_the_declared_walk_length() {
     use crate::graph::coupled::CoupledResource;
     let mut problem = problem(5, false);
     let graph = &mut problem.networks[0].graph;
-    for arc in &mut graph.arcs {
+    for arc in &mut graph.edit().arcs {
         arc.cost = 0.;
         arc.reduced_cost = 0.;
     }
@@ -361,7 +361,7 @@ fn default_simple_contract_and_walk_domain_guards_are_explicit() {
         .routes
         .iter()
         .all(|route| route.route.arcs.len() <= 5));
-    graph.elementary = true;
+    graph.edit().elementary = true;
     assert!(graph
         .set_route_domain(RouteDomain::BoundedWalks { max_arcs: 5 })
         .is_err());
@@ -540,7 +540,7 @@ fn bounded_walks_reject_explicit_incidence_without_hard_elementarity() {
         .graph
         .set_route_domain(RouteDomain::PhysicalSimple)
         .unwrap();
-    simple.networks[0].graph.elementary = true;
+    simple.networks[0].graph.edit().elementary = true;
     assert!(super::solve(simple, options.clone()).is_ok());
     let error = super::solve(problem, options).err().unwrap();
     assert!(error

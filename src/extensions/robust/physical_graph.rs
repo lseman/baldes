@@ -102,8 +102,8 @@ impl Problem {
         }
         let sink = n;
         let mut graph = Graph::new(n + 1, 2)?;
-        graph.source = self.depot;
-        graph.sink = sink;
+        graph.edit().source = self.depot;
+        graph.edit().sink = sink;
         for v in (0..n).filter(|&v| v != self.depot) {
             graph.add_elementarity_set(&[v])?;
         }
@@ -145,8 +145,8 @@ impl Problem {
             graph.set_bounds(v, 1, 0., self.capacity)?;
             graph.set_ng(v, &memory[v])?;
         }
-        graph.initial[0] = Some(self.nodes[self.depot].window.0);
-        graph.initial[1] = Some(0.);
+        graph.edit().initial[0] = Some(self.nodes[self.depot].window.0);
+        graph.edit().initial[1] = Some(0.);
         graph.set_coupled_resources(&self.budgeted_resources(&arcs, sink)?)?;
         graph.validate()?;
         Ok(graph)

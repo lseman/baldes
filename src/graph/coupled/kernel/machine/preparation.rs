@@ -9,6 +9,7 @@ impl<const D: usize> Graph<D> {
         rates: &[f64],
     ) -> Result<()> {
         let kernel = self
+            .edit()
             .coupled
             .as_mut()
             .ok_or_else(|| invalid("no coupled resources"))?;
@@ -85,14 +86,14 @@ impl<const D: usize> Graph<D> {
             .max_elapsed
             .is_some_and(|limit| started.elapsed() >= limit)
         {
-            self.coupled = original;
+            self.edit().coupled = original;
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
         if self
             .set_paired_machine_waiting_rates(resource, waiting_rates)
             .is_err()
         {
-            self.coupled = original;
+            self.edit().coupled = original;
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
                 "paired machine waiting rate installation",
             ));
@@ -101,7 +102,7 @@ impl<const D: usize> Graph<D> {
             .max_elapsed
             .is_some_and(|limit| started.elapsed() >= limit)
         {
-            self.coupled = original;
+            self.edit().coupled = original;
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
         FrontierOutcome::Complete(())
@@ -410,7 +411,11 @@ impl<const D: usize> Graph<D> {
             result
         };
         if matches!(result, FrontierOutcome::Complete(())) {
-            let kernel = self.coupled.as_mut().expect("prepared coupled kernel");
+            let kernel = self
+                .edit()
+                .coupled
+                .as_mut()
+                .expect("prepared coupled kernel");
             let index = kernel.definitions[..resource]
                 .iter()
                 .filter(|r| matches!(r, CoupledResource::PairedFront { .. }))
@@ -420,7 +425,7 @@ impl<const D: usize> Graph<D> {
                 kernel.machine_identity = std::sync::Arc::new(());
             }
         } else {
-            self.coupled = Some(original);
+            self.edit().coupled = Some(original);
         }
         result
     }
@@ -572,6 +577,7 @@ impl<const D: usize> Graph<D> {
                 .collect(),
         });
         let kernel = self
+            .edit()
             .coupled
             .as_mut()
             .ok_or_else(|| invalid("no coupled resources"))?;
@@ -603,6 +609,7 @@ impl<const D: usize> Graph<D> {
         root: Option<&PreparedSlopeFunction>,
     ) -> Result<()> {
         let kernel = self
+            .edit()
             .coupled
             .as_mut()
             .ok_or_else(|| invalid("no coupled resources"))?;
@@ -818,7 +825,7 @@ impl<const D: usize> Graph<D> {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
         if changed {
-            let kernel = self.coupled.as_mut().expect("kernel was present");
+            let kernel = self.edit().coupled.as_mut().expect("kernel was present");
             kernel.slope_paired[index] = staged;
             kernel.identity = std::sync::Arc::new(());
             kernel.machine_identity = std::sync::Arc::new(());
@@ -941,7 +948,7 @@ impl<const D: usize> Graph<D> {
             FrontierOutcome::Empty => return FrontierOutcome::Empty,
             FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
         };
-        let Some(kernel) = self.coupled.as_mut() else {
+        let Some(kernel) = self.edit().coupled.as_mut() else {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("no coupled resources"));
         };
         let index = kernel.definitions[..resource]

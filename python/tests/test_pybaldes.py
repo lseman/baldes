@@ -114,7 +114,7 @@ def test_cvrp_ignores_service_and_time_windows():
 
 
 @pytest.mark.parametrize("options", [
-    {"problem_type": "evrp"}, {"rounding": "bad"}, {"ng": 0},
+    {"problem_type": "evrp"}, {"rounding": "bad"}, {"rounding": ""}, {"ng": 0},
     {"time_limit": float("nan")}, {"time_limit": -1}, {"max_iterations": 0},
     {"upper_bound": float("nan")}, {"upper_bound": -1},
 ])

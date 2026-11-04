@@ -369,7 +369,7 @@ mod network {
     #[test]
     fn transitive_ryan_foster_contradictions_are_proved_infeasible() {
         let mut graph = baldes::Graph::<2>::new(5, 0).unwrap();
-        graph.elementary = true;
+        graph.edit().elementary = true;
         for u in 0..4 {
             for v in 1..5 {
                 if u != v {

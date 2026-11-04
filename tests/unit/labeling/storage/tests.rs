@@ -136,7 +136,7 @@ fn backward_disposable_dominance_subtracts_before_comparing() {
 #[test]
 fn equality_dominance_retains_binary_interval_endpoints() {
     let mut graph = Graph::<2>::new(3, 1).unwrap();
-    graph.resources[0] = ResourceKind::Equality;
+    graph.edit().resources[0] = ResourceKind::Equality;
     let make = |resource, cost| StoredLabel {
         id: 0,
         local_id: 0,

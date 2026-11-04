@@ -3,8 +3,8 @@ use super::*;
 fn graph(value: f64, upper: f64) -> Graph<2> {
     let mut g = Graph::<2>::new(3, 1).unwrap();
     g.add_arc(0, 1, 0.).unwrap();
-    g.arcs[0].consumption[0] = value;
-    for v in &mut g.vertices {
+    g.edit().arcs[0].consumption[0] = value;
+    for v in &mut g.edit().vertices {
         v.bounds[0] = Window::new(0., upper).unwrap();
     }
     g
@@ -22,10 +22,10 @@ fn binary_resource_grid_accepts_exact_fractions_and_rejects_ambiguous_scales() {
     assert!(validate(&graph(0.5, MAX_UNITS), 0).is_err());
     assert!(validate(&graph(-0.5, 1.), 0).is_err());
     let mut g = graph(1., 10.);
-    g.initial[0] = Some(f64::NAN);
+    g.edit().initial[0] = Some(f64::NAN);
     assert!(validate(&g, 0).is_err());
     let mut g = graph(1., 10.);
-    g.arcs[0].bounds[0] = Some(Window::new(0.1, 1.).unwrap());
+    g.edit().arcs[0].bounds[0] = Some(Window::new(0.1, 1.).unwrap());
     assert!(validate(&g, 0).is_err());
 }
 

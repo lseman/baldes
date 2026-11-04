@@ -183,13 +183,14 @@ fn order_retirement_graph_extent_and_exact_mode_invalidate_the_source_snapshot()
     registry.retired.insert(0);
     assert!(!source.matches(&registry, &graph, false));
     registry.retired.clear();
-    graph.graph_id = 7;
+    graph.edit().graph_id = 7;
     assert!(!source.matches(&registry, &graph, false));
-    graph.graph_id = -7; // The builder normalizes all negative graph IDs to zero.
+    graph.edit().graph_id = -7; // The builder normalizes all negative graph IDs to zero.
     assert!(source.matches(&registry, &graph, false));
-    graph.vertices.push(graph.vertices[0].clone());
+    let vertex = graph.vertices[0].clone();
+    graph.edit().vertices.push(vertex);
     assert!(!source.matches(&registry, &graph, false));
-    graph.vertices.pop();
+    graph.edit().vertices.pop();
     registry.cuts.push(cut(4, false));
     assert!(!source.matches(&registry, &graph, false));
 }
@@ -265,7 +266,7 @@ fn graph_local_arc_weights_reach_limited_and_full_pricing_inputs() {
     registry.cuts.push(input);
     let mut graph = Graph::<2>::new(6, 0).unwrap();
     for (id, arc, weight, vertex) in [(7, 3, 1, 1), (8, 4, 2, 2)] {
-        graph.graph_id = id;
+        graph.edit().graph_id = id;
         let inputs = build_inputs_with_duals(&registry, &graph, false);
         assert_eq!(
             inputs.0[0].arc_coefficient,
@@ -284,11 +285,11 @@ fn graph_local_arc_weights_reach_limited_and_full_pricing_inputs() {
     // those entries with this graph's local arc weights.
     registry.cuts[0].graph_support.clear();
     registry.cuts[0].ordered_support = Some(vec![(1, 1), (9, 1)]);
-    graph.graph_id = 8;
+    graph.edit().graph_id = 8;
     let inputs = build_inputs_with_duals(&registry, &graph, false);
     assert_eq!(inputs.2[0].ordered_support, vec![(1, 1), (10, 2)]);
     registry.cuts[0].graph_support = [(7, vec![(1, 1)]), (8, vec![(2, 1)])].into_iter().collect();
-    graph.graph_id = 9;
+    graph.edit().graph_id = 9;
     let inputs = build_inputs_with_duals(&registry, &graph, false);
     assert!(inputs.0[0].arc_coefficient.is_empty());
     assert!(inputs.2[0].ordered_support.is_empty());

@@ -131,18 +131,18 @@ impl Solver {
     /// Set the source vertex index.
     fn set_source(&mut self, v: i32) -> PyResult<()> {
         let v = self.vertex(v)?;
-        self.solver.get_mut().unwrap().graph.source = v;
+        self.solver.get_mut().unwrap().graph.edit().source = v;
         Ok(())
     }
     /// Set the sink vertex index.
     fn set_sink(&mut self, v: i32) -> PyResult<()> {
         let v = self.vertex(v)?;
-        self.solver.get_mut().unwrap().graph.sink = v;
+        self.solver.get_mut().unwrap().graph.edit().sink = v;
         Ok(())
     }
     /// Set a custom graph ID (returned by some debug hooks).
     fn set_graph_id(&mut self, id: i32) {
-        self.solver.get_mut().unwrap().graph.graph_id = id;
+        self.solver.get_mut().unwrap().graph.edit().graph_id = id;
     }
     /// Add a directed arc from ``tail`` to ``head`` with the given cost.
     /// Returns the new arc's integer ID.
@@ -172,7 +172,7 @@ impl Solver {
     /// Set the type of an existing resource (0 = disposable, 1 = equality).
     fn set_resource_type(&mut self, resource_id: i32, kind: i32) -> PyResult<()> {
         let r = self.resource(resource_id)?;
-        self.solver.get_mut().unwrap().graph.resources[r] = match kind {
+        self.solver.get_mut().unwrap().graph.edit().resources[r] = match kind {
             0 => ResourceKind::Disposable,
             1 => ResourceKind::Equality,
             _ => return Err(PyRuntimeError::new_err("invalid resource type")),
@@ -242,7 +242,7 @@ impl Solver {
         if !value.is_finite() {
             return Err(PyRuntimeError::new_err("finite initial resource required"));
         }
-        self.solver.get_mut().unwrap().graph.initial[r] = Some(value);
+        self.solver.get_mut().unwrap().graph.edit().initial[r] = Some(value);
         Ok(())
     }
     /// Set the NG-neighbourhood for a vertex.  The list must include the
@@ -284,7 +284,7 @@ impl Solver {
                 "elementarity set/node out of range",
             ));
         }
-        let elements = &mut self.solver.get_mut().unwrap().graph.vertices[v].elements;
+        let elements = &mut self.solver.get_mut().unwrap().graph.edit().vertices[v].elements;
         if !elements.contains(&set) {
             elements.push(set);
         }
@@ -383,7 +383,7 @@ impl Solver {
                 "reduced costs must be finite and contain one value per arc",
             ));
         }
-        for (arc, cost) in solver.graph.arcs.iter_mut().zip(costs) {
+        for (arc, cost) in solver.graph.edit().arcs.iter_mut().zip(costs) {
             arc.reduced_cost = cost;
         }
         Ok(())

@@ -54,8 +54,8 @@ fn instance(n: usize, seed: u64) -> Instance {
 fn graph(inst: &Instance) -> Graph<2> {
     let sink = inst.n + 1;
     let mut g = Graph::new(inst.n + 2, 1).unwrap();
-    g.source = 0;
-    g.sink = sink;
+    g.edit().source = 0;
+    g.edit().sink = sink;
     for v in 0..=sink {
         g.set_bounds(v, 0, 0., 100.).unwrap();
     }

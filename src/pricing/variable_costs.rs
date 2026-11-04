@@ -17,9 +17,7 @@ impl<const D: usize> Solver<D> {
             return Err(invalid("physical pricing cache domain"));
         }
         self.cache_variable_costs(raw)?;
-        for (arc, &cost) in self.graph.arcs.iter_mut().zip(cached) {
-            arc.reduced_cost = cost;
-        }
+        self.graph.set_reduced_costs(cached)?;
         Ok(())
     }
     pub fn cache_variable_costs(&mut self, costs: &[f64]) -> Result<()> {
@@ -43,9 +41,7 @@ impl<const D: usize> Solver<D> {
             }
             next.push(value);
         }
-        for (arc, cost) in self.graph.arcs.iter_mut().zip(next.iter()) {
-            arc.reduced_cost = *cost;
-        }
+        self.graph.set_reduced_costs(next)?;
         self.variable_costs.clear();
         self.variable_costs.extend_from_slice(costs);
         self.raw_arc_costs = None;
@@ -157,7 +153,9 @@ impl<const D: usize> Solver<D> {
         {
             return Err(invalid("raw arc cost domain"));
         }
-        for (position, arc) in raw.graph.arcs.iter_mut().enumerate() {
+        let next = &mut raw.arc_cost_scratch;
+        next.clear();
+        for (position, arc) in raw.graph.arcs.iter().enumerate() {
             let mut cost = self.raw_arc_costs.as_ref().map_or_else(
                 || {
                     if self.variable_costs.is_empty() {
@@ -180,8 +178,9 @@ impl<const D: usize> Solver<D> {
             if !cost.is_finite() {
                 return Err(invalid("raw variable arc cost overflow"));
             }
-            arc.reduced_cost = cost;
+            next.push(cost);
         }
+        raw.graph.set_reduced_costs(next)?;
         let remaining = budget.saturating_sub(started.elapsed());
         if remaining.is_zero() {
             self.requires_rollback = self.rollback_point_saved;
@@ -227,29 +226,15 @@ impl<const D: usize> Solver<D> {
         self.corrected_bound_indexed(bound, route, None)
     }
 
-    fn correction_arc_index(&self) -> Option<std::collections::HashMap<i32, usize>> {
-        if self
-            .graph
-            .arcs
-            .iter()
-            .enumerate()
-            .all(|(i, a)| usize::try_from(a.id) == Ok(i))
-        {
-            return None;
-        }
-        let mut index = std::collections::HashMap::with_capacity(self.graph.arcs.len());
-        for (position, arc) in self.graph.arcs.iter().enumerate() {
-            // Match the original linear search when IDs are duplicated.
-            index.entry(arc.id).or_insert(position);
-        }
-        Some(index)
+    fn correction_arc_index(&self) -> Option<crate::graph::lookup::ArcLookup<'_, D>> {
+        self.graph.sparse_arc_lookup()
     }
 
     fn corrected_bound_indexed(
         &self,
         mut bound: f64,
         route: &crate::Route,
-        index: Option<&std::collections::HashMap<i32, usize>>,
+        index: Option<&crate::graph::lookup::ArcLookup<'_, D>>,
     ) -> Result<f64> {
         if self.variable_costs.is_empty() && self.raw_arc_costs.is_none() {
             return Ok(bound);
@@ -259,20 +244,8 @@ impl<const D: usize> Solver<D> {
             // before using it: imported or physically filtered graphs can have
             // sparse IDs, and graph storage is publicly mutable.
             let arc = index
-                .and_then(|index| index.get(&id).copied())
-                .and_then(|position| self.graph.arcs.get(position).map(|arc| (position, arc)))
-                .or_else(|| {
-                    usize::try_from(id)
-                        .ok()
-                        .and_then(|position| {
-                            self.graph
-                                .arcs
-                                .get(position)
-                                .filter(|a| a.id == id)
-                                .map(|arc| (position, arc))
-                        })
-                        .or_else(|| self.graph.arcs.iter().enumerate().find(|(_, a)| a.id == id))
-                })
+                .and_then(|index| index.get(id))
+                .or_else(|| self.graph.arc_by_id(id))
                 .ok_or_else(|| invalid("unknown functor route arc"))?;
             let (position, arc) = arc;
             let mut raw = self

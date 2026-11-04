@@ -7,6 +7,8 @@ pub mod relaxation;
 pub mod symmetry;
 use crate::{invalid, Result};
 use std::collections::HashSet;
+pub(crate) mod lookup;
+mod mutation;
 pub mod ng;
 mod route_replay;
 mod time_windows;
@@ -75,7 +77,7 @@ pub struct Arc<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub memory: Vec<usize>,
 }
 #[derive(Clone, Debug, PartialEq)]
-pub struct Graph<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+pub struct GraphData<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub vertices: Vec<Vertex<D>>,
     pub arcs: Vec<Arc<D>>,
     pub resources: Vec<ResourceKind>,
@@ -92,11 +94,57 @@ pub struct Graph<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     #[cfg(feature = "multi-time-windows")]
     time_windows: std::collections::BTreeMap<(usize, usize), Vec<Window>>,
 }
+/// Graph with read-only field access. Mutations require an explicit edit scope.
+///
+/// ```compile_fail
+/// let mut graph = baldes::Graph::<2>::new(2, 0).unwrap();
+/// graph.source = 1; // Use graph.edit().source = 1 instead.
+/// ```
+#[derive(Clone, Debug)]
+pub struct Graph<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    data: GraphData<D>,
+    revision: u64,
+}
+static NEXT_GRAPH_REVISION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+fn next_graph_revision() -> u64 {
+    NEXT_GRAPH_REVISION
+        .fetch_update(
+            std::sync::atomic::Ordering::Relaxed,
+            std::sync::atomic::Ordering::Relaxed,
+            |value| value.checked_add(1),
+        )
+        .expect("graph revision space exhausted")
+}
+impl<const D: usize> std::ops::Deref for Graph<D> {
+    type Target = GraphData<D>;
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+impl<const D: usize> PartialEq for Graph<D> {
+    fn eq(&self, other: &Self) -> bool {
+        self.data == other.data
+    }
+}
+
 impl<const D: usize> Graph<D> {
+    /// Enter a tracked structural edit. A unique revision prevents equal edit
+    /// counts on independently modified clones from appearing identical.
+    /// Bulk edits are unchecked until `validate()` or solver preparation. Prefer
+    /// validated setters for individual edits. Conservatively invalidates the
+    /// structural revision even when the edit leaves values unchanged.
+    pub fn edit(&mut self) -> &mut GraphData<D> {
+        self.revision = next_graph_revision();
+        &mut self.data
+    }
+
     /// `self == other` with every arc's `reduced_cost` ignored, without
     /// cloning. The destructuring breaks the build if a field is added.
     pub fn same_topology(&self, other: &Graph<D>) -> bool {
-        let Graph {
+        if self.revision == other.revision {
+            return true;
+        }
+        let GraphData {
             vertices,
             arcs,
             resources,
@@ -112,7 +160,7 @@ impl<const D: usize> Graph<D> {
             coupled,
             #[cfg(feature = "multi-time-windows")]
             time_windows,
-        } = self;
+        } = &self.data;
         if !(*source == other.source
             && *sink == other.sink
             && *element_count == other.element_count
@@ -180,27 +228,30 @@ impl<const D: usize> Graph<D> {
             ));
         }
         Ok(Self {
-            vertices: (0..vertices)
-                .map(|v| Vertex {
-                    bounds: ScalarValues::filled(resources, Window::default()),
-                    elements: vec![v],
-                    memory: vec![v],
-                })
-                .collect(),
-            arcs: vec![],
-            resources: vec![ResourceKind::Disposable; resources],
-            source: 0,
-            sink: vertices - 1,
-            element_count: vertices,
-            elementary: false,
-            route_domain: RouteDomain::PhysicalSimple,
-            initial: ScalarValues::filled(resources, None),
-            graph_id: -1,
-            main_resource: None,
-            grouped: false,
-            coupled: None,
-            #[cfg(feature = "multi-time-windows")]
-            time_windows: Default::default(),
+            revision: next_graph_revision(),
+            data: GraphData {
+                vertices: (0..vertices)
+                    .map(|v| Vertex {
+                        bounds: ScalarValues::filled(resources, Window::default()),
+                        elements: vec![v],
+                        memory: vec![v],
+                    })
+                    .collect(),
+                arcs: vec![],
+                resources: vec![ResourceKind::Disposable; resources],
+                source: 0,
+                sink: vertices - 1,
+                element_count: vertices,
+                elementary: false,
+                route_domain: RouteDomain::PhysicalSimple,
+                initial: ScalarValues::filled(resources, None),
+                graph_id: -1,
+                main_resource: None,
+                grouped: false,
+                coupled: None,
+                #[cfg(feature = "multi-time-windows")]
+                time_windows: Default::default(),
+            },
         })
     }
     pub fn route_domain(&self) -> RouteDomain {
@@ -213,18 +264,18 @@ impl<const D: usize> Graph<D> {
         if domain == old {
             return self.validate();
         }
-        let previous = self.coupled.take();
-        self.route_domain = domain;
+        let previous = self.edit().coupled.take();
+        self.edit().route_domain = domain;
         if let Err(error) = self.validate() {
-            self.route_domain = old;
-            self.coupled = previous;
+            self.edit().route_domain = old;
+            self.edit().coupled = previous;
             return Err(error);
         }
-        self.coupled = previous.clone();
+        self.edit().coupled = previous.clone();
         self.refresh_coupled_bounds();
         if let Err(error) = self.validate() {
-            self.route_domain = old;
-            self.coupled = previous;
+            self.edit().route_domain = old;
+            self.edit().coupled = previous;
             return Err(error);
         }
         Ok(())
@@ -289,12 +340,12 @@ impl<const D: usize> Graph<D> {
             return None;
         }
         let mut graph = self.clone();
-        graph.element_count = 0;
-        for v in &mut graph.vertices {
+        graph.edit().element_count = 0;
+        for v in &mut graph.edit().vertices {
             v.elements.clear();
             v.memory.clear();
         }
-        for a in &mut graph.arcs {
+        for a in &mut graph.edit().arcs {
             a.elements.clear();
             a.memory.clear();
         }
@@ -306,12 +357,12 @@ impl<const D: usize> Graph<D> {
         if r >= D || r >= i32::MAX as usize {
             return Err(invalid("resource count exceeds compiled scalar capacity"));
         }
-        self.resources.push(kind);
-        self.initial[r] = None;
-        for vertex in &mut self.vertices {
+        self.edit().resources.push(kind);
+        self.edit().initial[r] = None;
+        for vertex in &mut self.edit().vertices {
             vertex.bounds[r] = Window::default();
         }
-        for arc in &mut self.arcs {
+        for arc in &mut self.edit().arcs {
             arc.consumption[r] = 0.;
             arc.bounds[r] = None;
         }
@@ -337,22 +388,24 @@ impl<const D: usize> Graph<D> {
         {
             return Err(invalid("invalid physical arc ID, endpoints, or cost"));
         }
-        self.arcs.push(Arc {
+        let resource_count = self.resources.len();
+        self.edit().arcs.push(Arc {
             id,
             tail,
             head,
             cost,
             reduced_cost: cost,
             variables: vec![],
-            consumption: ResourceValues::filled(self.resources.len(), 0.),
-            bounds: ScalarValues::filled(self.resources.len(), None),
+            consumption: ResourceValues::filled(resource_count, 0.),
+            bounds: ScalarValues::filled(resource_count, None),
             elements: vec![],
             memory: vec![],
         });
         Ok(())
     }
     pub fn arc_mut(&mut self, id: i32) -> Result<&mut Arc<D>> {
-        self.arcs
+        self.edit()
+            .arcs
             .iter_mut()
             .find(|a| a.id == id)
             .ok_or_else(|| invalid("unknown physical arc ID"))
@@ -368,7 +421,8 @@ impl<const D: usize> Graph<D> {
             return Err(invalid("resource ID out of range"));
         }
         let window = Window::new(lower, upper)?;
-        self.vertices
+        self.edit()
+            .vertices
             .get_mut(vertex)
             .ok_or_else(|| invalid("vertex out of range"))?
             .bounds[resource] = window;
@@ -381,7 +435,7 @@ impl<const D: usize> Graph<D> {
         let mut next = elements.to_vec();
         next.sort_unstable();
         next.dedup();
-        self.vertices[vertex].memory = next;
+        self.edit().vertices[vertex].memory = next;
         Ok(())
     }
     pub fn add_elementarity_set(&mut self, members: &[usize]) -> Result<usize> {
@@ -389,20 +443,20 @@ impl<const D: usize> Graph<D> {
             return Err(invalid("elementarity member out of range"));
         }
         if !self.grouped {
-            for v in &mut self.vertices {
+            for v in &mut self.edit().vertices {
                 v.elements.clear();
                 v.memory.clear();
             }
-            self.element_count = 0;
-            self.grouped = true;
+            self.edit().element_count = 0;
+            self.edit().grouped = true;
         }
         if self.element_count >= 1024 {
             return Err(invalid("elementarity set capacity"));
         }
         let id = self.element_count;
-        self.element_count += 1;
+        self.edit().element_count += 1;
         for &v in members {
-            self.vertices[v].elements.push(id);
+            self.edit().vertices[v].elements.push(id);
         }
         Ok(id)
     }
@@ -419,20 +473,21 @@ impl<const D: usize> Graph<D> {
             return Err(invalid("arc elementarity member out of range"));
         }
         if !self.grouped {
-            for vertex in &mut self.vertices {
+            for vertex in &mut self.edit().vertices {
                 vertex.elements.clear();
                 vertex.memory.clear();
             }
-            self.element_count = 0;
-            self.grouped = true;
+            self.edit().element_count = 0;
+            self.edit().grouped = true;
         }
         if self.element_count >= 1024 {
             return Err(invalid("elementarity set capacity"));
         }
         let id = self.element_count;
-        self.element_count += 1;
+        self.edit().element_count += 1;
         for arc_id in members {
-            self.arcs
+            self.edit()
+                .arcs
                 .iter_mut()
                 .find(|arc| arc.id == arc_id)
                 .expect("arc group members were validated")
@@ -472,7 +527,7 @@ impl<const D: usize> Graph<D> {
         if reduced.iter().any(|v| !v.is_finite()) {
             return Err(invalid("reduced cost overflow"));
         }
-        for ((a, &c), r) in self.arcs.iter_mut().zip(costs).zip(reduced) {
+        for ((a, &c), r) in self.edit().arcs.iter_mut().zip(costs).zip(reduced) {
             a.cost = c;
             a.reduced_cost = r;
         }
@@ -615,13 +670,13 @@ impl<const D: usize> Graph<D> {
                 return Err(invalid("NG set out of range"));
             }
         }
-        self.element_count = sets;
-        self.grouped = true;
-        for ((v, e), m) in self.vertices.iter_mut().zip(membership).zip(memory) {
+        self.edit().element_count = sets;
+        self.edit().grouped = true;
+        for ((v, e), m) in self.edit().vertices.iter_mut().zip(membership).zip(memory) {
             v.elements = e;
             v.memory = m;
         }
-        for a in &mut self.arcs {
+        for a in &mut self.edit().arcs {
             a.elements.clear();
             a.memory.clear();
         }

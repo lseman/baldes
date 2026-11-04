@@ -103,7 +103,7 @@ impl<const D: usize> Graph<D> {
                 continue;
             };
             let original = self.arcs[index].id;
-            self.arcs[index].bounds[resource] = Some(window);
+            self.edit().arcs[index].bounds[resource] = Some(window);
             out.arcs.push(WindowArc {
                 arc: original,
                 original,
@@ -120,7 +120,7 @@ impl<const D: usize> Graph<D> {
                     vertex: head,
                     window: w,
                 });
-                self.arcs.push(copy);
+                self.edit().arcs.push(copy);
                 next = next
                     .checked_add(1)
                     .ok_or_else(|| invalid("physical arc ID overflow"))?;

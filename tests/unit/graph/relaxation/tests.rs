@@ -7,7 +7,7 @@ fn graph() -> Graph<1> {
     }
     g.add_elementarity_set(&[1]).unwrap();
     g.add_elementarity_set(&[2]).unwrap();
-    for v in &mut g.vertices {
+    for v in &mut g.edit().vertices {
         v.memory.clear();
     }
     g
@@ -29,13 +29,13 @@ fn distance_memories_fill_every_vertex_and_arc_when_all_are_empty() {
 fn distance_memories_write_nothing_when_any_memory_exists() {
     // Native scans all vertex then all arc memories before writing anything.
     let mut g = graph();
-    g.vertices[2].memory = vec![1];
+    g.edit().vertices[2].memory = vec![1];
     assert!(!initialize_distances(&mut g, &DISTANCES, 2).unwrap());
     assert!(g.vertices[1].memory.is_empty());
     assert_eq!(g.vertices[2].memory, [1]);
 
     let mut g = graph();
-    g.arcs[5].memory = vec![1];
+    g.edit().arcs[5].memory = vec![1];
     assert!(!initialize_distances(&mut g, &DISTANCES, 2).unwrap());
     assert!(g.vertices.iter().all(|v| v.memory.is_empty()));
 }

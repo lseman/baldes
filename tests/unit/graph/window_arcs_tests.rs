@@ -77,7 +77,8 @@ fn split_pricing_matches_and_reaches_later_windows() {
     // Earliest service at 2 is 11; a cheaper copy for [15, 20] makes waiting
     // optimal, which pricing on the unsplit graph cannot represent.
     let later = split.selections()[&(2, 1)][0];
-    g.arcs
+    g.edit()
+        .arcs
         .iter_mut()
         .find(|a| a.id == later)
         .unwrap()

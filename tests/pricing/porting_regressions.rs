@@ -7,12 +7,12 @@ mod mixed_reversal;
 
 fn solver(symmetric: bool, cut: bool) -> Solver<2> {
     let mut s = Solver::<2>::new(5, 1).unwrap();
-    s.graph.vertices[0].elements.clear();
-    s.graph.vertices[4].elements.clear();
+    s.graph.edit().vertices[0].elements.clear();
+    s.graph.edit().vertices[4].elements.clear();
     for v in 0..5 {
         s.graph.set_bounds(v, 0, 0., 4.).unwrap();
     }
-    s.graph.elementary = true;
+    s.graph.edit().elementary = true;
     for u in 0..4 {
         for v in 1..5 {
             if u == v || (u == 0 && v == 4) {
@@ -29,7 +29,7 @@ fn solver(symmetric: bool, cut: bool) -> Solver<2> {
     }
     if !symmetric {
         // Disable the symmetric resource domain without changing path feasibility.
-        s.graph.vertices[1].bounds[0].lower = 0.25;
+        s.graph.edit().vertices[1].bounds[0].lower = 0.25;
     }
     if cut {
         s.cuts.add_strong_k_path_cut(5, &[1, 2], 1, -1.25).unwrap();
@@ -151,7 +151,7 @@ fn halfway_completion_matches_fresh_completion_and_exhaustive_paths() {
 fn changed_duals_reject_direct_continuation_and_rebuild_completion() {
     let mut s = solver(false, true);
     s.price_phase(0, 100, false).unwrap();
-    s.graph.arcs[0].reduced_cost -= 3.;
+    s.graph.edit().arcs[0].reduced_cost -= 3.;
     assert!(s
         .engine
         .as_mut()
@@ -192,7 +192,7 @@ fn symmetric_cut_pricing_and_fixing_preserve_the_exhaustive_universe() {
 #[test]
 fn asymmetric_reduced_costs_on_a_symmetric_resource_graph_match_direct_path_costs() {
     let mut s = solver(true, true);
-    for (i, arc) in s.graph.arcs.iter_mut().enumerate() {
+    for (i, arc) in s.graph.edit().arcs.iter_mut().enumerate() {
         arc.reduced_cost = (i as f64 * 7. % 13.) - 6.;
     }
     let expected = exhaustive(&s.graph, true, 100.);
@@ -221,7 +221,7 @@ fn dual_change_after_symmetric_preparation_falls_back_for_pricing_and_completion
         let mut s = solver(true, true);
         s.price_phase(0, 100, false).unwrap();
         assert!(s.engine.as_ref().unwrap().consumption_joins);
-        s.graph.arcs[0].reduced_cost -= 7.;
+        s.graph.edit().arcs[0].reduced_cost -= 7.;
         let expected = exhaustive(&s.graph, true, 100.);
         if complete {
             s.complete_labels(true).unwrap();
@@ -238,8 +238,8 @@ fn dual_change_after_symmetric_preparation_falls_back_for_pricing_and_completion
 #[test]
 fn depot_elements_are_transformed_for_symmetric_labeling() {
     let mut s = solver(true, false);
-    s.graph.vertices[0].elements = vec![0];
-    s.graph.vertices[4].elements = vec![4];
+    s.graph.edit().vertices[0].elements = vec![0];
+    s.graph.edit().vertices[4].elements = vec![4];
     s.price_phase(0, 100, false).unwrap();
     assert!(s.engine.as_ref().unwrap().consumption_joins);
     assert_costs(
@@ -254,7 +254,7 @@ fn nonzero_initial_resource_is_transformed_for_symmetric_labeling() {
     for v in 0..5 {
         s.graph.set_bounds(v, 0, 3., 7.).unwrap();
     }
-    s.graph.initial[0] = Some(3.);
+    s.graph.edit().initial[0] = Some(3.);
     let result = s.price_phase(0, 100, false).unwrap();
     assert!(s.engine.as_ref().unwrap().consumption_joins);
     let expected = exhaustive(&s.graph, true, 100.);
@@ -1224,7 +1224,7 @@ fn exact_root_pricing_preserves_raw_costs_when_native_rounding_ties_routes() {
         .map(|v| v.as_f64().unwrap())
         .collect();
     let mut solver = Solver::<2>::new(10, 1).unwrap();
-    solver.graph.graph_id = 7;
+    solver.graph.edit().graph_id = 7;
     for vertex in 0..10 {
         solver.graph.set_bounds(vertex, 0, 0., 2.).unwrap();
     }
@@ -1713,7 +1713,7 @@ fn check_mixed_incidence_separation_capture(capture: &str) {
                 );
             }
             let mut solver = baldes::pricing::Solver::<2>::new(8, 0).unwrap();
-            solver.graph.graph_id = 7;
+            solver.graph.edit().graph_id = 7;
             for &(tail, head, id) in &route {
                 solver.graph.add_arc_with_id(id, tail, head, 0.).unwrap();
             }
@@ -2030,7 +2030,7 @@ fn check_mixed_incidence_separation_capture(capture: &str) {
         for graph in [&g7, &g8] {
             let mut pricing_graph =
                 baldes::graph::Graph::<2>::new(num_sets as usize + 2, 0).unwrap();
-            pricing_graph.graph_id = graph.id;
+            pricing_graph.edit().graph_id = graph.id;
             for arc in &graph.arcs {
                 pricing_graph
                     .add_arc(arc.tail as usize, arc.head as usize, 0.)
@@ -2077,7 +2077,7 @@ fn check_mixed_incidence_separation_capture(capture: &str) {
                 .and_then(|cases| cases.iter().find(|case| number(&case["graph"]) == graph.id))
             {
                 let mut solver = Solver::<2>::new(num_sets as usize + 2, 1).unwrap();
-                solver.graph.graph_id = graph.id;
+                solver.graph.edit().graph_id = graph.id;
                 for vertex in 0..num_sets as usize + 2 {
                     solver.graph.set_bounds(vertex, 0, 0., 2.).unwrap();
                 }
@@ -2915,9 +2915,9 @@ fn check_mixed_incidence_coefficient_captures(capture: &str, expected_count: usi
         {
             for direction in [0., 1., 2.] {
                 let mut solver = Solver::<2>::new(8, 1).unwrap();
-                solver.graph.graph_id = graph_id;
-                solver.graph.vertices[0].elements.clear();
-                solver.graph.vertices[7].elements.clear();
+                solver.graph.edit().graph_id = graph_id;
+                solver.graph.edit().vertices[0].elements.clear();
+                solver.graph.edit().vertices[7].elements.clear();
                 for vertex in 0..8 {
                     solver.graph.set_bounds(vertex, 0, 0., 10.).unwrap();
                 }
@@ -3118,9 +3118,9 @@ fn transformed_symmetry_preserves_routes_after_dual_changes_and_fixing() {
     for cut in [false, true] {
         for threshold in [-1., 2.5, 5.] {
             let mut s = solver(true, cut);
-            s.graph.vertices[0].elements = vec![0];
-            s.graph.vertices[4].elements = vec![4];
-            s.graph.initial[0] = Some(3.);
+            s.graph.edit().vertices[0].elements = vec![0];
+            s.graph.edit().vertices[4].elements = vec![4];
+            s.graph.edit().initial[0] = Some(3.);
             for v in 0..5 {
                 s.graph.set_bounds(v, 0, 3., 7.).unwrap();
             }
@@ -3128,7 +3128,7 @@ fn transformed_symmetry_preserves_routes_after_dual_changes_and_fixing() {
             // Head-assigned customer duals are conservative under reversal,
             // despite unequal individual reverse-arc reduced costs.
             let duals = [0., 2., 3., 1.5, 0.];
-            for a in &mut s.graph.arcs {
+            for a in &mut s.graph.edit().arcs {
                 a.reduced_cost = a.cost - duals[a.head];
             }
             let expected = exhaustive(&s.graph, cut, threshold);
@@ -3155,13 +3155,13 @@ fn transformed_symmetry_preserves_routes_after_dual_changes_and_fixing() {
 fn mirrored_fixing_preserves_two_resource_frontiers() {
     for seed in 0..16 {
         let mut s = Solver::<2>::new(5, 2).unwrap();
-        s.graph.elementary = true;
+        s.graph.edit().elementary = true;
         s.enumeration_preserve_arc_paths = true;
         for v in 0..5 {
             s.graph.set_bounds(v, 0, 2., 8.).unwrap();
             s.graph.set_bounds(v, 1, 1., 10.).unwrap();
         }
-        s.graph.initial = [Some(2.), Some(1.)].into();
+        s.graph.edit().initial = [Some(2.), Some(1.)].into();
         for u in 0..4 {
             for v in 1..5 {
                 if u == v || (u == 0 && v == 4) {
@@ -3205,7 +3205,7 @@ fn capacity_candidate_ids_and_counters_persist_and_reset() {
 fn coupled_solver(symmetric: bool, cut: bool) -> Solver<2> {
     use baldes::graph::coupled::CoupledResource;
     let mut s = solver(symmetric, cut);
-    for arc in &mut s.graph.arcs {
+    for arc in &mut s.graph.edit().arcs {
         arc.reduced_cost = -2.;
     }
     let allowed = s
@@ -3305,7 +3305,7 @@ fn coupled_prefix_reversal_falls_back_for_duals_and_isolates_forbidden_children(
         .iter()
         .all(|r| !r.arcs.contains(&s.graph.arcs[0].id)));
     assert!(s.engine.as_ref().unwrap().consumption_joins);
-    for (i, a) in s.graph.arcs.iter_mut().enumerate() {
+    for (i, a) in s.graph.edit().arcs.iter_mut().enumerate() {
         a.reduced_cost = (i * 7 % 13) as f64 - 6.;
     }
     let expected = coupled_exhaustive(&s.graph, false, 100.);
@@ -3343,7 +3343,7 @@ fn g13_coupled_retained_universe_survives_duals_fixing_and_sibling_branches() {
                 let forbidden = seed % child.graph.arcs.len();
                 let forbidden_id = child.graph.arcs[forbidden].id;
                 child.set_forbidden_arcs(vec![forbidden]).unwrap();
-                for (i, arc) in child.graph.arcs.iter_mut().enumerate() {
+                for (i, arc) in child.graph.edit().arcs.iter_mut().enumerate() {
                     arc.reduced_cost = ((i * 7 + seed * 3) % 17) as f64 - 8.;
                 }
                 let expected: BTreeMap<_, _> = coupled_exhaustive(&child.graph, cut, 100.)
@@ -3391,11 +3391,11 @@ fn g13_bounded_cycles_jumps_and_terminal_equality_match_literal_walks() {
             for equality in [false, true] {
                 let mut s = Solver::<2>::new(3, 1).unwrap();
                 for v in 0..3 {
-                    s.graph.vertices[v].elements.clear();
+                    s.graph.edit().vertices[v].elements.clear();
                     s.graph.set_bounds(v, 0, 0., 4.).unwrap();
                 }
                 if equality {
-                    s.graph.resources[0] = ResourceKind::Equality;
+                    s.graph.edit().resources[0] = ResourceKind::Equality;
                 }
                 s.graph.set_bounds(2, 0, 4., 4.).unwrap();
                 for (tail, head, cost) in [(0, 1, -1.), (1, 1, -2.), (1, 2, 0.)] {
@@ -3463,7 +3463,7 @@ fn symmetric_consumption_join_counts_nonzero_source_state_once() {
                 .set_bounds(vertex, 0, initial, initial + 3.)
                 .unwrap();
         }
-        symmetric.graph.initial[0] = explicit.then_some(initial);
+        symmetric.graph.edit().initial[0] = explicit.then_some(initial);
         let expected = exhaustive(&symmetric.graph, false, 100.);
         assert!(expected.keys().any(|path| path.len() == 3));
         assert!(!expected.keys().any(|path| path.len() > 3));
@@ -3483,7 +3483,7 @@ fn arc_memory_ng_strengthening_mirrors_on_symmetric_execution() {
     use baldes::graph::relaxation::{Controls, FractionalPath};
     for symmetric in [false, true] {
         let mut s = solver(symmetric, false);
-        s.graph.elementary = false;
+        s.graph.edit().elementary = false;
         s.price_phase(0, 100, false).unwrap();
         assert_eq!(s.engine.as_ref().unwrap().consumption_joins, symmetric);
         let id = |s: &Solver<2>, tail: usize, head: usize| {
@@ -3532,9 +3532,9 @@ fn arc_memory_ng_strengthening_mirrors_on_symmetric_execution() {
 fn symmetric_join_subtracts_the_source_initial_value() {
     for init in [0., 2.] {
         let mut s = Solver::<2>::new(4, 1).unwrap();
-        s.graph.vertices[0].elements.clear();
-        s.graph.vertices[3].elements.clear();
-        s.graph.elementary = true;
+        s.graph.edit().vertices[0].elements.clear();
+        s.graph.edit().vertices[3].elements.clear();
+        s.graph.edit().elementary = true;
         for v in 0..4 {
             s.graph.set_bounds(v, 0, init, init + 8.5).unwrap();
         }
@@ -3658,7 +3658,7 @@ fn check_covering_vertex_rounds(fixture: &str, iterations: i32, mixed: bool) {
     );
     let number = |value: &serde_json::Value| value.as_i64().unwrap() as i32;
     let mut graph = Graph::<2>::new(11, 0).unwrap();
-    graph.graph_id = 7;
+    graph.edit().graph_id = 7;
     let arcs = capture["arcs"].as_array().unwrap();
     for arc in arcs {
         graph

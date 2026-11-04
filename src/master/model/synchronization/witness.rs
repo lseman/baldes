@@ -194,7 +194,7 @@ fn schedule_at<const D: usize>(
             let graph = domains.get_mut(&member.network).unwrap();
             let old = graph.vertices[member.vertex].bounds[service.definition.resource];
             if starts[i] < old.lower || starts[i] > old.upper {
-                graph.arcs.retain(|a| a.head != member.vertex);
+                graph.edit().arcs.retain(|a| a.head != member.vertex);
                 continue;
             }
             graph.set_bounds(

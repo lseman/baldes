@@ -11,7 +11,7 @@ fn raw_functor_pricing_restores_discarded_paths_and_keeps_branch_restrictions() 
     for v in 0..3 {
         solver.graph.set_bounds(v, 0, 0., 10.).unwrap();
     }
-    solver.graph.elementary = true;
+    solver.graph.edit().elementary = true;
     let a = solver.graph.add_arc(0, 1, 0.).unwrap();
     solver.graph.arc_mut(a).unwrap().variables = vec![(0, 1e8)];
     let b = solver.graph.add_arc(0, 1, 0.05).unwrap();
@@ -174,7 +174,7 @@ fn enumeration_frontier_records_discarded_terminal_scores_in_their_cost_epoch() 
     let mut parent = solver;
     parent.enumeration = Some(universe);
     let mut child = parent.fork_for_node();
-    for arc in &mut child.graph.arcs {
+    for arc in &mut child.graph.edit().arcs {
         arc.reduced_cost += 10.;
     }
     child.inspect_enumeration(f64::INFINITY).unwrap();
@@ -217,7 +217,7 @@ fn enumeration_frontier_keeps_completion_rejections_separate_from_numeric_scores
 #[test]
 fn enumeration_frontier_reports_ordered_join_pruning_separately() {
     let mut solver = frontier_solver();
-    for arc in &mut solver.graph.arcs {
+    for arc in &mut solver.graph.edit().arcs {
         arc.consumption[0] = if arc.tail == 0 && arc.head != 3 {
             3.
         } else {
@@ -247,8 +247,8 @@ fn enumeration_frontier_reports_ordered_join_pruning_separately() {
 #[test]
 fn completion_callbacks_never_receive_non_elementary_vertex_extensions() {
     let mut solver = Solver::<2>::new(5, 2).unwrap();
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[4].elements.clear();
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[4].elements.clear();
     for vertex in 0..5 {
         solver.graph.set_bounds(vertex, 0, 0., 100.).unwrap();
         solver.graph.set_bounds(vertex, 1, 0., 2.).unwrap();
@@ -375,8 +375,8 @@ fn check_reference_enumeration(input: &str, resources: usize) {
     let arcs: usize = header[1].parse().unwrap();
     let cutoff: f64 = header[2].parse().unwrap();
     let mut solver = Solver::<2>::new(vertices, resources).unwrap();
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[vertices - 1].elements.clear();
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[vertices - 1].elements.clear();
     for vertex in 0..vertices {
         solver.graph.set_bounds(vertex, 0, 0., 2.).unwrap();
         if resources == 2 {
@@ -475,8 +475,8 @@ fn retained_standard_paths_match_captured_repricing_bits() {
     let path_count: usize = take(&mut input);
     let cases: usize = take(&mut input);
     let mut solver = Solver::<2>::new(vertices, 1).unwrap();
-    solver.graph.vertices[0].elements.clear();
-    solver.graph.vertices[vertices - 1].elements.clear();
+    solver.graph.edit().vertices[0].elements.clear();
+    solver.graph.edit().vertices[vertices - 1].elements.clear();
     for vertex in 0..vertices {
         solver.graph.set_bounds(vertex, 0, 0., 2.).unwrap();
     }
@@ -500,7 +500,7 @@ fn retained_standard_paths_match_captured_repricing_bits() {
     solver.bucket_steps[0] = 1.;
     assert_eq!(solver.enumerate(cutoff).unwrap().len(), path_count);
     for case in 0..cases {
-        for arc in &mut solver.graph.arcs {
+        for arc in &mut solver.graph.edit().arcs {
             arc.reduced_cost = take(&mut input);
         }
         let expected: BTreeMap<_, _> = paths
@@ -536,8 +536,8 @@ fn fixing_matches_native_prepared_grid_and_selected_labels() {
     let cutoff: f64 = header[2].parse().unwrap();
     let mut graph = Graph::<2>::new(n, 1).unwrap();
     for v in [0, n - 1] {
-        graph.vertices[v].elements.clear();
-        graph.vertices[v].memory.clear();
+        graph.edit().vertices[v].elements.clear();
+        graph.edit().vertices[v].memory.clear();
     }
     for v in 0..n {
         let bounds: Vec<f64> = lines
@@ -672,8 +672,8 @@ fn fixing_completion_matches_native_backward_label_pruning() {
     let arc_count: usize = header[1].parse().unwrap();
     let mut graph = Graph::<2>::new(n, 1).unwrap();
     for vertex in [0, n - 1] {
-        graph.vertices[vertex].elements.clear();
-        graph.vertices[vertex].memory.clear();
+        graph.edit().vertices[vertex].elements.clear();
+        graph.edit().vertices[vertex].memory.clear();
     }
     for vertex in 0..n {
         let bounds: Vec<f64> = lines
@@ -829,13 +829,13 @@ fn check_captured_enumeration(
     let cutoff: f64 = header[2].parse().unwrap();
     let mut graph = Graph::<2>::new(n, 1).unwrap();
     for vertex in [0, n - 1] {
-        graph.vertices[vertex].elements.clear();
-        graph.vertices[vertex].memory.clear();
+        graph.edit().vertices[vertex].elements.clear();
+        graph.edit().vertices[vertex].memory.clear();
     }
     if align_elements {
         for vertex in 1..n - 1 {
-            graph.vertices[vertex].elements = vec![vertex - 1];
-            graph.vertices[vertex].memory = vec![vertex - 1];
+            graph.edit().vertices[vertex].elements = vec![vertex - 1];
+            graph.edit().vertices[vertex].memory = vec![vertex - 1];
         }
     }
     for vertex in 0..n {

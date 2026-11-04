@@ -83,6 +83,7 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
         .then(|| -> Result<_> {
             let mut relaxed = graph.clone();
             relaxed
+                .edit()
                 .resources
                 .fill(crate::graph::ResourceKind::Disposable);
             relaxed.set_coupled_resources(&[])?;
@@ -245,7 +246,7 @@ fn collect_paired_program_routes<const D: usize>(
     let mut solver = crate::pricing::Solver::<D>::new(graph.vertices.len(), graph.resources.len())
         .map_err(|error| error.to_string())?;
     solver.graph = graph.clone();
-    for arc in &mut solver.graph.arcs {
+    for arc in &mut solver.graph.edit().arcs {
         arc.reduced_cost = 0.;
     }
     solver.graph.suppress_coupled_costs();

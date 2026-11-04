@@ -57,7 +57,7 @@ impl RowKernels {
                     }
                     // Pricing assigns the subproblem identity to its graph.
                     let mut graph = n.graph.clone();
-                    graph.graph_id = n.id;
+                    graph.edit().graph_id = n.id;
                     registered::normalize(&c.cut, &graph)?;
                 }
             }

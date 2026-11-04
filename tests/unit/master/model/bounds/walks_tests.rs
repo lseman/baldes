@@ -36,7 +36,7 @@ fn bounded_walks_keep_repeated_vertices_and_enforce_arc_windows() {
     // The cheapest permitted walk repeats vertex 1. An elementary-path proof
     // would incorrectly publish zero as a lower bound on this walk domain.
     assert_eq!(run(&graph), Some(Some(-5.)));
-    graph.arcs[2].bounds[0] = Some(crate::Window::new(0., 2.).unwrap());
+    graph.edit().arcs[2].bounds[0] = Some(crate::Window::new(0., 2.).unwrap());
     assert_eq!(run(&graph), Some(Some(0.)));
 }
 

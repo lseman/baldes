@@ -395,7 +395,7 @@ fn residual_aggregate_row_avoids_sequential_fixed_cancellation() {
 fn residual_aggregate_activity_is_installed_before_column_coefficients() {
     use crate::graph::coupled::CoupledResource;
     let mut graph = Graph::<2>::new(2, 0).unwrap();
-    graph.elementary = true;
+    graph.edit().elementary = true;
     graph.add_arc(0, 1, -1.).unwrap();
     graph
         .set_coupled_resources(&[CoupledResource::CustomResource {
@@ -811,7 +811,7 @@ fn half_arc_validation_rejects_invalid_topology_without_panicking() {
     let mut graph = Graph::<2>::new(3, 0).unwrap();
     graph.add_arc(0, 1, 0.).unwrap();
     graph.add_arc(1, 2, 0.).unwrap();
-    graph.source = graph.vertices.len();
+    graph.edit().source = graph.vertices.len();
     assert!(!integral_path_parity(&graph, &[(0, 0.5), (1, 0.5)]));
 }
 

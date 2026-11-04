@@ -101,8 +101,7 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
                         node.set_incidence_separator_history(history);
                     }
                 }
-                node.reset_evaluation_artificials()?;
-                node.reset_evaluation_incidence_phase();
+                node.prepare_evaluation()?;
                 let result = node.solve_forked(options);
                 if self.options.threads == 1 {
                     if let Ok(output) = &result {

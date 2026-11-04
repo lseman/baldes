@@ -2,9 +2,9 @@ use super::*;
 
 fn model() -> Graph<2> {
     let mut g = Graph::new(4, 1).unwrap();
-    g.elementary = true;
-    g.vertices[0].elements.clear();
-    g.vertices[3].elements.clear();
+    g.edit().elementary = true;
+    g.edit().vertices[0].elements.clear();
+    g.edit().vertices[3].elements.clear();
     for v in 0..4 {
         g.set_bounds(v, 0, 0., 2.).unwrap();
     }
@@ -228,7 +228,7 @@ fn retained_reference_activity_duals_price_all_columns_at_the_independent_lp_poi
                 .graph
                 .set_coupled_pricing_adjustments(&[(1, q - 1. - dual)])
                 .unwrap();
-            solver.graph.arcs[0].reduced_cost -= dual * arc_row;
+            solver.graph.edit().arcs[0].reduced_cost -= dual * arc_row;
             solver
                 .set_option("BALDESuseBidirectionalSearch", direction)
                 .unwrap();
@@ -297,7 +297,7 @@ fn raw_cost_forks_reload_changed_activity_adjustments() {
     let make = || {
         let mut solver = crate::pricing::Solver::<2>::new(4, 1).unwrap();
         solver.graph = model();
-        for (position, arc) in solver.graph.arcs.iter_mut().enumerate() {
+        for (position, arc) in solver.graph.edit().arcs.iter_mut().enumerate() {
             arc.cost = 0.;
             arc.variables = vec![(position, 1.)];
         }

@@ -57,7 +57,7 @@ fn standard_knapsack_pricing_charges_recorded_native_coefficient() {
 
     for mode in [0., 1., 2.] {
         let mut solver = Solver::<2>::new(4, 2).unwrap();
-        solver.graph.graph_id = 7;
+        solver.graph.edit().graph_id = 7;
         solver.knapsack_exact_coefficients = true;
         solver
             .options
@@ -113,7 +113,7 @@ fn enumeration_keeps_routes_with_same_support_and_distinct_cut_denominators() {
             let id = solver.graph.add_arc(vertex, vertex + 1, 0.).unwrap();
             solver.graph.arc_mut(id).unwrap().consumption[0] = 1.;
         }
-        solver.graph.elementary = true;
+        solver.graph.edit().elementary = true;
         solver
             .options
             .set("BALDESuseBidirectionalSearch", mode)
@@ -834,7 +834,7 @@ fn exhaustive_mixed_cut_lifecycle_preserves_enumerated_routes() {
         for scan in [0., 1.] {
             for cyclic in [false, true] {
                 let mut solver = Solver::<2>::new(6, 1).unwrap();
-                solver.graph.elementary = true;
+                solver.graph.edit().elementary = true;
                 solver.enumeration_preserve_arc_paths = true;
                 for v in 0..6 {
                     solver.graph.set_bounds(v, 0, 0., 5.).unwrap();
@@ -893,7 +893,7 @@ fn exhaustive_mixed_cut_lifecycle_preserves_enumerated_routes() {
                         }
                         2 => {
                             solver.cuts.cuts.reverse();
-                            for arc in &mut solver.graph.arcs {
+                            for arc in &mut solver.graph.edit().arcs {
                                 arc.reduced_cost += 0.25;
                             }
                         }
@@ -1265,7 +1265,7 @@ fn separated_kpath_memory_survives_registration_and_pricing() {
     );
     let priced = solver.price_phase(0, 10, false).unwrap();
     assert_eq!(priced.columns[0].cost, -2.);
-    solver.graph.graph_id = 1;
+    solver.graph.edit().graph_id = 1;
     assert_eq!(
         solver
             .cuts

@@ -169,7 +169,7 @@ fn general_native_raw_certificates_match_independent_nonlattice_machine_programs
             }])
             .unwrap();
         if spec.scale == 0. {
-            graph.coupled.as_mut().unwrap().suppress_costs();
+            graph.edit().coupled.as_mut().unwrap().suppress_costs();
         }
         // Fixtures describe the explicitly selected MACHINE feasibility
         // model. Its scope cannot silently replace a default source witness.
@@ -236,7 +236,7 @@ fn machine_feasibility_requires_explicit_model_choice_and_survives_cloning() {
         Some((true, [3., 3.]))
     );
     let mut child = graph.clone();
-    child.coupled.as_mut().unwrap().suppress_costs();
+    child.edit().coupled.as_mut().unwrap().suppress_costs();
     assert!(child.front_program_domain());
     assert_eq!(
         child.coupled_kernel().unwrap().certify(&[0]),

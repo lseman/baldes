@@ -270,7 +270,7 @@ fn root_snapshots_and_tree_modes_do_not_promote_an_unsupported_certificate() {
         Graph,
     };
     let mut graph = Graph::<2>::new(3, 1).unwrap();
-    graph.resources[0] = ResourceKind::Equality;
+    graph.edit().resources[0] = ResourceKind::Equality;
     for vertex in 0..3 {
         graph.set_bounds(vertex, 0, 0., 10.).unwrap();
     }
@@ -666,7 +666,7 @@ fn resource_rounding_retry_does_not_publish_a_root_feasibility_proof() {
     for customer in [1, 2] {
         graph.add_elementarity_set(&[customer]).unwrap();
     }
-    graph.initial[0] = Some(0.);
+    graph.edit().initial[0] = Some(0.);
     for v in 0..4 {
         graph.set_bounds(v, 0, 0., upper).unwrap();
         graph.set_ng(v, &[0, 1]).unwrap();
@@ -712,7 +712,7 @@ fn rounded_resource_feasibility_does_not_publish_an_integer_incumbent() {
         Graph,
     };
     let mut graph = Graph::<2>::new(3, 1).unwrap();
-    graph.initial[0] = Some(0.);
+    graph.edit().initial[0] = Some(0.);
     graph.add_elementarity_set(&[1]).unwrap();
     for v in 0..3 {
         graph.set_bounds(v, 0, 0., 1.).unwrap();

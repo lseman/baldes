@@ -42,7 +42,7 @@ fn parallel_arcs_cycles_waiting_and_equality_have_explicit_canonical_paths() {
         &[[0., 0.], [2., 0.], [3., 0.]]
     );
     let mut equality = graph.clone();
-    equality.resources[0] = ResourceKind::Equality;
+    equality.edit().resources[0] = ResourceKind::Equality;
     let domain = CompleteCanonicalPaths::collect(&equality, limits()).unwrap();
     assert_eq!(domain.paths().len(), 1);
     assert_eq!(domain.paths()[0].arc_positions(), &[6, 5]);
@@ -150,7 +150,7 @@ fn empty_domain_and_impossible_initial_state_are_complete() {
         .paths()
         .is_empty());
     let mut graph = super::tests::graph();
-    graph.initial[0] = Some(10.);
+    graph.edit().initial[0] = Some(10.);
     assert!(CompleteCanonicalPaths::collect(&graph, limits())
         .unwrap()
         .paths()
@@ -171,7 +171,7 @@ fn direct_paths_and_cost_overflow_are_not_silently_omitted() {
 #[test]
 fn malformed_graphs_are_not_completed_domains() {
     let mut graph = graph();
-    graph.arcs[0].head = 99;
+    graph.edit().arcs[0].head = 99;
     assert_eq!(
         CompleteCanonicalPaths::collect(&graph, limits()).unwrap_err(),
         PathDomainFailure::InvalidGraph
@@ -205,7 +205,7 @@ fn sparse_path_search_does_not_rescan_unrelated_arcs() {
 
 fn chain(consumption: &[f64], upper: f64) -> Graph<2> {
     let mut g = Graph::<2>::new(consumption.len() + 1, 1).unwrap();
-    g.initial[0] = Some(0.);
+    g.edit().initial[0] = Some(0.);
     for vertex in 0..g.vertices.len() {
         g.set_bounds(vertex, 0, 0., upper).unwrap();
     }
@@ -312,7 +312,7 @@ fn relaxed_collection_has_atomic_limits_and_explicit_unknown_arithmetic() {
         PathDomainFailure::Arithmetic
     );
     let mut g = chain(&[1., 1.], 2.);
-    g.resources[0] = ResourceKind::Equality;
+    g.edit().resources[0] = ResourceKind::Equality;
     assert_eq!(
         CompleteResourceRelaxation::collect(&g, limits()).unwrap_err(),
         PathDomainFailure::UnsupportedResources
@@ -520,7 +520,7 @@ fn cost_coverage_is_outward_and_invalid_or_partial_searches_return_no_domain() {
         Err(PathDomainFailure::StoredArcLimit)
     ));
     let mut equality = graph;
-    equality.resources.push(ResourceKind::Equality);
+    equality.edit().resources.push(ResourceKind::Equality);
     assert!(matches!(
         CostBoundedResourceRelaxation::collect(&equality, &weights, 1., limits()),
         Err(PathDomainFailure::UnsupportedResources)

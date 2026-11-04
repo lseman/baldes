@@ -24,3 +24,12 @@ it. See the [unified solve guide](solve.md) for normalization and shared default
 Routing input returns an LP relaxation; network model input also supports
 `tree=True`. A root `Optimal` status describes LP convergence, not an integer
 routing optimum. The [handbook](../pybaldes/README.md) documents each input contract.
+
+Network tree solves accept `tree_threads=1`, `absolute_gap=1e-6`,
+`relative_gap=1e-9`, `integer_objective=False`, and optional `diving` configuration.
+These are forwarded to the shared Rust solve options for validation.
+
+Routing distance defaults differ between frontends: the CLI uses truncated
+tenths, while Python follows the instance metric. Specify `--rounding none`
+(CLI) and `rounding="none"` (Python), or another matching mode, when comparing
+results. An empty rounding string is invalid.

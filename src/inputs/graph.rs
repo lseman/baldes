@@ -92,7 +92,7 @@ impl Instance {
             let elements: Vec<_> = order.into_iter().map(|customer| customer - 1).collect();
             graph.set_ng(v, &elements)?;
         }
-        graph.initial[0] = Some(if time_windows {
+        graph.edit().initial[0] = Some(if time_windows {
             self.customers[0].ready * scale
         } else {
             0.

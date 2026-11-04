@@ -270,9 +270,9 @@ impl Problem {
         }
         let sink = 2 * n + 1;
         let mut graph = Graph::new(sink + 1, 1)?;
-        graph.source = 0;
-        graph.sink = sink;
-        graph.initial[0] = Some(self.instance.nodes[0].open);
+        graph.edit().source = 0;
+        graph.edit().sink = sink;
+        graph.edit().initial[0] = Some(self.instance.nodes[0].open);
         for (v, node) in self.instance.nodes.iter().enumerate() {
             graph.set_bounds(v, 0, node.open, node.close)?;
         }

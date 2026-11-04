@@ -64,7 +64,7 @@ def _routing(
     reduced_cost_fixing: bool = True,
     upper_bound: float = math.inf,
     time_limit: float = 120.0,
-    max_iterations: int = 10_000,
+    max_iterations: int = 100_000,
     max_cut_rounds: Optional[int] = None,
     pricing_options: Optional[Mapping[str, float]] = None,
 ) -> RootResult:
@@ -104,7 +104,7 @@ def _routing(
         problem_type = "vrptw" if all(math.isfinite(c.due) for c in instance.customers) else "cvrp"
     rows = [(c.x, c.y, c.demand, c.ready, c.due, c.service) for c in instance.customers]
     distances = None if instance.distances is None else [list(row) for row in instance.distances]
-    data = _core._solve({"kind": "routing", "data": {'name': instance.name, 'vehicles': instance.vehicles, 'capacity': instance.capacity, 'customers': rows, 'distances': distances}}, {'problem_type': problem_type, 'ng': ng, 'rounding': rounding or instance.rounding, 'capacity_cuts': capacity_cuts, 'rank_one_cuts': rank_one_cuts, 'stabilize': stabilize, 'enumerate': reduced_cost_fixing, 'upper_bound': upper_bound, 'time_limit': time_limit, 'max_iterations': max_iterations, 'max_cut_rounds': max_cut_rounds, 'pricing_options': dict(pricing_options or {}), 'two_path_cuts': two_path_cuts, 'master_solver': master_solver, 'hgs_time': hgs_time, 'hgs_columns': str(hgs_columns), 'hgs_seed': hgs_seed, 'verbose': verbose, 'log_interval': log_interval, 'bound_mode': bound_mode, 'clp_scaling': clp_scaling, 'clp_keep_work_areas': clp_keep_work_areas, 'master_threads': master_threads, 'stabilization_max_tree_depth': stabilization_max_tree_depth})
+    data = _core._solve({"kind": "routing", "data": {'name': instance.name, 'vehicles': instance.vehicles, 'capacity': instance.capacity, 'customers': rows, 'distances': distances}}, {'problem_type': problem_type, 'ng': ng, 'rounding': instance.rounding if rounding is None else rounding, 'capacity_cuts': capacity_cuts, 'rank_one_cuts': rank_one_cuts, 'stabilize': stabilize, 'enumerate': reduced_cost_fixing, 'upper_bound': upper_bound, 'time_limit': time_limit, 'max_iterations': max_iterations, 'max_cut_rounds': max_cut_rounds, 'pricing_options': dict(pricing_options or {}), 'two_path_cuts': two_path_cuts, 'master_solver': master_solver, 'hgs_time': hgs_time, 'hgs_columns': str(hgs_columns), 'hgs_seed': hgs_seed, 'verbose': verbose, 'log_interval': log_interval, 'bound_mode': bound_mode, 'clp_scaling': clp_scaling, 'clp_keep_work_areas': clp_keep_work_areas, 'master_threads': master_threads, 'stabilization_max_tree_depth': stabilization_max_tree_depth})
     data["duals"] = tuple(data["duals"])
     data["routes"] = tuple(
         RootRoute(**{**r, "nodes": tuple(r["nodes"]), "arcs": tuple(r["arcs"])})
@@ -119,6 +119,11 @@ def _networks(
     problem: NetworkProblem,
     *,
     tree: bool = False,
+    tree_threads: int = 1,
+    absolute_gap: float = 1e-6,
+    relative_gap: float = 1e-9,
+    integer_objective: bool = False,
+    diving: Optional[Mapping[str, Any]] = None,
     network_pricing_schedule: str = "full-sweep",
     network_unpromising_limit: int = 1,
     network_promising_limit: int = 1000000,
@@ -163,7 +168,10 @@ def _networks(
     """
     if not isinstance(problem, NetworkProblem):
         raise TypeError("problem must be a NetworkProblem")
-    options = dict(synchronized_services=synchronized_services, tree=tree, network_pricing_schedule=network_pricing_schedule, network_unpromising_limit=network_unpromising_limit, network_promising_limit=network_promising_limit, stabilization_max_tree_depth=stabilization_max_tree_depth, proximal=proximal, branching_registrations=branching_registrations, network_tree_search=network_tree_search, network_strategy2_bound_rounding=network_strategy2_rounding, network_open_node_limit=network_open_node_limit, network_scoring_gap_tolerance=network_scoring_gap_tolerance, network_share_inactive_columns=network_share_inactive_columns, network_search_inactive_columns=network_search_inactive_columns, variable_boxes=variable_boxes, original_variable_boxes=original_variable_boxes, enumerate=enumerate, enumeration_route_limit=enumeration_route_limit,
+    options = dict(synchronized_services=synchronized_services, tree=tree,
+                   tree_threads=tree_threads, absolute_gap=absolute_gap,
+                   relative_gap=relative_gap, integer_objective=integer_objective,
+                   diving=None if diving is None else dict(diving), network_pricing_schedule=network_pricing_schedule, network_unpromising_limit=network_unpromising_limit, network_promising_limit=network_promising_limit, stabilization_max_tree_depth=stabilization_max_tree_depth, proximal=proximal, branching_registrations=branching_registrations, network_tree_search=network_tree_search, network_strategy2_bound_rounding=network_strategy2_rounding, network_open_node_limit=network_open_node_limit, network_scoring_gap_tolerance=network_scoring_gap_tolerance, network_share_inactive_columns=network_share_inactive_columns, network_search_inactive_columns=network_search_inactive_columns, variable_boxes=variable_boxes, original_variable_boxes=original_variable_boxes, enumerate=enumerate, enumeration_route_limit=enumeration_route_limit,
                    enumeration_work_limit=enumeration_work_limit, enumeration_stored_arc_limit=enumeration_stored_arc_limit,
                    enumeration_time_limit=enumeration_time_limit, enumerated_mip=enumerated_mip,
                    mip_time_limit=mip_time_limit, mip_node_limit=mip_node_limit,

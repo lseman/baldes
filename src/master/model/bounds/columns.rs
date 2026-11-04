@@ -19,12 +19,13 @@ pub(in crate::master::model) fn physical_paths<const D: usize>(
     let domain = super::super::resource_groups::residual_domain_graph(oracle).ok()?;
     let mut relaxed = domain.as_ref().clone();
     relaxed
+        .edit()
         .resources
         .fill(crate::graph::ResourceKind::Disposable);
     // Exact zero-activity proofs restrict future positive-quantity columns,
     // even when the corresponding inactive LP row has zero dual value.
     // Heuristic and reduced-cost exclusions are deliberately not used here.
-    relaxed.arcs.retain(|arc| {
+    relaxed.edit().arcs.retain(|arc| {
         !oracle
             .proved_zero_arcs
             .get(oracle.index[&arc.id])
@@ -80,9 +81,10 @@ pub(in crate::master::model) fn visit_physical_paths<const D: usize>(
     let domain = super::super::resource_groups::residual_domain_graph(oracle).ok()?;
     let mut relaxed = domain.as_ref().clone();
     relaxed
+        .edit()
         .resources
         .fill(crate::graph::ResourceKind::Disposable);
-    relaxed.arcs.retain(|arc| {
+    relaxed.edit().arcs.retain(|arc| {
         !oracle
             .proved_zero_arcs
             .get(oracle.index[&arc.id])

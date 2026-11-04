@@ -34,8 +34,8 @@ fn evaluation_resets_ordinary_penalties_from_initial_cost_without_compounding() 
     for &column in &inherited.warm.artificials {
         assert_eq!(inherited.master.costs[column], 4.8);
     }
-    node.reset_evaluation_artificials().unwrap();
-    node.reset_evaluation_artificials().unwrap();
+    node.prepare_evaluation().unwrap();
+    node.prepare_evaluation().unwrap();
     for &column in &node.warm.artificials {
         assert_eq!(node.master.costs[column], 1.2);
     }
@@ -65,7 +65,7 @@ fn new_branch_rows_use_initial_effective_cost_not_current_penalty_or_floor() {
     for &column in &child.warm.artificials[count..] {
         assert_eq!(child.master.costs[column], 1.2);
     }
-    child.reset_evaluation_artificials().unwrap();
+    child.prepare_evaluation().unwrap();
     for &column in &child.warm.artificials {
         assert_eq!(child.master.costs[column], 1.2);
     }
@@ -88,7 +88,7 @@ fn separated_row_artificials_keep_their_distinct_cost_policy() {
     node.warm.columns.push(None);
     node.warm.artificials.push(column);
     node.warm.cut_artificials.push((0, column));
-    node.reset_evaluation_artificials().unwrap();
+    node.prepare_evaluation().unwrap();
     assert_eq!(node.master.costs[column], 7.2);
     // Missing creation metadata deliberately leaves this separated column unchanged.
 }
@@ -102,7 +102,7 @@ fn reset_preserves_only_the_selected_original_proof_as_a_tree_floor() {
         node.warm.bound = 0.25;
         node.warm.numerical_bound = 0.5;
         node.warm.certified_bound = 0.25;
-        node.reset_evaluation_artificials().unwrap();
+        node.prepare_evaluation().unwrap();
         assert_eq!(node.state.tree_bound_floor, 0.25);
         assert_eq!(node.warm.bound_mode, mode);
         assert_eq!(node.warm.bound, f64::NEG_INFINITY);
@@ -198,8 +198,8 @@ fn separated_artificials_reset_from_individual_creation_bases_without_compoundin
     for &column in &ids {
         node.master.set_cost(column, 99.).unwrap();
     }
-    node.reset_evaluation_artificials().unwrap();
-    node.reset_evaluation_artificials().unwrap();
+    node.prepare_evaluation().unwrap();
+    node.prepare_evaluation().unwrap();
     for ((&column, expected), base) in ids.iter().zip([2.4, 6.]).zip([2., 5.]) {
         assert_eq!(node.master.costs[column], expected);
         assert_eq!(parent.master.costs[column], base);
@@ -277,7 +277,7 @@ fn generated_rank_one_cut_artificials_retain_real_creation_costs() {
         assert_eq!(node.state.cut_artificial_bases[&column], 1000.);
         node.master.set_cost(column, 4800.).unwrap();
     }
-    node.reset_evaluation_artificials().unwrap();
+    node.prepare_evaluation().unwrap();
     for &(_, column) in &node.warm.cut_artificials {
         assert_eq!(node.master.costs[column], 1200.);
     }

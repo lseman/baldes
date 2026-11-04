@@ -386,9 +386,9 @@ impl CoupledKernel {
 
 impl<const D: usize> Graph<D> {
     pub(crate) fn refresh_coupled_bounds(&mut self) {
-        if let Some(mut kernel) = self.coupled.take() {
+        if let Some(mut kernel) = self.edit().coupled.take() {
             kernel.refresh_bounds(self);
-            self.coupled = Some(kernel);
+            self.edit().coupled = Some(kernel);
         }
     }
 }

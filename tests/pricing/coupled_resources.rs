@@ -234,7 +234,7 @@ fn function() -> PiecewiseLinearFunction {
 }
 fn nonlinear_chain() -> Graph<2> {
     let mut graph = Graph::new(4, 0).unwrap();
-    graph.elementary = true;
+    graph.edit().elementary = true;
     for tail in 0..3 {
         graph.add_arc(tail, tail + 1, -10.).unwrap();
     }
@@ -637,7 +637,7 @@ fn nonlinear_future_cost_prevents_discarding_a_more_expensive_prefix() {
 fn selection_simultaneous_loads_and_signed_cumulative_dependencies_match_tiny_path_oracle() {
     use std::collections::BTreeMap;
     let mut graph: Graph<2> = Graph::new(5, 1).unwrap();
-    graph.elementary = true;
+    graph.edit().elementary = true;
     for vertex in 0..5 {
         graph.set_bounds(vertex, 0, 0., 4.).unwrap();
     }
@@ -862,9 +862,9 @@ fn nonlinear_state_costs_compose_with_cut_bearing_joins_and_dual_refresh() {
 
 fn interval_cost_fixture(seed: usize) -> Graph<2> {
     let mut graph = Graph::<2>::new(4, 1).unwrap();
-    graph.elementary = true;
-    graph.vertices[0].elements.clear();
-    graph.vertices[3].elements.clear();
+    graph.edit().elementary = true;
+    graph.edit().vertices[0].elements.clear();
+    graph.edit().vertices[3].elements.clear();
     for v in 0..4 {
         graph.set_bounds(v, 0, 0., 3.).unwrap();
     }
@@ -1043,7 +1043,7 @@ fn interval_front_pricing_cuts_fixing_retention_and_forks_preserve_physical_path
             };
             check(solver.enumerate(1000.).unwrap(), &expected);
             let mut sibling = solver.fork_for_node();
-            for (i, arc) in solver.graph.arcs.iter_mut().enumerate() {
+            for (i, arc) in solver.graph.edit().arcs.iter_mut().enumerate() {
                 arc.reduced_cost += (i % 3) as f64;
             }
             let refreshed = oracle(&solver.graph);
@@ -1309,7 +1309,7 @@ fn zero_charge_interval_suffix_retains_physical_scalar_costs_in_every_search_mod
     let mut graph = Graph::<2>::new(3, 1).unwrap();
     graph.add_arc(0, 1, 1.).unwrap();
     graph.add_arc(1, 2, 2.).unwrap();
-    for arc in &mut graph.arcs {
+    for arc in &mut graph.edit().arcs {
         arc.consumption[0] = 1.;
     }
     graph

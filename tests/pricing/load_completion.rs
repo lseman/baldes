@@ -124,7 +124,7 @@ fn load_completion_preserves_negative_pricing_minima_in_both_directions() {
 #[test]
 fn positive_pricing_minimum_remains_a_conservative_bound_after_pruning() {
     let mut g = network(&[1., 1., 1.], 3., 0);
-    for arc in &mut g.arcs {
+    for arc in &mut g.edit().arcs {
         arc.reduced_cost = 2.;
     }
     let baseline = run(&g, false, 1, 0.);
@@ -174,7 +174,7 @@ fn load_completion_allows_ng_revisits_and_declines_unbounded_zero_load_walks() {
 #[test]
 fn fixing_and_enumeration_rebuild_labels_pruned_by_load_completion() {
     let mut g = network(&[1., 1., 1.], 3., 0);
-    for arc in &mut g.arcs {
+    for arc in &mut g.edit().arcs {
         arc.cost = 1.;
         arc.reduced_cost = 1.;
     }
@@ -200,7 +200,8 @@ fn packing_cut_penalties_and_asymmetric_arc_prices_keep_valid_completion_bounds(
         let mut g = network(&[0.6, 0.8, 1.2, 0.5], 2.4, seed);
         // A positive directed arc charge models a Theta dual contribution;
         // other reduced arc prices already include coverage/branch prices.
-        g.arcs
+        g.edit()
+            .arcs
             .iter_mut()
             .find(|a| a.tail == 1 && a.head == 2)
             .unwrap()
@@ -418,7 +419,7 @@ fn subset_tables_rebuild_after_repricing_and_fixing_retains_the_full_route_unive
             .minimum_reduced_cost,
         0.
     );
-    for arc in &mut solver.graph.arcs {
+    for arc in &mut solver.graph.edit().arcs {
         if arc.tail == 1 && arc.head == 3 {
             arc.reduced_cost = -2.;
         }
@@ -429,7 +430,7 @@ fn subset_tables_rebuild_after_repricing_and_fixing_retains_the_full_route_unive
     assert!((result.minimum_reduced_cost - oracle).abs() < 1e-7);
 
     let mut g = network(&[1., 1., 1.], 3., 0);
-    for arc in &mut g.arcs {
+    for arc in &mut g.edit().arcs {
         arc.cost = if arc.tail == 2 && arc.head == 1 {
             -1.
         } else {
@@ -464,7 +465,7 @@ fn projected_arc_memory_and_zero_load_cycles_keep_safe_subset_bounds() {
     // Arc memories can retain an element absent from a vertex's explicit
     // neighborhood. Use PreparedNg's transitions, not only vertex memory.
     let mut g = subset_cycle(false);
-    for arc in &mut g.arcs {
+    for arc in &mut g.edit().arcs {
         if (arc.tail == 1 && arc.head == 2) || (arc.tail == 2 && arc.head == 1) {
             arc.memory.push(0);
         }
@@ -478,7 +479,7 @@ fn projected_arc_memory_and_zero_load_cycles_keep_safe_subset_bounds() {
     // Full selected memory breaks a zero-load negative cycle even though
     // the unconditional shortest-walk relaxation is unbounded.
     let mut g = subset_cycle(true);
-    for arc in &mut g.arcs {
+    for arc in &mut g.edit().arcs {
         arc.consumption[0] = 0.;
     }
     for mode in [0, 1, 2] {
