@@ -4,7 +4,7 @@ impl Params {
     /// Set the seed of the random number generator.
     pub fn set_seed(&mut self, seed: i32) {
         self.config.seed = seed;
-        self.rng = std::cell::RefCell::new(Xoroshiro128Plus::new(seed));
+        self.rng = std::cell::RefCell::new(DefaultRng::new(seed));
     }
 
     /// Restart the clock used by the time limit.

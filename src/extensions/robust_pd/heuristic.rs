@@ -8,7 +8,7 @@
 //! capacity work per position. A move is accepted only after
 //! [`Problem::replay`] confirms the new route.
 use super::Problem;
-use crate::rng::Xoroshiro128Plus;
+use crate::rng::DefaultRng;
 use std::time::{Duration, Instant};
 
 mod genetic;
@@ -115,7 +115,7 @@ struct Search<'a> {
     extensions: IlsExtensions,
     n: usize,
     budget: usize,
-    rng: Xoroshiro128Plus,
+    rng: DefaultRng,
     deadline: Instant,
 }
 
@@ -132,7 +132,7 @@ impl Problem {
             },
             n,
             budget: self.parameters.time_budget.min(2 * n + 1),
-            rng: Xoroshiro128Plus::from_seed(options.seed),
+            rng: DefaultRng::from_seed(options.seed),
             deadline: Instant::now() + options.time_limit,
         };
         if (0..n).any(|r| search.alone(r).is_none()) {

@@ -41,7 +41,9 @@ pub use genetic::Genetic;
 pub use individual::{Individual, SortableF64};
 pub use matrix::Matrix;
 pub use params::{
-    Client, Config, InstanceData, Params, ProblemType, Savings, TimeWindow, Xoroshiro128Plus,
+    Client, Config, DefaultRng, InstanceData, Params, ProblemType, Savings, TimeWindow,
 };
 pub use population::Population;
 pub use split::Split;
+
+pub use crate::rng::Xoroshiro128Plus;

@@ -217,14 +217,14 @@ impl Default for Config {
 }
 
 // Preserve the original HGS import path.
-pub use crate::rng::Xoroshiro128Plus;
+pub use crate::rng::{DefaultRng, Xoroshiro128Plus};
 
 /// All parameters and instance data needed by the HGS algorithm.
 pub struct Params {
     /// Algorithm configuration.
     pub config: Config,
     /// Random number generator (interior mutability for shared access).
-    pub rng: std::cell::RefCell<Xoroshiro128Plus>,
+    pub rng: std::cell::RefCell<DefaultRng>,
     /// Start time for elapsed-time tracking.
     start_time: Instant,
 

@@ -176,7 +176,7 @@ impl Params {
         };
         let degrees_to_ring = |degrees: i32| (degrees as f64 / 360. * 65536.) as u16;
         let mut params = Params {
-            rng: std::cell::RefCell::new(Xoroshiro128Plus::new(config.seed)),
+            rng: std::cell::RefCell::new(DefaultRng::new(config.seed)),
             start_time: Instant::now(),
             penalty_capacity: Cell::new(penalty_capacity),
             penalty_wait_time: 0.0,

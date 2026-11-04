@@ -1,11 +1,11 @@
-use crate::{extensions::common::validate_route, inputs::Instance, rng::Xoroshiro128Plus};
+use crate::{extensions::common::validate_route, inputs::Instance, rng::DefaultRng};
 use std::time::Instant;
 
 /// Batch removal and feasible reinsertion, preserving the original on failure.
 pub(super) fn perturb(
     instance: &Instance,
     routes: &mut Vec<Vec<usize>>,
-    rng: &mut Xoroshiro128Plus,
+    rng: &mut DefaultRng,
     strength: usize,
     sequence: bool,
     deadline: Instant,

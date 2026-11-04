@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::time::Instant;
 
 use super::solution::validate_plan;
-use super::{run_hgs, run_hgs_seeded, HgsOptions, Xoroshiro128Plus};
+use super::{run_hgs, run_hgs_seeded, DefaultRng, HgsOptions};
 use crate::inputs::Instance;
 
 /// Outer-search objective. HGS subproblems minimize distance at a fixed fleet
@@ -175,7 +175,7 @@ fn select_routes(
     options: &IntensifyOptions,
     round: usize,
     stall: usize,
-    rng: &mut Xoroshiro128Plus,
+    rng: &mut DefaultRng,
     excluded: &BTreeSet<usize>,
 ) -> Vec<usize> {
     let mut eligible: Vec<_> = (0..plan.routes.len())
@@ -436,7 +436,7 @@ pub fn intensify_with_callback(
     } else {
         None
     };
-    let mut rng = Xoroshiro128Plus::new(options.subproblem.seed);
+    let mut rng = DefaultRng::new(options.subproblem.seed);
     let mut stall = 0;
     let mut accepted = 0;
     let mut improvements = 0;

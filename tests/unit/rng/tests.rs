@@ -129,3 +129,29 @@ fn isolated_gnu_rand_matches_native_default_sequence() {
         }
     }
 }
+
+#[test]
+fn default_generator_follows_build_selection() {
+    let mut selected = DefaultRng::new(7);
+    #[cfg(not(feature = "rng-gnu"))]
+    {
+        let mut expected = Xoroshiro128Plus::new(7);
+        for _ in 0..100 {
+            assert_eq!(selected.next(), expected.next());
+        }
+    }
+    #[cfg(feature = "rng-gnu")]
+    {
+        let mut expected = GnuRand::new(7);
+        for _ in 0..100 {
+            let value = (u64::from(expected.next()) << 33)
+                | (u64::from(expected.next()) << 2)
+                | (u64::from(expected.next()) & 3);
+            assert_eq!(selected.next(), value);
+        }
+    }
+    for _ in 0..100 {
+        assert!(selected.uniform_below(17) < 17);
+        assert!((0.0..1.0).contains(&selected.next_f64()));
+    }
+}

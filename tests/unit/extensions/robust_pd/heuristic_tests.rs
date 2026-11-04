@@ -46,7 +46,7 @@ fn search(p: &Problem) -> Search<'_> {
         extensions: IlsExtensions::default(),
         n,
         budget: p.parameters.time_budget.min(2 * n + 1),
-        rng: Xoroshiro128Plus::from_seed(7),
+        rng: DefaultRng::from_seed(7),
         deadline: Instant::now() + Duration::from_secs(60),
     }
 }

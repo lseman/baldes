@@ -12,7 +12,7 @@ mod tests;
 use crate::{
     extensions::common::{self, validate_plan},
     inputs::Instance,
-    rng::Xoroshiro128Plus,
+    rng::DefaultRng,
 };
 
 #[derive(Clone, Debug)]
@@ -81,7 +81,7 @@ pub fn run_ails_ii(
             .checked_add(duration)
             .ok_or("AILS-II time limit is too large")?
     };
-    let mut rng = Xoroshiro128Plus::new(options.seed);
+    let mut rng = DefaultRng::new(options.seed);
     let mut best = seed.to_vec();
     common::improve_plan(
         instance,

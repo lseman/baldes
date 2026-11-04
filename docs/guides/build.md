@@ -303,3 +303,14 @@ the portable implementation. No global CPU flags are required. The AVX-512
 kernel needs only AVX-512F, including for the packed NG masks, and preserves
 first-candidate ordering and the original floating-point comparison order.
 See [SIMD dispatch](../reference/simd.md) for dispatch behavior and portability details.
+
+### Default heuristic random generator
+
+In `make config`, select **Default random algorithm → Xoroshiro128Plus / GnuRand**.
+The default is Xoroshiro128Plus, including when loading older configuration files.
+The saved setting is `CONFIG_RNG=xoroshiro128plus` or `CONFIG_RNG=gnurand`.
+Direct Cargo builds select the GNU-based default with `--features rng-gnu`.
+General heuristic streams use `DefaultRng`; explicitly named compatibility streams
+retain their specified algorithm. The GNU-based general generator assembles each
+64-bit draw from three isolated GNU libc `rand()` draws so bounded sampling and
+shuffling retain a full-width generator domain. Seeds use their low 32 bits.

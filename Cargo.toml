@@ -30,6 +30,8 @@ path = "src/lib.rs"
 crate-type = ["rlib"]
 
 [features]
+# Select GNU-based random generation for default heuristic streams.
+rng-gnu = []
 default = ["ryan-foster-master", "accumulated-resource-master", "ipm-blocked"]
 # Safe Rust matrix-multiplication panels for large IPM fronts; no native BLAS.
 ipm-blocked = ["dep:ndarray", "dep:matrixmultiply"]

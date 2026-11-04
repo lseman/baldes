@@ -32,7 +32,7 @@ fn local_search_pass_respects_its_overall_deadline() {
 fn batch_perturbations_preserve_feasible_coverage() {
     use crate::extensions::common::validate_plan;
     use crate::inputs::{Customer, Instance, Rounding};
-    use crate::rng::Xoroshiro128Plus;
+    use crate::rng::DefaultRng;
     use std::time::{Duration, Instant};
 
     let customers = (0..=8)
@@ -59,7 +59,7 @@ fn batch_perturbations_preserve_feasible_coverage() {
         super::perturbation::perturb(
             &instance,
             &mut expired,
-            &mut Xoroshiro128Plus::new(0),
+            &mut DefaultRng::new(0),
             4,
             sequence,
             Instant::now(),
@@ -70,7 +70,7 @@ fn batch_perturbations_preserve_feasible_coverage() {
             super::perturbation::perturb(
                 &instance,
                 &mut routes,
-                &mut Xoroshiro128Plus::new(seed),
+                &mut DefaultRng::new(seed),
                 4,
                 sequence,
                 Instant::now() + Duration::from_secs(1),

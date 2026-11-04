@@ -1,5 +1,5 @@
 //! Route-level perturbation and improvement operators shared by heuristics.
-use crate::{inputs::Instance, rng::Xoroshiro128Plus};
+use crate::{inputs::Instance, rng::DefaultRng};
 pub mod sisr;
 pub mod solution;
 #[cfg(test)]
@@ -252,7 +252,7 @@ pub(crate) fn validate_route(instance: &Instance, route: &[usize]) -> Result<(),
 pub fn sisr_kick(
     instance: &Instance,
     routes: &mut [Vec<usize>],
-    rng: &mut Xoroshiro128Plus,
+    rng: &mut DefaultRng,
     strength: usize,
 ) {
     let eligible: Vec<_> = routes

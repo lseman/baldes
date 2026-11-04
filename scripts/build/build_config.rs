@@ -83,6 +83,7 @@ struct Config {
     rank_one_node_memory: bool,
     /// Native NG local memory per vertex: 15, 31 or 63 elements.
     ng_memory: usize,
+    gnu_rng: bool,
     release: bool,
     native_cpu: bool,
     simd: SimdMode,
@@ -108,6 +109,7 @@ impl Default for Config {
             accumulated_resource_master: true,
             rank_one_node_memory: false,
             ng_memory: 15,
+            gnu_rng: false,
             release: true,
             native_cpu: false,
             simd: SimdMode::Off,
@@ -156,6 +158,13 @@ impl Config {
                         "arc" => false,
                         "node" => true,
                         _ => return Err("CONFIG_RANK_ONE_MEMORY must be arc or node".into()),
+                    }
+                }
+                "CONFIG_RNG" => {
+                    config.gnu_rng = match value {
+                        "xoroshiro128plus" => false,
+                        "gnurand" => true,
+                        _ => return Err("CONFIG_RNG must be xoroshiro128plus or gnurand".into()),
                     }
                 }
                 "CONFIG_NG_MEMORY" => {
@@ -279,7 +288,7 @@ impl Config {
         format!(
             "# BALDES build configuration; edit with make config.\n\
             CONFIG_PROFILE={}\nCONFIG_CLP={}\nCONFIG_HIGHS={}\nCONFIG_GUROBI={}\nCONFIG_CLI={}\nCONFIG_MULTI_TIME_WINDOWS={}\n\
-            CONFIG_RYAN_FOSTER={}\nCONFIG_ACCUMULATED_RESOURCE={}\nCONFIG_RANK_ONE_MEMORY={}\nCONFIG_NG_MEMORY={}\n\
+            CONFIG_RYAN_FOSTER={}\nCONFIG_ACCUMULATED_RESOURCE={}\nCONFIG_RANK_ONE_MEMORY={}\nCONFIG_NG_MEMORY={}\nCONFIG_RNG={}\n\
             CONFIG_SIMD={}\nCONFIG_NATIVE_CPU={}\nCONFIG_RELEASE_DEBUG={}\nCONFIG_OFFLINE={}\nCONFIG_LOCKED={}\n\
             CONFIG_JOBS={}\nCONFIG_RESOURCE_DIMENSIONS={}\nCONFIG_TARGET={}\nCONFIG_HIGHS_DIR={}\nCONFIG_GUROBI_HOME={}\n",
             if self.release { "release" } else { "dev" },
@@ -292,6 +301,7 @@ impl Config {
             if self.accumulated_resource_master { "master" } else { "pricing" },
             if self.rank_one_node_memory { "node" } else { "arc" },
             self.ng_memory,
+            if self.gnu_rng { "gnurand" } else { "xoroshiro128plus" },
             self.simd.name(),
             yn(self.native_cpu),
             yn(self.release_debug),
@@ -359,6 +369,7 @@ impl Config {
                 "accumulated-resource-master",
             ),
             (self.rank_one_node_memory, "rank-one-node-memory"),
+            (self.gnu_rng, "rng-gnu"),
             (self.ng_memory == 31, "ng-memory-31"),
             (self.ng_memory == 63, "ng-memory-63"),
             (self.simd == SimdMode::Avx2, "simd"),
@@ -486,6 +497,7 @@ impl Config {
             15 => self.multi_time_windows = !self.multi_time_windows,
             16 => self.ryan_foster_master = !self.ryan_foster_master,
             17 => self.accumulated_resource_master = !self.accumulated_resource_master,
+            20 => self.gnu_rng = !self.gnu_rng,
             18 => self.rank_one_node_memory = !self.rank_one_node_memory,
             19 => {
                 self.ng_memory = match self.ng_memory {
@@ -511,6 +523,7 @@ impl Config {
             Item::value(16, "BUILD", "Ryan–Foster enforcement", if self.ryan_foster_master { "Master" } else { "Pricing" }, "Fixed at compile time. Pricing keeps branch-violating columns out of labeling. Master enforces branches only through master rows; pricing ignores them, so bounds at branched nodes can be weaker."),
             Item::value(17, "BUILD", "Accumulated-resource branching", if self.accumulated_resource_master { "Master" } else { "Pricing" }, "Fixed at compile time. Pricing tightens the branched arc windows during labeling. Master enforces branches only through master rows; pricing keeps the original windows, so bounds at branched nodes can be weaker."),
             Item::value(18, "BUILD", "Rank-one memory", if self.rank_one_node_memory { "Node" } else { "Arc / runtime" }, "Node forces generated arc-memory rank-one cuts to use node memory. Arc preserves runtime memory settings. Full vertex-memory modes and manually registered rows retain their declared representation."),
+            Item::value(20, "BUILD", "Default random algorithm", if self.gnu_rng { "GnuRand" } else { "Xoroshiro128Plus" }, "Default heuristic generator. Explicit GNU compatibility streams retain their specified algorithm."),
             Item::value(19, "BUILD", "NG memory", self.ng_memory.to_string(), "Cycle 15 / 31 / 63 elements of native NG local memory per vertex. Wider memory admits larger ng neighborhoods but enlarges every label. Default: 15."),
             Item::value(12, "PERFORMANCE", "SIMD acceleration", self.simd.name(), "Cycle Off / AVX2 / AVX-512, skipping modes unsupported by this CPU. Host target only. AVX-512 requires Rust 1.89+. Runtime detection keeps portable fallback."),
             Item::toggle(4, "PERFORMANCE", "Native CPU", self.native_cpu, "Optimize for this computer with target-cpu=native. Clear the target triple before enabling; use portable builds for distribution."),
@@ -932,6 +945,16 @@ mod tests {
     }
 
     #[test]
+    fn rng_selection_round_trips_and_selects_feature() {
+        let mut c = Config::default();
+        assert!(!c.gnu_rng);
+        assert!(c.text().contains("CONFIG_RNG=xoroshiro128plus"));
+        c.edit(20, None).unwrap();
+        assert_eq!(Config::parse(&c.text()).unwrap(), c);
+        assert!(args(&c, "build").iter().any(|a| a.contains("rng-gnu")));
+        assert!(Config::parse("CONFIG_RNG=invalid").is_err());
+    }
+    #[test]
     fn simd_modes_follow_cpu_support() {
         for (cpu, expected) in [
             (
@@ -1166,7 +1189,7 @@ mod tests {
         c.edit(11, Some("0".into())).unwrap();
         assert_eq!(c.resource_dimensions, 0);
         assert!(c.cargo("clean").unwrap().vars.is_empty());
-        assert_eq!(c.rows().len(), 20);
+        assert_eq!(c.rows().len(), 21);
     }
     #[test]
     fn ryan_foster_enforcement_round_trips_and_selects_its_feature() {

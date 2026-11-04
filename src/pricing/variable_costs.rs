@@ -87,8 +87,9 @@ impl<const D: usize> Solver<D> {
         {
             let mut answer = self.price_phase(index, maximum, false)?;
             if !answer.columns.is_empty() {
+                let index = self.correction_arc_index();
                 for route in &mut answer.columns {
-                    route.cost = self.corrected_bound(route.cost, route)?;
+                    route.cost = self.corrected_bound_indexed(route.cost, route, index.as_ref())?;
                 }
                 // The first route is the cached search's best, not necessarily
                 // the raw minimum. This result never certifies a bound.
@@ -133,7 +134,6 @@ impl<const D: usize> Solver<D> {
             raw.controls = self.controls.clone();
             raw.options.clone_from(&self.options);
             raw.phases.clone_from(&self.phases);
-            raw.cuts.clone_from(&self.cuts);
             raw.round.clone_from(&self.round);
             raw.bucket_steps = self.bucket_steps;
             raw.cutoff = self.cutoff;
@@ -188,7 +188,12 @@ impl<const D: usize> Solver<D> {
             return Err(incomplete("raw variable pricing time limit"));
         }
         raw.controls.time_limit = remaining;
+        // Cut refresh only reads the registry. Lend the current registry for
+        // this sweep rather than cloning its structural data and duals. Restore
+        // ownership before propagating either success or failure.
+        std::mem::swap(&mut raw.cuts, &mut self.cuts);
         let mut answer = raw.price_phase(index, maximum, false);
+        std::mem::swap(&mut raw.cuts, &mut self.cuts);
         self.round = std::mem::take(&mut raw.round);
         self.requires_rollback = raw.requires_rollback;
         // Preserve the cached objective and its labels; only the raw sweep
@@ -218,17 +223,56 @@ impl<const D: usize> Solver<D> {
 
     /// Correct one cached route's value. This is a route-specific correction,
     /// not a lower bound on routes discarded by rounded pricing.
-    pub fn corrected_bound(&self, mut bound: f64, route: &crate::Route) -> Result<f64> {
+    pub fn corrected_bound(&self, bound: f64, route: &crate::Route) -> Result<f64> {
+        self.corrected_bound_indexed(bound, route, None)
+    }
+
+    fn correction_arc_index(&self) -> Option<std::collections::HashMap<i32, usize>> {
+        if self
+            .graph
+            .arcs
+            .iter()
+            .enumerate()
+            .all(|(i, a)| usize::try_from(a.id) == Ok(i))
+        {
+            return None;
+        }
+        let mut index = std::collections::HashMap::with_capacity(self.graph.arcs.len());
+        for (position, arc) in self.graph.arcs.iter().enumerate() {
+            // Match the original linear search when IDs are duplicated.
+            index.entry(arc.id).or_insert(position);
+        }
+        Some(index)
+    }
+
+    fn corrected_bound_indexed(
+        &self,
+        mut bound: f64,
+        route: &crate::Route,
+        index: Option<&std::collections::HashMap<i32, usize>>,
+    ) -> Result<f64> {
         if self.variable_costs.is_empty() && self.raw_arc_costs.is_none() {
             return Ok(bound);
         }
         for &id in &route.arcs {
-            let arc = self
-                .graph
-                .arcs
-                .iter()
-                .enumerate()
-                .find(|(_, a)| a.id == id)
+            // Ordinary graphs assign arc IDs by position. Check that invariant
+            // before using it: imported or physically filtered graphs can have
+            // sparse IDs, and graph storage is publicly mutable.
+            let arc = index
+                .and_then(|index| index.get(&id).copied())
+                .and_then(|position| self.graph.arcs.get(position).map(|arc| (position, arc)))
+                .or_else(|| {
+                    usize::try_from(id)
+                        .ok()
+                        .and_then(|position| {
+                            self.graph
+                                .arcs
+                                .get(position)
+                                .filter(|a| a.id == id)
+                                .map(|arc| (position, arc))
+                        })
+                        .or_else(|| self.graph.arcs.iter().enumerate().find(|(_, a)| a.id == id))
+                })
                 .ok_or_else(|| invalid("unknown functor route arc"))?;
             let (position, arc) = arc;
             let mut raw = self

@@ -51,7 +51,7 @@ fn barycenter_selects_nearest_route_and_respects_customer_limit() {
         max_customers: 2,
         ..options()
     };
-    let mut rng = Xoroshiro128Plus::new(7);
+    let mut rng = DefaultRng::new(7);
     let selected = select_routes(&data, &plan, &opts, 0, 0, &mut rng, &BTreeSet::new());
     assert!(
         selected == vec![0, 1] || selected == vec![2, 3],
@@ -204,7 +204,7 @@ fn neighborhood_size_and_time_limits_preserve_seed() {
         max_customers: 2,
         ..options()
     };
-    let mut rng = Xoroshiro128Plus::new(1);
+    let mut rng = DefaultRng::new(1);
     let selected = select_routes(&instance, &plan, &opts, 0, 20, &mut rng, &BTreeSet::new());
     assert!(
         selected
@@ -310,7 +310,7 @@ fn parallel_selection_excludes_already_assigned_routes() {
     let instance = instance();
     let routes = vec![vec![1], vec![2], vec![3], vec![4]];
     let plan = Plan::new(routes.clone(), validate_plan(&instance, &routes).unwrap());
-    let mut rng = Xoroshiro128Plus::new(2);
+    let mut rng = DefaultRng::new(2);
     let first = select_routes(
         &instance,
         &plan,

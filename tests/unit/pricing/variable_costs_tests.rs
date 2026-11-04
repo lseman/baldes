@@ -628,3 +628,54 @@ fn presence_dual_updates_reuse_only_raw_preparation_and_match_fresh_searches() {
     assert!(solver.raw_pricing.is_none());
     matches_fresh(&mut solver, 1e-9);
 }
+
+#[test]
+fn route_correction_handles_sparse_arc_ids_and_reordered_storage() {
+    let mut solver = model();
+    solver.cache_variable_costs(&[1e-9]).unwrap();
+    let priced = solver.price_phase(0, 8, false).unwrap();
+    let mut route = priced.columns[0].clone();
+    let expected = solver.corrected_bound(route.cost, &route).unwrap();
+    for arc in &mut solver.graph.arcs {
+        arc.id += 100;
+    }
+    for id in &mut route.arcs {
+        *id += 100;
+    }
+    solver.graph.arcs.reverse();
+    assert_eq!(
+        solver.corrected_bound(route.cost, &route).unwrap(),
+        expected
+    );
+    route.arcs[0] = -1;
+    assert!(solver.corrected_bound(route.cost, &route).is_err());
+}
+
+#[test]
+fn batch_correction_index_preserves_sparse_and_duplicate_id_lookup() {
+    let mut solver = model();
+    solver.cache_variable_costs(&[1e-9]).unwrap();
+    let priced = solver.price_phase(0, 8, false).unwrap();
+    assert!(solver.correction_arc_index().is_none());
+    let mut routes = priced.columns;
+    for arc in &mut solver.graph.arcs {
+        arc.id += 100;
+    }
+    for route in &mut routes {
+        for id in &mut route.arcs {
+            *id += 100;
+        }
+    }
+    solver.graph.arcs.reverse();
+    let duplicate = solver.graph.arcs[0].clone();
+    solver.graph.arcs.push(duplicate);
+    let index = solver.correction_arc_index().unwrap();
+    for route in &routes {
+        assert_eq!(
+            solver
+                .corrected_bound_indexed(route.cost, route, Some(&index))
+                .unwrap(),
+            solver.corrected_bound(route.cost, route).unwrap()
+        );
+    }
+}

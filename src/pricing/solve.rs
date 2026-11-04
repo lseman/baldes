@@ -110,13 +110,16 @@ impl<const D: usize> Solver<D> {
         if self.enumeration.is_some() {
             let enumerated_kpath = self.enumerated_kpath_inputs();
             let universe = self.enumeration.as_mut().unwrap();
-            let previous: Vec<f64> = universe
-                .paths
-                .partitions
-                .iter()
-                .flatten()
-                .map(|path| path.reduced_cost)
-                .collect();
+            let mut previous = std::mem::take(&mut self.arc_cost_scratch);
+            previous.clear();
+            previous.extend(
+                universe
+                    .paths
+                    .partitions
+                    .iter()
+                    .flatten()
+                    .map(|path| path.reduced_cost),
+            );
             universe.paths.inspect_with_presence(
                 &self.graph,
                 f64::INFINITY,
@@ -134,13 +137,20 @@ impl<const D: usize> Solver<D> {
             let (routes, minimum) = match priced {
                 Ok(result) => result,
                 Err(error) => {
-                    for (path, old) in universe.paths.partitions.iter_mut().flatten().zip(previous)
+                    for (path, old) in universe
+                        .paths
+                        .partitions
+                        .iter_mut()
+                        .flatten()
+                        .zip(previous.iter().copied())
                     {
                         path.reduced_cost = old;
                     }
+                    self.arc_cost_scratch = previous;
                     return Err(error);
                 }
             };
+            self.arc_cost_scratch = previous;
             return Ok(PricingResult {
                 columns: routes,
                 minimum_reduced_cost: minimum,
@@ -162,10 +172,9 @@ impl<const D: usize> Solver<D> {
         let call_time_limit = self.pricing_time_limit()?;
         let started = std::time::Instant::now();
         let engine_controls = self.engine_controls(phase.exact());
-        let reuse = self
-            .prepared
-            .as_ref()
-            .is_some_and(|prepared| prepared.same_topology(&self.graph))
+        // refresh_cuts already validated topology and clears prepared/engine
+        // on a mismatch. Nothing above mutates the graph after that check.
+        let reuse = self.prepared.is_some()
             && self
                 .engine
                 .as_ref()
@@ -217,14 +226,7 @@ impl<const D: usize> Solver<D> {
         }
         if let Ok(result) = &answer {
             if phase.exact() {
-                let labels = engine
-                    .forward
-                    .buckets
-                    .iter()
-                    .chain(&engine.backward.buckets)
-                    .flatten()
-                    .map(|b| b.active.len())
-                    .sum();
+                let labels = result.statistics.forward_labels + result.statistics.backward_labels;
                 self.round.collect(
                     started.elapsed().as_secs_f64(),
                     result.statistics.dominance_checks,

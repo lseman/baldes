@@ -1,6 +1,6 @@
 //! Spatially adjacent string removals and feasible greedy recreation.
 use super::{validate_plan, validate_route};
-use crate::{inputs::Instance, rng::Xoroshiro128Plus};
+use crate::{inputs::Instance, rng::DefaultRng};
 use std::time::Instant;
 
 /// Ruin spatially close strings from distinct routes, then reinsert customers.
@@ -8,7 +8,7 @@ use std::time::Instant;
 pub fn ruin_recreate(
     instance: &Instance,
     routes: &mut Vec<Vec<usize>>,
-    rng: &mut Xoroshiro128Plus,
+    rng: &mut DefaultRng,
     strength: usize,
     deadline: Instant,
 ) -> bool {

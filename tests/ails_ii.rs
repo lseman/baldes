@@ -3,7 +3,7 @@ use baldes::extensions::common::improve_plan;
 use baldes::extensions::common::sisr_kick;
 use baldes::extensions::common::{construct_feasible, validate_plan};
 use baldes::inputs::{Customer, Instance, Rounding};
-use baldes::rng::Xoroshiro128Plus;
+use baldes::rng::DefaultRng;
 use std::time::{Duration, Instant};
 
 fn instance() -> Instance {
@@ -241,7 +241,7 @@ fn relocation_handles_asymmetric_costs_and_nonzero_depot_diagonal() {
 fn local_search_preserves_feasibility_for_varied_directed_matrices() {
     for seed in 0..24 {
         let mut instance = instance();
-        let mut rng = Xoroshiro128Plus::new(seed);
+        let mut rng = DefaultRng::new(seed);
         let mut matrix = vec![vec![0.; 5]; 5];
         for row in &mut matrix {
             for value in row {
@@ -328,7 +328,7 @@ fn fixed_iteration_search_is_reproducible() {
 fn sisr_kick_preserves_the_customer_set() {
     let instance = instance();
     let mut routes = vec![vec![1, 2, 3], vec![4]];
-    sisr_kick(&instance, &mut routes, &mut Xoroshiro128Plus::new(12), 3);
+    sisr_kick(&instance, &mut routes, &mut DefaultRng::new(12), 3);
     let mut customers: Vec<_> = routes.into_iter().flatten().collect();
     customers.sort_unstable();
     assert_eq!(customers, vec![1, 2, 3, 4]);
@@ -339,7 +339,7 @@ fn sisr_recreation_preserves_feasibility_and_restores_on_timeout() {
     let instance = instance();
     let original = vec![vec![1, 2, 3], vec![4]];
     let mut routes = original.clone();
-    let mut rng = Xoroshiro128Plus::new(8);
+    let mut rng = DefaultRng::new(8);
     assert!(!baldes::extensions::common::sisr::ruin_recreate(
         &instance,
         &mut routes,
@@ -366,7 +366,7 @@ fn sisr_keeps_capacity_and_coverage_across_seeds() {
     let mut changed = 0;
     for seed in 0..50 {
         let mut routes = initial.clone();
-        let mut rng = Xoroshiro128Plus::new(seed);
+        let mut rng = DefaultRng::new(seed);
         if baldes::extensions::common::sisr::ruin_recreate(
             &instance,
             &mut routes,
@@ -391,7 +391,7 @@ fn sisr_preserves_time_windows_across_seeds() {
     validate_plan(&instance, &initial).unwrap();
     for seed in 0..50 {
         let mut routes = initial.clone();
-        let mut rng = Xoroshiro128Plus::new(seed);
+        let mut rng = DefaultRng::new(seed);
         let _ = baldes::extensions::common::sisr::ruin_recreate(
             &instance,
             &mut routes,
