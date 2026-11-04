@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Branching family registration order BranchingRegistration::FamilyOrder declares the creation order ofregistered branching families for candidate admission. JSON SolveOptions usesth">
+<meta name="theme-color" content="#0b0e11">
+<title>Branching family registration order — BALDES docs</title>
+<link rel="canonical" href="https://baldes.laioseman.com/docs/solver/branch-family-registration.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/solve.html">Unified solve interface</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/architecture.html">Solver architecture and ownership</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/concepts.html">Solver concepts and interface choices</a><a href="../guides/documentation.html">Maintaining the documentation</a><a href="../guides/python.html">Python: pyBaldes</a><a href="../guides/ails-ii.html">Standalone AILS-II search</a><a href="../guides/releases.html">Python wheels and releases</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="../pybaldes/index.html">pyBaldes documentation</a><a href="../pybaldes/networks.html">Shared-master network models</a><a href="../pybaldes/installation.html">Install pyBaldes</a><a href="../pybaldes/quickstart.html">pyBaldes quickstart</a><a href="../pybaldes/routing.html">Routing inputs and options</a><a href="../pybaldes/pricing.html">Stateful pricing with Solver</a><a href="../pybaldes/resources.html">Coupled resources and function encodings</a><a href="../pybaldes/results.html">Results, bounds, and exactness</a><a href="../pybaldes/api.html">pyBaldes API reference</a><a href="../pybaldes/troubleshooting.html">pyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="models.html">Network models and shared masters</a><a href="column-imports.html">Finite column imports</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="feasibility.html">Routing feasibility recovery</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="stabilization.html">Dual-price stabilization</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="deluxing.html">DeLuxing column fixing</a><a href="branch-family-registration.html" aria-current="page">Branching family registration order</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/hgs-intensify.html">BKS-seeded HGS intensification</a><a href="../extensions/hgs-dri.html">Customer decomposition for HGS</a><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/robust-pd.html">Robust pickup and delivery with time windows</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a><a href="../extensions/stochastic.html">Stochastic demands and replenishment recourse</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a><a href="../benchmarks/stochastic.html">Stochastic branch-and-cut versus branch-and-price</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/solver/branch-family-registration.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> The solver</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="branching-family-registration-order">Branching family registration order</h1>
+<p><code>BranchingRegistration::FamilyOrder</code> declares the creation order of
+registered branching families for candidate admission. JSON <code>SolveOptions</code> uses
+the shared <code>branching_registrations</code> array. The networks CLI accepts that array
+from a file with <code>--tree --branching-registrations registrations.json</code>.</p>
+<p>Ordinary family registrations record their construction order, so they do not
+need separate order entries. <code>family-order</code> entries are an explicit override,
+useful when specifying the position of an implicit producer such as
+packing-resource. When an override is present, declare each participating
+family whose relative order is needed.</p>
+<div class="code-block"><div class="code-heading"><span>JSON</span></div><pre><code class="language-json"><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"family-order"</span><span class="p">,</span><span class="w"> </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"mapped-family"</span><span class="p">:</span><span class="w"> </span><span class="s2">"arcs"</span><span class="p">}},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"family-order"</span><span class="p">,</span><span class="w"> </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="s2">"packing-assignment"</span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"family-order"</span><span class="p">,</span><span class="w"> </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="s2">"packing-resource"</span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"family-order"</span><span class="p">,</span><span class="w"> </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="s2">"packing-ryan-foster"</span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"family-order"</span><span class="p">,</span><span class="w"> </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"component-generator"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">}},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"family-order"</span><span class="p">,</span><span class="w"> </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"component-class"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">}},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"family-order"</span><span class="p">,</span><span class="w"> </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"paths-per-network"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">}},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"family-order"</span><span class="p">,</span><span class="w"> </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"cluster"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">}}</span>
+<span class="p">]</span>
+</code></pre></div>
+<p>A mapped family refers to the family name in a <code>selection</code> registration.
+Alternatively, <code>{&quot;mapped-registration&quot;: 0}</code> refers to the first mapped
+registration; if that variable has shared family metadata, it refers to that
+shared family. The indexed <code>component-generator</code>, <code>component-class</code>,
+<code>paths-per-network</code>, and <code>cluster</code> entries likewise refer to registrations of
+their own kind, starting at zero. Packing assignment and Ryan–Foster entries
+require their corresponding family registrations. Packing resource is the
+implicit resource separator registration, including at nodes where it produces
+no candidate. Unknown references and duplicate family references, including
+mapped aliases of the same family, are rejected before tree evaluation.</p>
+<p>Both <code>component-class</code> and <code>component-generator</code> entries are accepted in JSON
+<code>SolveOptions.branching_registrations</code> when <code>tree</code> is enabled. Rust callers can use
+<code>BranchingRegistry::register</code> with <code>BranchingRegistration</code> variants
+for these families, the ordering declarations, directions, selection metadata,
+and the other branching controls. The tree validates and prepares the registry
+before using it at each node.</p>
+<p><code>expression</code> and <code>aggregate-variable</code> registrations require original pricing
+identities. JSON solves compile them using the model's pricing-variable registry;
+Rust callers use <code>BranchingRegistry::register_with_pricing</code> for those entries.</p>
+<p>For example, a JSON solve can register an original mapped variable together
+with its selection rule and direction:</p>
+<div class="code-block"><div class="code-heading"><span>JSON</span></div><pre><code class="language-json"><span class="p">{</span>
+<span class="w">  </span><span class="nt">"tree"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"branching_registrations"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"policy"</span><span class="p">,</span><span class="w"> </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="s2">"phased"</span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"strong-branching"</span><span class="p">,</span><span class="w"> </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{}},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"mapped"</span><span class="p">,</span><span class="w"> </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"count42"</span><span class="p">,</span><span class="w"> </span><span class="nt">"priority"</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"networks"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"network"</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span><span class="w"> </span><span class="nt">"per_route"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">}]</span>
+<span class="w">    </span><span class="p">}},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"selection"</span><span class="p">,</span><span class="w"> </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"count42"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"selection"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"family"</span><span class="p">:</span><span class="w"> </span><span class="s2">"counts"</span><span class="p">,</span><span class="w"> </span><span class="nt">"rule"</span><span class="p">:</span><span class="w"> </span><span class="s2">"fraction-weighted-priority"</span><span class="p">,</span>
+<span class="w">                    </span><span class="nt">"variable_priority"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">"default_factor"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">}</span>
+<span class="w">    </span><span class="p">}},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"direction"</span><span class="p">,</span><span class="w"> </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"count42"</span><span class="p">,</span><span class="w"> </span><span class="nt">"direction"</span><span class="p">:</span><span class="w"> </span><span class="s2">"upper-first"</span>
+<span class="w">    </span><span class="p">}}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The corresponding CLI file contains the array itself. Python accepts the
+array as <code>branching_registrations=</code>. Each entry has one <code>kind</code> and its <code>config</code>;
+<code>strong-branching</code> with <code>{}</code> uses the default phase settings.</p>
+<p>Each visited family receives the current candidate quota independently. The
+coordinator retains the resulting family sets and divides the remaining fresh
+budget between them after reserving history candidates. Construction order
+therefore matters when the quota is smaller than the number of families.
+Component generators retain their registration identity independently of the
+ordinal used to rank published generator instances, and publish at the actual
+adaptive quota.</p>
+<p>The recorded construction sequence resolves the relative order of registered
+producer kinds at a visited priority. If a <code>family-order</code> override is used, it
+must include every participating family to resolve their relative order. A
+missing producer retains the adapter admission policy for that selection.
+Empty registrations retain their positions. Master, other activity,
+and assignment producers currently lack a recovered shared
+owner/order contract and retain the adapter policy when visited; an order array
+does not invent their owner. Lower unvisited priorities do not disable resolved
+family admission. This option does not change child constraints or history
+score formulas.</p>
+<p><code>selection</code> registrations can name mapped variables, prepared cluster
+generators, packing assignments, explicit component classes, or per-network
+path counts.
+Cluster names have the form <code>cluster:&lt;network&gt;:&lt;group&gt;</code> for a boundary and
+<code>cluster:&lt;network&gt;:&lt;group&gt;:&lt;group&gt;</code> for a pair. Supply metadata for the
+generators to compare with the same family name and rule; <code>variable_priority</code>
+and <code>default_factor</code> then use the same selection rules as mapped variables.
+The cluster registration's <code>priority</code> sets its family level. Names must resolve
+to prepared generators, so explicit partitions make the group numbering easier
+to predict. Component classes use their registered names, and path-count names
+use <code>paths:&lt;network&gt;</code>; packing assignments use <code>ESA_&lt;network&gt;_&lt;group&gt;</code>.
+Unconfigured generators retain their default ordering. When configured
+generators tie under their selection rules, their registration sequence
+determines the tie order across families.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="../extensions/stochastic.html"><small>Previous guide</small>Stochastic demands and replenishment recourse <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p></nav></aside>
+</div>
+</body></html>
