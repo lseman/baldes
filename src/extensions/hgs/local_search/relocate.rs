@@ -2,6 +2,7 @@ use super::*;
 
 impl<'p> HGSLocalSearch<'p> {
     /// Move single client U and insert it after V.
+    #[inline]
     pub fn move_single_client(&mut self, u: usize, v: usize) -> bool {
         let u_prev = self.nodes[u].prev as usize;
         let x = self.nodes[u].next as usize;
@@ -113,6 +114,7 @@ impl<'p> HGSLocalSearch<'p> {
     }
 
     /// Move two clients (U, X) and insert them after V.
+    #[inline]
     pub fn move_two_clients(&mut self, u: usize, v: usize) -> bool {
         let x = self.nodes[u].next as usize;
         if self.nodes[x].is_depot {
@@ -226,6 +228,7 @@ impl<'p> HGSLocalSearch<'p> {
     }
 
     /// Move two clients (X, U) reversed and insert them after V.
+    #[inline]
     pub fn move_two_clients_reversed(&mut self, u: usize, v: usize) -> bool {
         let x = self.nodes[u].next as usize;
         if self.nodes[x].is_depot {
