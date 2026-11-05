@@ -2,8 +2,8 @@
 //!
 //! The search uses a two-phase reference policy and adaptive diversification
 //! inspired by AILS-II. Feasible insertion and complete-plan validation support
-//! time windows; the published CVRP feasibility-repair procedure and granular
-//! SWAP* neighborhood are not yet implemented.
+//! time windows. Local improvement uses granular route moves including SWAP*;
+//! the published CVRP feasibility-repair procedure is not yet implemented.
 mod perturbation;
 pub mod repair;
 #[cfg(test)]
@@ -109,11 +109,17 @@ pub(crate) fn run_ails_ii_controlled(
     let instance = cached.as_ref();
     let mut rng = DefaultRng::new(options.seed);
     let mut best = seed.to_vec();
-    if !cancelled() && std::time::Instant::now() < deadline {
-        common::improve_plan(
-            instance,
+    let local_search = if !cancelled() && std::time::Instant::now() < deadline {
+        common::LocalSearch::new(instance, deadline)
+    } else {
+        None
+    };
+    if let Some(search) = local_search.as_ref().filter(|_| !cancelled()) {
+        let changed = vec![true; best.len()];
+        search.improve(
             &mut best,
             pass_deadline(deadline, options.time_limit),
+            &changed,
         );
     }
     let mut best_cost = validate_plan(instance, &best)?;
@@ -163,12 +169,13 @@ pub(crate) fn run_ails_ii_controlled(
             .enumerate()
             .map(|(i, route)| original.get(i) != Some(route))
             .collect();
-        common::improve_modified_routes(
-            instance,
-            &mut candidate,
-            pass_deadline(deadline, options.time_limit),
-            &changed,
-        );
+        if let Some(search) = &local_search {
+            search.improve(
+                &mut candidate,
+                pass_deadline(deadline, options.time_limit),
+                &changed,
+            );
+        }
         let cost = validate_plan(instance, &candidate)?;
         distance_sum[operator] += edge_distance(&original, &candidate) as f64;
         distance_count[operator] += 1;
