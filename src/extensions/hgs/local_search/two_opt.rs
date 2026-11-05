@@ -2,6 +2,7 @@ use super::*;
 
 impl<'p> HGSLocalSearch<'p> {
     /// 2-opt within a single route.
+    #[inline(always)]
     pub fn two_opt_within_trip(&mut self, u: usize, v: usize) -> bool {
         if self.nodes[u].position >= self.nodes[v].position - 1 {
             return false;
@@ -59,6 +60,7 @@ impl<'p> HGSLocalSearch<'p> {
     }
 
     /// 2-opt* between two different routes.
+    #[inline(always)]
     pub fn two_opt_between_trips(&mut self, u: usize, v: usize) -> bool {
         let x = self.nodes[u].next as usize;
         let y = self.nodes[v].next as usize;

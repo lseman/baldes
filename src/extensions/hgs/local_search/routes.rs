@@ -356,14 +356,10 @@ impl<'p> HGSLocalSearch<'p> {
         indiv.evaluate_complete_cost();
     }
 
-    /// Clients of a route in order.
-    pub(super) fn route_clients(&self, r: usize) -> Vec<usize> {
-        let mut clients = Vec::with_capacity(self.routes[r].nb_customers.max(0) as usize);
-        let mut node = self.nodes[self.depot_start(r)].next as usize;
-        while !self.nodes[node].is_depot {
-            clients.push(node);
-            node = self.nodes[node].next as usize;
-        }
-        clients
+    /// Borrow the route links without materializing a customer list.
+    pub(super) fn route_clients(&self, r: usize) -> impl Iterator<Item = usize> + '_ {
+        let first = self.nodes[self.depot_start(r)].next as usize;
+        std::iter::successors(Some(first), |&node| Some(self.nodes[node].next as usize))
+            .take_while(|&node| !self.nodes[node].is_depot)
     }
 }

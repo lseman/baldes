@@ -53,7 +53,12 @@ impl<'p> HGSLocalSearch<'p> {
         let route2_tw = self.routes[r2].tw_data.clone();
         let tw_outdated = self.routes[r1].is_delta_removel_tw_outdated;
         let route1_tw = self.routes[r1].tw_data.clone();
-        for u in self.route_clients(r1) {
+        // Only cached costs change here; route links remain intact. Advance
+        // before testing the cache so cache hits also progress without a list.
+        let mut next_u = self.nodes[self.depot_start(r1)].next as usize;
+        while !self.nodes[next_u].is_depot {
+            let u = next_u;
+            next_u = self.nodes[u].next as usize;
             let (prev, next) = (self.nodes[u].prev as usize, self.nodes[u].next as usize);
             let removal = self.cost(prev, next) - self.cost(prev, u) - self.cost(u, next);
             if !with_tw {
@@ -238,7 +243,6 @@ impl<'p> HGSLocalSearch<'p> {
 
         let (load_u, load_v) = (self.routes[r_u].load, self.routes[r_v].load);
         let current_load_pen = self.penalty_excess_load(load_u) + self.penalty_excess_load(load_v);
-        let clients_v = self.route_clients(r_v);
         let mut best = SwapStarElement {
             move_cost: 1e30,
             load_pen_u: 1e30,
@@ -250,7 +254,7 @@ impl<'p> HGSLocalSearch<'p> {
         };
         for u in self.route_clients(r_u) {
             let demand_u = self.params.cli[self.nodes[u].cour as usize].demand;
-            for &v in &clients_v {
+            for v in self.route_clients(r_v) {
                 let demand_v = self.params.cli[self.nodes[v].cour as usize].demand;
                 let load_pen_u = self.penalty_excess_load(load_u + demand_v - demand_u);
                 let load_pen_v = self.penalty_excess_load(load_v + demand_u - demand_v);
