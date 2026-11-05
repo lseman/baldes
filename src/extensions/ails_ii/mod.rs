@@ -60,16 +60,35 @@ pub fn run_ails_ii(
     seed: &[Vec<usize>],
     options: &AilsIiOptions,
 ) -> Result<AilsIiResult, String> {
-    if options.iterations == 0
-        || options.phase_length == 0
-        || options.elite_size == 0
-        || !options.time_limit.is_finite()
-        || options.time_limit < 0.
-        || !options.threshold.is_finite()
-        || !(0.0..=1.0).contains(&options.threshold)
-    {
-        return Err("invalid AILS-II iteration, phase, elite or threshold setting".into());
+    run_ails_ii_controlled(instance, seed, options, None, || false)
+}
+
+impl AilsIiOptions {
+    pub(crate) fn validate(&self) -> Result<(), String> {
+        if self.iterations == 0
+            || self.phase_length == 0
+            || self.elite_size == 0
+            || !self.time_limit.is_finite()
+            || self.time_limit < 0.
+            || !self.threshold.is_finite()
+            || !(0.0..=1.0).contains(&self.threshold)
+        {
+            return Err("invalid AILS-II iteration, phase, elite or threshold setting".into());
+        }
+        Ok(())
     }
+}
+
+/// The same engine with a caller deadline and cooperative cancellation between
+/// search passes. Each operator also observes the bounded search deadline.
+pub(crate) fn run_ails_ii_controlled(
+    instance: &Instance,
+    seed: &[Vec<usize>],
+    options: &AilsIiOptions,
+    caller_deadline: Option<std::time::Instant>,
+    cancelled: impl Fn() -> bool,
+) -> Result<AilsIiResult, String> {
+    options.validate()?;
     validate_plan(instance, seed)?;
     let started = std::time::Instant::now();
     let deadline = if options.time_limit == 0. {
@@ -81,13 +100,22 @@ pub fn run_ails_ii(
             .checked_add(duration)
             .ok_or("AILS-II time limit is too large")?
     };
+    let deadline = caller_deadline.map_or(deadline, |end| end.min(deadline));
+    let cached = if cancelled() || std::time::Instant::now() >= deadline {
+        std::borrow::Cow::Borrowed(instance)
+    } else {
+        instance.cached_distances()
+    };
+    let instance = cached.as_ref();
     let mut rng = DefaultRng::new(options.seed);
     let mut best = seed.to_vec();
-    common::improve_plan(
-        instance,
-        &mut best,
-        pass_deadline(deadline, options.time_limit),
-    );
+    if !cancelled() && std::time::Instant::now() < deadline {
+        common::improve_plan(
+            instance,
+            &mut best,
+            pass_deadline(deadline, options.time_limit),
+        );
+    }
     let mut best_cost = validate_plan(instance, &best)?;
     let mut current = best.clone();
     let mut elite = vec![(best_cost, best.clone())];
@@ -98,7 +126,7 @@ pub fn run_ails_ii(
     let mut distance_sum = [0.0; 3];
     let mut distance_count = [0usize; 3];
     for iteration in 0..options.iterations {
-        if std::time::Instant::now() >= deadline {
+        if cancelled() || std::time::Instant::now() >= deadline {
             break;
         }
         let phase_two = (iteration / options.phase_length) % 2 == 1;

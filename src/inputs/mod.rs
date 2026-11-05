@@ -59,6 +59,21 @@ impl Rounding {
     }
 }
 impl Instance {
+    /// Cache the selected metric for repeated heuristic evaluations. Preserve
+    /// explicit matrices and bound the optional cache to eight MiB of values.
+    pub(crate) fn cached_distances(&self) -> std::borrow::Cow<'_, Self> {
+        let n = self.customers.len();
+        if self.distances.is_some() || n.checked_mul(n).is_none_or(|entries| entries > 1_048_576) {
+            return std::borrow::Cow::Borrowed(self);
+        }
+        let matrix = (0..n)
+            .map(|i| (0..n).map(|j| self.distance(i, j, self.rounding)).collect())
+            .collect();
+        let mut cached = self.clone();
+        cached.distances = Some(matrix);
+        std::borrow::Cow::Owned(cached)
+    }
+
     /// Whether every customer has a finite time window (CVRPLIB has none).
     pub fn has_time_windows(&self) -> bool {
         self.customers.iter().all(|c| c.due.is_finite())
@@ -98,6 +113,15 @@ mod parsing;
 mod root;
 
 #[cfg(feature = "clp")]
+mod heuristic_routes;
+#[cfg(feature = "clp")]
 mod hgs;
 #[cfg(feature = "clp")]
+pub(crate) use heuristic_routes::HeuristicRouteMap;
+#[cfg(feature = "clp")]
 pub use hgs::{HgsColumns, HgsSeed, HgsSeedSummary, HgsWarmStart};
+
+#[cfg(feature = "clp")]
+mod savings;
+#[cfg(feature = "clp")]
+pub use savings::SavingsSeed;

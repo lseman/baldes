@@ -39,6 +39,8 @@ Options:
   --diving              Strong limited-discrepancy diving every 10 nodes (off by default)
   --no-diving           Disable diving (default)
   --local-search FILE   Partial-incumbent diving controls JSON (--tree; depth_limit >= 0 enables)
+  --background-ils      Run the shared AILS-II engine on a background thread
+                        (solve only; 100 ms per job, 16 disjoint routes, 20 rounds)
   --restricted-mip      Restricted-master integer heuristic at the root (HiGHS)
   --mip-nodes N         Node budget of that heuristic (enables it)
   --no-mip-heuristic    Disable it (default)
@@ -52,6 +54,7 @@ Options:
   --clp-scaling MODE    off (default), equilibrium, auto, geometric, or ruiz
   --clp-work-areas MODE retain (default) or discard after each LP solve
   --bound-mode MODE     numerical (default) or certified (independent bound validation)
+  --initial-columns MODE artificial (default) or savings (Clarke–Wright; solve only)
   --hgs-time SECONDS    Run HGS before root/tree solve for this search budget
   --hgs-columns MODE    best (default), all, or N cheapest feasible HGS routes
   --no-stabilization    Disable dual stabilization
@@ -76,6 +79,7 @@ Options:
   -h, --help            Print help";
 
 struct RoutingOptions {
+    background_ils: bool,
     ignore_time_windows: bool,
     customers: Option<usize>,
     ng: usize,
@@ -100,6 +104,7 @@ struct RoutingOptions {
     hgs_seed: i32,
     hgs_time: Option<std::time::Duration>,
     hgs_columns: baldes::inputs::HgsColumns,
+    savings_columns: bool,
     robust: Option<baldes::extensions::robust::Uncertainty>,
     tree: bool,
     node_limit: usize,
@@ -113,6 +118,7 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
     let mut customers = None;
     let mut ng = 8;
     let mut options = model::Options::default();
+    let mut background_ils = false;
     // Keep routing's low initial feasibility penalty independent of the
     // general model default. CG raises artificial penalties when necessary.
     options.cg.artificial_cost = 2.76;
@@ -139,6 +145,7 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
     let mut hgs_nb_iter: Option<u32> = None;
     let mut hgs_seed = 0;
     let mut hgs_time = None;
+    let mut savings_columns = false;
     let mut hgs_columns = baldes::inputs::HgsColumns::Best;
     let mut robust = None;
     while let Some(arg) = args.next() {
@@ -149,6 +156,19 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
             continue;
         }
         match arg.as_str() {
+            "--initial-columns" => {
+                if kind != "solve" {
+                    return Err("--initial-columns requires solve".into());
+                }
+                savings_columns = match args.next().as_deref() {
+                    Some("artificial") => false,
+                    Some("savings") => true,
+                    _ => return Err("--initial-columns must be artificial or savings".into()),
+                };
+            }
+            "--background-ils" => {
+                background_ils = true;
+            }
             "--help" | "-h" => {
                 println!("{ROUTING_HELP}");
                 println!("\n{}", crate::hgs_cli::HELP);
@@ -398,6 +418,11 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
         }
     }
     let ails_iterations = common.iterations;
+    if background_ils {
+        if kind != "solve" || robust.is_some() {
+            return Err("--background-ils requires a nominal CVRP/VRPTW solve".into());
+        }
+    }
     common.apply_routing(&mut options);
     hgs_extension.validate()?;
     if kind == "ails-ii" && (hgs_extension.intensify || hgs_extension.dri) {
@@ -434,6 +459,7 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
         options.reduced_cost_fixing = false;
     }
     Ok(Some(RoutingOptions {
+        background_ils,
         ignore_time_windows,
         customers,
         ng,
@@ -458,6 +484,7 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
         hgs_seed,
         hgs_time,
         hgs_columns,
+        savings_columns,
         robust,
         tree,
         node_limit,
@@ -499,6 +526,7 @@ fn routing_branch_variables<const D: usize>(
 
 pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Result<(), String> {
     let Some(RoutingOptions {
+        background_ils,
         ignore_time_windows,
         customers,
         ng,
@@ -523,6 +551,7 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
         hgs_seed,
         hgs_time,
         hgs_columns,
+        savings_columns,
         robust,
         tree,
         node_limit,
@@ -725,7 +754,46 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
     // A root LP may use one route per customer; the tree enforces the fleet.
     let fleet = if tree { instance.vehicles } else { n };
     let mut node = options;
+    if background_ils {
+        node.background_ils = Some(background_ils_options(
+            &instance, &graph, rounding, hgs_seed,
+        ));
+    }
     let mut initial_solution = None;
+    if savings_columns {
+        let seed = instance
+            .seed_savings(&graph, rounding)
+            .map_err(|e| e.to_string())?;
+        eprintln!(
+            "Savings seed: columns={} incumbent={:?}",
+            seed.routes.len(),
+            seed.incumbent
+        );
+        if let Some(upper) = seed.incumbent {
+            let bound = node.separation.upper_bound.get_or_insert(upper);
+            *bound = bound.min(upper);
+            if tree {
+                initial_solution = Some((
+                    upper,
+                    seed.routes
+                        .iter()
+                        .map(|route| model::FixedRoute {
+                            route: model::NetworkRoute {
+                                network: 0,
+                                route: route.clone(),
+                            },
+                            quantity: 1.,
+                        })
+                        .collect(),
+                ));
+            }
+        }
+        node.seed_routes.extend(
+            seed.routes
+                .into_iter()
+                .map(|route| model::NetworkRoute { network: 0, route }),
+        );
+    }
     if let Some(time_limit) = hgs_time {
         let seed = instance
             .seed_hgs(
@@ -737,7 +805,11 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
                     seed: hgs_seed,
                 },
                 node.cg.log_interval.is_some(),
-                &[],
+                &node
+                    .seed_routes
+                    .iter()
+                    .map(|r| r.route.clone())
+                    .collect::<Vec<_>>(),
             )
             .map_err(|e| e.to_string())?;
         eprintln!(
@@ -761,14 +833,19 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
                         quantity: 1.,
                     })
                     .collect();
-                initial_solution = Some((upper, routes));
+                if initial_solution
+                    .as_ref()
+                    .is_none_or(|(cost, _)| upper < *cost)
+                {
+                    initial_solution = Some((upper, routes));
+                }
             }
         }
-        node.seed_routes = seed
-            .routes
-            .into_iter()
-            .map(|route| model::NetworkRoute { network: 0, route })
-            .collect();
+        node.seed_routes.extend(
+            seed.routes
+                .into_iter()
+                .map(|route| model::NetworkRoute { network: 0, route }),
+        );
     }
     let problem =
         model::Problem::set_partitioning(graph, fleet as f64).map_err(|e| e.to_string())?;
@@ -882,6 +959,18 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
         }
     }
     Ok(())
+}
+
+fn background_ils_options<const D: usize>(
+    instance: &Instance,
+    graph: &baldes::Graph<D>,
+    rounding: Rounding,
+    seed: i32,
+) -> model::BackgroundIlsOptions {
+    let mut options =
+        model::BackgroundIlsOptions::new(instance.heuristic_instance(graph, rounding));
+    options.search.seed = seed;
+    options
 }
 
 /// Tree heuristic, gap and parallelism flags.

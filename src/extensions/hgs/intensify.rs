@@ -272,29 +272,10 @@ fn subproblem(
     plan: &Plan,
     selected: &[usize],
 ) -> (Instance, Vec<usize>, Vec<Vec<usize>>) {
-    let mut map = vec![0];
-    let mut seed = Vec::new();
-    for &i in selected {
-        let mut route = Vec::new();
-        for &customer in &plan.routes[i] {
-            route.push(map.len());
-            map.push(customer);
-        }
-        seed.push(route);
-    }
-    let sub = Instance {
-        name: format!("{}-subset", instance.name),
-        vehicles: selected.len(),
-        capacity: instance.capacity,
-        customers: map.iter().map(|&i| instance.customers[i].clone()).collect(),
-        rounding: instance.rounding,
-        distances: instance.distances.as_ref().map(|matrix| {
-            map.iter()
-                .map(|&i| map.iter().map(|&j| matrix[i][j]).collect())
-                .collect()
-        }),
-    };
-    (sub, map, seed)
+    crate::extensions::common::route_subproblem(
+        instance,
+        selected.iter().map(|&i| plan.routes[i].as_slice()),
+    )
 }
 
 struct Job {

@@ -1,6 +1,76 @@
 use super::*;
 
 #[test]
+fn background_ils_is_opt_in_and_uses_the_routing_seed() {
+    assert!(
+        !parse_options("solve", vec![])
+            .unwrap()
+            .unwrap()
+            .background_ils
+    );
+    let parsed = parse_options(
+        "solve",
+        ["--background-ils", "--seed", "17"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+    )
+    .unwrap()
+    .unwrap();
+    assert!(parsed.background_ils);
+    let mut instance = Instance::read(format!(
+        "{}/instances/Solomon/R201.txt",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    instance.truncate(5).unwrap();
+    let graph = instance.capacity_graph(8, Rounding::Tenth).unwrap();
+    let ils = background_ils_options(&instance, &graph, Rounding::Tenth, parsed.hgs_seed);
+    assert_eq!(ils.search.seed, 17);
+    assert_eq!(ils.max_routes, 16);
+    assert_eq!(ils.search.time_limit, 0.1);
+    assert_eq!(ils.instance.rounding, Rounding::Tenth);
+    assert!(ils
+        .instance
+        .customers
+        .iter()
+        .all(|c| c.service == 0. && c.due == f64::INFINITY));
+    for kind in ["hgs", "ails-ii", "ce"] {
+        assert!(parse_options(kind, vec!["--background-ils".into()]).is_err());
+    }
+}
+
+#[test]
+fn background_ils_preserves_the_small_vrptw_root_optimum() {
+    let mut instance = Instance::read(format!(
+        "{}/instances/Solomon/R201.txt",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    instance.truncate(5).unwrap();
+    let graph = instance.graph(8, Rounding::Tenth).unwrap();
+    let ils = background_ils_options(&instance, &graph, Rounding::Tenth, 1);
+    let problem = model::Problem::set_partitioning(graph, 5.).unwrap();
+    let mut options = parse_options(
+        "solve",
+        ["--background-ils", "--no-enumeration"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+    )
+    .unwrap()
+    .unwrap()
+    .options;
+    options.cg.time_limit = std::time::Duration::from_secs(10);
+    options.background_ils = Some(ils);
+    let with_ils = model::solve(problem.clone(), options.clone()).unwrap();
+    options.background_ils = None;
+    let baseline = model::solve(problem, options).unwrap();
+    assert_eq!(with_ils.master.status, baseline.master.status);
+    assert!((with_ils.master.lp - baseline.master.lp).abs() < 1e-6);
+}
+
+#[test]
 fn routing_r201_starts_with_its_low_feasibility_penalty() {
     let mut instance = Instance::read(format!(
         "{}/instances/Solomon/R201.txt",
@@ -117,4 +187,57 @@ fn edge_and_hybrid_producers_keep_their_existing_registration_boundary() {
     let (hybrid, selection) = routing_branch_variables(&problem, "hybrid");
     assert!(hybrid.is_empty());
     assert!(selection.is_empty());
+}
+
+#[test]
+fn savings_initial_columns_are_opt_in_and_solve_only() {
+    assert!(
+        !parse_options("solve", vec![])
+            .unwrap()
+            .unwrap()
+            .savings_columns
+    );
+    for (value, expected) in [("savings", true), ("artificial", false)] {
+        let options = parse_options("solve", vec!["--initial-columns".into(), value.into()])
+            .unwrap()
+            .unwrap();
+        assert_eq!(options.savings_columns, expected);
+    }
+    assert!(parse_options("solve", vec!["--initial-columns".into()]).is_err());
+    assert!(parse_options("solve", vec!["--initial-columns".into(), "invalid".into()]).is_err());
+    for kind in ["hgs", "ails-ii", "ce"] {
+        assert!(parse_options(kind, vec!["--initial-columns".into(), "savings".into()]).is_err());
+    }
+}
+
+#[test]
+fn savings_columns_preserve_cvrp_and_vrptw_root_optima() {
+    let mut instance = Instance::read(format!(
+        "{}/instances/Solomon/R201.txt",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    instance.truncate(5).unwrap();
+    for graph in [
+        instance.capacity_graph(8, Rounding::Tenth).unwrap(),
+        instance.graph(8, Rounding::Tenth).unwrap(),
+    ] {
+        let seed = instance.seed_savings(&graph, Rounding::Tenth).unwrap();
+        assert!(!seed.routes.is_empty());
+        let problem = model::Problem::set_partitioning(graph, 5.).unwrap();
+        let mut options = parse_options("solve", vec!["--no-enumeration".into()])
+            .unwrap()
+            .unwrap()
+            .options;
+        options.cg.time_limit = std::time::Duration::from_secs(10);
+        let baseline = model::solve(problem.clone(), options.clone()).unwrap();
+        options.seed_routes = seed
+            .routes
+            .into_iter()
+            .map(|route| model::NetworkRoute { network: 0, route })
+            .collect();
+        let seeded = model::solve(problem, options).unwrap();
+        assert_eq!(seeded.master.status, baseline.master.status);
+        assert!((seeded.master.lp - baseline.master.lp).abs() < 1e-6);
+    }
 }

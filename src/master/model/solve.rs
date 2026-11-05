@@ -2,6 +2,9 @@
 use super::*;
 
 pub(super) fn validate_options(options: &Options) -> Result<()> {
+    if let Some(ils) = &options.background_ils {
+        ils.validate()?;
+    }
     if options
         .objective_cutoff
         .is_some_and(|cutoff| !cutoff.is_finite())
@@ -761,6 +764,11 @@ fn execute_node_cg<const D: usize>(
     let started = Instant::now();
     let time_limit = options.cg.time_limit;
     let max_iterations = options.cg.max_iterations;
+    let mut background_ils = options
+        .background_ils
+        .clone()
+        .map(background_ils::Worker::<D>::new)
+        .transpose()?;
     let mut result = loop {
         let spent = previous.as_ref().map_or(0, |out| out.iterations);
         options.cg.max_iterations = max_iterations.saturating_sub(spent);
@@ -774,7 +782,23 @@ fn execute_node_cg<const D: usize>(
         let optimized = cg::optimize_with_log_context(
             &mut master,
             &schedule,
-            |phase, duals| state.borrow_mut().price(phase, duals),
+            |phase, duals| {
+                // Poll before pricing: work submitted by this call is only
+                // eligible at a later master iteration. Never wait for ILS.
+                let candidates = match background_ils.as_mut() {
+                    Some(worker) => worker.poll()?,
+                    None => vec![],
+                };
+                let mut state = state.borrow_mut();
+                let mut answer = state.price(phase, duals)?;
+                if let Some(worker) = background_ils.as_mut() {
+                    answer
+                        .columns
+                        .extend(background_ils::collect(&mut state, candidates, duals)?);
+                    worker.submit(&state, &answer.columns)?;
+                }
+                Ok(answer)
+            },
             &mut controller,
             options.cg.take_continuation(),
             log_context.as_deref(),

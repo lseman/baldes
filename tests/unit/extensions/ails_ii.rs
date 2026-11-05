@@ -1,6 +1,44 @@
 use super::{canonical_routes, edge_distance, pass_deadline};
 
 #[test]
+fn shared_engine_observes_caller_deadline_and_cancellation() {
+    use crate::inputs::{Customer, Instance, Rounding};
+    let instance = Instance {
+        name: "controlled".into(),
+        vehicles: 1,
+        capacity: 2.,
+        rounding: Rounding::None,
+        distances: None,
+        customers: [0., 1.]
+            .into_iter()
+            .enumerate()
+            .map(|(i, x)| Customer {
+                x,
+                y: 0.,
+                demand: i as f64,
+                ready: 0.,
+                due: 100.,
+                service: 0.,
+            })
+            .collect(),
+    };
+    let seed = vec![vec![1]];
+    let options = super::AilsIiOptions {
+        time_limit: 0.,
+        ..Default::default()
+    };
+    for cancelled in [false, true] {
+        let deadline = (!cancelled).then(std::time::Instant::now);
+        let result =
+            super::run_ails_ii_controlled(&instance, &seed, &options, deadline, || cancelled)
+                .unwrap();
+        assert_eq!(result.iterations, 0);
+        assert_eq!(result.routes, seed);
+        assert_eq!(result.best_cost, 2.);
+    }
+}
+
+#[test]
 fn elite_comparison_ignores_route_order_and_empty_routes() {
     let a = vec![vec![1, 2], vec![], vec![3, 4]];
     let b = vec![vec![3, 4], vec![1, 2]];

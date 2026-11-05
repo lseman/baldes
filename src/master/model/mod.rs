@@ -3,7 +3,9 @@
 //! Arc entries refer to shared rows. Each network also receives its own
 //! multiplicity rows. Additive rows and assignment branches survive node forks.
 //! Complete all-network enumeration can feed an optional HiGHS integer copy.
+mod background_ils;
 mod controller;
+pub use background_ils::BackgroundIlsOptions;
 use controller::ColumnGenerationController;
 mod feasibility;
 mod fixing;
@@ -169,6 +171,9 @@ impl<const D: usize> Problem<D> {
 
 #[derive(Clone, Debug)]
 pub struct Options {
+    /// Optional shared AILS-II search on an independent worker. Candidates are
+    /// revalidated and repriced before entering a later pricing batch.
+    pub background_ils: Option<BackgroundIlsOptions>,
     /// Retain original integer primals and close their valid bound gap before
     /// pricing. Trees enable this automatically; root LP solves default off.
     pub integer_primal_termination: bool,
@@ -229,6 +234,7 @@ impl Default for Options {
         let mut cg = cg::Options::default();
         cg.artificial_cost = 1_200_000.;
         Self {
+            background_ils: None,
             integer_primal_termination: false,
             search_inactive_columns: false,
             variable_boxes: vec![],

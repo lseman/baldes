@@ -11,6 +11,37 @@ pub fn validate_plan(instance: &Instance, routes: &[Vec<usize>]) -> Result<f64, 
     validate_plan_with_fleet(instance, routes, true)
 }
 
+/// Build a dense customer subproblem from disjoint routes. The caller validates
+/// the input routes; `map[local]` restores the original customer ID.
+pub(crate) fn route_subproblem<'a>(
+    instance: &Instance,
+    routes: impl IntoIterator<Item = &'a [usize]>,
+) -> (Instance, Vec<usize>, Vec<Vec<usize>>) {
+    let mut map = vec![0];
+    let mut seed = Vec::new();
+    for customers in routes {
+        let mut route = Vec::with_capacity(customers.len());
+        for &customer in customers {
+            route.push(map.len());
+            map.push(customer);
+        }
+        seed.push(route);
+    }
+    let sub = Instance {
+        name: format!("{}-subset", instance.name),
+        vehicles: seed.len(),
+        capacity: instance.capacity,
+        customers: map.iter().map(|&i| instance.customers[i].clone()).collect(),
+        rounding: instance.rounding,
+        distances: instance.distances.as_ref().map(|matrix| {
+            map.iter()
+                .map(|&i| map.iter().map(|&j| matrix[i][j]).collect())
+                .collect()
+        }),
+    };
+    (sub, map, seed)
+}
+
 pub(crate) fn validate_plan_with_fleet(
     instance: &Instance,
     routes: &[Vec<usize>],
@@ -19,27 +50,18 @@ pub(crate) fn validate_plan_with_fleet(
     if instance.customers.len() < 2 || routes.is_empty() {
         return Err("a solution needs customers and routes".into());
     }
+    validate_instance(instance)?;
+    plan_cost(instance, routes, enforce_fleet)
+}
+
+/// Replay a plan after immutable instance data has been validated at the search
+/// boundary. Coverage, fleet, resource feasibility and costs are still checked.
+pub(crate) fn plan_cost(
+    instance: &Instance,
+    routes: &[Vec<usize>],
+    enforce_fleet: bool,
+) -> Result<f64, String> {
     let n = instance.customers.len();
-    if !instance.capacity.is_finite()
-        || instance.capacity <= 0.0
-        || instance.customers.iter().any(|c| {
-            !c.x.is_finite()
-                || !c.y.is_finite()
-                || !c.demand.is_finite()
-                || c.demand < 0.0
-                || !c.ready.is_finite()
-                || c.due.is_nan()
-                || c.due < c.ready
-                || !c.service.is_finite()
-                || c.service < 0.0
-        })
-        || instance
-            .distances
-            .as_ref()
-            .is_some_and(|m| m.len() != n || m.iter().any(|r| r.len() != n))
-    {
-        return Err("invalid instance data or distance matrix dimensions".into());
-    }
     if enforce_fleet
         && instance.vehicles > 0
         && routes.iter().filter(|r| !r.is_empty()).count() > instance.vehicles
@@ -87,6 +109,34 @@ pub(crate) fn validate_plan_with_fleet(
         return Err("solution omits customers or has a non-finite cost".into());
     }
     Ok(cost)
+}
+
+pub(crate) fn validate_instance(instance: &Instance) -> Result<(), String> {
+    let n = instance.customers.len();
+    if n < 2 {
+        return Err("an instance needs a depot and customers".into());
+    }
+    if !instance.capacity.is_finite()
+        || instance.capacity <= 0.0
+        || instance.customers.iter().any(|c| {
+            !c.x.is_finite()
+                || !c.y.is_finite()
+                || !c.demand.is_finite()
+                || c.demand < 0.0
+                || !c.ready.is_finite()
+                || c.due.is_nan()
+                || c.due < c.ready
+                || !c.service.is_finite()
+                || c.service < 0.0
+        })
+        || instance
+            .distances
+            .as_ref()
+            .is_some_and(|m| m.len() != n || m.iter().any(|r| r.len() != n))
+    {
+        return Err("invalid instance data or distance matrix dimensions".into());
+    }
+    Ok(())
 }
 
 /// Build a feasible starting plan by cheapest feasible insertion, opening a
@@ -318,6 +368,9 @@ pub(crate) fn improve_modified_routes(
     deadline: std::time::Instant,
     initial_changed: &[bool],
 ) {
+    if std::time::Instant::now() >= deadline || validate_plan(instance, routes).is_err() {
+        return;
+    }
     let mut changed: Vec<bool> = (0..routes.len())
         .map(|i| initial_changed.get(i).copied().unwrap_or(false))
         .collect();
@@ -325,7 +378,7 @@ pub(crate) fn improve_modified_routes(
         if std::time::Instant::now() >= deadline {
             return;
         }
-        let Ok(base) = validate_plan(instance, routes) else {
+        let Ok(base) = plan_cost(instance, routes, true) else {
             return;
         };
         let mut chosen = None;
@@ -379,7 +432,7 @@ pub(crate) fn improve_modified_routes(
                             let mut candidate = routes.clone();
                             candidate[from] = new_source;
                             candidate[to] = new_target;
-                            if validate_plan(instance, &candidate)
+                            if plan_cost(instance, &candidate, true)
                                 .is_ok_and(|cost| cost < base - 1e-8)
                             {
                                 chosen = Some(candidate);
@@ -391,7 +444,8 @@ pub(crate) fn improve_modified_routes(
                         let customer = candidate[from].remove(i);
                         let insert = if from == to && pos > i { pos - 1 } else { pos };
                         candidate[to].insert(insert, customer);
-                        if validate_plan(instance, &candidate).is_ok_and(|cost| cost < base - 1e-8)
+                        if plan_cost(instance, &candidate, true)
+                            .is_ok_and(|cost| cost < base - 1e-8)
                         {
                             chosen = Some(candidate);
                             break 'search;
@@ -420,7 +474,8 @@ pub(crate) fn improve_modified_routes(
                                 candidate[a][i] = candidate[b][j];
                                 candidate[b][j] = tmp;
                             }
-                            if validate_plan(instance, &candidate).is_ok_and(|v| v < base - 1e-8) {
+                            if plan_cost(instance, &candidate, true).is_ok_and(|v| v < base - 1e-8)
+                            {
                                 chosen = Some(candidate);
                                 break 'moves;
                             }
@@ -433,7 +488,8 @@ pub(crate) fn improve_modified_routes(
                                 candidate[a].extend(tail_b);
                                 candidate[b].extend(tail_a);
                             }
-                            if validate_plan(instance, &candidate).is_ok_and(|v| v < base - 1e-8) {
+                            if plan_cost(instance, &candidate, true).is_ok_and(|v| v < base - 1e-8)
+                            {
                                 chosen = Some(candidate);
                                 break 'moves;
                             }
@@ -465,7 +521,7 @@ pub(crate) fn improve_modified_routes(
                                     let mut candidate = reduced.clone();
                                     candidate[a].insert(pos_a, from_b);
                                     candidate[b].insert(pos_b, from_a);
-                                    if validate_plan(instance, &candidate)
+                                    if plan_cost(instance, &candidate, true)
                                         .is_ok_and(|v| v < base - 1e-8)
                                     {
                                         chosen = Some(candidate);

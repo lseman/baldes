@@ -2,6 +2,7 @@ use super::*;
 
 impl<'p> HGSLocalSearch<'p> {
     /// Swap two single clients U and V.
+    #[inline(always)]
     pub fn swap_two_single_clients(&mut self, u: usize, v: usize) -> bool {
         let u_prev = self.nodes[u].prev as usize;
         let x = self.nodes[u].next as usize;
@@ -133,6 +134,7 @@ impl<'p> HGSLocalSearch<'p> {
     }
 
     /// Swap two clients (U, X) for one client V.
+    #[inline(always)]
     pub fn swap_two_clients_for_one(&mut self, u: usize, v: usize) -> bool {
         let x = self.nodes[u].next as usize;
         if self.nodes[x].is_depot {
@@ -271,6 +273,7 @@ impl<'p> HGSLocalSearch<'p> {
     }
 
     /// Swap two client pairs (U, X) and (V, Y).
+    #[inline(always)]
     pub fn swap_two_client_pairs(&mut self, u: usize, v: usize) -> bool {
         let x = self.nodes[u].next as usize;
         let y = self.nodes[v].next as usize;

@@ -120,17 +120,7 @@ impl Instance {
             return Err(invalid("HGS column count must be positive"));
         }
         graph.validate()?;
-        let mut instance = self.clone();
-        instance.rounding = rounding;
-        // Capacity graphs have zero time consumption, irrespective of the
-        // original file's time windows. Give HGS the same problem semantics.
-        if graph.arcs.iter().all(|a| a.consumption[0] == 0.) {
-            for customer in &mut instance.customers {
-                customer.ready = 0.;
-                customer.due = f64::INFINITY;
-                customer.service = 0.;
-            }
-        }
+        let instance = self.heuristic_instance(graph, rounding);
         let controls = HgsOptions {
             time_limit: warm.time_limit.as_secs_f64(),
             seed: warm.seed,
@@ -143,22 +133,8 @@ impl Instance {
             driver::run_hgs(&instance, &controls)
         }
         .map_err(invalid)?;
-        let arcs: std::collections::HashMap<_, _> = graph
-            .arcs
-            .iter()
-            .map(|a| ((a.tail, a.head), a.id))
-            .collect();
-        let convert = |customers: &[usize]| {
-            let nodes: Vec<_> = std::iter::once(graph.source)
-                .chain(customers.iter().copied())
-                .chain(std::iter::once(graph.sink))
-                .collect();
-            let ids = nodes
-                .windows(2)
-                .map(|w| arcs.get(&(w[0], w[1])).copied())
-                .collect::<Option<Vec<_>>>()?;
-            graph.elementary_route(&ids).ok().flatten()
-        };
+        let route_map = super::HeuristicRouteMap::new(graph);
+        let convert = |customers: &[usize]| route_map.convert(graph, customers);
         let best = found
             .routes
             .iter()
