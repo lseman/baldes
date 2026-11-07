@@ -32,7 +32,8 @@ pub(super) struct ArcSetMember {
 /// packing-set indices per network; when empty, the packing-assignment
 /// registration is used. When neither is present, explicit rank-one
 /// incidence supplies the sets, or a single network's customer vertices are
-/// used in vertex order.
+/// used in vertex order. A set may contain several vertices and may be absent
+/// from some networks; each route contributes its set membership once.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RyanFosterBranching {
@@ -177,8 +178,8 @@ impl RyanFosterBranching {
         Ok(())
     }
 
-    /// Network members of a pair, or None when a network holds only one of
-    /// the sets or a set with several vertices.
+    /// Use direct vertex restrictions when every participating network has one
+    /// vertex for each set. Other layouts need set-valued arc membership.
     fn members(&self, a: usize, b: usize) -> Option<Vec<RyanFosterMember>> {
         let mut members = vec![];
         for (&network, singles) in &self.prepared.vertices {
@@ -193,6 +194,40 @@ impl RyanFosterBranching {
             }
         }
         (!members.is_empty()).then_some(members)
+    }
+
+    fn vertex_arc_members<const D: usize>(
+        &self,
+        node: &NodeSnapshot<D>,
+        a: usize,
+        b: usize,
+    ) -> Vec<ArcSetMember> {
+        node.state
+            .oracles
+            .iter()
+            .filter_map(|oracle| {
+                let labels = self.prepared.labels.get(&oracle.network.id)?;
+                // Customer vertices are visited through their incoming arcs.
+                // Use only that event, so a single visit is not counted twice.
+                let entering = |set| {
+                    oracle
+                        .network
+                        .graph
+                        .arcs
+                        .iter()
+                        .filter(|arc| labels.get(arc.head) == Some(&Some(set)))
+                        .map(|arc| arc.id)
+                        .collect::<Vec<_>>()
+                };
+                let first = entering(a);
+                let second = entering(b);
+                (!first.is_empty() || !second.is_empty()).then_some(ArcSetMember {
+                    network: oracle.network.id,
+                    first,
+                    second,
+                })
+            })
+            .collect()
     }
 
     pub(super) fn proposals<const D: usize>(&self, output: &Output<D>) -> Result<Vec<Proposal>> {
@@ -275,11 +310,12 @@ impl RyanFosterBranching {
                     })
                     .collect();
                 Restriction::ArcSetRyanFoster { members }
-            } else {
-                let Some(members) = self.members(a, b) else {
-                    continue;
-                };
+            } else if let Some(members) = self.members(a, b) {
                 Restriction::RyanFoster { members }
+            } else {
+                Restriction::ArcSetRyanFoster {
+                    members: self.vertex_arc_members(node, a, b),
+                }
             };
             // Zero padding keeps the name tie-break in native pair order.
             let name = format!("PS_{a:0width$}_{b:0width$}");

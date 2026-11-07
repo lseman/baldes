@@ -286,8 +286,11 @@ branching history.
 - `{"kind": "ryan-foster", "config": {"priority": 2, "sets": [...]}}`: packing-set Ryan–Foster.
   `sets` uses the `packing` vertex format; when it is empty, the `packing`
   registration is used, and a single network otherwise uses each customer
-  vertex as its own set. Candidates are pairs whose LP co-occurrence lies
-  strictly between `1e-6` and `0.999999`, ranked by distance to one half.
+  vertex as its own set. A set may contain several vertices or be absent from
+  some networks. Together branches exclude paths visiting exactly one set;
+  apart branches exclude paths visiting both. Candidates are pairs whose LP
+  co-occurrence lies strictly between `1e-6` and `0.999999`, ranked by distance
+  to one half.
   The together child is the upper child. A branch is a `<= 0` row whose
   column coefficient is one for violating paths, and pricing excludes those
   paths, as in the native solver; columns are not capped.
@@ -330,9 +333,11 @@ controls and defaults:
   is never used. Counted in `restricted_mip_calls`.
 - `absolute_gap` and `relative_gap` (defaults `1e-6` and `1e-9`, the native
   `optimalityGapTolerance` and `relOptimalityGapTolerance`): a node closes when
-  its bound is within the larger of the tree tolerance, the absolute gap and
-  the relative gap times the incumbent. Larger gaps stop the search early;
-  `Optimal` then means optimal within that gap.
+  its bound is within the largest of the tree tolerance, the comparison band
+  `1e-6 + 1e-10 * max(abs(bound), abs(incumbent))`, the absolute gap and the
+  relative gap times the absolute incumbent. The comparison band applies only
+  to finite bounds. Larger gaps stop the search early; `Optimal` then means
+  optimal within that gap. The reported lower bound retains its proof value.
 - `integer_objective` (default off, native `integerValuedBound`): round node
   bounds up before pruning. It is rejected unless every arc, master-variable
   and fixed cost is an integer and there are no resource or original-variable

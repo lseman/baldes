@@ -263,13 +263,398 @@ fn several_networks_require_packing_sets_and_customer_vertices() {
         NetworkPackingAssignment::new(1, vec![(1, 0)]),
     ];
     labelled.prepare(graphs(), None, None).unwrap();
-    // Set 1 is absent from network 1 while set 0 is present there.
+    // This layout needs set-valued membership rather than a direct vertex pair.
     assert!(labelled.members(0, 1).is_none());
     labelled.sets = vec![NetworkPackingAssignment::new(0, vec![(0, 0)])];
     assert!(labelled.prepare(graphs(), None, None).is_err());
     assert!(RyanFosterBranching::new(f64::NAN)
         .prepare(graphs().take(1), None, None)
         .is_err());
+}
+
+fn vertex_set_fixture(
+    multiple_vertices: bool,
+) -> (Problem<2>, RyanFosterBranching, Vec<NetworkRoute>) {
+    use crate::graph::Window;
+    let mut networks = vec![];
+    let mut registrations = vec![];
+    let mut routes = vec![];
+    for id in [7, 42, 99, 101] {
+        let mut labels = match id {
+            7 => vec![(1, 0), (3, 1)],
+            42 => vec![(1, 0)],
+            99 => vec![(3, 1)],
+            _ => vec![(2, 2)],
+        };
+        if multiple_vertices && matches!(id, 7 | 42) {
+            labels.push((2, 0));
+        }
+        let paths = match id {
+            7 => {
+                let mut paths = vec![vec![], vec![1], vec![3], vec![1, 3]];
+                if multiple_vertices {
+                    paths.extend([vec![2], vec![2, 3]]);
+                }
+                paths
+            }
+            42 if multiple_vertices => vec![vec![], vec![1], vec![2]],
+            42 => vec![vec![], vec![1]],
+            99 => vec![vec![], vec![3]],
+            _ => vec![vec![2]],
+        };
+        let mut edges = BTreeSet::new();
+        for path in paths {
+            let vertices: Vec<_> = std::iter::once(0).chain(path).chain([4]).collect();
+            edges.extend(vertices.windows(2).map(|edge| (edge[0], edge[1])));
+        }
+        let mut graph = Graph::<2>::new(5, 0).unwrap();
+        for (index, (tail, head)) in edges.into_iter().enumerate() {
+            graph
+                .add_arc_with_id(
+                    10 + 7 * index as i32,
+                    tail,
+                    head,
+                    if tail == 0 && id != 101 { 1. } else { 0. },
+                )
+                .unwrap();
+        }
+        let arc_entries = graph
+            .arcs
+            .iter()
+            .map(|arc| {
+                labels
+                    .iter()
+                    .find(|&&(vertex, set)| vertex == arc.head && set < 2)
+                    .map_or_else(Vec::new, |&(_, set)| vec![(set, 1.)])
+            })
+            .collect();
+        // Enumerate the tiny DAG independently of the pricing engine.
+        fn visit(graph: &Graph<2>, vertex: usize, path: &mut Vec<i32>, paths: &mut Vec<Vec<i32>>) {
+            if vertex == graph.sink {
+                paths.push(path.clone());
+                return;
+            }
+            for arc in graph.arcs.iter().filter(|arc| arc.tail == vertex) {
+                path.push(arc.id);
+                visit(graph, arc.head, path, paths);
+                path.pop();
+            }
+        }
+        let mut paths = vec![];
+        visit(&graph, graph.source, &mut vec![], &mut paths);
+        routes.extend(paths.into_iter().map(|arcs| NetworkRoute {
+            network: id,
+            route: graph.elementary_route(&arcs).unwrap().unwrap(),
+        }));
+        networks.push(Network {
+            id,
+            graph,
+            multiplicity: Window::new(
+                if id == 101 { 1. } else { 0. },
+                if id == 7 { 0.5 } else { 1. },
+            )
+            .unwrap(),
+            arc_entries,
+            route_entries: vec![],
+            activity_entries: vec![],
+        });
+        registrations.push(NetworkPackingAssignment::new(id, labels));
+    }
+    let problem = Problem {
+        rows: vec![
+            Row {
+                sense: RowSense::Equal,
+                rhs: 1.
+            };
+            2
+        ],
+        networks,
+    };
+    let mut branching = RyanFosterBranching::new(100.);
+    branching.sets = registrations;
+    branching
+        .prepare(
+            problem.networks.iter().map(|n| (n.id, &n.graph)),
+            None,
+            None,
+        )
+        .unwrap();
+    (problem, branching, routes)
+}
+
+fn visits_vertex_pair(branching: &RyanFosterBranching, route: &NetworkRoute) -> (bool, bool) {
+    let labels = &branching.prepared.labels[&route.network];
+    let contains = |set| {
+        route
+            .route
+            .nodes
+            .iter()
+            .any(|&v| labels[v as usize] == Some(set))
+    };
+    (contains(0), contains(1))
+}
+
+#[test]
+fn vertex_set_children_preserve_missing_and_multiple_members_through_pricing_and_enumeration() {
+    for multiple_vertices in [false, true] {
+        for mode in [
+            crate::master::cg::BoundMode::Numerical,
+            crate::master::cg::BoundMode::Certified,
+        ] {
+            let (problem, branching, routes) = vertex_set_fixture(multiple_vertices);
+            let mut configured = options();
+            configured.cg.bound_mode = mode;
+            configured.preprocessing.enabled = false;
+            configured.reduced_cost_fixing = false;
+            configured.gap_enumeration = false;
+            let root = solve_with_master_variables(problem, vec![], configured.clone()).unwrap();
+            assert!((root.master.lp - 1.5).abs() < 1e-6);
+            let proposals = branching.proposals(&root).unwrap();
+            let proposal = proposals
+                .iter()
+                .find(|p| p.name == "PS_0_1")
+                .expect("fractional pair must not be discarded");
+            assert!((proposal.value - 0.5).abs() < 1e-6);
+            let Restriction::ArcSetRyanFoster { members } = &proposal.restriction else {
+                panic!("expected set-valued restrictions")
+            };
+            assert_eq!(members.len(), 3);
+            assert!(members
+                .iter()
+                .any(|m| m.network == 42 && m.second.is_empty()));
+            assert!(members
+                .iter()
+                .any(|m| m.network == 99 && m.first.is_empty()));
+            for together in [false, true] {
+                let accepts = |route: &NetworkRoute| {
+                    let (a, b) = visits_vertex_pair(&branching, route);
+                    if together {
+                        a == b
+                    } else {
+                        !(a && b)
+                    }
+                };
+                let child = root
+                    .snapshot
+                    .with_arc_set_branch(members, together)
+                    .unwrap();
+                let row = child.state.shared_rows.len() - 1;
+                for route in &routes {
+                    let oracle = child
+                        .state
+                        .oracles
+                        .iter()
+                        .find(|o| o.network.id == route.network)
+                        .unwrap();
+                    assert_eq!(
+                        oracle
+                            .solver
+                            .route_satisfies_relaxation(&route.route.nodes, &route.route.arcs)
+                            .unwrap(),
+                        accepts(route),
+                        "route validation: {together} {} {:?}",
+                        route.network,
+                        route.route.nodes,
+                    );
+                    let coefficient = super::entries(oracle, &route.route)
+                        .unwrap()
+                        .into_iter()
+                        .find(|&(r, _)| r == row)
+                        .map_or(0., |(_, value)| value);
+                    assert_eq!(
+                        coefficient,
+                        if accepts(route) { 0. } else { 1. },
+                        "{together} {} {:?}",
+                        route.network,
+                        route.route.nodes
+                    );
+                }
+                let complete = child.enumerate(&EnumerationOptions::default()).unwrap();
+                assert!(
+                    complete.enumeration_report().complete,
+                    "{:?}",
+                    complete.enumeration_report()
+                );
+                let actual: BTreeSet<_> = complete
+                    .state
+                    .universe
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .map(|&tag| {
+                        let route = &complete.state.routes[tag];
+                        (route.network, route.route.arcs.clone())
+                    })
+                    .collect();
+                let expected: BTreeSet<_> = routes
+                    .iter()
+                    .filter(|route| accepts(route))
+                    .map(|route| (route.network, route.route.arcs.clone()))
+                    .collect();
+                assert_eq!(
+                    actual, expected,
+                    "together={together}, multi={multiple_vertices}"
+                );
+                let solved = child.fork().unwrap().solve(configured.clone()).unwrap();
+                if together {
+                    // Only the half-capacity network can visit both sets.
+                    assert!(
+                        super::super::model_strong::proven_infeasible(&solved),
+                        "{:?}",
+                        solved.master
+                    );
+                } else {
+                    assert_eq!(solved.master.status, crate::master::cg::Status::Optimal);
+                    assert!((solved.master.lp - 2.).abs() < 1e-6);
+                    for (route, &value) in solved.routes.iter().zip(&solved.values) {
+                        if value > 1e-8 {
+                            assert!(accepts(route));
+                        }
+                    }
+                }
+                assert!(child
+                    .state
+                    .oracles
+                    .iter()
+                    .find(|o| o.network.id == 101)
+                    .unwrap()
+                    .arc_set_branch_rows
+                    .is_empty());
+            }
+            assert!(root
+                .snapshot
+                .state
+                .oracles
+                .iter()
+                .all(|o| o.arc_set_branch_rows.is_empty() && o.ryan_foster_rows.is_empty()));
+            assert!((root.snapshot.solve(configured).unwrap().master.lp - 1.5).abs() < 1e-6);
+        }
+    }
+}
+
+#[test]
+fn vertex_set_tree_matches_independent_integer_route_covers() {
+    for multiple_vertices in [false, true] {
+        let (problem, branching, routes) = vertex_set_fixture(multiple_vertices);
+        let mut optimum = f64::INFINITY;
+        for mask in 0..1_usize << routes.len() {
+            let mut cover = [0; 2];
+            let mut counts = BTreeMap::<i32, usize>::new();
+            let mut cost = 0.;
+            for (index, route) in routes.iter().enumerate() {
+                if mask & (1 << index) == 0 {
+                    continue;
+                }
+                let (a, b) = visits_vertex_pair(&branching, route);
+                cover[0] += usize::from(a);
+                cover[1] += usize::from(b);
+                *counts.entry(route.network).or_default() += 1;
+                cost += route.route.original_cost;
+            }
+            if cover == [1, 1]
+                && problem.networks.iter().all(|n| {
+                    let quantity = counts.get(&n.id).copied().unwrap_or(0) as f64;
+                    quantity >= n.multiplicity.lower && quantity <= n.multiplicity.upper
+                })
+            {
+                optimum = optimum.min(cost);
+            }
+        }
+        assert_eq!(optimum, 2.);
+        for mode in [
+            crate::master::cg::BoundMode::Numerical,
+            crate::master::cg::BoundMode::Certified,
+        ] {
+            for strong in [false, true] {
+                let mut configured = ModelTreeOptions::default();
+                configured.node.cg.stabilize = false;
+                configured.node.cg.bound_mode = mode;
+                configured.node.preprocessing.enabled = false;
+                configured.node.reduced_cost_fixing = false;
+                configured.node.gap_enumeration = false;
+                configured.branching_registry.branching =
+                    crate::master::tree::NetworkBranchingPolicy::Phased;
+                configured.branching_registry.ryan_foster = Some(branching.clone());
+                configured.branching_registry.strong_branching = strong.then(Default::default);
+                let output = crate::master::tree::solve(problem.clone(), configured).unwrap();
+                assert_eq!(
+                    output.status,
+                    crate::master::tree::TreeStatus::Optimal,
+                    "{output:?}"
+                );
+                assert!((output.incumbent - optimum).abs() < 1e-6, "{output:?}");
+                assert!((output.bound - optimum).abs() < 1e-6, "{output:?}");
+                if strong {
+                    assert!(output
+                        .mapped_branch_evaluations
+                        .iter()
+                        .any(|e| e.name == "PS_0_1"));
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn vertex_set_branches_keep_fixed_reductions_exact_when_the_child_is_infeasible() {
+    let (problem, branching, _) = vertex_set_fixture(true);
+    for mode in [
+        crate::master::cg::BoundMode::Numerical,
+        crate::master::cg::BoundMode::Certified,
+    ] {
+        let mut configured = options();
+        configured.cg.bound_mode = mode;
+        configured.preprocessing.enabled = false;
+        configured.reduced_cost_fixing = false;
+        configured.gap_enumeration = false;
+        let root =
+            solve_with_master_variables(problem.clone(), vec![], configured.clone()).unwrap();
+        let proposals = branching.proposals(&root).unwrap();
+        let Restriction::ArcSetRyanFoster { members } = &proposals
+            .iter()
+            .find(|p| p.name == "PS_0_1")
+            .unwrap()
+            .restriction
+        else {
+            panic!("expected set-valued restrictions")
+        };
+        let complete = root
+            .snapshot
+            .enumerate(&EnumerationOptions::default())
+            .unwrap();
+        let tag = complete
+            .state
+            .universe
+            .as_ref()
+            .unwrap()
+            .iter()
+            .copied()
+            .find(|&tag| {
+                let route = &complete.state.routes[tag];
+                route.network == 42 && route.route.nodes == [0, 1, 4]
+            })
+            .unwrap();
+        let fixed = complete.fix_route(tag, 1.).unwrap();
+        let child = fixed.with_arc_set_branch(members, true).unwrap();
+        let route = &child.state.fixed_routes[0].route;
+        let oracle = child
+            .state
+            .oracles
+            .iter()
+            .find(|o| o.network.id == route.network)
+            .unwrap();
+        assert!(!super::super::lifecycle::integer_route_feasible(oracle, &route.route).unwrap());
+        assert!(super::super::bounds::exact_fixed_reduction(&child.state, &child.master).unwrap());
+        let solved = child.solve(configured.clone()).unwrap();
+        assert!(
+            super::super::model_strong::proven_infeasible(&solved),
+            "{:?}",
+            solved.master
+        );
+        let restored = fixed.solve(configured).unwrap();
+        assert_eq!(restored.master.status, crate::master::cg::Status::Optimal);
+        assert!((restored.master.lp - 2.).abs() < 1e-6);
+    }
 }
 
 #[test]

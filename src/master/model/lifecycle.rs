@@ -811,7 +811,7 @@ pub(super) fn original_route_feasible<const D: usize>(
     Ok(problem.exact_route_feasible(route).is_some()
         && oracle
             .solver
-            .route_satisfies_relaxation(&route.nodes, &route.arcs)?)
+            .route_satisfies_relaxation_in_domain(&route.nodes, &route.arcs, false)?)
 }
 
 /// Replay explicit fixed copies into a fresh model before preprocessing or pricing.

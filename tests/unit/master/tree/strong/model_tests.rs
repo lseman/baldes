@@ -531,6 +531,143 @@ fn strong_trials_retain_original_incumbents_and_only_completed_exact_bounds() {
     }
 }
 
+fn repeated_exact_master_root(
+    fractional_sibling: bool,
+    phase_count: usize,
+    mode: cg::BoundMode,
+) -> (Output<2>, ModelTreeOptions) {
+    let count = if fractional_sibling { 2 } else { 1 };
+    let problem = Problem {
+        rows: (0..count)
+            .map(|_| Row {
+                sense: RowSense::GreaterEqual,
+                rhs: 0.5,
+            })
+            .collect(),
+        networks: vec![],
+    };
+    let variables = (0..count)
+        .map(|index| MasterVariable {
+            id: index as i32 + 1,
+            cost: 1.,
+            integer: true,
+            bounds: Bounds {
+                lower: 0.,
+                upper: 1.,
+            },
+            entries: vec![(index, 1.)],
+        })
+        .collect();
+    let mut options = strong_tree_options();
+    options.node.cg.stabilize = false;
+    options.node.cg.bound_mode = mode;
+    options.node.preprocessing.enabled = false;
+    options.branching_registry.mapped_variables = vec![MappedBranchVariable {
+        name: "x".into(),
+        priority: 1.,
+        networks: vec![],
+        masters: vec![(1, 1.)],
+    }];
+    options
+        .branching_registry
+        .strong_branching
+        .as_mut()
+        .unwrap()
+        .phases = vec![
+        StrongPhase {
+            subtree_ratio: 0.,
+            reduced_cost_fixing: false,
+            ..Default::default()
+        };
+        phase_count
+    ];
+    let output = solve_with_master_variables(problem, variables, options.node.clone()).unwrap();
+    (output, options)
+}
+
+#[test]
+fn repeated_exact_phases_preserve_conquered_children_without_new_trials_or_history() {
+    for mode in [cg::BoundMode::Numerical, cg::BoundMode::Certified] {
+        for phase_count in 1..=3 {
+            let (output, options) = repeated_exact_master_root(false, phase_count, mode);
+            let mut history = History::default();
+            let selected = choose_registered(
+                &output,
+                &options,
+                &mut history,
+                f64::INFINITY,
+                Instant::now() + Duration::from_secs(10),
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!(history.trials, 2);
+            assert_eq!(history.processed_trials, 2);
+            assert_eq!(history.evaluations.len(), 2);
+            assert!(history.evaluations.iter().all(|e| e.stage == 1));
+            assert_eq!(history.incumbent.as_ref().unwrap().0, 1.);
+            assert!(proven_infeasible(selected.evaluated[0].as_ref().unwrap()));
+            let upper = selected.evaluated[1].as_ref().unwrap();
+            assert!(options.closes(upper.master.bound, 1.));
+            assert_eq!(
+                upper
+                    .snapshot
+                    .integer_witness(options.tolerance)
+                    .unwrap()
+                    .unwrap()
+                    .0,
+                1.
+            );
+        }
+    }
+}
+
+#[test]
+fn repeated_exact_phases_still_treat_solved_children_without_a_closing_proof() {
+    for mode in [cg::BoundMode::Numerical, cg::BoundMode::Certified] {
+        for phase_count in 1..=3 {
+            let (output, options) = repeated_exact_master_root(true, phase_count, mode);
+            let mut history = History::default();
+            let selected = choose_registered(
+                &output,
+                &options,
+                &mut history,
+                f64::INFINITY,
+                Instant::now() + Duration::from_secs(10),
+            )
+            .unwrap()
+            .unwrap();
+            // The down side is infeasible. The up side still has y=0.5 and
+            // no incumbent to close it, even though its LP solved optimally.
+            assert_eq!(history.trials, 1 + phase_count);
+            assert_eq!(history.processed_trials, 1 + phase_count);
+            assert_eq!(history.evaluations.len(), 1 + phase_count);
+            assert_eq!(
+                history.evaluations.iter().filter(|e| e.side == 0).count(),
+                1
+            );
+            assert_eq!(
+                history
+                    .evaluations
+                    .iter()
+                    .filter(|e| e.side == 1)
+                    .map(|e| e.stage)
+                    .collect::<Vec<_>>(),
+                (1..=phase_count).collect::<Vec<_>>()
+            );
+            assert!(history.incumbent.is_none());
+            assert!(proven_infeasible(selected.evaluated[0].as_ref().unwrap()));
+            let upper = selected.evaluated[1].as_ref().unwrap();
+            assert_eq!(upper.master.status, cg::Status::Optimal);
+            assert!(upper
+                .snapshot
+                .integer_witness(options.tolerance)
+                .unwrap()
+                .is_none());
+            assert!((upper.master.bound - 1.5).abs() < 1e-6);
+        }
+    }
+}
+
 #[test]
 fn subtree_budget_reduces_admission_to_one_and_skips_the_final_nonexact_screen() {
     let mut output = root();

@@ -230,14 +230,19 @@ fn network_minimum<const D: usize>(
     }
     // Ryan–Foster rows restrict this node's paths; walks they exclude cannot
     // lower the bound. Unavailable refinements keep the unrestricted walk.
-    if !oracle.ryan_foster_rows.is_empty() {
+    if !oracle.ryan_foster_rows.is_empty() || !oracle.arc_set_branch_rows.is_empty() {
         let constraints: Vec<_> = oracle.ryan_foster_rows.iter().map(|&(_, c)| c).collect();
+        let arc_constraints: Vec<_> = oracle
+            .arc_set_branch_rows
+            .iter()
+            .map(|(_, c)| c.clone())
+            .collect();
         let allowance = (*resource_work / 4).min(1_000_000);
         let mut remaining = allowance;
         let restricted = ryan_foster::minimum(
             graph,
             &weights,
-            &constraints,
+            (&constraints, &arc_constraints),
             |a| {
                 !reaches_sink[graph.arcs[a].head]
                     || oracle

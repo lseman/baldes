@@ -43,6 +43,38 @@ fn gaps_close_nodes_within_the_native_tolerances() {
 }
 
 #[test]
+fn pruning_comparison_band_scales_with_finite_bounds_without_closing_unknown_nodes() {
+    let configured = ModelTreeOptions {
+        tolerance: 1e-8,
+        absolute_gap: 0.,
+        relative_gap: 0.,
+        ..Default::default()
+    };
+    // The large positive case is also checked against the original binary
+    // in internal/audits/tree-branching-review-20261107/.
+    for (bound, incumbent, closed) in [
+        (100_000_000., 100_000_000.005, true),
+        (100., 100.005, false),
+        (100_000_000., 100_000_000.02, false),
+        (-100_000_000.005, -100_000_000., true),
+        (-100_000_000.02, -100_000_000., false),
+        (-5e-7, 0., true),
+        (f64::NEG_INFINITY, 100_000_000., false),
+        (100_000_000., f64::INFINITY, false),
+        (f64::NEG_INFINITY, f64::INFINITY, false),
+        (f64::INFINITY, 100_000_000., true),
+        (f64::NAN, 100_000_000., false),
+        (100_000_000., f64::NAN, false),
+    ] {
+        assert_eq!(
+            configured.closes(bound, incumbent),
+            closed,
+            "{bound} / {incumbent}"
+        );
+    }
+}
+
+#[test]
 fn integer_objective_bounds_require_and_preserve_integer_costs() {
     let decimal = rc101(25, Rounding::None);
     let mut configured = options(&decimal);

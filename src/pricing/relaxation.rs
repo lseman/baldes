@@ -56,6 +56,16 @@ impl<const D: usize> Solver<D> {
     /// Whether a route (vertices and arc ids in path order) is feasible for
     /// the current NG relaxation.
     pub fn route_satisfies_relaxation(&self, vertices: &[i32], arcs: &[i32]) -> Result<bool> {
+        self.route_satisfies_relaxation_in_domain(vertices, arcs, true)
+    }
+    /// Fixed-reduction proofs replay originally feasible routes even when a
+    /// later branch contradicts them. Keep that domain separate from pricing.
+    pub(crate) fn route_satisfies_relaxation_in_domain(
+        &self,
+        vertices: &[i32],
+        arcs: &[i32],
+        branch_domain: bool,
+    ) -> Result<bool> {
         if self
             .graph
             .max_route_arcs()
@@ -66,10 +76,20 @@ impl<const D: usize> Solver<D> {
         if vertices.len() != arcs.len() + 1 {
             return Err(invalid("route node/arc dimensions"));
         }
-        if self.ryan_foster.iter().any(|c| {
-            !c.satisfied_by(vertices.iter().map(|&v| v as usize))
-                || !c.elementary_on_pair(vertices.iter().map(|&v| v as usize))
-        }) {
+        if branch_domain
+            && self.ryan_foster.iter().any(|c| {
+                !c.satisfied_by(vertices.iter().map(|&v| v as usize))
+                    || !c.elementary_on_pair(vertices.iter().map(|&v| v as usize))
+            })
+        {
+            return Ok(false);
+        }
+        if branch_domain
+            && self
+                .arc_set_branches
+                .iter()
+                .any(|c| !c.satisfied_by(arcs.iter().copied()))
+        {
             return Ok(false);
         }
 

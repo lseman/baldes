@@ -205,15 +205,22 @@ impl RestrictedMasterMip {
 impl ModelTreeOptions {
     /// Whether a node bound closes it against the incumbent: integer-valued
     /// objectives round the bound up first, and the gap is the largest of
-    /// the tree tolerance and the absolute and relative gaps.
+    /// the tree tolerance, the scale-dependent comparison band, and the absolute
+    /// and relative gaps. These comparisons do not raise published proof bounds.
     pub(super) fn closes(&self, bound: f64, incumbent: f64) -> bool {
         let bound = if self.integer_objective && bound.is_finite() {
             (bound - (1e-6 + 1e-10 * bound.abs())).ceil()
         } else {
             bound
         };
+        let comparison_band = if bound.is_finite() && incumbent.is_finite() {
+            1e-6 + 1e-10 * bound.abs().max(incumbent.abs())
+        } else {
+            0.
+        };
         let gap = if incumbent.is_finite() {
             self.tolerance
+                .max(comparison_band)
                 .max(self.absolute_gap)
                 .max(self.relative_gap * incumbent.abs())
         } else {

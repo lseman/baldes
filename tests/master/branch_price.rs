@@ -197,6 +197,59 @@ fn gap_closed_tree_does_not_publish_the_suboptimal_initial_incumbent_as_a_bound(
     }
 }
 #[test]
+fn comparison_band_closed_tree_keeps_the_lower_bound_below_its_incumbent() {
+    let mut graph = baldes::Graph::<2>::new(4, 1).unwrap();
+    for vertex in 0..4 {
+        graph.set_bounds(vertex, 0, 0., 10.).unwrap();
+    }
+    // Every covered customer costs 5e7; every route costs another 0.005.
+    // The pair costs 1e8+0.005; two singletons cost 1e8+0.01.
+    for (tail, head, cost) in [
+        (0, 1, 50_000_000.),
+        (1, 3, 0.005),
+        (0, 2, 50_000_000.),
+        (2, 3, 0.005),
+        (1, 2, 50_000_000.),
+    ] {
+        graph.add_arc(tail, head, cost).unwrap();
+    }
+    let problem = RoutingContext::set_partitioning(graph, 2.).unwrap();
+    let mut root_options = options().node;
+    root_options.cg.gap_relative = 0.;
+    let root = baldes::master::model::solve(problem.clone(), root_options.clone()).unwrap();
+    let singletons: Vec<_> = root
+        .routes
+        .iter()
+        .filter(|route| route.route.nodes.len() == 3)
+        .map(|route| baldes::master::model::FixedRoute {
+            route: route.clone(),
+            quantity: 1.,
+        })
+        .collect();
+    assert_eq!(singletons.len(), 2);
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let mut controls = options();
+        controls.node = root_options.clone();
+        controls.node.cg.bound_mode = mode;
+        controls.absolute_gap = 0.;
+        controls.relative_gap = 0.;
+        controls.initial_solution = Some((100_000_000.02, singletons.clone()));
+        let output = tree::solve(problem.clone(), controls).unwrap();
+        assert_eq!(output.status, TreeStatus::Optimal, "{output:?}");
+        assert_eq!(output.open_nodes, 0);
+        assert!(
+            (output.incumbent - 100_000_000.01).abs() < 1e-6,
+            "{output:?}"
+        );
+        assert!(
+            output.bound.is_finite() && output.bound <= 100_000_000.005,
+            "{output:?}"
+        );
+        assert!(output.incumbent - output.bound > 0.004, "{output:?}");
+    }
+}
+
+#[test]
 fn tree_closes_fractional_root_with_and_without_integer_heuristic() {
     let instance = triangle();
     for (mip, fleet) in [(0, 2.), (0, 3.), (10000, 2.), (10000, 3.)]

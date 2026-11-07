@@ -1628,6 +1628,23 @@ pub(super) fn choose_proposals<const D: usize>(
             // removing it from trial accounting or branch evaluation.
             let mut abandoned = false;
             for (processed, side) in sides.iter().copied().enumerate() {
+                // Completed exact trials keep their proofs and observations.
+                // Later phases must not treat an already conquered child again;
+                // a solved but still open relaxation remains eligible.
+                let current_incumbent = history
+                    .incumbent
+                    .as_ref()
+                    .map_or(incumbent, |witness| incumbent.min(witness.0));
+                if candidate.evaluated[side].as_ref().is_some_and(|result| {
+                    proven_infeasible(result)
+                        || current_incumbent.is_finite()
+                            && options.closes(
+                                result.master.bound.max(result.snapshot.tree_bound()),
+                                current_incumbent,
+                            )
+                }) {
+                    continue;
+                }
                 if exact && phase.tree_depth_score && partial_scores_comparable {
                     if let Some(best) = phase_best_score {
                         let binary;

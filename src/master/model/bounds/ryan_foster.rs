@@ -3,30 +3,31 @@
 //! A node's Ryan–Foster rows exclude every path that serves exactly one of a
 //! `together` pair, or both of an `apart` pair. Pricing respects them; the plain
 //! shortest walk does not. This refinement runs the same directed walk on the
-//! product of the graph with the set of Ryan–Foster vertices already visited,
+//! product of the graph with the Ryan–Foster memberships already visited,
 //! accepting only states that satisfy every row, so it is a valid lower bound
 //! over the node's domain that can only tighten the unrestricted walk.
 use super::add;
-use crate::pricing::restrictions::RyanFosterConstraint;
+use crate::pricing::restrictions::{ArcSetConstraint, RyanFosterConstraint};
 use crate::Graph;
 use std::time::Instant;
 
 /// Product states are capped so the refinement stays a bounded side proof.
-const MAX_TRACKED_VERTICES: usize = 6;
+const MAX_TRACKED_MEMBERSHIPS: usize = 6;
 
 /// `Some(Some(v))`: every permitted walk costs at least `v`. `Some(None)`: no
 /// permitted source/sink walk exists. `None`: unavailable (no restriction,
-/// too many tracked vertices, a negative cycle, budget or deadline), in which
+/// too many tracked memberships, a negative cycle, budget or deadline), in which
 /// case the caller keeps its unrestricted bound.
 pub(super) fn minimum<const D: usize>(
     graph: &Graph<D>,
     weights: &[f64],
-    constraints: &[RyanFosterConstraint],
+    constraints: (&[RyanFosterConstraint], &[ArcSetConstraint]),
     excluded: impl Fn(usize) -> bool,
     work: &mut usize,
     deadline: Instant,
 ) -> Option<Option<f64>> {
-    if constraints.is_empty() {
+    let (constraints, arc_constraints) = constraints;
+    if constraints.is_empty() && arc_constraints.is_empty() {
         return None;
     }
     let mut tracked: Vec<usize> = vec![];
@@ -37,11 +38,14 @@ pub(super) fn minimum<const D: usize>(
             }
         }
     }
-    if tracked.len() > MAX_TRACKED_VERTICES || tracked.iter().any(|&v| v >= graph.vertices.len()) {
+    let memberships = tracked
+        .len()
+        .checked_add(arc_constraints.len().checked_mul(2)?)?;
+    if memberships > MAX_TRACKED_MEMBERSHIPS || tracked.iter().any(|&v| v >= graph.vertices.len()) {
         return None;
     }
     let bit = |v: usize| tracked.iter().position(|&t| t == v).map(|i| 1usize << i);
-    let states = 1usize << tracked.len();
+    let states = 1usize << memberships;
     let accepted = |mask: usize| {
         constraints.iter().all(|c| {
             let a = bit(c.first).is_some_and(|b| mask & b != 0);
@@ -51,8 +55,41 @@ pub(super) fn minimum<const D: usize>(
             } else {
                 !(a && b)
             }
+        }) && arc_constraints.iter().enumerate().all(|(index, c)| {
+            let a = mask & (1 << (tracked.len() + 2 * index)) != 0;
+            let b = mask & (1 << (tracked.len() + 2 * index + 1)) != 0;
+            if c.together {
+                a == b
+            } else {
+                !(a && b)
+            }
         })
     };
+    // The proof domain may contain only a subset of the physical arcs. Match
+    // membership by ID, and debit those scans before expanding product states.
+    let membership_work = arc_constraints.iter().try_fold(0usize, |cost, c| {
+        cost.checked_add(c.first.len())?.checked_add(c.second.len())
+    })?;
+    let entered: Vec<_> = graph
+        .arcs
+        .iter()
+        .map(|arc| {
+            if Instant::now() >= deadline {
+                return None;
+            }
+            *work = work.checked_sub(membership_work)?;
+            let mut mask = bit(arc.head).unwrap_or(0);
+            for (index, c) in arc_constraints.iter().enumerate() {
+                if c.first.contains(&arc.id) {
+                    mask |= 1 << (tracked.len() + 2 * index);
+                }
+                if c.second.contains(&arc.id) {
+                    mask |= 1 << (tracked.len() + 2 * index + 1);
+                }
+            }
+            Some(mask)
+        })
+        .collect::<Option<_>>()?;
     let vertices = graph.vertices.len();
     let mut distances: Vec<Option<f64>> = vec![None; vertices * states];
     let start = bit(graph.source).unwrap_or(0);
@@ -72,13 +109,12 @@ pub(super) fn minimum<const D: usize>(
             if excluded(a) {
                 continue;
             }
-            let entered = bit(arc.head).unwrap_or(0);
             for mask in 0..states {
                 let Some(tail) = distances[arc.tail * states + mask] else {
                     continue;
                 };
                 let candidate = add(tail, weight)?;
-                let slot = &mut distances[arc.head * states + (mask | entered)];
+                let slot = &mut distances[arc.head * states + (mask | entered[a])];
                 if slot.map_or(true, |previous| candidate < previous) {
                     *slot = Some(candidate);
                     changed = true;
