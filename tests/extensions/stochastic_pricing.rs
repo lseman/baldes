@@ -19,7 +19,7 @@ fn close(a: f64, b: f64) {
 }
 
 #[test]
-fn theta_graph_reweights_negative_rounded_arcs_without_changing_route_costs() {
+fn theta_graph_arc_bounds_match_relaxed_route_costs() {
     let p = Problem::new(
         10,
         vec![Demand::new(vec![(1, 1.)]).unwrap(); 3],
@@ -386,4 +386,130 @@ fn hgs_budget_is_charged_to_theta_solve_and_zero_budget_skips_hgs() {
     assert!(!summary.accepted_plan);
     assert!(!answer.tree.incumbent.is_finite());
     assert_eq!(answer.tree.nodes, 0);
+}
+
+#[test]
+fn negative_detours_only_reduce_their_actual_predecessor_arc() {
+    let p = Problem::new(
+        10,
+        vec![Demand::new(vec![(1, 1.)]).unwrap(); 3],
+        vec![
+            vec![0., 1., 1., 1.],
+            vec![1., 0., 1., 1.],
+            vec![1., 1., 0., 1.],
+            vec![1., 1., 3., 0.],
+        ],
+    )
+    .unwrap();
+    // Only 3 -> 2 benefits from a preventive trip through the depot. A
+    // customer-wide minimum would incorrectly subtract one from [2] as well.
+    close(p.relaxed_route_cost(&[2]), 2.);
+    close(p.relaxed_route_cost(&[1, 2, 3]), 4.);
+    close(p.relaxed_route_cost(&[3, 2]), 4.);
+    close(
+        p.evaluate_route(&[3, 2], Policy::OptimalRestocking)
+            .unwrap()
+            .total_cost,
+        4.,
+    );
+    close(
+        p.evaluate_route(&[3, 2], Policy::Classical)
+            .unwrap()
+            .total_cost,
+        5.,
+    );
+}
+
+#[test]
+fn arc_recourse_bounds_are_conservative_for_all_tiny_route_orders() {
+    let routes = [
+        vec![1],
+        vec![2],
+        vec![3],
+        vec![1, 2],
+        vec![1, 3],
+        vec![2, 1],
+        vec![2, 3],
+        vec![3, 1],
+        vec![3, 2],
+        vec![1, 2, 3],
+        vec![1, 3, 2],
+        vec![2, 1, 3],
+        vec![2, 3, 1],
+        vec![3, 1, 2],
+        vec![3, 2, 1],
+    ];
+    for capacity in [3, 4, 6] {
+        for first in [0., 0.5, 1.] {
+            for second in [0., 0.5, 1.] {
+                for third in [0., 0.5, 1.] {
+                    let p = Problem::new(
+                        capacity,
+                        [first, second, third]
+                            .into_iter()
+                            .map(|probability| {
+                                Demand::new(vec![(0, probability), (2, 1. - probability)]).unwrap()
+                            })
+                            .collect(),
+                        vec![
+                            vec![0., 1., 1., 1.],
+                            vec![1., 0., 1., 1.],
+                            vec![1., 1., 0., 1.],
+                            vec![1., 1., 3., 0.],
+                        ],
+                    )
+                    .unwrap();
+                    for route in &routes {
+                        let mean: f64 = route.iter().map(|&j| p.demands()[j - 1].mean()).sum();
+                        if mean > capacity as f64 {
+                            continue;
+                        }
+                        let bound = p.relaxed_route_cost(route);
+                        for policy in [Policy::Classical, Policy::OptimalRestocking] {
+                            let actual = p.evaluate_route(route, policy).unwrap().total_cost;
+                            assert!(
+                                bound <= actual + 1e-10,
+                                "{route:?} {policy:?}: {bound} > {actual}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn arc_bounded_nonmetric_theta_tree_matches_the_tiny_oracle() {
+    use baldes::extensions::stochastic::TinyOptions;
+    use baldes::master::tree::{ModelTreeOptions, TreeStatus};
+    let p = Problem::new(
+        3,
+        vec![Demand::new(vec![(0, 0.5), (2, 0.5)]).unwrap(); 3],
+        vec![
+            vec![0., 1., 1., 1.],
+            vec![1., 0., 1., 1.],
+            vec![1., 1., 0., 1.],
+            vec![1., 1., 3., 0.],
+        ],
+    )
+    .unwrap();
+    for policy in [Policy::Classical, Policy::OptimalRestocking] {
+        let expected = p
+            .solve_tiny(
+                policy,
+                TinyOptions {
+                    max_vehicles: 2,
+                    route_budget: 1000,
+                },
+            )
+            .unwrap()
+            .unwrap();
+        let actual = p
+            .solve_theta_cuts(policy, 2, 3, ModelTreeOptions::default())
+            .unwrap();
+        assert_eq!(actual.status, TreeStatus::Optimal);
+        close(actual.incumbent, expected.total_cost);
+        close(actual.bound, expected.total_cost);
+    }
 }

@@ -31,10 +31,16 @@ Computation uses `f64`; no Monte Carlo sampling is involved.
 ## Conventional routing with Theta cuts
 
 `Problem::solve` uses the ordinary BALDES routing branch-cut-and-price tree.
-Pricing uses mean demands and travel costs plus per-customer recourse lower
-bounds. Exact P1/P3 route evaluation supplies the excess charged by Theta
-optimality cuts. Integral routes are separated before accepting an integral
-master solution. The separate stochastic Bellman-pricing master/tree has been
+Pricing uses mean demands and arc-specific recourse lower bounds. The base cost
+of arc `i -> j` is `min(c_ij, c_i0 + c_0j)`, with the depot sum rounded downward.
+This preserves a valid lower bound under both policies, including rounded
+nonmetric costs: a negative preventive detour is charged only on its actual
+predecessor arc, rather than on every visit to its destination customer. Exact P1/P3 route evaluation supplies the excess charged by Theta
+optimality cuts. Ordinary cut rounds also check routes supported by fractional
+columns against the aggregate arc flow, including fixed routes. Only violated
+Theta inequalities are added; the cut formula and pricing coefficients are the
+same as for integral routes. Integral routes are separated before accepting an
+integral master solution. The separate stochastic Bellman-pricing master/tree has been
 removed.
 
 The routing pipeline includes heuristic pricing phases, exact bidirectional

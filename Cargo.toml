@@ -37,7 +37,7 @@ default = ["ryan-foster-master", "accumulated-resource-master", "ipm-blocked"]
 ipm-blocked = ["dep:ndarray", "dep:matrixmultiply"]
 # Exact small-p enumeration on NVIDIA CUDA (requires nvcc).
 cuda = ["dep:cc"]
-# Runtime-dispatched AVX2 dominance scans and rank-one bitsets; portable fallback.
+# Runtime-dispatched AVX2 dominance, rank-one bitsets and HGS diversity; portable fallback.
 simd = []
 # Disjoint service-start windows on disposable scalar resources.
 multi-time-windows = []

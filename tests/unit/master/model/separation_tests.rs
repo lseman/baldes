@@ -1381,3 +1381,118 @@ fn explicit_arc_incidence_requires_exact_unit_master_rows() {
         "{error}"
     );
 }
+
+#[test]
+fn fractional_theta_cuts_use_aggregate_arc_flow_and_fixed_routes() {
+    use crate::extensions::stochastic::{Demand, Policy};
+    use crate::master::model::{FixedRoute, NetworkRoute};
+    use crate::master::LpMaster;
+    let stochastic = crate::extensions::stochastic::Problem::new(
+        3,
+        vec![Demand::new(vec![(0, 0.5), (2, 0.5)]).unwrap(); 3],
+        (0..4)
+            .map(|i| (0..4).map(|j| if i == j { 0. } else { 1. }).collect())
+            .collect(),
+    )
+    .unwrap();
+    for fixed_quantity in [0., 0.2] {
+        let (problem, recourse) = stochastic.theta_cut_model(Policy::Classical, 1, 3).unwrap();
+        let graph = &problem.networks[0].graph;
+        let seeds: Vec<_> = [vec![0, 1, 2, 3, 4], vec![0, 1, 3, 2, 4]]
+            .into_iter()
+            .map(|nodes| {
+                let arcs: Vec<_> = nodes
+                    .windows(2)
+                    .map(|pair| {
+                        graph
+                            .arcs
+                            .iter()
+                            .find(|a| a.tail == pair[0] && a.head == pair[1])
+                            .unwrap()
+                            .id
+                    })
+                    .collect();
+                NetworkRoute {
+                    network: 0,
+                    route: graph.elementary_route(&arcs).unwrap().unwrap(),
+                }
+            })
+            .collect();
+        let mut options = Options::default();
+        options.cg.time_limit = std::time::Duration::ZERO;
+        options.separation.route_recourse = Some(recourse);
+        options.seed_routes = seeds.clone();
+        let mut output = super::super::solve(problem, options).unwrap();
+        let snapshot = &mut output.snapshot;
+        let tags = output.master.column_tags.clone();
+        let tagged: Vec<_> = tags
+            .iter()
+            .enumerate()
+            .filter(|(_, tag)| **tag >= 0)
+            .map(|(column, tag)| (column, *tag as usize))
+            .collect();
+        let columns: Vec<_> = seeds
+            .iter()
+            .map(|seed| {
+                tagged
+                    .iter()
+                    .find(|(_, tag)| snapshot.state.routes[*tag].route.arcs == seed.route.arcs)
+                    .unwrap()
+                    .0
+            })
+            .collect();
+        if fixed_quantity > 0. {
+            snapshot.state.fixed_routes.push(FixedRoute {
+                route: seeds[0].clone(),
+                quantity: fixed_quantity,
+            });
+        }
+        let mut cuts = snapshot.state.cuts.take().unwrap();
+        let mut round = super::Round {
+            state: &mut snapshot.state,
+            cuts: &mut cuts,
+            tagged,
+            values: vec![0.; tags.len()],
+        };
+        // The two tours share one arc and differ on three. At 50/50 no
+        // route inequality is violated, despite both tours' positive excess.
+        round.values[columns[0]] = 0.5 - fixed_quantity;
+        round.values[columns[1]] = 0.5;
+        assert!(round.theta_violations(&tags, true).unwrap().is_empty());
+        // At 80/20 the first tour's arc-flow support is 0.4, even though
+        // neither loaded column is integral. Fixed flow must also be counted.
+        round.values[columns[0]] = 0.8 - fixed_quantity;
+        round.values[columns[1]] = 0.2;
+        assert_eq!(
+            round.theta_violations(&tags, false).unwrap().len(),
+            usize::from(fixed_quantity > 0.),
+        );
+        let violations = round.theta_violations(&tags, true).unwrap();
+        assert_eq!(violations.len(), 1);
+        let (_, variable, excess, length) = &violations[0];
+        assert!(*excess > 0.);
+        assert_eq!(*length, 4);
+        let theta_column = round.variable_column(&tags, *variable).unwrap();
+        round.values[theta_column] = *excess * 0.4;
+        assert!(round.theta_violations(&tags, true).unwrap().is_empty());
+        round.values[theta_column] = 0.;
+        let mut rows = round.new_rows(&snapshot.master).unwrap();
+        let row = snapshot.master.rhs().len();
+        assert_eq!(round.separate_theta(&mut rows, &tags).unwrap(), 1);
+        round.install(&mut snapshot.master, rows).unwrap();
+        let coefficient = |column| {
+            snapshot
+                .master
+                .column_entries(column)
+                .unwrap()
+                .into_iter()
+                .find(|(r, _)| *r == row)
+                .map_or(0., |(_, value)| value)
+        };
+        assert_eq!(coefficient(columns[0]), -4.);
+        assert_eq!(coefficient(columns[1]), -1.);
+        assert_eq!(coefficient(theta_column), 1. / excess);
+        assert!((snapshot.master.rhs()[row] - (-3. + 4. * fixed_quantity)).abs() < 1e-12);
+        assert!(round.theta_violations(&tags, true).unwrap().is_empty());
+    }
+}

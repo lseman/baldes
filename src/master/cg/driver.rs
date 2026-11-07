@@ -698,6 +698,33 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     options.node_depth,
                 )?;
             }
+            // A per-column reduced-cost tolerance can hide an aggregate LP
+            // gap larger than the requested convergence tolerance. Retain small
+            // negative columns from an exact pass when its bound still fails
+            // that check, then re-solve instead of publishing a false optimum.
+            let insertion_tolerance = if fresh == 0
+                && exact
+                && !positive
+                && out.bound.is_finite()
+                && !gap_smaller_than_tolerance(
+                    out.bound,
+                    out.lp,
+                    options.gap_absolute,
+                    options.gap_relative,
+                ) {
+                fresh = pending
+                    .iter()
+                    .flatten()
+                    .filter(|(identity, column)| {
+                        column.acceptable
+                            && master_reduced_cost(column, &raw) < 0.
+                            && !seen.contains(identity)
+                    })
+                    .count();
+                0.
+            } else {
+                options.tolerance
+            };
             let due = phase_walk.penalty_updates < options.max_penalty_updates && positive;
             penalties = fresh == 0
                 && due
@@ -721,7 +748,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 for (identity, column) in batch {
                     if !column.acceptable
                         || (!options.insert_non_negative
-                            && master_reduced_cost(&column, &raw) >= -options.tolerance)
+                            && master_reduced_cost(&column, &raw) >= -insertion_tolerance)
                     {
                         continue;
                     }

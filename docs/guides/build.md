@@ -290,6 +290,8 @@ scan applies when the model activates one or two disposable resources and
 the compiled capacity is at least two.
 The `simd` feature also enables runtime-dispatched AVX2 rank-one bitset
 accumulation for at least 16 words, independently of the resource dimension.
+HGS also uses AVX2 for broken-pairs diversity comparisons with at least 16
+customers, with exact integer counts and a portable fallback.
 This feature does not require `target-cpu=native` and does not change numerical
 comparison tolerances or certification policy.
 

@@ -1,7 +1,7 @@
 //! Expected recourse through Theta optimality cuts (Tomazella, Munari and
 //! Morabito 2026) in the deterministic BALDES routing branch-cut-and-price.
 //! Pricing is the classic capacitated one: mean demands, arc cost travel plus
-//! the head customer's recourse lower bound. The routing master separates a
+//! an arc-specific recourse lower bound. The routing master separates a
 //! Theta cut for every integral route whose expected cost exceeds that.
 use super::{Policy, Problem};
 use crate::master::model::separation::{CapacityCutConfig, Recourse, RouteRecourse};
@@ -32,39 +32,32 @@ impl RouteRecourse for ExpectedRecourse {
 }
 
 impl Problem {
-    // A customer can incur at most one negative preventive detour per visit.
-    // Charging each customer's own bound is tighter than n times the worst
-    // detour, and remains safe for rounded/nonmetric distance matrices.
-    pub(super) fn recourse_customer_lower_bounds(&self) -> Vec<f64> {
-        (1..=self.demands.len())
-            .map(|j| {
-                (0..=self.demands.len())
-                    .map(|i| self.costs[i][0] + self.costs[0][j] - self.costs[i][j])
-                    .fold(0., f64::min)
-                    * (1. + 1e-10)
-            })
-            .collect()
+    // At transition i -> j, direct service adds a nonnegative failure cost;
+    // preventive restocking adds c_i0 + c_0j - c_ij. Thus every Bellman
+    // transition is bounded below by min(0, c_i0 + c_0j - c_ij), plus the
+    // suffix's lower bound. Charge that bound only on its actual arc.
+    fn relaxed_arc_cost(&self, from: usize, to: usize) -> f64 {
+        let via_depot = crate::core::rounding::add_down(self.costs[from][0], self.costs[0][to])
+            .unwrap_or(f64::INFINITY);
+        self.costs[from][to].min(via_depot)
     }
 
-    /// Travel cost plus per-customer recourse lower bounds: a lower bound on
-    /// the expected cost of the route under either policy.
+    /// Travel plus arc-specific lower bounds on replenishment recourse.
+    /// This is a lower bound on the expected route cost under either policy,
+    /// including rounded/nonmetric costs with negative preventive detours.
     pub fn relaxed_route_cost(&self, route: &[usize]) -> f64 {
-        let charges = self.recourse_customer_lower_bounds();
         let mut from = 0;
         let mut cost = 0.;
         for &to in route.iter().chain(std::iter::once(&0)) {
-            cost += self.costs[from][to];
-            if to != 0 {
-                cost += charges[to - 1];
-            }
+            cost += self.relaxed_arc_cost(from, to);
             from = to;
         }
         cost
     }
 
     /// Classic capacitated routing graph on mean demands. Vertex `j` is
-    /// customer `j`, the sink is `n + 1`. Arc costs add the head customer's
-    /// recourse lower bound, so a route costs `relaxed_route_cost`. NG
+    /// customer `j`, the sink is `n + 1`. Each arc costs the smaller of direct
+    /// travel and travel via the depot, so a route costs `relaxed_route_cost`. NG
     /// neighborhoods hold the `ng` nearest vertices.
     pub fn theta_cut_graph(&self, ng: usize) -> Result<Graph> {
         let n = self.demands.len();
@@ -74,7 +67,6 @@ impl Problem {
             .collect();
         // Mean sums carry rounding error; never exclude a feasible route.
         let capacity = self.capacity as f64 * (1. + 1e-9) + 1e-9;
-        let charges = self.recourse_customer_lower_bounds();
         let mut graph = Graph::new(n + 2, 2)?;
         for customer in 1..=n {
             graph.add_elementarity_set(&[customer])?;
@@ -84,8 +76,7 @@ impl Problem {
             if u != 0 && v != sink && means[i] + means[j] > capacity {
                 return Ok(());
             }
-            let charge = if j == 0 { 0. } else { charges[j - 1] };
-            let id = graph.add_arc(u, v, self.costs[i][j] + charge)?;
+            let id = graph.add_arc(u, v, self.relaxed_arc_cost(i, j))?;
             graph.arc_mut(id)?.consumption = [0., means[j]].into();
             Ok(())
         };
@@ -96,39 +87,6 @@ impl Problem {
                 if j != k {
                     add(j, k)?;
                 }
-            }
-        }
-        // A conservative recourse charge can make an individual arc slightly
-        // negative. Vertex potentials preserve every source-to-sink route cost
-        // while moving that charge to other arcs on the same route.
-        if graph.arcs.iter().any(|arc| arc.cost < 0.) {
-            let mut potential = vec![0.; n + 2];
-            for _ in 0..n + 1 {
-                let mut changed = false;
-                for arc in &graph.arcs {
-                    let candidate = potential[arc.tail] + arc.cost;
-                    if candidate < potential[arc.head] {
-                        potential[arc.head] = candidate;
-                        changed = true;
-                    }
-                }
-                if !changed {
-                    break;
-                }
-            }
-            if potential[sink] != 0.
-                || graph
-                    .arcs
-                    .iter()
-                    .any(|arc| potential[arc.tail] + arc.cost < potential[arc.head])
-            {
-                return Err(invalid(
-                    "stochastic relaxed graph cannot be reweighted to nonnegative arcs",
-                ));
-            }
-            for arc in &mut graph.edit().arcs {
-                arc.cost = (arc.cost + potential[arc.tail] - potential[arc.head]).max(0.);
-                arc.reduced_cost = arc.cost;
             }
         }
         for v in 0..=sink {

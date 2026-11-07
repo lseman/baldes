@@ -15,6 +15,14 @@ slice bounds checks remain in place, and floating-point gain calculations
 retain their order. Short bitsets and other CPUs use the portable loop.
 `simd-avx512` includes this AVX2 bitset path; only dominance uses AVX-512F.
 
+With `simd`, HGS broken-pairs diversity comparisons use AVX2 for at least
+16 customers on supported x86-64 CPUs. Four customer IDs are compared per
+batch, including the independent depot-entry condition. Counts stay integer
+until the original final division, preserving population distances and ordering.
+Unaligned slices and incomplete batches are supported; small inputs, other
+CPUs, and builds without `simd` use the scalar loop. `simd-avx512` includes
+this AVX2 path as well.
+
 The AVX-512F kernel uses ordered comparisons, retains the exact EPSILON
 addition/subtraction order, and returns the first matching label or prefix
 key stop in storage order. It widens eight packed u16 NG masks into eight

@@ -373,3 +373,41 @@ fn columns_only_improvement_cannot_publish_approximate_bound() {
     assert_eq!(out.lp, 0.);
     assert!(out.numerical_bound <= 0.);
 }
+
+#[test]
+fn small_negative_columns_close_the_aggregate_pricing_gap() {
+    for stabilize in [false, true] {
+        let cost = 100.;
+        let cheaper = cost - 0.75e-6;
+        let mut master = ClpMaster::new().unwrap();
+        master.add_row(RowSense::GreaterEqual, 2., &[]).unwrap();
+        master.add_column(cost, &[(0, 1.)]).unwrap();
+        let out = optimize(
+            &mut master,
+            &exact(),
+            |_, duals| {
+                let mut candidate = column(cheaper, 1, "small_improvement");
+                candidate.reduced_cost = cheaper - duals[0];
+                Ok(Answer {
+                    minimum: candidate.reduced_cost,
+                    columns: vec![candidate],
+                    exact: true,
+                    bound_minimum: None,
+                })
+            },
+            &mut NoController,
+            Options {
+                stabilize,
+                multiplicity: 2.,
+                known: vec![column(cost, 0, "initial")],
+                insert_non_negative: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(out.status, Status::Optimal);
+        assert!(out.inserted_tags.contains(&1));
+        assert!((out.lp - 2. * cheaper).abs() < 1e-8);
+        assert!(gap_smaller_than_tolerance(out.bound, out.lp, 1e-6, 1e-9));
+    }
+}

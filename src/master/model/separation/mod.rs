@@ -15,6 +15,7 @@ use crate::cuts::kpath::{GeneralKPathSeparator, KPathSeparator};
 use crate::cuts::FractionalColumn;
 use crate::cuts::MemoryKind;
 use crate::master::LpMaster;
+use std::collections::BTreeSet;
 mod options;
 pub(crate) use options::KPathSeparation;
 pub use options::{
@@ -1972,22 +1973,64 @@ impl<const D: usize> Round<'_, D> {
             .position(|&tag| master_variables::decode(tag) == Some((index, 1.)))
     }
 
-    /// Integral routes (master value one, or fixed) whose anchor Theta is
-    /// below their excess and whose cut is not installed yet.
-    fn theta_violations(&self, tags: &[i32]) -> Result<Vec<(Vec<i32>, usize, f64, usize)>> {
+    /// Supported routes whose arc-flow Theta inequality is violated. Fractional
+    /// candidates strengthen ordinary cut rounds; only integral candidates are
+    /// mandatory when checking whether a node may finish separation.
+    fn theta_violations(
+        &self,
+        tags: &[i32],
+        include_fractional: bool,
+    ) -> Result<Vec<(Vec<i32>, usize, f64, usize)>> {
         if self.cuts.recourse.is_none() {
             return Ok(vec![]);
         }
-        let mut integral: Vec<&Route> = self
+        let mut flow = BTreeMap::<i32, f64>::new();
+        for &(column, tag) in &self.tagged {
+            if self.values[column] == 0. {
+                continue;
+            }
+            for &arc in &self.route(tag).arcs {
+                *flow.entry(arc).or_default() += self.values[column];
+            }
+        }
+        for fixed in &self.state.fixed_routes {
+            for &arc in &fixed.route.route.arcs {
+                *flow.entry(arc).or_default() += fixed.quantity;
+            }
+        }
+        let mut candidates: Vec<&Route> = self
             .tagged
             .iter()
-            .filter(|&&(column, _)| self.values[column] >= 1. - 1e-6)
+            .filter(|&&(column, _)| {
+                self.values[column] >= 1. - 1e-6
+                    || (include_fractional && self.values[column] > 1e-9)
+            })
             .map(|&(_, tag)| self.route(tag))
             .collect();
-        integral.extend(self.state.fixed_routes.iter().map(|f| &f.route.route));
+        candidates.extend(self.state.fixed_routes.iter().map(|f| &f.route.route));
         let mut violated: Vec<(Vec<i32>, usize, f64, usize)> = vec![];
-        for route in integral {
-            let Some(&anchor) = interior(route).iter().min() else {
+        for route in candidates {
+            let customers = interior(route);
+            // Relaxed NG paths are not elementary recourse-cut templates.
+            if customers.iter().copied().collect::<BTreeSet<_>>().len() != customers.len() {
+                continue;
+            }
+            let mut arcs = route.arcs.clone();
+            arcs.sort_unstable();
+            arcs.dedup();
+            if self.cuts.theta_cuts.contains(&arcs) || violated.iter().any(|(a, ..)| *a == arcs) {
+                continue;
+            }
+            let support = arcs
+                .iter()
+                .map(|arc| flow.get(arc).copied().unwrap_or(0.))
+                .sum::<f64>()
+                + 1.
+                - route.arcs.len() as f64;
+            if support <= 1e-9 {
+                continue;
+            }
+            let Some(&anchor) = customers.iter().min() else {
                 continue;
             };
             let variable = self
@@ -2001,22 +2044,17 @@ impl<const D: usize> Round<'_, D> {
                 .variable_column(tags, variable)
                 .ok_or_else(|| invalid("Theta variable is not in the master"))?;
             let excess = self.excess(route)?;
-            if self.values[column] >= excess - 1e-6 * (1. + excess) {
+            if self.values[column] >= excess * support - 1e-6 * (1. + excess) {
                 continue;
             }
-            let mut arcs = route.arcs.clone();
-            arcs.sort_unstable();
-            arcs.dedup();
-            if !self.cuts.theta_cuts.contains(&arcs) && !violated.iter().any(|(a, ..)| *a == arcs) {
-                violated.push((arcs, variable, excess, route.arcs.len()));
-            }
+            violated.push((arcs, variable, excess, route.arcs.len()));
         }
         Ok(violated)
     }
 
-    /// Cut off every integral route whose anchor Theta is below its excess.
+    /// Separate valid Theta inequalities using the aggregate physical arc flow.
     fn separate_theta(&mut self, rows: &mut NewRows, tags: &[i32]) -> Result<usize> {
-        let violated = self.theta_violations(tags)?;
+        let violated = self.theta_violations(tags, true)?;
         for (arcs, variable, excess, length) in &violated {
             let count = |route: &Route| {
                 -(route
@@ -2398,7 +2436,7 @@ pub(super) fn requires_separation<const D: usize>(
         tagged,
         values,
     }
-    .theta_violations(tags)
+    .theta_violations(tags, false)
     .map(|v| !v.is_empty());
     state.cuts = Some(cuts);
     result
