@@ -180,6 +180,7 @@ fn sequential_tree_evaluation_carries_incidence_history_to_siblings() {
             branch_order: 0,
             parent_branch_order: 0,
             strategy2_dual_bound: 0.,
+            strategy2_primal_bound: f64::INFINITY,
         };
         let output = search
             .evaluate(std::slice::from_mut(&mut entry), &mut queue)

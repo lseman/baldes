@@ -315,6 +315,13 @@ impl<const D: usize> crate::master::tree::Evaluation for Output<D> {
     fn proven_infeasible(&self) -> bool {
         model_strong::proven_infeasible(self)
     }
+    fn primal_bound(&self) -> f64 {
+        if self.master.iterations == 0 {
+            f64::INFINITY
+        } else {
+            self.master.lp
+        }
+    }
 }
 
 impl<const D: usize> NodeSnapshot<D> {

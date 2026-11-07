@@ -386,10 +386,11 @@ uses a custom heap rather than Rust's ordering-based `BinaryHeap`.
 the higher numerical LP bound at equal depth, followed by creation order.
 Its overflow queue retains the usual lower-bound preference, as in native.
 `network_tree_search="bound-priority"` selects native strategy 2. It orders
-queued children by the numerical LP dual bound, then the native
-child primal-bound sentinels, depth, parent treatment rank and creation
-order. The child primal sentinels are equal before evaluation, so depth and
-parent rank decide ties. The default `network_strategy2_rounding="unrounded"`
+queued children by the numerical LP dual bound, then higher LP primal
+value, depth, parent treatment rank and creation
+order. Exact prepared children retain their evaluated LP primal; ordinary
+children use the constructor sentinel until evaluation. The default
+`network_strategy2_rounding="unrounded"`
 matches the native continuous-objective bound contract with nonpositive
 `integerValuedBound`. Integer-objective models can select `"guarded-tolerance"`
 for tolerant integer rounding, or `"exact-ceil"` for forced integer rounding.

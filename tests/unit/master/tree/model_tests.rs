@@ -282,6 +282,7 @@ fn native_strategy2_uses_guarded_integer_rounded_numerical_bound() {
 fn native_strategy2_uses_depth_parent_rank_then_creation_serial_for_ties() {
     let shallow = BoundPriorityKey {
         dual_bound: 2.0,
+        primal_bound: f64::INFINITY,
         depth: 1,
         parent_branch_order: 1,
         serial: 1,
@@ -359,4 +360,46 @@ fn strategy2_keeps_a_proven_empty_child_closed_when_numerical_channel_is_unknown
     assert!(selected.proven_infeasible());
     assert_eq!(selected.strategy2_dual_bound, 1e12);
     assert_eq!(selected.numerical_bound(), f64::INFINITY);
+}
+
+#[test]
+fn native_strategy2_prepared_lp_primal_precedes_depth_and_keeps_fresh_sentinel() {
+    // Native comparator probe: equal secondary duals prefer LP primal 30 to 20,
+    // even when the latter child is deeper. These values are queue metadata.
+    for (primals, expected_depth) in [([20., 30.], 1), ([20., 20.0000005], 2)] {
+        let mut frontier = TreeFrontier::new(
+            TreeSearchPolicy::BoundPriority,
+            1000,
+            IntegerBoundRounding::ExactCeil,
+        );
+        for (index, primal) in primals.into_iter().enumerate() {
+            let mut output = checkpoint_output();
+            output.master.lp = primal;
+            assert!(output.master.iterations > 0);
+            let mut node = output.snapshot.fork().unwrap();
+            node.state.node_depth = 2 - index;
+            node.warm.numerical_bound = 9.1 + index as f64 * 0.1;
+            frontier.push_evaluated(node, 1, Some(output)).unwrap();
+        }
+        assert_eq!(
+            frontier.pop().unwrap().unwrap().node.state.node_depth,
+            expected_depth
+        );
+    }
+    let mut frontier = TreeFrontier::new(
+        TreeSearchPolicy::BoundPriority,
+        1000,
+        IntegerBoundRounding::Unrounded,
+    );
+    let mut output = checkpoint_output();
+    output.master.lp = 20.;
+    let mut prepared = output.snapshot.fork().unwrap();
+    prepared.warm.numerical_bound = 10.;
+    prepared.state.node_depth = 2;
+    frontier.push_evaluated(prepared, 1, Some(output)).unwrap();
+    let mut fresh = checkpoint();
+    fresh.warm.numerical_bound = 10.;
+    fresh.state.node_depth = 1;
+    frontier.push(fresh, 1).unwrap();
+    assert!(frontier.pop().unwrap().unwrap().evaluated.is_none());
 }

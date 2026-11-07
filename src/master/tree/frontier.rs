@@ -8,6 +8,10 @@ pub(crate) trait NodeInfo {
 }
 pub(crate) trait Evaluation {
     fn proven_infeasible(&self) -> bool;
+    /// LP primal retained by an evaluated child; fresh children use the sentinel.
+    fn primal_bound(&self) -> f64 {
+        f64::INFINITY
+    }
 }
 
 /// Assignment-tree frontier order, independent of which branch family is used.
@@ -20,7 +24,7 @@ pub enum TreeSearchPolicy {
     /// Process the open node with the lowest inherited numerical LP bound first.
     BestBound,
     /// Native strategy 2: inherited numerical dual bound with declared rounding,
-    /// queued-child primal sentinels, depth, parent branch-and-price order.
+    /// higher evaluated LP primal, depth, parent branch-and-price order.
     #[serde(rename = "bound-priority")]
     BoundPriority,
     /// Native strategy 3: depth, then higher numerical LP bound, then creation.
@@ -62,6 +66,7 @@ pub(crate) struct QueuedNode<N, E> {
     pub(crate) branch_order: i32,
     pub(crate) parent_branch_order: i32,
     pub(crate) strategy2_dual_bound: f64,
+    pub(crate) strategy2_primal_bound: f64,
 }
 
 impl<N: NodeInfo, E: Evaluation> QueuedNode<N, E> {
@@ -139,6 +144,7 @@ pub(crate) fn bound_priority_values(numerical_bound: f64, rounding: IntegerBound
 #[derive(Clone, Copy)]
 pub(crate) struct BoundPriorityKey {
     pub(crate) dual_bound: f64,
+    pub(crate) primal_bound: f64,
     pub(crate) depth: usize,
     pub(crate) parent_branch_order: i32,
     pub(crate) serial: u64,
@@ -150,6 +156,12 @@ pub(crate) fn bound_priority_less(left: BoundPriorityKey, right: BoundPriorityKe
         return false;
     }
     if bound_less(right.dual_bound, left.dual_bound) {
+        return true;
+    }
+    if bound_less(right.primal_bound, left.primal_bound) {
+        return false;
+    }
+    if bound_less(left.primal_bound, right.primal_bound) {
         return true;
     }
     if left.depth != right.depth {
@@ -178,17 +190,19 @@ impl<N: NodeInfo, E: Evaluation> Priority<QueuedNode<N, E>> for HeapOrder {
         let left_depth = left.node.depth();
         let right_depth = right.node.depth();
         if matches!(*self, HeapOrder::BoundPriority) {
-            // A native child initializes both primal-bound tie fields to the
-            // objective-sense sentinel and they stay equal until evaluation.
+            // Exact prepared children retain the evaluated LP primal. Ordinary
+            // children retain the constructor sentinel until treatment.
             return bound_priority_less(
                 BoundPriorityKey {
                     dual_bound: left.strategy2_dual_bound,
+                    primal_bound: left.strategy2_primal_bound,
                     depth: left_depth,
                     parent_branch_order: left.parent_branch_order,
                     serial: left.serial,
                 },
                 BoundPriorityKey {
                     dual_bound: right.strategy2_dual_bound,
+                    primal_bound: right.strategy2_primal_bound,
                     depth: right_depth,
                     parent_branch_order: right.parent_branch_order,
                     serial: right.serial,
@@ -362,6 +376,9 @@ impl<N: NodeInfo, E: Evaluation> TreeFrontier<N, E> {
         } else {
             bound_priority_bound(&node, strategy2_bound_rounding)
         };
+        let strategy2_primal_bound = evaluated
+            .as_ref()
+            .map_or(f64::INFINITY, Evaluation::primal_bound);
         match self {
             Self::BestBound {
                 nodes,
@@ -377,6 +394,7 @@ impl<N: NodeInfo, E: Evaluation> TreeFrontier<N, E> {
                     branch_order,
                     parent_branch_order,
                     strategy2_dual_bound,
+                    strategy2_primal_bound,
                 };
                 *next_serial = next_serial
                     .checked_add(1)
@@ -401,6 +419,7 @@ impl<N: NodeInfo, E: Evaluation> TreeFrontier<N, E> {
                     branch_order,
                     parent_branch_order,
                     strategy2_dual_bound,
+                    strategy2_primal_bound,
                 };
                 *next_serial = next_serial
                     .checked_add(1)
