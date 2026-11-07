@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Background AILS-II For nominal CVRP/VRPTW input, enable the existing AILS-II heuristic on anindependent worker with: The flag also applies to solve --tree; --seed N sets the search">
+<meta name="theme-color" content="#0b0e11">
+<title>Background AILS-II — BALDES docs</title>
+<link rel="canonical" href="https://baldes.laioseman.com/docs/guides/background-ils.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="first-solve.html">Your first solve</a><a href="solve.html">Unified solve interface</a><a href="build.html">Configuring and building BALDES</a><a href="architecture.html">Solver architecture and ownership</a><a href="source-layout.html">Source layout</a><a href="cli.html">Command-line usage</a><a href="concepts.html">Solver concepts and interface choices</a><a href="documentation.html">Maintaining the documentation</a><a href="python.html">Python: pyBaldes</a><a href="ails-ii.html">Standalone AILS-II search</a><a href="releases.html">Python wheels and releases</a><a href="background-ils.html" aria-current="page">Background AILS-II</a><a href="savings-initial-columns.html">Clarke–Wright initial columns</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="../pybaldes/index.html">pyBaldes documentation</a><a href="../pybaldes/networks.html">Shared-master network models</a><a href="../pybaldes/installation.html">Install pyBaldes</a><a href="../pybaldes/quickstart.html">pyBaldes quickstart</a><a href="../pybaldes/routing.html">Routing inputs and options</a><a href="../pybaldes/pricing.html">Stateful pricing with Solver</a><a href="../pybaldes/resources.html">Coupled resources and function encodings</a><a href="../pybaldes/results.html">Results, bounds, and exactness</a><a href="../pybaldes/api.html">pyBaldes API reference</a><a href="../pybaldes/troubleshooting.html">pyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/models.html">Network models and shared masters</a><a href="../solver/column-imports.html">Finite column imports</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a><a href="../solver/branch-family-registration.html">Branching family registration order</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/hgs-intensify.html">BKS-seeded HGS intensification</a><a href="../extensions/hgs-dri.html">Customer decomposition for HGS</a><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/robust-pd.html">Robust pickup and delivery with time windows</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a><a href="../extensions/stochastic.html">Stochastic demands and replenishment recourse</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a><a href="../benchmarks/stochastic.html">Stochastic branch-and-cut versus branch-and-price</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/guides/background-ils.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Getting started</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="background-ails-ii">Background AILS-II</h1>
+<p>For nominal CVRP/VRPTW input, enable the existing AILS-II heuristic on an
+independent worker with:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">baldes<span class="w"> </span>solve<span class="w"> </span>INSTANCE<span class="w"> </span>--background-ils
+</code></pre></div>
+<p>The flag also applies to <code>solve --tree</code>; <code>--seed N</code> sets the search seed. The
+CLI supplies the instance with the same rounding and time semantics as the
+pricing graph, including <code>--ignore-time-windows</code>.</p>
+<p>Rust callers supply the nominal instance matching the selected network:</p>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::</span><span class="n">model</span><span class="p">::{</span><span class="n">BackgroundIlsOptions</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">};</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="n">heuristic_instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">instance</span><span class="p">.</span><span class="n">heuristic_instance</span><span class="p">(</span><span class="o">&amp;</span><span class="n">graph</span><span class="p">,</span><span class="w"> </span><span class="n">rounding</span><span class="p">);</span>
+<span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">background</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BackgroundIlsOptions</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">heuristic_instance</span><span class="p">);</span>
+<span class="n">background</span><span class="p">.</span><span class="n">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="n">background</span><span class="p">.</span><span class="n">max_routes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">16</span><span class="p">;</span>
+<span class="n">background</span><span class="p">.</span><span class="n">search</span><span class="p">.</span><span class="n">time_limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.1</span><span class="p">;</span>
+<span class="n">background</span><span class="p">.</span><span class="n">search</span><span class="p">.</span><span class="n">iterations</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">20</span><span class="p">;</span>
+<span class="n">background</span><span class="p">.</span><span class="n">search</span><span class="p">.</span><span class="n">seed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Options</span><span class="p">::</span><span class="n">default</span><span class="p">();</span>
+<span class="n">options</span><span class="p">.</span><span class="n">background_ils</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">background</span><span class="p">);</span>
+</code></pre></div>
+<p><code>search</code> is the same <code>AilsIiOptions</code> type used by the standalone <code>ails-ii</code>
+command. Both call one AILS-II engine with the same perturbation, adaptive
+acceptance, elite selection and shared local-search operators. The background
+adapter contains no separate local-search implementation.</p>
+<p>The worker ranks pricing routes by current reduced cost and selects up to
+<code>max_routes</code> resource-feasible routes without overlapping customers. Their union
+forms a complete feasible seed for a smaller instance. It uses the subproblem
+builder shared with HGS intensification, preserving explicit distance matrices,
+capacity, windows, service times and rounding. AILS-II can move customers between
+these routes. Improved routes are mapped back to original customer IDs and
+replayed through the physical route converter shared with HGS seeding.</p>
+<p>One persistent OS thread handles at most one job at a time and sleeps on a
+bounded channel when idle. The master hands off shared immutable references;
+selection, seed replay, subproblem construction and search run on the worker.
+Completed results enter a later pricing batch without waiting. The master checks
+current branch constraints, arc fixings, multiplicity and complete-domain
+restrictions, then rebuilds costs and coefficients at the current dual point.
+Ordinary column admission and deduplication still apply; exact pricing alone
+supplies its bounds. The returned neighborhood is not a full-model incumbent.</p>
+<p>Shutdown closes the job channel, requests cancellation and joins the worker.
+AILS-II observes cancellation between passes and uses the earlier of its job
+budget and the node deadline within operators. The background time budget must
+be positive. Complete enumerated domains and retained gap pools decline jobs.
+Only the configured instance's nominal split-depot network is supported;
+coupled-resource graphs require a model-specific heuristic.</p>
+<p>The feature is disabled by default. The OS schedules its thread without reserving
+or pinning a core. It can compete with pricing for CPU/cache bandwidth, and extra
+columns can increase LP solve time. There is no guaranteed speedup or deterministic
+arrival order. Previous timing results for the removed route-level ILS do not
+measure this AILS-II integration.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="../extensions/stochastic.html"><small>Previous guide</small>Stochastic demands and replenishment recourse <span aria-hidden="true">↗</span></a><a href="savings-initial-columns.html"><small>Next guide</small>Clarke–Wright initial columns <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p></nav></aside>
+</div>
+</body></html>
