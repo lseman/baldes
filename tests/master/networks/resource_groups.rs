@@ -2,6 +2,54 @@
 use super::*;
 use model::{EnumerationOptions, ResourceGroupMember};
 
+use baldes::master::branching::ACCUMULATED_RESOURCE_IN_PRICING;
+
+fn check_lp<const D: usize>(output: &Output<D>, expected: f64) {
+    if ACCUMULATED_RESOURCE_IN_PRICING || output.snapshot.resource_group_branches().count() == 0 {
+        super::optimal(output, expected);
+        return;
+    }
+    assert!(
+        matches!(output.master.status, Status::Optimal | Status::Stalled),
+        "{:?}",
+        output.master
+    );
+    assert!(
+        (output.master.lp - expected).abs() < 1e-7,
+        "{} != {expected}",
+        output.master.lp
+    );
+    assert!(output.master.bound <= expected + 1e-7);
+    if output.master.status == Status::Optimal {
+        assert!(output.master.bound >= expected - 1e-6);
+    }
+    assert_eq!(output.routes.len(), output.values.len());
+}
+
+fn check_tree(output: &baldes::master::tree::ModelTreeOutput, expected: f64, complete: bool) {
+    assert!(output.bound <= expected + 1e-6, "{output:?}");
+    if ACCUMULATED_RESOURCE_IN_PRICING
+        || complete
+        || output.status == baldes::master::tree::TreeStatus::Optimal
+    {
+        assert_eq!(
+            output.status,
+            baldes::master::tree::TreeStatus::Optimal,
+            "{output:?}"
+        );
+        assert!((output.incumbent - expected).abs() < 1e-6, "{output:?}");
+        assert!((output.bound - expected).abs() < 1e-6, "{output:?}");
+    } else {
+        assert_eq!(
+            output.status,
+            baldes::master::tree::TreeStatus::Incomplete,
+            "{output:?}"
+        );
+        assert!(output.open_nodes > 0, "{output:?}");
+        assert!(output.incumbent >= expected - 1e-6, "{output:?}");
+    }
+}
+
 fn adjacent_pair_problem(q: f64) -> (Problem<5>, Vec<ResourceGroupMember>) {
     let mut networks = vec![];
     let mut members = vec![];
@@ -95,7 +143,7 @@ fn enumeration_keeps_costlier_same_cover_path_for_fixed_resource_descendant() {
             .enumerate(&EnumerationOptions::default())
             .unwrap();
         let loaded = complete.solve(configured.clone()).unwrap();
-        optimal(&loaded, 4.5);
+        check_lp(&loaded, 4.5);
         // Equal packing support does not identify a physical path: the more
         // expensive pair has a different resource profile and can be fixed.
         let special = loaded
@@ -110,7 +158,7 @@ fn enumeration_keeps_costlier_same_cover_path_for_fixed_resource_descendant() {
             .unwrap()
             .with_resource_group_branch(7, 4, 2., false, &members)
             .unwrap();
-        optimal(&child.solve(configured.clone()).unwrap(), 5.125);
+        check_lp(&child.solve(configured.clone()).unwrap(), 5.125);
         let tree = child
             .solve_tree(baldes::master::tree::ModelTreeOptions {
                 node: configured.clone(),
@@ -121,7 +169,7 @@ fn enumeration_keeps_costlier_same_cover_path_for_fixed_resource_descendant() {
         assert_eq!(tree.status, baldes::master::tree::TreeStatus::Optimal);
         assert_eq!(tree.incumbent, 6.125);
         assert!(tree.incumbent - tree.bound < 1e-6);
-        optimal(&parent.snapshot.solve(configured).unwrap(), 4.5);
+        check_lp(&parent.snapshot.solve(configured).unwrap(), 4.5);
     }
 }
 
@@ -139,7 +187,7 @@ fn adjacent_pair_profiles_close_both_children_without_repeating_the_split() {
             let mut configured = options();
             configured.cg.bound_mode = mode;
             let parent = model::solve(problem.clone(), configured.clone()).unwrap();
-            optimal(&parent, 4.5);
+            check_lp(&parent, 4.5);
             for upper in [false, true] {
                 let child = parent
                     .snapshot
@@ -167,14 +215,7 @@ fn adjacent_pair_profiles_close_both_children_without_repeating_the_split() {
                             ..Default::default()
                         })
                         .unwrap();
-                    assert_eq!(
-                        tree.status,
-                        baldes::master::tree::TreeStatus::Optimal,
-                        "q={q:?}, upper={upper}, enumeration={enumeration}: {tree:?}"
-                    );
-                    assert!((tree.incumbent - 6.).abs() < 1e-7);
-                    assert!(tree.bound <= tree.incumbent);
-                    assert!(tree.incumbent - tree.bound < 1e-6);
+                    check_tree(&tree, 6., enumeration);
                     for fixed in tree.routes {
                         let member = members
                             .iter()
@@ -193,7 +234,7 @@ fn adjacent_pair_profiles_close_both_children_without_repeating_the_split() {
                     }
                 }
             }
-            optimal(&parent.snapshot.solve(configured).unwrap(), 4.5);
+            check_lp(&parent.snapshot.solve(configured).unwrap(), 4.5);
         }
     }
 }
@@ -269,16 +310,20 @@ fn shared_group_children_refresh_schedules_and_survive_enumeration_and_restorati
                         configured.enumeration = Some(EnumerationOptions::default());
                     }
                     let parent = model::solve(problem, configured.clone()).unwrap();
-                    optimal(&parent, 2.);
+                    check_lp(&parent, 2.);
                     for upper in [false, true] {
                         let child = parent
                             .snapshot
                             .with_resource_group_branch(0, 4, 1.5, upper, &members)
                             .unwrap();
                         assert_eq!(child.resource_group_branches().count(), 2);
-                        let expected = if upper && !waiting { 4. } else { 2. };
+                        let expected = if upper && (!waiting || !ACCUMULATED_RESOURCE_IN_PRICING) {
+                            4.
+                        } else {
+                            2.
+                        };
                         let result = child.solve(configured.clone()).unwrap();
-                        optimal(&result, expected);
+                        check_lp(&result, expected);
                         for (route, &q) in result.routes.iter().zip(&result.values) {
                             if q <= 1e-6 {
                                 continue;
@@ -299,7 +344,7 @@ fn shared_group_children_refresh_schedules_and_survive_enumeration_and_restorati
                             .snapshot
                             .enumerate(&EnumerationOptions::default())
                             .unwrap();
-                        optimal(&all.solve(configured.clone()).unwrap(), expected);
+                        check_lp(&all.solve(configured.clone()).unwrap(), expected);
                         #[cfg(feature = "highs")]
                         assert_eq!(
                             all.solve_enumerated_mip(&Default::default())
@@ -313,7 +358,7 @@ fn shared_group_children_refresh_schedules_and_survive_enumeration_and_restorati
                         );
                     }
                     assert_eq!(parent.snapshot.resource_group_branches().count(), 0);
-                    optimal(&parent.snapshot.solve(configured).unwrap(), 2.);
+                    check_lp(&parent.snapshot.solve(configured).unwrap(), 2.);
                 }
             }
         }
@@ -340,7 +385,7 @@ fn a_complete_parent_keeps_a_capped_path_when_the_branch_changes_its_schedule() 
         .unwrap();
     let complete = capped.enumerate(&EnumerationOptions::default()).unwrap();
     let solved = complete.solve(options()).unwrap();
-    optimal(&solved, 2.75);
+    check_lp(&solved, 2.75);
     let tag = solved
         .routes
         .iter()
@@ -357,11 +402,34 @@ fn a_complete_parent_keeps_a_capped_path_when_the_branch_changes_its_schedule() 
         .with_resource_group_branch(0, 4, 1.5, true, &members)
         .unwrap();
     let result = branch.solve(options()).unwrap();
-    optimal(&result, 2.75);
-    assert_eq!(result.routes[tag].route.resource_profile[1][4], 1.5 - 1e-6);
-    assert!((result.values[tag] - 0.25).abs() < 1e-8);
-    optimal(&solved.snapshot.solve(options()).unwrap(), 2.75);
-    optimal(&parent.snapshot.solve(options()).unwrap(), 2.);
+    check_lp(
+        &result,
+        if ACCUMULATED_RESOURCE_IN_PRICING {
+            2.75
+        } else {
+            4.
+        },
+    );
+    assert_eq!(
+        result.routes[tag].route.resource_profile[1][4],
+        if ACCUMULATED_RESOURCE_IN_PRICING {
+            1.5 - 1e-6
+        } else {
+            0.5
+        }
+    );
+    assert!(
+        (result.values[tag]
+            - if ACCUMULATED_RESOURCE_IN_PRICING {
+                0.25
+            } else {
+                0.
+            })
+        .abs()
+            < 1e-8
+    );
+    check_lp(&solved.snapshot.solve(options()).unwrap(), 2.75);
+    check_lp(&parent.snapshot.solve(options()).unwrap(), 2.);
 }
 
 #[test]
@@ -382,21 +450,21 @@ fn shared_group_fixed_copies_and_infeasible_descendants_are_isolated() {
     let lower = fixed
         .with_resource_group_branch(0, 4, 1.5, false, &members)
         .unwrap();
-    optimal(&lower.solve(options()).unwrap(), 2.);
+    check_lp(&lower.solve(options()).unwrap(), 2.);
     let branch_first = parent
         .snapshot
         .with_resource_group_branch(0, 4, 1.5, false, &members)
         .unwrap()
         .fix_route(cheap, 1.)
         .unwrap();
-    optimal(&branch_first.solve(options()).unwrap(), 2.);
+    check_lp(&branch_first.solve(options()).unwrap(), 2.);
     let upper = parent
         .snapshot
         .fix_route(unrelated, 1.)
         .unwrap()
         .with_resource_group_branch(0, 4, 1.5, true, &members)
         .unwrap();
-    optimal(&upper.solve(options()).unwrap(), 4.);
+    check_lp(&upper.solve(options()).unwrap(), 4.);
     let _incompatible = fixed
         .with_resource_group_branch(0, 4, 1.5, true, &members)
         .unwrap()
@@ -427,8 +495,8 @@ fn shared_group_fixed_copies_and_infeasible_descendants_are_isolated() {
             .status,
         baldes::master::solvers::mip::MipStatus::Infeasible
     );
-    optimal(&fixed.solve(options()).unwrap(), 2.);
-    optimal(&parent.snapshot.solve(options()).unwrap(), 2.);
+    check_lp(&fixed.solve(options()).unwrap(), 2.);
+    check_lp(&parent.snapshot.solve(options()).unwrap(), 2.);
 }
 
 #[test]
@@ -468,7 +536,7 @@ fn shared_group_proof_rejects_cancellation_and_invalid_support_without_mutation(
         .with_resource_group_branch(0, 4, 1.5, true, &members)
         .is_err());
     assert_eq!(parent.snapshot.resource_group_branches().count(), 0);
-    optimal(&parent.snapshot.solve(options()).unwrap(), 2.);
+    check_lp(&parent.snapshot.solve(options()).unwrap(), 2.);
 }
 
 #[cfg(feature = "highs")]
@@ -508,7 +576,7 @@ fn shared_group_cutoff_views_keep_the_restricted_domain() {
             .status,
             MipStatus::ObjectiveCutoff
         );
-        optimal(&parent.snapshot.solve(options()).unwrap(), 2.);
+        check_lp(&parent.snapshot.solve(options()).unwrap(), 2.);
     }
 }
 
@@ -544,29 +612,31 @@ fn exact_feasible_but_unreconstructible_branch_leaves_parent_unchanged() {
         }],
     };
     let parent = model::solve(problem, options()).unwrap();
-    optimal(&parent, 1.);
+    check_lp(&parent, 1.);
     let before = parent
         .routes
         .iter()
         .map(|r| r.route.resource_profile.clone())
         .collect::<Vec<_>>();
-    let error = parent
-        .snapshot
-        .with_resource_group_branch(
-            0,
-            4,
-            1e16 + 2.,
-            true,
-            &[ResourceGroupMember {
-                network: 7,
-                arcs: vec![2],
-            }],
-        )
-        .unwrap_err();
-    assert!(error.to_string().contains("canonical schedule"), "{error}");
+    let attached = parent.snapshot.with_resource_group_branch(
+        0,
+        4,
+        1e16 + 2.,
+        true,
+        &[ResourceGroupMember {
+            network: 7,
+            arcs: vec![2],
+        }],
+    );
+    if ACCUMULATED_RESOURCE_IN_PRICING {
+        let error = attached.unwrap_err();
+        assert!(error.to_string().contains("canonical schedule"), "{error}");
+    } else {
+        assert_eq!(attached.unwrap().resource_group_branches().count(), 1);
+    }
     assert_eq!(parent.snapshot.resource_group_branches().count(), 0);
     let resumed = parent.snapshot.solve(options()).unwrap();
-    optimal(&resumed, 1.);
+    check_lp(&resumed, 1.);
     assert_eq!(
         resumed
             .routes
@@ -609,22 +679,36 @@ fn resource_load_rows_keep_original_path_semantics_when_a_branch_adds_waiting() 
         .snapshot
         .with_resource_knapsack_row(row.clone(), &coefficients)
         .unwrap();
-    assert!(cut
-        .with_resource_group_branch(0, 4, 1.5, true, &members)
-        .is_err());
+    assert_eq!(
+        cut.with_resource_group_branch(0, 4, 1.5, true, &members)
+            .is_err(),
+        ACCUMULATED_RESOURCE_IN_PRICING
+    );
     let branch = parent
         .snapshot
         .with_resource_group_branch(0, 4, 1.5, true, &members)
         .unwrap();
-    assert!(branch
-        .with_resource_knapsack_row(row.clone(), &coefficients)
-        .is_err());
+    assert_eq!(
+        branch
+            .with_resource_knapsack_row(row.clone(), &coefficients)
+            .is_err(),
+        ACCUMULATED_RESOURCE_IN_PRICING
+    );
     let complete = cut.enumerate(&EnumerationOptions::default()).unwrap();
     let branch = complete
         .with_resource_group_branch(0, 4, 1.5, true, &members)
         .unwrap();
     let solved = branch.solve(options()).unwrap();
-    optimal(&solved, 2.);
+    if ACCUMULATED_RESOURCE_IN_PRICING {
+        check_lp(&solved, 2.);
+    } else {
+        assert_eq!(
+            solved.master.status,
+            Status::Infeasible,
+            "{:?}",
+            solved.master
+        );
+    }
     let reverse = parent
         .snapshot
         .enumerate(&EnumerationOptions::default())
@@ -633,7 +717,18 @@ fn resource_load_rows_keep_original_path_semantics_when_a_branch_adds_waiting() 
         .unwrap()
         .with_resource_knapsack_row(row, &coefficients)
         .unwrap();
-    optimal(&reverse.solve(options()).unwrap(), 2.);
+    let reversed = reverse.solve(options()).unwrap();
+    if !ACCUMULATED_RESOURCE_IN_PRICING {
+        assert_eq!(
+            reversed.master.status,
+            Status::Infeasible,
+            "{:?}",
+            reversed.master
+        );
+        check_lp(&parent.snapshot.solve(options()).unwrap(), 2.);
+        return;
+    }
+    check_lp(&reversed, 2.);
     #[cfg(feature = "highs")]
     assert_eq!(
         solved
@@ -647,7 +742,7 @@ fn resource_load_rows_keep_original_path_semantics_when_a_branch_adds_waiting() 
             .objective,
         2.
     );
-    optimal(&parent.snapshot.solve(options()).unwrap(), 2.);
+    check_lp(&parent.snapshot.solve(options()).unwrap(), 2.);
 }
 
 #[test]
@@ -703,13 +798,13 @@ fn equality_resources_filter_without_introducing_waiting() {
         let mut configured = options();
         configured.cg.bound_mode = mode;
         let parent = model::solve(problem.clone(), configured.clone()).unwrap();
-        optimal(&parent, 2.);
+        check_lp(&parent, 2.);
         for upper in [false, true] {
             let child = parent
                 .snapshot
                 .with_resource_group_branch(0, 4, 1.5, upper, &members)
                 .unwrap();
-            optimal(
+            check_lp(
                 &child.solve(configured.clone()).unwrap(),
                 if upper { 4. } else { 2. },
             );
@@ -782,7 +877,7 @@ fn public_triangle_group_mapping_survives_actual_shared_tree_descendants() {
         let mut configured = options();
         configured.cg.bound_mode = mode;
         let parent = model::solve(problem.clone(), configured.clone()).unwrap();
-        optimal(&parent, 4.5);
+        check_lp(&parent, 4.5);
         let choices = parent.snapshot.resource_group_candidates(1e-6).unwrap();
         let mapped = choices
             .iter()
@@ -809,19 +904,14 @@ fn public_triangle_group_mapping_survives_actual_shared_tree_descendants() {
                 ..Default::default()
             })
             .unwrap();
-        assert_eq!(
-            automatic.status,
-            baldes::master::tree::TreeStatus::Optimal,
-            "{automatic:?}"
-        );
-        assert_eq!((automatic.incumbent, automatic.bound), (6., 6.));
+        check_tree(&automatic, 6., false);
         assert!(automatic.nodes > 1);
         for upper in [false, true] {
             let child = parent
                 .snapshot
                 .with_resource_group_branch(1, 4, 2., upper, &members)
                 .unwrap();
-            optimal(&child.solve(configured.clone()).unwrap(), 5.);
+            check_lp(&child.solve(configured.clone()).unwrap(), 5.);
             let solved = child.solve(configured.clone()).unwrap();
             assert!(!solved
                 .snapshot
@@ -837,14 +927,10 @@ fn public_triangle_group_mapping_survives_actual_shared_tree_descendants() {
                     ..Default::default()
                 })
                 .unwrap();
-            assert_eq!(
-                tree.status,
-                baldes::master::tree::TreeStatus::Optimal,
-                "{tree:?}"
-            );
-            assert_eq!(tree.incumbent, 6.);
-            assert_eq!(tree.bound, 6.);
-            assert!(tree.nodes > 1, "must execute descendant branches");
+            check_tree(&tree, 6., false);
+            if tree.status == baldes::master::tree::TreeStatus::Optimal {
+                assert!(tree.nodes > 1, "must execute descendant branches");
+            }
             for fixed in tree.routes {
                 let member = members
                     .iter()
@@ -862,7 +948,7 @@ fn public_triangle_group_mapping_survives_actual_shared_tree_descendants() {
                 }
             }
         }
-        optimal(&parent.snapshot.solve(configured).unwrap(), 4.5);
+        check_lp(&parent.snapshot.solve(configured).unwrap(), 4.5);
     }
 }
 
@@ -891,19 +977,19 @@ fn sparse_parallel_member_ids_survive_blocking_and_domain_reindexing() {
         let mut configured = options();
         configured.cg.bound_mode = mode;
         let parent = model::solve(problem.clone(), configured.clone()).unwrap();
-        optimal(&parent, 2.);
+        check_lp(&parent, 2.);
         for upper in [false, true] {
             let child = parent
                 .snapshot
                 .with_resource_group_branch(0, 4, 1.5, upper, &members)
                 .unwrap();
             let result = child.solve(configured.clone()).unwrap();
-            optimal(&result, if upper { 4. } else { 2. });
+            check_lp(&result, if upper { 4. } else { 2. });
             let complete = result
                 .snapshot
                 .enumerate(&EnumerationOptions::default())
                 .unwrap();
-            optimal(
+            check_lp(
                 &complete.solve(configured.clone()).unwrap(),
                 if upper { 4. } else { 2. },
             );
@@ -920,7 +1006,7 @@ fn sparse_parallel_member_ids_survive_blocking_and_domain_reindexing() {
                 if upper { 4. } else { 2. }
             );
         }
-        optimal(&parent.snapshot.solve(configured).unwrap(), 2.);
+        check_lp(&parent.snapshot.solve(configured).unwrap(), 2.);
     }
 }
 
@@ -956,7 +1042,7 @@ fn rounded_compatible_profiles_cannot_hide_an_exact_fixed_resource_contradiction
         }],
     };
     let parent = model::solve(problem, options()).unwrap();
-    optimal(&parent, 1.);
+    check_lp(&parent, 1.);
     let tag = parent
         .routes
         .iter()
@@ -993,7 +1079,7 @@ fn rounded_compatible_profiles_cannot_hide_an_exact_fixed_resource_contradiction
             "fixed={fixed}"
         );
     }
-    optimal(&parent.snapshot.solve(options()).unwrap(), 1.);
+    check_lp(&parent.snapshot.solve(options()).unwrap(), 1.);
 }
 
 #[test]
@@ -1043,7 +1129,7 @@ fn automatic_shared_resource_candidates_keep_weighted_mass_and_ancestor_windows(
             configured.enumeration = Some(EnumerationOptions::default());
         }
         let parent = model::solve(problem, configured.clone()).unwrap();
-        optimal(&parent, 1.);
+        check_lp(&parent, 1.);
         assert!(parent.snapshot.resource_group_candidates(0.).is_err());
         let candidates = parent.snapshot.resource_group_candidates(1e-6).unwrap();
         assert_eq!(candidates.len(), 1);
@@ -1059,7 +1145,7 @@ fn automatic_shared_resource_candidates_keep_weighted_mass_and_ancestor_windows(
             .unwrap()
             .solve(configured.clone())
             .unwrap();
-        optimal(&lower, 4.);
+        check_lp(&lower, 4.);
         assert!(lower
             .snapshot
             .resource_group_candidates(1e-6)
@@ -1072,12 +1158,7 @@ fn automatic_shared_resource_candidates_keep_weighted_mass_and_ancestor_windows(
                 ..Default::default()
             })
             .unwrap();
-        assert_eq!(
-            tree.status,
-            baldes::master::tree::TreeStatus::Optimal,
-            "{tree:?}"
-        );
-        assert_eq!((tree.incumbent, tree.bound), (4., 4.));
-        optimal(&parent.snapshot.solve(configured).unwrap(), 1.);
+        check_tree(&tree, 4., complete);
+        check_lp(&parent.snapshot.solve(configured).unwrap(), 1.);
     }
 }

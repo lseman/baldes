@@ -31,7 +31,8 @@ for Ryan–Foster and accumulated-resource branch rows. To use the older
 pricing-enforced policies, disable default features and select the desired
 backend explicitly, for example `cargo build --release --no-default-features
 --features clp`. Certified mode still requires independent original-domain
-proofs and does not treat numerical master-only closure as certification.
+proofs. Master-only branch solves retain relaxed pricing bounds and remain
+stalled if those bounds cannot close the restricted-master objective.
 
 Disjoint service-start windows are optional: use
 `cargo build --release --features multi-time-windows` for the library, or

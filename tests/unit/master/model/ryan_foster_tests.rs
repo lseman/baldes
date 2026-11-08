@@ -451,7 +451,7 @@ fn vertex_set_children_preserve_missing_and_multiple_members_through_pricing_and
                             .solver
                             .route_satisfies_relaxation(&route.route.nodes, &route.route.arcs)
                             .unwrap(),
-                        accepts(route),
+                        accepts(route) || !crate::master::branching::RYAN_FOSTER_IN_PRICING,
                         "route validation: {together} {} {:?}",
                         route.network,
                         route.route.nodes,
@@ -504,7 +504,15 @@ fn vertex_set_children_preserve_missing_and_multiple_members_through_pricing_and
                         solved.master
                     );
                 } else {
-                    assert_eq!(solved.master.status, crate::master::cg::Status::Optimal);
+                    if crate::master::branching::RYAN_FOSTER_IN_PRICING {
+                        assert_eq!(solved.master.status, crate::master::cg::Status::Optimal);
+                    } else {
+                        assert!(matches!(
+                            solved.master.status,
+                            crate::master::cg::Status::Optimal | crate::master::cg::Status::Stalled
+                        ));
+                        assert!(solved.master.bound <= 2. + 1e-6);
+                    }
                     assert!((solved.master.lp - 2.).abs() < 1e-6);
                     for (route, &value) in solved.routes.iter().zip(&solved.values) {
                         if value > 1e-8 {
@@ -533,7 +541,7 @@ fn vertex_set_children_preserve_missing_and_multiple_members_through_pricing_and
 }
 
 #[test]
-fn vertex_set_tree_matches_independent_integer_route_covers() {
+fn vertex_set_tree_bounds_respect_independent_integer_route_covers() {
     for multiple_vertices in [false, true] {
         let (problem, branching, routes) = vertex_set_fixture(multiple_vertices);
         let mut optimum = f64::INFINITY;
@@ -577,13 +585,25 @@ fn vertex_set_tree_matches_independent_integer_route_covers() {
                 configured.branching_registry.ryan_foster = Some(branching.clone());
                 configured.branching_registry.strong_branching = strong.then(Default::default);
                 let output = crate::master::tree::solve(problem.clone(), configured).unwrap();
-                assert_eq!(
-                    output.status,
-                    crate::master::tree::TreeStatus::Optimal,
-                    "{output:?}"
-                );
-                assert!((output.incumbent - optimum).abs() < 1e-6, "{output:?}");
-                assert!((output.bound - optimum).abs() < 1e-6, "{output:?}");
+                assert!(output.bound <= optimum + 1e-6, "{output:?}");
+                if crate::master::branching::RYAN_FOSTER_IN_PRICING {
+                    assert_eq!(
+                        output.status,
+                        crate::master::tree::TreeStatus::Optimal,
+                        "{output:?}"
+                    );
+                }
+                if output.status == crate::master::tree::TreeStatus::Optimal {
+                    assert!((output.incumbent - optimum).abs() < 1e-6, "{output:?}");
+                    assert!((output.bound - optimum).abs() < 1e-6, "{output:?}");
+                } else {
+                    assert_eq!(
+                        output.status,
+                        crate::master::tree::TreeStatus::Incomplete,
+                        "{output:?}"
+                    );
+                    assert!(output.open_nodes > 0, "{output:?}");
+                }
                 if strong {
                     assert!(output
                         .mapped_branch_evaluations
@@ -658,7 +678,7 @@ fn vertex_set_branches_keep_fixed_reductions_exact_when_the_child_is_infeasible(
 }
 
 #[test]
-fn ryan_foster_tree_reaches_the_default_branching_optimum() {
+fn ryan_foster_tree_preserves_default_optimum_bounds_and_open_nodes() {
     let problem = rc101(25);
     let solve = |ryan_foster: Option<RyanFosterBranching>| {
         let mut configured = ModelTreeOptions::default();
@@ -670,14 +690,17 @@ fn ryan_foster_tree_reaches_the_default_branching_optimum() {
     let default = solve(None);
     let paired = solve(Some(RyanFosterBranching::new(2.)));
     assert_eq!(default.status, crate::master::tree::TreeStatus::Optimal);
-    assert_eq!(paired.status, crate::master::tree::TreeStatus::Optimal);
     assert!(paired.processed_nodes > 1);
-    assert!(
-        (default.incumbent - paired.incumbent).abs() < 1e-6,
-        "{} {}",
-        default.incumbent,
-        paired.incumbent
-    );
+    assert!(paired.bound <= default.incumbent + 1e-6, "{paired:?}");
+    if crate::master::branching::RYAN_FOSTER_IN_PRICING {
+        assert_eq!(paired.status, crate::master::tree::TreeStatus::Optimal);
+    }
+    if paired.status == crate::master::tree::TreeStatus::Optimal {
+        assert!((default.incumbent - paired.incumbent).abs() < 1e-6);
+    } else {
+        assert_eq!(paired.status, crate::master::tree::TreeStatus::Incomplete);
+        assert!(paired.open_nodes > 0);
+    }
 }
 
 #[test]
@@ -863,4 +886,104 @@ fn explicit_incidence_candidate_values_match_native_capture() {
             "{name}: {actual} != {expected}"
         );
     }
+}
+
+#[test]
+fn enforcement_switch_changes_pricing_but_preserves_master_branch_and_bounds() {
+    let (problem, _, routes) = vertex_set_fixture(false);
+    let mut configured = options();
+    configured.preprocessing.enabled = false;
+    configured.reduced_cost_fixing = false;
+    configured.gap_enumeration = false;
+    let root = solve_with_master_variables(problem, vec![], configured.clone()).unwrap();
+    let member = RyanFosterMember {
+        network: 7,
+        first: 1,
+        second: 3,
+    };
+    let arc_member = ArcSetMember {
+        network: 7,
+        first: root.snapshot.state.oracles[0]
+            .network
+            .graph
+            .arcs
+            .iter()
+            .filter(|a| a.head == 1)
+            .map(|a| a.id)
+            .collect(),
+        second: root.snapshot.state.oracles[0]
+            .network
+            .graph
+            .arcs
+            .iter()
+            .filter(|a| a.head == 3)
+            .map(|a| a.id)
+            .collect(),
+    };
+    for arc_sets in [false, true] {
+        let mut child = if arc_sets {
+            root.snapshot
+                .with_arc_set_branch(std::slice::from_ref(&arc_member), false)
+                .unwrap()
+        } else {
+            root.snapshot.with_ryan_foster(&[member], false).unwrap()
+        };
+        let oracle = &child.state.oracles[0];
+        let violating = routes
+            .iter()
+            .find(|r| r.network == 7 && r.route.nodes.contains(&1) && r.route.nodes.contains(&3))
+            .unwrap();
+        assert_eq!(
+            super::entries(oracle, &violating.route)
+                .unwrap()
+                .last()
+                .unwrap()
+                .1,
+            1.
+        );
+        assert!(
+            !super::super::lifecycle::integer_route_feasible(oracle, &violating.route).unwrap()
+        );
+        assert_eq!(
+            oracle
+                .solver
+                .route_satisfies_relaxation(&violating.route.nodes, &violating.route.arcs)
+                .unwrap(),
+            !crate::master::branching::RYAN_FOSTER_IN_PRICING
+        );
+        let mut duals = vec![0.; child.master.rhs.len()];
+        duals[child.state.shared_offset] = 10.;
+        duals[child.state.shared_offset + 1] = 10.;
+        *duals.last_mut().unwrap() = -100.;
+        let priced = child.state.price(0, &duals).unwrap();
+        let expected_minimum = if crate::master::branching::RYAN_FOSTER_IN_PRICING {
+            -9.
+        } else {
+            -19.
+        };
+        assert!(
+            (priced.minimum - expected_minimum).abs() < 1e-6,
+            "{priced:?}"
+        );
+        let solved = child.solve(configured.clone()).unwrap();
+        // Independent covers: apart routes cost at least two; singleton routes attain two.
+        assert!(
+            solved.master.numerical_bound <= 2. + 1e-6,
+            "{:?}",
+            solved.master
+        );
+        assert!(solved.master.lp >= 2. - 1e-6, "{:?}", solved.master);
+        if solved.master.status == cg::Status::Optimal {
+            assert!(
+                (solved.master.bound - 2.).abs() < 1e-6,
+                "{:?}",
+                solved.master
+            );
+        }
+        assert_ne!(solved.master.status, cg::Status::Infeasible);
+    }
+    assert!(root.snapshot.state.oracles[0]
+        .solver
+        .ryan_foster_constraints()
+        .is_empty());
 }

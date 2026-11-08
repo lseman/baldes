@@ -231,7 +231,17 @@ pub(super) fn recover<const D: usize>(
         }
         // Coupled resources change the phase-I pricing program (charges are
         // suppressed), so exhaustion there is not an original-domain proof.
-        let complete_exact = answer.exact
+        // Exhausting a relaxed pricing domain without a new usable column
+        // does not prove the branch-restricted phase-I master infeasible.
+        let unpriced_branches = state.universe.is_none()
+            && state.oracles.iter().any(|o| {
+                (!crate::master::branching::RYAN_FOSTER_IN_PRICING
+                    && (!o.ryan_foster_rows.is_empty() || !o.arc_set_branch_rows.is_empty()))
+                    || (!crate::master::branching::ACCUMULATED_RESOURCE_IN_PRICING
+                        && !o.resource_groups.is_empty())
+            });
+        let complete_exact = !unpriced_branches
+            && answer.exact
             && state.scheduler.complete
             && !state
                 .oracles

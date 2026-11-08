@@ -795,6 +795,10 @@ pub(super) fn integer_route_feasible<const D: usize>(
 ) -> Result<bool> {
     let problem = super::resource_groups::domain_graph(oracle)?;
     Ok(problem.exact_route_feasible(route).is_some()
+        && super::ryan_foster::entries(oracle, route)?.is_empty()
+        && super::resource_groups::entries(oracle, route)
+            .iter()
+            .all(|&(_, a)| a == 0.)
         && oracle
             .solver
             .route_satisfies_relaxation(&route.nodes, &route.arcs)?)

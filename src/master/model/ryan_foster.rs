@@ -3,7 +3,7 @@
 //! A branch on packing sets `a` and `b` is a master row `sum <= 0` whose
 //! column coefficient is one exactly when the column's path violates the
 //! branch (together: visits exactly one of the sets; apart: visits both),
-//! and the same restriction is installed in every member network's pricing.
+//! and pricing enforces it when `ryan-foster-master` is disabled.
 //! Columns are never capped. Candidates are pairs whose LP co-occurrence lies
 //! strictly between 1e-6 and 0.999999, ranked by distance to one half with
 //! ties in pair order, and the together child is the upper child.
@@ -411,13 +411,20 @@ impl<const D: usize> NodeSnapshot<D> {
                     together,
                 },
             ));
-            oracle.solver.set_arc_set_branches(
-                oracle
-                    .arc_set_branch_rows
-                    .iter()
-                    .map(|(_, c)| c.clone())
-                    .collect(),
+            // Validate physical arc membership even when pricing is relaxed.
+            let constraints: Vec<_> = oracle
+                .arc_set_branch_rows
+                .iter()
+                .map(|(_, c)| c.clone())
+                .collect();
+            crate::pricing::restrictions::RyanFosterResources::prepare_arc_sets(
+                &oracle.solver.graph,
+                &[],
+                &constraints,
             )?;
+            if crate::master::branching::RYAN_FOSTER_IN_PRICING {
+                oracle.solver.set_arc_set_branches(constraints)?;
+            }
         }
         node = super::nonlinear::refresh_row(node, shared)?;
         node.state.correction = None;
@@ -428,7 +435,8 @@ impl<const D: usize> NodeSnapshot<D> {
     /// Branch on whether two packing sets are served together by the same
     /// path (`together`) or never by the same path. Existing columns keep
     /// their bounds; violating columns get coefficient one in a new `<= 0`
-    /// row, and pricing of every member network excludes violating paths.
+    /// row. Pricing also excludes violating paths unless `ryan-foster-master`
+    /// selects master-only enforcement.
     /// The parent is unchanged.
     pub fn with_ryan_foster(&self, members: &[RyanFosterMember], together: bool) -> Result<Self> {
         if members.is_empty() {
@@ -469,8 +477,15 @@ impl<const D: usize> NodeSnapshot<D> {
                     together,
                 },
             ));
-            let constraints = oracle.ryan_foster_rows.iter().map(|(_, c)| *c).collect();
-            oracle.solver.set_ryan_foster(constraints)?;
+            let constraints: Vec<_> = oracle.ryan_foster_rows.iter().map(|(_, c)| *c).collect();
+            // Validate the public branch input in either enforcement mode.
+            crate::pricing::restrictions::RyanFosterResources::prepare(
+                &oracle.solver.graph,
+                &constraints,
+            )?;
+            if crate::master::branching::RYAN_FOSTER_IN_PRICING {
+                oracle.solver.set_ryan_foster(constraints)?;
+            }
         }
         node = super::nonlinear::refresh_row(node, shared)?;
         node.state.correction = None;

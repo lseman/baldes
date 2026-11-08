@@ -91,17 +91,25 @@ in the final solution.
 By default, Ryan–Foster is enforced through its master violation row, matching
 the recovered modern MetaSolver restore path. Pricing receives neither the
 hard binary-resource
-restriction nor the violation row's dual cost. After exact column generation
-returns no new improving master columns, numerical mode uses the completed
-restricted-master objective as the node bound. If artificials remain, pure
-phase I runs first and marks numerical infeasibility when an exact pass adds
-no improving master columns. Limits and incomplete pricing leave the node open.
-These numerical decisions are not original-domain certificates; certified mode
-still requires an independent bound or infeasibility proof.
+restriction nor the violation row's dual cost. The master still assigns zero
+weight to violating routes. Pricing supplies a lower bound from its relaxed
+domain; a higher restricted-master objective is not substituted for that bound.
+When the bounds do not close, the solve remains stalled rather than claiming
+optimality. Likewise, a phase-I pass that adds no usable columns does not by
+itself establish branch infeasibility. Independent certificates or complete
+enumeration can still close these nodes. Limits and incomplete pricing leave
+the node open.
 
-To select the stronger pricing-enforced policy, build with
-`--no-default-features` (and add backend features such as `clp` as needed).
-In that mode binary resources enforce the rule during labeling and bidirectional
+The build menu's **Ryan–Foster enforcement** setting selects either policy.
+With Cargo, `ryan-foster-master` selects master-only enforcement; omit it to
+select pricing enforcement. For example, to change only Ryan–Foster while
+retaining Clp and the other default policies:
+
+```bash
+cargo build --release --no-default-features --features clp,accumulated-resource-master,ipm-blocked
+```
+
+In pricing mode binary resources enforce the rule during labeling and bidirectional
 joins; retained enumeration is filtered by the same rule, and existing NG
 routes that repeat a pair endpoint are retired from the child master.
 
@@ -241,16 +249,30 @@ packing group. It is a route violation indicator, rather than a violation count.
 
 By default these branches are enforced only through their master rows,
 matching the recovered native restore behavior. Pricing keeps the original arc
-windows, and nodes close with the same numerical master-only policy as
-master-row Ryan–Foster branching above. With disposable resources this can also
+windows. This accumulated-resource policy is independent of the
+Ryan–Foster enforcement switch above. With disposable resources this can also
 change which schedules pricing generates: tightening a lower window can add
 waiting to a cheap path in pricing mode, while master-only mode retains its
 original earliest schedule and may reject it through the violation row. The two
 build modes therefore need not produce the same child LP objective.
 An empty resource-window intersection also remains a resource violation row in
 master-only mode; it does not introduce an arc-flow dual into pricing.
-To enable pricing-window enforcement instead, build with
-`--no-default-features` (and add backend features such as `clp` as needed).
+A relaxed pricing pass that adds no usable column cannot alone establish branch
+infeasibility or replace the lower bound with the restricted-master objective.
+The node remains open when its bound cannot close the gap. Complete enumeration
+checks route schedules against the master rows in either mode.
+
+The build menu's **Accumulated-resource branching** setting selects the policy.
+With Cargo, `accumulated-resource-master` selects master-only enforcement; omit
+it to enable pricing-window enforcement. To change only this policy while
+retaining Clp and the other defaults:
+
+```bash
+cargo build --release --no-default-features --features clp,ryan-foster-master,ipm-blocked
+```
+
+This matches the distinction observed between native `RCSPuseMetaSolver = 1`
+(master only) and the older `RCSPuseMetaSolver = 0` pricing-window path.
 Resource-domain changes discard inherited labels/enumeration before repricing;
 parent and sibling graphs remain independent. Original resource limits remain
 in effect. The existing requirement for backward equality resources to have a

@@ -464,10 +464,35 @@ fn typed_children_match_fresh_models_and_survive_snapshot_setup() {
             let fresh = restrict(&cold(problem.clone(), &options), branch)
                 .solve(options.clone())
                 .unwrap();
-            assert!(
-                (child.master.bound - fresh.master.bound).abs() < 1e-6,
-                "{branch:?}: child={child:?} fresh={fresh:?}"
-            );
+            if !baldes::master::branching::RYAN_FOSTER_IN_PRICING
+                && matches!(branch, Branch::Apart | Branch::Together)
+            {
+                // Warm and cold relaxed pricing may retain different valid
+                // lower bounds. A complete route universe supplies the common
+                // branch LP optimum independently of that pricing trajectory.
+                let reference = restrict(&cold(problem.clone(), &options), branch)
+                    .enumerate(&EnumerationOptions::default())
+                    .unwrap()
+                    .solve(options.clone())
+                    .unwrap();
+                assert_eq!(reference.master.status, Status::Optimal, "{reference:?}");
+                for result in [&child, &fresh] {
+                    assert!(result.master.bound <= reference.master.lp + 1e-6);
+                    assert!(result.master.lp >= reference.master.lp - 1e-6);
+                    assert!(matches!(
+                        result.master.status,
+                        Status::Optimal | Status::Stalled
+                    ));
+                    if result.master.status == Status::Optimal {
+                        assert!((result.master.bound - reference.master.lp).abs() < 1e-6);
+                    }
+                }
+            } else {
+                assert!(
+                    (child.master.bound - fresh.master.bound).abs() < 1e-6,
+                    "{branch:?}: child={child:?} fresh={fresh:?}"
+                );
+            }
             assert_eq!(snapshot.enumeration_report().routes, count);
             for (route, &x) in child.routes.iter().zip(&child.values) {
                 if x <= 1e-6 {
@@ -543,17 +568,43 @@ fn resource_threshold_branches_match_fresh_and_inherited_masters() {
             let fresh = branch(&cold(p.clone(), &options))
                 .solve(options.clone())
                 .unwrap();
-            assert_eq!(
-                child.master.status, fresh.master.status,
-                "threshold={threshold} upper={upper}"
-            );
-            assert!(
-                child.master.lp == fresh.master.lp
-                    || (child.master.lp - fresh.master.lp).abs() < 1e-6,
-                "threshold={threshold} upper={upper}: child={} fresh={}",
-                child.master.lp,
-                fresh.master.lp
-            );
+            if baldes::master::branching::ACCUMULATED_RESOURCE_IN_PRICING {
+                assert_eq!(
+                    child.master.status, fresh.master.status,
+                    "threshold={threshold} upper={upper}"
+                );
+                assert!(
+                    child.master.lp == fresh.master.lp
+                        || (child.master.lp - fresh.master.lp).abs() < 1e-6
+                );
+            } else {
+                let reference = branch(&cold(p.clone(), &options))
+                    .enumerate(&EnumerationOptions::default())
+                    .unwrap()
+                    .solve(options.clone())
+                    .unwrap();
+                for result in [&child, &fresh] {
+                    if reference.master.status == baldes::master::cg::Status::Infeasible {
+                        assert!(matches!(
+                            result.master.status,
+                            baldes::master::cg::Status::Infeasible
+                                | baldes::master::cg::Status::Stalled
+                        ));
+                    } else {
+                        assert_eq!(reference.master.status, baldes::master::cg::Status::Optimal);
+                        assert!(result.master.bound <= reference.master.lp + 1e-6);
+                        assert!(result.master.lp >= reference.master.lp - 1e-6);
+                        assert!(matches!(
+                            result.master.status,
+                            baldes::master::cg::Status::Optimal
+                                | baldes::master::cg::Status::Stalled
+                        ));
+                        if result.master.status == baldes::master::cg::Status::Optimal {
+                            assert!((result.master.bound - reference.master.lp).abs() < 1e-6);
+                        }
+                    }
+                }
+            }
             assert_eq!(snapshot.resource_group_branches().count(), 0);
             assert_eq!(child.snapshot.resource_group_branches().count(), 1);
         }

@@ -123,3 +123,145 @@ fn sparse_refresh_merge_matches_full_row_replacement_with_legacy_metadata() {
         assert_eq!(actual, expected);
     }
 }
+
+#[test]
+fn resource_enforcement_switch_preserves_master_profiles_and_safe_completion() {
+    use crate::master::branching::ACCUMULATED_RESOURCE_IN_PRICING;
+    let mut graph = Graph::<2>::new(3, 1).unwrap();
+    for vertex in 0..3 {
+        graph.set_bounds(vertex, 0, 0., 3.).unwrap();
+    }
+    let cheap = graph.add_arc(0, 1, 1.).unwrap();
+    graph.arc_mut(cheap).unwrap().consumption[0] = 0.5;
+    let alternative = graph.add_arc(0, 1, 2.).unwrap();
+    graph.arc_mut(alternative).unwrap().consumption[0] = 2.5;
+    graph.add_arc(1, 2, 0.).unwrap();
+    let mut configured = Options::default();
+    configured.cg.stabilize = false;
+    configured.preprocessing.enabled = false;
+    configured.reduced_cost_fixing = false;
+    configured.gap_enumeration = false;
+    let parent = solve(
+        Problem::set_partitioning(graph, 1.).unwrap(),
+        configured.clone(),
+    )
+    .unwrap();
+    let child = parent
+        .snapshot
+        .with_resource_group_branch(
+            0,
+            0,
+            1.,
+            true,
+            &[ResourceGroupMember {
+                network: 0,
+                arcs: vec![cheap, alternative],
+            }],
+        )
+        .unwrap();
+    let oracle = &child.state.oracles[0];
+    assert_eq!(
+        oracle.solver.accumulated_resource_branches().len(),
+        if ACCUMULATED_RESOURCE_IN_PRICING {
+            2
+        } else {
+            0
+        }
+    );
+    let cheap_arc = oracle
+        .solver
+        .graph
+        .arcs
+        .iter()
+        .find(|a| a.id == cheap)
+        .unwrap();
+    assert_eq!(
+        cheap_arc.bounds[0].map(|w| w.lower),
+        ACCUMULATED_RESOURCE_IN_PRICING.then_some(1. - 1e-6)
+    );
+    let retained = child
+        .state
+        .routes
+        .iter()
+        .find(|r| r.route.arcs.contains(&cheap))
+        .unwrap();
+    assert_eq!(
+        retained.route.resource_profile[1][0],
+        if ACCUMULATED_RESOURCE_IN_PRICING {
+            1. - 1e-6
+        } else {
+            0.5
+        }
+    );
+    assert_eq!(
+        super::super::resource_groups::entries(oracle, &retained.route)[0].1,
+        if ACCUMULATED_RESOURCE_IN_PRICING {
+            0.
+        } else {
+            1.
+        }
+    );
+    if !ACCUMULATED_RESOURCE_IN_PRICING {
+        assert!(!super::super::lifecycle::integer_route_feasible(oracle, &retained.route).unwrap());
+    }
+    let solved = child.solve(configured.clone()).unwrap();
+    let optimum = if ACCUMULATED_RESOURCE_IN_PRICING {
+        1.
+    } else {
+        2.
+    };
+    assert!(solved.master.bound <= optimum + 1e-6, "{:?}", solved.master);
+    if ACCUMULATED_RESOURCE_IN_PRICING {
+        assert_eq!(solved.master.status, cg::Status::Optimal);
+        assert!((solved.master.lp - optimum).abs() < 1e-6);
+    } else {
+        assert_eq!(
+            solved.master.status,
+            cg::Status::Stalled,
+            "{:?}",
+            solved.master
+        );
+    }
+    // Full original-path enumeration proves feasibility independently of the
+    // relaxed pricing result, and must not invent waiting in master-only mode.
+    let complete = solved
+        .snapshot
+        .enumerate(&EnumerationOptions::default())
+        .unwrap();
+    assert!(complete.enumeration_report().complete);
+    let exact = complete.solve(configured).unwrap();
+    assert_eq!(
+        exact.master.status,
+        cg::Status::Optimal,
+        "{:?}",
+        exact.master
+    );
+    assert!((exact.master.lp - optimum).abs() < 1e-6);
+    assert!((exact.master.bound - optimum).abs() < 1e-6);
+    let expected_arc = if ACCUMULATED_RESOURCE_IN_PRICING {
+        cheap
+    } else {
+        alternative
+    };
+    assert!(exact
+        .routes
+        .iter()
+        .zip(&exact.values)
+        .any(|(r, &q)| q > 0.9 && r.route.arcs.contains(&expected_arc)));
+    assert!(parent.snapshot.state.oracles[0]
+        .solver
+        .accumulated_resource_branches()
+        .is_empty());
+    assert_eq!(
+        parent
+            .snapshot
+            .state
+            .routes
+            .iter()
+            .find(|r| r.route.arcs.contains(&cheap))
+            .unwrap()
+            .route
+            .resource_profile[1][0],
+        0.5
+    );
+}

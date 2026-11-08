@@ -208,13 +208,49 @@ fn threshold_children_preserve_rows_bounds_and_restore_the_parent() {
             )
             .solve(options.clone())
             .unwrap();
-            assert_eq!(child.master.status, fresh.master.status);
-            // The network model always enforces resource branches in pricing,
-            // so the upper child can wait at the new lower window on the
-            // cheap route; the `accumulated-resource-master` feature only
-            // affects the removed routing root.
-            let _ = ACCUMULATED_RESOURCE_IN_PRICING;
-            let expected = 1.;
+            // Pricing mode can wait on the cheap route. Master-only mode
+            // preserves its original schedule and must use the costlier arc.
+            let expected = if upper && !ACCUMULATED_RESOURCE_IN_PRICING {
+                2.
+            } else {
+                1.
+            };
+            for result in [&child, &fresh] {
+                assert!(result.master.bound <= expected + 1e-8);
+                assert!(matches!(
+                    result.master.status,
+                    baldes::master::cg::Status::Optimal | baldes::master::cg::Status::Stalled
+                ));
+                if result.master.status == baldes::master::cg::Status::Optimal {
+                    assert!((result.master.bound - expected).abs() < 1e-8);
+                }
+                for (route, &value) in result.routes.iter().zip(&result.values) {
+                    if value > 1e-6 {
+                        let q = route.route.resource_profile[1][4];
+                        assert!(if upper { q >= boundary } else { q <= boundary });
+                    }
+                }
+            }
+            let cheap = child
+                .routes
+                .iter()
+                .find(|r| r.route.arcs.contains(&arrivals[0]))
+                .unwrap();
+            let expected_arrival = if upper && ACCUMULATED_RESOURCE_IN_PRICING {
+                boundary
+            } else {
+                boundary - 0.5e-6
+            };
+            assert_eq!(cheap.route.resource_profile[1][4], expected_arrival);
+            let complete = child
+                .snapshot
+                .enumerate(&EnumerationOptions::default())
+                .unwrap()
+                .solve(options.clone())
+                .unwrap();
+            assert!(complete.snapshot.enumeration_report().complete);
+            assert!((complete.master.lp - expected).abs() < 1e-8);
+            assert!((complete.master.bound - expected).abs() < 1e-8);
             assert!(
                 (fresh.master.lp - expected).abs() < 1e-8,
                 "upper={upper}: {fresh:?}"
@@ -258,7 +294,7 @@ fn accumulated_branch_registers_one_master_row_in_both_build_modes() {
 #[test]
 #[cfg(all(feature = "clp", feature = "accumulated-resource-master"))]
 fn impossible_resource_window_remains_a_master_only_resource_branch() {
-    use baldes::master::model::{self, Options, Problem};
+    use baldes::master::model::{self, EnumerationOptions, Options, Problem};
     let mut s = solver(ResourceKind::Disposable);
     let arc = s.graph.add_arc(0, 1, 1.).unwrap();
     s.graph.add_arc(1, 2, 0.).unwrap();
@@ -269,11 +305,23 @@ fn impossible_resource_window_remains_a_master_only_resource_branch() {
     // Head upper bound is 3: the upper child excludes every use of this arc,
     // and with it the only route covering vertex 1.
     let child = resource_branch(&parent.snapshot, vec![arc], 4., true)
-        .solve(options)
+        .solve(options.clone())
         .unwrap();
+    assert_eq!(child.master.status, baldes::master::cg::Status::Stalled);
+    assert!(child
+        .master
+        .feasibility
+        .iter()
+        .all(|r| !r.certified_infeasible));
+    let complete = child
+        .snapshot
+        .enumerate(&EnumerationOptions::default())
+        .unwrap();
+    assert!(complete.enumeration_report().complete);
+    let proved = complete.solve(options).unwrap();
     assert_eq!(
-        child.master.status,
+        proved.master.status,
         baldes::master::cg::Status::Infeasible,
-        "{child:?}"
+        "{proved:?}"
     );
 }

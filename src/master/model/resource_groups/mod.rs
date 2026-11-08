@@ -44,22 +44,27 @@ pub(super) fn entries<const D: usize>(oracle: &Oracle<D>, route: &Route) -> Vec<
 fn windows_graph<const D: usize>(oracle: &Oracle<D>) -> Result<(Graph<D>, HashSet<i32>)> {
     let mut graph = oracle.network.graph.as_ref().clone();
     let mut blocked = HashSet::new();
-    for (_, group) in &oracle.resource_groups {
-        group.install(&mut graph)?;
-        blocked.extend(
-            group
-                .arcs()
-                .iter()
-                .copied()
-                .filter(|&a| group.additive(a) != 0.),
-        );
+    if crate::master::branching::ACCUMULATED_RESOURCE_IN_PRICING {
+        for (_, group) in &oracle.resource_groups {
+            group.install(&mut graph)?;
+            blocked.extend(
+                group
+                    .arcs()
+                    .iter()
+                    .copied()
+                    .filter(|&a| group.additive(a) != 0.),
+            );
+        }
     }
     synchronization::install_windows(oracle, &mut graph, &mut blocked);
     Ok((graph, blocked))
 }
 
 pub(super) fn domain_graph<const D: usize>(oracle: &Oracle<D>) -> Result<Cow<'_, Graph<D>>> {
-    if oracle.resource_groups.is_empty() && oracle.synchronized_windows.is_empty() {
+    if (oracle.resource_groups.is_empty()
+        || !crate::master::branching::ACCUMULATED_RESOURCE_IN_PRICING)
+        && oracle.synchronized_windows.is_empty()
+    {
         return Ok(Cow::Borrowed(&oracle.network.graph));
     }
     let (mut graph, blocked) = windows_graph(oracle)?;
@@ -95,7 +100,8 @@ pub(super) fn check_load_rows<const D: usize>(
         .iter()
         .find(|o| o.network.id == network)
         .ok_or_else(|| invalid("unknown resource group network"))?;
-    if state.universe.is_none()
+    if crate::master::branching::ACCUMULATED_RESOURCE_IN_PRICING
+        && state.universe.is_none()
         && oracle.network.graph.resources.get(resource)
             == Some(&crate::graph::ResourceKind::Disposable)
         && oracle
@@ -115,6 +121,8 @@ impl<const D: usize> NodeSnapshot<D> {
     /// shared packing group. The original row must prove at most one occurrence
     /// across all networks and static variables. Both children include t-1e-6.
     /// The parent is unchanged, including on validation or backend failure.
+    /// Master-only mode preserves original schedules and pricing windows.
+    /// Pricing mode also tightens windows and refreshes inherited schedules.
     /// Re-timing a disposable axis with resource-load rows requires a complete
     /// universe, so their original path coefficients remain unchanged.
     pub fn with_resource_group_branch(
@@ -157,7 +165,8 @@ impl<const D: usize> NodeSnapshot<D> {
             if !seen.insert(member.network) {
                 return Err(invalid("duplicate resource group network"));
             }
-            if upper
+            if crate::master::branching::ACCUMULATED_RESOURCE_IN_PRICING
+                && upper
                 && oracle.network.graph.resources.get(resource)
                     == Some(&crate::graph::ResourceKind::Disposable)
                 && state.universe.is_none()
@@ -202,20 +211,24 @@ impl<const D: usize> NodeSnapshot<D> {
                 .iter_mut()
                 .find(|o| o.network.id == network)
                 .unwrap();
-            for &arc in group.arcs() {
-                oracle
-                    .solver
-                    .add_accumulated_resource_branch(AccumulatedResourceBranch {
-                        arc,
-                        resource,
-                        threshold,
-                        upper,
-                    })?;
+            if crate::master::branching::ACCUMULATED_RESOURCE_IN_PRICING {
+                for &arc in group.arcs() {
+                    oracle
+                        .solver
+                        .add_accumulated_resource_branch(AccumulatedResourceBranch {
+                            arc,
+                            resource,
+                            threshold,
+                            upper,
+                        })?;
+                }
             }
             oracle.resource_groups.push((shared, group));
         }
         node = super::nonlinear::refresh_row(node, shared)?;
-        if profiles::refresh(&mut node, &self.state, &seen)? {
+        if crate::master::branching::ACCUMULATED_RESOURCE_IN_PRICING
+            && profiles::refresh(&mut node, &self.state, &seen)?
+        {
             // An original-feasible fixed path can become exactly impossible
             // under a new window even if its rounded profile passes the rule.
             node = node.with_row(

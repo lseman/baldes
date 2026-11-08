@@ -180,6 +180,12 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
                 Some(true) => {}
                 None => return Err("Arithmetic: exact resource replay is unknown".into()),
             }
+            if !super::super::ryan_foster::entries(oracle, &probe)
+                .map_err(|error| error.to_string())?
+                .is_empty()
+            {
+                continue;
+            }
             if !oracle
                 .solver
                 .route_satisfies_relaxation(&probe.nodes, &probe.arcs)
@@ -197,6 +203,12 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
             probe.resources = canonical.resources;
             probe.resource_profile = canonical.resource_profile;
             probe.coupled_values = canonical.coupled_values;
+            if super::super::resource_groups::entries(oracle, &probe)
+                .iter()
+                .any(|&(_, a)| a != 0.)
+            {
+                continue;
+            }
             let mut ids = probe.arcs.clone();
             ids.sort_unstable();
             probe.original_cost = ids
@@ -316,6 +328,12 @@ fn collect_paired_program_routes<const D: usize>(
                 continue;
             }
         }
+        if !super::super::ryan_foster::entries(oracle, &candidate)
+            .map_err(|error| error.to_string())?
+            .is_empty()
+        {
+            continue;
+        }
         if !oracle
             .solver
             .route_satisfies_relaxation(&candidate.nodes, &candidate.arcs)
@@ -338,6 +356,12 @@ fn collect_paired_program_routes<const D: usize>(
             .ok()
             .flatten()
             .ok_or("Arithmetic: paired route reconstruction")?;
+        if super::super::resource_groups::entries(oracle, &route)
+            .iter()
+            .any(|&(_, a)| a != 0.)
+        {
+            continue;
+        }
         routes.push(route);
     }
     if Instant::now() >= deadline {
