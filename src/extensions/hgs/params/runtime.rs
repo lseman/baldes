@@ -1,6 +1,18 @@
 use super::*;
 
 impl Params {
+    pub(in crate::extensions::hgs) fn inherit_search_runtime(&mut self, source: &Self) {
+        self.config = source.config.clone();
+        self.start_time = source.start_time;
+        self.rng.replace(source.rng.borrow().clone());
+        self.penalty_capacity.set(source.penalty_capacity.get());
+        self.penalty_time_warp.set(source.penalty_time_warp.get());
+        self.penalty_wait_time = source.penalty_wait_time;
+        self.verbose = source.verbose;
+        self.instance_name.clone_from(&source.instance_name);
+        self.circle_sector_overlap_tolerance = source.circle_sector_overlap_tolerance;
+        self.min_circle_sector_size = source.min_circle_sector_size;
+    }
     /// Set the seed of the random number generator.
     pub fn set_seed(&mut self, seed: i32) {
         self.config.seed = seed;

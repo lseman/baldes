@@ -3,9 +3,22 @@ use super::*;
 impl<'p> HGSLocalSearch<'p> {
     /// RELOCATE*: the best move of one client of `r_u` after a client of `r_v`.
     pub(super) fn relocate_star(&mut self, r_u: usize, r_v: usize) -> bool {
-        let mut best_cost = 0.;
+        self.evaluate_relocate_star(r_u, r_v, None, true).is_some()
+    }
+
+    pub(super) fn evaluate_relocate_star(
+        &mut self,
+        r_u: usize,
+        r_v: usize,
+        focus: Option<usize>,
+        apply: bool,
+    ) -> Option<f64> {
+        let mut best_cost = if focus.is_some() { f64::INFINITY } else { 0. };
         let mut best: Option<(usize, usize)> = None;
-        for u in self.route_clients(r_u) {
+        for u in self
+            .route_clients(r_u)
+            .filter(|&u| focus.is_none_or(|f| f == u))
+        {
             let (prev, next) = (self.nodes[u].prev as usize, self.nodes[u].next as usize);
             let route_u_tw = TimeWindowData::merge(
                 &self.nodes[prev].prefix_tw_data,
@@ -30,19 +43,25 @@ impl<'p> HGSLocalSearch<'p> {
                     + self.penalty_excess_load(self.routes[r_v].load + load_u)
                     + self.penalty_time_windows(&route_v_tw)
                     - self.routes[r_v].penalty;
-                if cost_supp_u + cost_supp_v < best_cost - MY_EPSILON {
+                if cost_supp_u + cost_supp_v < best_cost - MY_EPSILON
+                    && (focus.is_none() || cost_supp_u + cost_supp_v <= self.delta_limit())
+                {
                     best_cost = cost_supp_u + cost_supp_v;
                     best = Some((u, v));
                 }
             }
         }
-        let Some((u, v)) = best else { return false };
+        let (u, v) = best?;
+        if !apply {
+            return Some(best_cost);
+        }
+        self.register_delta(best_cost);
         self.insert_node(u, v);
         self.nb_moves += 1;
         self.search_completed = false;
         self.update_route_data(r_u);
         self.update_route_data(r_v);
-        true
+        Some(best_cost)
     }
 
     /// Insertion costs of each client of `r1` into `r2` (SWAP* preprocessing),
@@ -227,6 +246,27 @@ impl<'p> HGSLocalSearch<'p> {
     /// SWAP* (Vidal 2022): exchange a client of `r_u` with one of `r_v`,
     /// each reinserted at its best position, if it improves the penalized cost.
     pub(super) fn swap_star(&mut self, r_u: usize, r_v: usize, with_tw: bool) -> bool {
+        self.evaluate_swap_star(r_u, r_v, with_tw, None, true)
+            .is_some()
+    }
+
+    pub(super) fn evaluate_swap_star(
+        &mut self,
+        r_u: usize,
+        r_v: usize,
+        with_tw: bool,
+        focus: Option<usize>,
+        apply: bool,
+    ) -> Option<f64> {
+        let first_v = self.nodes[self.depot_start(r_v)].next as usize;
+        if !self.route_clients(r_u).any(|u| {
+            self.swap_neighborhood
+                .candidates(u, first_v, r_v, &self.nodes)
+                .next()
+                .is_some()
+        }) {
+            return None;
+        }
         for r in [r_u, r_v] {
             if !self.best_insert_initialized_for_route[r] {
                 self.best_insert_initialized_for_route[r] = true;
@@ -252,9 +292,17 @@ impl<'p> HGSLocalSearch<'p> {
             v: 0,
             best_position_v: None,
         };
-        for u in self.route_clients(r_u) {
+        for u in self
+            .route_clients(r_u)
+            .filter(|&u| focus.is_none_or(|f| f == u))
+        {
             let demand_u = self.params.cli[self.nodes[u].cour as usize].demand;
-            for v in self.route_clients(r_v) {
+            for v in self
+                .swap_neighborhood
+                .candidates(u, first_v, r_v, &self.nodes)
+            {
+                #[cfg(test)]
+                self.swap_pairs_tested.set(self.swap_pairs_tested.get() + 1);
                 let demand_v = self.params.cli[self.nodes[v].cour as usize].demand;
                 let load_pen_u = self.penalty_excess_load(load_u + demand_v - demand_u);
                 let load_pen_v = self.penalty_excess_load(load_v + demand_u - demand_v);
@@ -265,12 +313,31 @@ impl<'p> HGSLocalSearch<'p> {
                     self.nodes[u].delta_removal + self.nodes[v].delta_removal
                 };
                 // Insertion costs are nonnegative bounds: skip hopeless pairs.
-                if delta_load_pen + delta_removal as f64 > 0. {
+                if focus.is_none() && delta_load_pen + delta_removal as f64 > 0. {
                     continue;
                 }
                 let (extra_v, position_u) = self.cheapest_insert_simult_removal(u, v, with_tw);
                 let (extra_u, position_v) = self.cheapest_insert_simult_removal(v, u, with_tw);
-                let move_cost = delta_load_pen + (delta_removal + extra_u + extra_v) as f64;
+                let mut move_cost = delta_load_pen + (delta_removal + extra_u + extra_v) as f64;
+                if focus.is_some() {
+                    // New time-warp penalties cannot be negative. This bound
+                    // remains valid for asymmetric, non-metric macro matrices.
+                    let lower = self.swap_star_route_cost(u, v, position_v)
+                        + self.swap_star_route_cost(v, u, position_u)
+                        + load_pen_u
+                        + load_pen_v
+                        - self.routes[r_u].penalty
+                        - self.routes[r_v].penalty;
+                    if lower > self.delta_limit().min(best.move_cost) + MY_EPSILON {
+                        continue;
+                    }
+                    move_cost = lower
+                        + self.penalty_time_windows(&self.swap_star_route_tw(u, v, position_v))
+                        + self.penalty_time_windows(&self.swap_star_route_tw(v, u, position_u));
+                    if move_cost > self.delta_limit() {
+                        continue;
+                    }
+                }
                 if move_cost < best.move_cost {
                     best = SwapStarElement {
                         move_cost,
@@ -286,7 +353,7 @@ impl<'p> HGSLocalSearch<'p> {
         }
         let (Some(position_u), Some(position_v)) = (best.best_position_u, best.best_position_v)
         else {
-            return false;
+            return None;
         };
         let (u, v) = (best.u, best.v);
 
@@ -301,16 +368,21 @@ impl<'p> HGSLocalSearch<'p> {
             + best.load_pen_v
             + self.penalty_time_windows(&route_v_tw)
             - self.routes[r_v].penalty;
-        if cost_supp_u + cost_supp_v > -MY_EPSILON {
-            return false;
+        if cost_supp_u + cost_supp_v > self.delta_limit() {
+            return None;
         }
 
+        let delta = cost_supp_u + cost_supp_v;
+        if !apply {
+            return Some(delta);
+        }
+        self.register_delta(delta);
         self.insert_node(u, position_u);
         self.insert_node(v, position_v);
         self.nb_moves += 1;
         self.search_completed = false;
         self.update_route_data(r_u);
         self.update_route_data(r_v);
-        true
+        Some(delta)
     }
 }

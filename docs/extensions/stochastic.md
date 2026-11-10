@@ -203,3 +203,13 @@ Tests cover hand-calculated and scenario-tree route costs, exact tiny-instance
 solutions, the routing tree against the tiny oracle with both policies and cut
 families, bucket fixing, HGS route validation, seeded incumbents without pool
 search, stochastic objective reconstruction, and shared time budgets.
+
+With Clp, an existing initial plan (including an HGS plan) can optionally be
+refined using exact stochastic route evaluation before the tree starts. Set
+`SolveOptions::incumbent_search_time_limit`, or use
+`stochastic_instance --incumbent-search-seconds 0.25`. Zero disables refinement
+(the default). This time is part of `tree.time_limit`; improved columns retain
+the Theta formulation's relaxed objectives. `SolveResult::incumbent_search`
+reports the replayed objectives and work counts. See
+[initial-plan refinement](stochastic_restocking.md#optional-initial-plan-refinement-for-theta)
+for move limits and cooperative deadline behavior.

@@ -2,6 +2,11 @@ use super::*;
 
 /// The controller owns incumbent tracking and the pricing route universe.
 pub trait Controller<M> {
+    /// Retained original-domain objective proof independent of completion of
+    /// the next pricing call. Never return a restricted-master objective here.
+    fn retained_objective_bound(&self) -> Option<f64> {
+        None
+    }
     /// Stable physical slots for proved redundant rows. No phase-I variable
     /// or stabilization geometry may reactivate these semantic tombstones.
     fn inactive_rows(&self) -> Vec<usize> {
@@ -49,6 +54,12 @@ pub trait Controller<M> {
     /// Only exact batches publish a numerical bound. Multiple pricing domains
     /// can contribute different multiplicities.
     fn pricing_bound(&self, _master: &M, _duals: &[f64]) -> Result<Option<f64>> {
+        Ok(None)
+    }
+    /// Independent numerical bound from completed pricing stages, even when
+    /// the current batch is incomplete. This never supplies a certificate or
+    /// changes pricing completion. None preserves exact-batch-only behavior.
+    fn completed_stage_bound(&self, _master: &M, _duals: &[f64]) -> Result<Option<f64>> {
         Ok(None)
     }
     /// Validate a conservative bound when an exact pass may close pricing or

@@ -123,12 +123,26 @@ impl<const D: usize> Solver<D> {
         Duration::try_from_secs_f64(seconds).map_err(|_| invalid("pricing time limit"))
     }
     pub(super) fn engine_controls(&self, exact: bool) -> EngineControls<D> {
+        let staged = self
+            .graph
+            .coupled_kernel()
+            .is_some_and(|k| k.bellman_pricing());
+        let backward = self
+            .graph
+            .coupled_kernel()
+            .is_some_and(|k| k.backward_pricing());
         EngineControls {
-            bidirectional: self
-                .options
-                .get("BALDESuseBidirectionalSearch")
-                .unwrap_or(2.)
-                != 0.,
+            staged_pricing: staged,
+            backward_only: self
+                .graph
+                .coupled_kernel()
+                .is_some_and(|k| k.backward_pricing()),
+            bidirectional: (!staged || backward)
+                && self
+                    .options
+                    .get("BALDESuseBidirectionalSearch")
+                    .unwrap_or(2.)
+                    != 0.,
             bidirectional_mode: self
                 .options
                 .get("BALDESuseBidirectionalSearch")

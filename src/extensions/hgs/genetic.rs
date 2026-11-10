@@ -13,6 +13,15 @@ use crate::extensions::hgs::{Individual, Params, Population, Split};
 /// Number of candidate offspring created from one individual pair.
 pub const NUMBER_OF_CANDIDATE_OFFSPRINGS: usize = 4;
 
+/// Evolution counters retained across compression stages.
+#[derive(Default)]
+pub(crate) struct EvolutionState {
+    pub(crate) granular: Option<i32>,
+    restarts: usize,
+    non_productive: usize,
+    iterations: usize,
+}
+
 /// Genetic engine that runs the crossover operators and main evolutionary loop.
 pub struct Genetic<'a, 'p> {
     params: &'p Params,
@@ -47,48 +56,79 @@ impl<'a, 'p> Genetic<'a, 'p> {
     /// iterations without improvement or the time limit. With a time limit,
     /// the population restarts instead of stopping on non-improvement.
     pub fn run(&mut self, population: &mut Population<'p>, max_iter_non_prod: usize) {
-        if self.params.nb_clients == 1 {
-            return;
+        self.run_epoch(
+            population,
+            max_iter_non_prod,
+            &mut EvolutionState::default(),
+            usize::MAX,
+        );
+    }
+
+    pub(crate) fn run_epoch(
+        &mut self,
+        population: &mut Population<'p>,
+        max_iter_non_prod: usize,
+        state: &mut EvolutionState,
+        steps: usize,
+    ) -> bool {
+        if self.params.nb_clients <= 1 {
+            return true;
         }
         const MDM_NON_UPDATING_RESTARTS: f64 = 0.05;
         let config = &self.params.config;
         let repair_threshold = config.repair_probability.max(0) as u64;
         let repeat_until_time_limit = config.time_limit > 0.0 && config.do_repeat_until_time_limit;
-        let mut nb_granular = config.nb_granular;
-        let mut nb_restarts = 0;
-        let mut nb_iter_non_prod = 1;
-        let mut nb_iter = 0usize;
-        while nb_iter_non_prod <= max_iter_non_prod && !self.params.is_time_limit_exceeded() {
-            // Selection and crossover, then local search on the best offspring.
-            let best = {
-                let (parent_a, parent_b) = population.get_non_identical_parents();
-                self.best_of_srex_and_ox_crossovers(parent_a, parent_b)
-            };
-            let offspring = &mut self.candidate_offsprings[best];
-            self.local_search.run(
-                offspring,
-                self.params.penalty_capacity.get(),
-                self.params.penalty_time_warp.get(),
-            );
-            let mut is_new_best = population.add_individual(offspring, true);
-
-            // Repair half of the infeasible offspring with stronger penalties.
-            if !offspring.is_feasible
-                && self.params.rng.borrow_mut().next() % 100 < repair_threshold
+        let mut nb_granular = state.granular.unwrap_or(config.nb_granular);
+        let mut nb_restarts = state.restarts;
+        let mut nb_iter_non_prod = state.non_productive.max(1);
+        let mut nb_iter = state.iterations;
+        let first_iteration = nb_iter;
+        while nb_iter_non_prod <= max_iter_non_prod
+            && !self.params.is_time_limit_exceeded()
+            && nb_iter - first_iteration < steps
+            && config
+                .generation_limit
+                .is_none_or(|limit| nb_iter < limit as usize)
+        {
+            let is_new_best = if let Some(improved) =
+                population.insert_reserved_seeds(nb_iter_non_prod, max_iter_non_prod)
             {
-                self.local_search.run(
-                    offspring,
-                    self.params.penalty_capacity.get() * 10.0,
-                    self.params.penalty_time_warp.get() * 10.0,
-                );
-                if offspring.is_feasible {
-                    is_new_best |= population.add_individual(offspring, false);
+                improved
+            } else {
+                // Selection and crossover, then local search on the best offspring.
+                let best = {
+                    let (parent_a, parent_b) = population.get_non_identical_parents();
+                    let best = self.best_of_srex_and_ox_crossovers(parent_a, parent_b);
+                    self.local_search.run_with_parents(
+                        &mut self.candidate_offsprings[best],
+                        self.params.penalty_capacity.get(),
+                        self.params.penalty_time_warp.get(),
+                        &[parent_a, parent_b],
+                    );
+                    best
+                };
+                let offspring = &mut self.candidate_offsprings[best];
+                let mut is_new_best = population.add_individual(offspring, true);
+
+                // Repair half of the infeasible offspring with stronger penalties.
+                if !offspring.is_feasible
+                    && self.params.rng.borrow_mut().next() % 100 < repair_threshold
+                {
+                    self.local_search.run(
+                        offspring,
+                        self.params.penalty_capacity.get() * 10.0,
+                        self.params.penalty_time_warp.get() * 10.0,
+                    );
+                    if offspring.is_feasible {
+                        is_new_best |= population.add_individual(offspring, false);
+                    }
                 }
-            }
+                is_new_best
+            };
 
             nb_iter_non_prod = if is_new_best { 1 } else { nb_iter_non_prod + 1 };
 
-            if nb_iter % 100 == 0 {
+            if nb_iter.is_multiple_of(100) {
                 population.manage_penalties();
             }
             let log_interval = if config.log_pool_interval > 0 {
@@ -96,7 +136,7 @@ impl<'a, 'p> Genetic<'a, 'p> {
             } else {
                 500
             };
-            if nb_iter % log_interval == 0 {
+            if nb_iter.is_multiple_of(log_interval) {
                 population.print_state(nb_iter as i32, nb_iter_non_prod as i32);
             }
 
@@ -113,9 +153,9 @@ impl<'a, 'p> Genetic<'a, 'p> {
 
             // Growth of the granular neighborhoods and of the population.
             let grows = |every_iter: i32, every_non_improving: i32| {
-                (every_iter > 0 && nb_iter % every_iter as usize == 0)
+                (every_iter > 0 && nb_iter.is_multiple_of(every_iter as usize))
                     || (every_non_improving > 0
-                        && nb_iter_non_prod % every_non_improving as usize == 0)
+                        && nb_iter_non_prod.is_multiple_of(every_non_improving as usize))
             };
             if config.grow_nb_granular_size != 0
                 && grows(
@@ -138,6 +178,15 @@ impl<'a, 'p> Genetic<'a, 'p> {
             nb_iter += 1;
             population.nb_generations += 1;
         }
+        state.granular = Some(nb_granular);
+        state.restarts = nb_restarts;
+        state.non_productive = nb_iter_non_prod;
+        state.iterations = nb_iter;
+        nb_iter_non_prod > max_iter_non_prod
+            || self.params.is_time_limit_exceeded()
+            || config
+                .generation_limit
+                .is_some_and(|limit| nb_iter >= limit as usize)
     }
 
     /// Order Crossover (OX) on a random segment, in both parent orders.

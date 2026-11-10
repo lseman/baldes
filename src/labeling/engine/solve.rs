@@ -17,6 +17,36 @@ impl<const D: usize> LabelingEngine<D> {
         controls: &Controls,
         allow_partial: bool,
     ) -> Result<PricingResult> {
+        // Completion callbacks are call-local and never change the model's
+        // resource/certificate definitions. Packing cuts add nonnegative
+        // penalties; unsupported cut families retain unpruned labeling.
+        let started = Instant::now();
+        let packing = self.cuts.kpath.is_empty()
+            && !self.cuts.presence.active()
+            && !self.cuts.knapsack.active
+            && self.cuts.inputs.iter().all(|c| {
+                !c.covering
+                    && !c.type2
+                    && c.dual.is_finite()
+                    && c.dual >= 0.
+                    && c.vertex_coefficient.iter().all(|&v| v >= 0)
+                    && c.arc_coefficient.values().all(|&v| v >= 0)
+            });
+        let prepared = if packing
+            && (controls.negative_only
+                || self.controls.backward_only
+                || self.controls.staged_pricing)
+        {
+            started
+                .checked_add(controls.time_limit)
+                .and_then(|deadline| g.with_pricing_plugins(controls.zero_threshold, deadline))
+        } else {
+            None
+        };
+        let mut remaining = controls.clone();
+        remaining.time_limit = remaining.time_limit.saturating_sub(started.elapsed());
+        let g = prepared.as_ref().unwrap_or(g);
+        let controls = &remaining;
         // Completion bounds prune labels that cannot improve. A route improves
         // when its label cost is below `zero_threshold` (minus any route-level
         // offset such as a fleet dual), so the configured threshold is relative
@@ -24,7 +54,15 @@ impl<const D: usize> LabelingEngine<D> {
         // floor the reported minimum below the true improving threshold.
         let base = self.controls.load_completion_threshold;
         self.controls.load_completion_threshold = base + controls.zero_threshold;
-        let result = self.solve_relative(g, controls, allow_partial);
+        let mut result = self.solve_relative(g, controls, allow_partial);
+        if prepared.is_some() {
+            if let Ok(answer) = &mut result {
+                answer.minimum_reduced_cost =
+                    answer.minimum_reduced_cost.min(controls.zero_threshold);
+            }
+            self.half_ready = false;
+            self.full_ready = false;
+        }
         self.controls.load_completion_threshold = base;
         result
     }
@@ -87,8 +125,16 @@ impl<const D: usize> LabelingEngine<D> {
             self.coupled_present || self.cuts.presence.active(),
         );
         self.statistics = Statistics::default();
-        self.root(g, true)?;
-        if self.runtime_bidirectional() && !self.consumption_joins {
+        if self.controls.backward_only {
+            self.grid.bidirectional = true;
+            self.grid.ensure_backward(g)?;
+            self.backward
+                .reset(self.grid.backward.buckets.iter().map(Vec::len));
+        } else {
+            self.root(g, true)?;
+        }
+        if (self.runtime_bidirectional() || self.controls.backward_only) && !self.consumption_joins
+        {
             self.root(g, false)?;
         }
         let started = Instant::now();
@@ -109,7 +155,13 @@ impl<const D: usize> LabelingEngine<D> {
                 (self.statistics.forward_time, self.statistics.backward_time) =
                     self.run_both_directions(g, controls, started, &mut pool)?;
             } else {
-                self.run_direction(g, true, controls, started, &mut pool)?;
+                self.run_direction(
+                    g,
+                    !self.controls.backward_only,
+                    controls,
+                    started,
+                    &mut pool,
+                )?;
                 self.statistics.forward_time = started.elapsed().as_secs_f64();
             }
             self.refresh_coupled_completion(g);
@@ -276,6 +328,7 @@ impl<const D: usize> LabelingEngine<D> {
                     && matches!(
                         error.message.as_str(),
                         "pricing label limit exceeded"
+                            | "pricing column batch limit reached"
                             | "pricing hard time limit exceeded"
                             | "pricing concatenation time limit exceeded"
                     ) =>

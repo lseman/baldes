@@ -88,7 +88,7 @@ impl Params {
 
     /// Shared part of the constructors (HGS Params::Params). `nb_vehicles` 0
     /// means the default fleet ceil(1.3 * demand / capacity) + 3.
-    pub(super) fn build(
+    pub(in crate::extensions::hgs) fn build(
         mut cli: Vec<Client>,
         nb_vehicles: i32,
         vehicle_capacity: i32,

@@ -239,10 +239,16 @@ pub fn run_dri(
         || options.clustering_iterations == 0
         || !options.fuzziness.is_finite()
         || options.fuzziness <= 1.0
+        || !options.hgs.local_search.valid()
         || options.hgs.nb_iter == 0
         || options.hgs.nb_iter > i32::MAX as u32
         || options.hgs.population_size == 0
         || options.hgs.population_size > i32::MAX as u32
+        || options
+            .hgs
+            .compression
+            .as_ref()
+            .is_some_and(|c| c.interval == 0)
         || options.vicinity == 0
         || options.customer_neighbors == 0
         || !options.fuzzy_threshold.is_finite()

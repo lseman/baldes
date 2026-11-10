@@ -282,3 +282,7 @@ required-features = ["clp"]
 [[test]]
 name = "paired_backward_capture"
 path = "tests/pricing/coupled/backward_pairing.rs"
+
+[[test]]
+name = "stochastic_restocking"
+path = "tests/extensions/stochastic_restocking.rs"

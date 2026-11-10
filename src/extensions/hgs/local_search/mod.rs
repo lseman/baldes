@@ -172,9 +172,28 @@ struct SwapStarElement {
     best_position_v: Option<usize>,
 }
 
+/// Optional customer-level search policy. Credit is in original instance cost units.
+#[derive(Clone, Debug, Default)]
+pub struct LocalSearchOptions {
+    pub best_move: bool,
+    /// Improving moves earn credit during pass one only. Zero disables deterioration.
+    pub max_deterioration: f64,
+}
+impl LocalSearchOptions {
+    pub(crate) fn valid(&self) -> bool {
+        self.max_deterioration.is_finite()
+            && self.max_deterioration >= 0.
+            && self.max_deterioration <= f64::MAX / 10.
+            && (self.best_move || self.max_deterioration == 0.)
+    }
+}
+
 /// Main Local Search engine for HGS.
 pub struct HGSLocalSearch<'p> {
     params: &'p Params,
+    move_credit: Option<f64>,
+    candidate_routes: Vec<bool>,
+    refresh_swap: bool,
     pub search_completed: bool,
     pub nb_moves: i32,
     pub order_nodes: Vec<usize>,
@@ -201,12 +220,25 @@ pub struct HGSLocalSearch<'p> {
     /// because the search mutates them and `params` is shared.
     correlated_vertices: Vec<Vec<usize>>,
     nb_granular: i32,
+    searched_plans: inheritance::SearchedPlans,
+    /// Search-time route indices in either parent; never mix parent proofs.
+    inherited_routes: Vec<[Option<usize>; 2]>,
+    swap_neighborhood: swap_neighborhood::SwapNeighborhood,
+    #[cfg(test)]
+    swap_pairs_tested: std::cell::Cell<usize>,
+    #[cfg(test)]
+    ri_pairs_tested: usize,
+    #[cfg(test)]
+    ri_pairs_reused: usize,
 }
 
+mod best_move;
 mod construction;
+mod inheritance;
 mod relocate;
 mod routes;
 mod search;
 mod star;
 mod swap;
+mod swap_neighborhood;
 mod two_opt;

@@ -101,6 +101,7 @@ impl<'a, const D: usize> Context<'a, D> {
     }
     pub(super) fn runtime_bidirectional(&self) -> bool {
         self.controls.bidirectional
+            && !self.controls.backward_only
             && (self.controls.bidirectional_mode == 1
                 || (self.controls.bidirectional_mode == 2 && self.phase.exact()))
     }

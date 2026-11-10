@@ -1,6 +1,60 @@
 use super::*;
 use crate::master::clp::ClpMaster;
 
+#[test]
+fn independent_objective_proof_survives_a_later_pricing_timeout() {
+    struct Retained(Option<f64>);
+    impl Controller<ClpMaster> for Retained {
+        fn fix_pricing(&mut self, _: &ClpMaster, _: &[f64]) -> Result<()> {
+            self.0 = Some(3.);
+            Ok(())
+        }
+        fn retained_objective_bound(&self) -> Option<f64> {
+            self.0
+        }
+    }
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let mut master = ClpMaster::new().unwrap();
+        master.add_row(RowSense::GreaterEqual, 1., &[]).unwrap();
+        master.add_column(10., &[(0, 1.)]).unwrap();
+        let mut calls = 0;
+        let output = optimize(
+            &mut master,
+            &[],
+            |_, _| {
+                calls += 1;
+                if calls > 1 {
+                    return Err(crate::incomplete("pricing time limit"));
+                }
+                Ok(Answer {
+                    columns: vec![Column {
+                        cost: 5.,
+                        reduced_cost: -5.,
+                        entries: vec![(0, 1.)],
+                        acceptable: true,
+                        tag: 42,
+                        identity: "improving".into(),
+                    }],
+                    minimum: f64::NEG_INFINITY,
+                    exact: false,
+                    bound_minimum: None,
+                })
+            },
+            &mut Retained(Some(3.)),
+            Options {
+                stabilize: false,
+                bound_mode: mode,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(output.status, Status::TimeLimit);
+        assert_eq!(output.bound, 3.);
+        assert_eq!(output.certified_bound, 3.);
+        assert!(output.bound < output.lp);
+    }
+}
+
 struct ExternalCutoff {
     certificate: Option<f64>,
     complete: bool,
@@ -108,5 +162,65 @@ fn positive_artificial_cutoff_requires_selected_proof_and_complete_exact_domain(
         assert!(!partial.pruned_by_bound);
         assert_eq!(partial.numerical_bound, f64::NEG_INFINITY);
         assert_eq!(partial.certified_bound, f64::NEG_INFINITY);
+    }
+}
+
+#[test]
+fn completed_stage_bound_survives_partial_pricing_without_entering_the_certified_channel() {
+    struct Stage;
+    impl Controller<ClpMaster> for Stage {
+        fn pricing_complete(&self) -> bool {
+            false
+        }
+        fn completed_stage_bound(&self, _: &ClpMaster, _: &[f64]) -> Result<Option<f64>> {
+            Ok(Some(3.))
+        }
+    }
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let mut master = ClpMaster::new().unwrap();
+        master.add_row(RowSense::GreaterEqual, 1., &[]).unwrap();
+        master.add_column(10., &[(0, 1.)]).unwrap();
+        let mut calls = 0;
+        let output = optimize(
+            &mut master,
+            &[],
+            |_, _| {
+                calls += 1;
+                if calls > 1 {
+                    return Err(crate::incomplete("pricing time limit"));
+                }
+                Ok(Answer {
+                    columns: vec![Column {
+                        cost: 5.,
+                        reduced_cost: -5.,
+                        entries: vec![(0, 1.)],
+                        acceptable: true,
+                        tag: 42,
+                        identity: "stage-improving".into(),
+                    }],
+                    minimum: 0.,
+                    exact: false,
+                    bound_minimum: None,
+                })
+            },
+            &mut Stage,
+            Options {
+                stabilize: false,
+                bound_mode: mode,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(output.status, Status::TimeLimit);
+        assert_eq!(output.numerical_bound, 3.);
+        assert_eq!(output.certified_bound, f64::NEG_INFINITY);
+        assert_eq!(
+            output.bound,
+            if mode == BoundMode::Numerical {
+                3.
+            } else {
+                f64::NEG_INFINITY
+            }
+        );
     }
 }

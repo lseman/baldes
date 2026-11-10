@@ -105,6 +105,31 @@ fn make_test_instance() -> Instance {
 }
 
 #[test]
+fn hgs_seeded_compression_without_checks_matches_the_ordinary_seeded_trajectory() {
+    use baldes::extensions::hgs::{run_hgs_seeded, CompressionOptions};
+    let instance = make_test_instance();
+    let seed = vec![vec![1, 2, 3], vec![4, 5, 6], vec![7, 8, 9, 10]];
+    for delay_seed in [false, true] {
+        let mut options = HgsOptions {
+            time_limit: 0.,
+            nb_iter: 15,
+            population_size: 3,
+            seed: 19,
+            delay_seed,
+            ..Default::default()
+        };
+        let ordinary = run_hgs_seeded(&instance, &options, std::slice::from_ref(&seed)).unwrap();
+        options.compression = Some(CompressionOptions {
+            interval: usize::MAX,
+        });
+        let compressed = run_hgs_seeded(&instance, &options, std::slice::from_ref(&seed)).unwrap();
+        assert_eq!(ordinary.routes, compressed.routes);
+        assert_eq!(ordinary.best_cost, compressed.best_cost);
+        assert_eq!(ordinary.generations, compressed.generations);
+    }
+}
+
+#[test]
 fn test_hgs_cvrp_runs() {
     let instance = make_test_instance();
 
@@ -230,4 +255,42 @@ fn hgs_retains_fractional_explicit_matrix_costs_and_search_costs() {
     )
     .unwrap();
     assert!((result.best_cost.unwrap() - expected).abs() < 1e-12);
+}
+
+#[test]
+fn route_decomposition_preserves_seed_quality_within_the_original_fleet() {
+    use baldes::extensions::hgs::solution::validate_plan;
+    use baldes::extensions::hgs::{run_hgs_decomposed, RouteDecompositionOptions};
+    let instance = make_test_instance();
+    let initial = run_hgs(
+        &instance,
+        &HgsOptions {
+            time_limit: 0.05,
+            nb_iter: 10,
+            population_size: 3,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(initial.best_cost.is_some());
+    let result = run_hgs_decomposed(
+        &instance,
+        Some(&initial.routes),
+        &RouteDecompositionOptions {
+            time_limit: 0.15,
+            target_customers: 6,
+            phases: 2,
+            hgs: HgsOptions {
+                nb_iter: 10,
+                population_size: 3,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(result.decomposition.subproblems > 0);
+    let cost = validate_plan(&instance, &result.solution.routes).unwrap();
+    assert!(cost <= initial.best_cost.unwrap() + 1e-9);
+    assert_eq!(Some(cost), result.solution.best_cost);
 }

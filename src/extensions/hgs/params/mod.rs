@@ -108,8 +108,10 @@ pub struct Savings {
 /// Configuration parameters for the HGS algorithm.
 #[derive(Clone, Debug)]
 pub struct Config {
+    pub local_search: super::local_search::LocalSearchOptions,
     /// Iterations without improvement until termination.
     pub nb_iter: i32,
+    pub generation_limit: Option<u32>,
     /// CPU time limit in seconds (0 = infinity).
     pub time_limit: f64,
     /// Use wall-clock time instead of CPU time.
@@ -152,6 +154,15 @@ pub struct Config {
     pub use_dynamic_parameters: bool,
     pub path_solution: String,
     pub nb_granular: i32,
+    /// Directed SWAP* shortlist size before symmetrizing. Zero (the default)
+    /// preserves broad search; 35 enables the experimental filtered policy.
+    pub swap_star_neighbors: usize,
+    /// Keep this percentage of closest demands before ranking by travel cost.
+    /// Values above 100 use all demands; zero leaves only periodic broad passes.
+    pub swap_star_demand_percentage: u8,
+    /// First and every Nth actual intensification pass are unfiltered.
+    /// Zero or one disables filtering.
+    pub swap_star_full_pass_interval: usize,
     pub intensification_probability_ls: i32,
     pub use_swap_star_tw: bool,
     pub skip_swap_star_dist: bool,
@@ -166,7 +177,9 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            local_search: Default::default(),
             nb_iter: 20000,
+            generation_limit: None,
             time_limit: 0.0, // 0 = infinity (checked separately)
             use_wall_clock_time: false,
             path_bks: String::new(),
@@ -203,6 +216,9 @@ impl Default for Config {
             use_dynamic_parameters: false,
             path_solution: String::new(),
             nb_granular: 40,
+            swap_star_neighbors: 0,
+            swap_star_demand_percentage: 30,
+            swap_star_full_pass_interval: 5,
             intensification_probability_ls: 15,
             use_swap_star_tw: true,
             skip_swap_star_dist: false,

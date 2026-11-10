@@ -64,8 +64,8 @@ pub enum CoupledResource {
     /// A resource supplied by an extension (for example EVRP charging).
     /// Objective costs require explicit opt-in; it cannot be a numeric
     /// dependency parent. Feasibility-only plugins can supply an independent
-    /// proof callback; cost-bearing plugins currently have no directed cost
-    /// certificate. Plugins are not serialized.
+    /// proof callback; cost-bearing plugins need an explicit independent
+    /// objective certificate. Plugins are not serialized.
     #[cfg_attr(feature = "clp", serde(skip))]
     Plugin(PluginResource),
     /// Numeric base transition retaining its literal function encoding.

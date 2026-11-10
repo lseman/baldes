@@ -89,6 +89,26 @@ fn network_minimum<const D: usize>(
     if !oracle.activity_rows.is_empty() {
         return columns::minimum(oracle, offset, duals, resource_work, deadline);
     }
+    // Extension-provided q-route proofs include the original resource cost
+    // jointly with additive dual weights. Dropped nonadditive terms must be
+    // nonnegative; their unsupported signs keep the generic fallback.
+    if oracle.presence_rows.is_empty() && oracle.knapsack_rows.is_empty() {
+        if let Some(kernel) = oracle.network.graph.coupled_kernel() {
+            if let Some(weights) = arc_cost_lower_bounds(oracle, offset, duals) {
+                if let Some(mut minimum) =
+                    kernel.plugin_pricing_minimum(&weights, resource_work, deadline)
+                {
+                    for &(row, coefficient) in &oracle.route_entries {
+                        minimum = subtract_product(minimum, duals[row], coefficient)?;
+                    }
+                    for &(row, coefficient) in oracle.network.route_entries.iter() {
+                        minimum = subtract_product(minimum, duals[offset + row], coefficient)?;
+                    }
+                    return Some(Some(minimum));
+                }
+            }
+        }
+    }
     // Pickup/delivery feasibility depends on the whole route's departure load.
     // Independent arc relaxations cannot prove that all routes exceed capacity.
     // Reuse the budgeted joint proof, retaining the relaxation when it is unknown.
@@ -101,7 +121,13 @@ fn network_minimum<const D: usize>(
                 )
             })
     }) {
-        if let Some(bound) = columns::minimum(oracle, offset, duals, resource_work, deadline) {
+        // Joint path proofs may exhaust their allowance without covering the
+        // domain. Preserve work for polynomial resource/objective envelopes.
+        let allowance = *resource_work / 4;
+        let mut remaining = allowance;
+        let bound = columns::minimum(oracle, offset, duals, &mut remaining, deadline);
+        *resource_work -= allowance - remaining;
+        if let Some(bound) = bound {
             return Some(bound);
         }
     }
@@ -518,16 +544,17 @@ type Contributions = (
     crate::master::numerics::ExactSum,
     Vec<crate::master::numerics::ExactSum>,
 );
-pub(super) fn exact_contributions<const D: usize>(
+pub(super) fn witness_contributions<const D: usize>(
     state: &State<D>,
     routes: &[FixedRoute],
 ) -> Result<Option<Contributions>> {
-    exact_contributions_in_domain(state, routes, true)
+    exact_contributions_in_domain(state, routes, true, true)
 }
 fn exact_contributions_in_domain<const D: usize>(
     state: &State<D>,
     routes: &[FixedRoute],
     branch_domain: bool,
+    enclose_objective: bool,
 ) -> Result<Option<Contributions>> {
     use crate::master::numerics::ExactSum;
     let mut rows = vec![ExactSum::default(); state.shared_rows.len()];
@@ -591,7 +618,20 @@ fn exact_contributions_in_domain<const D: usize>(
             let Some((true, cost)) = kernel.certify_with_budget(&arcs, &mut 1_000_000, None) else {
                 return Ok(None);
             };
-            if cost[0] != cost[1] || objective.product(cost[0], fixed.quantity).is_none() {
+            // Incumbents need a conservative upper objective, whereas fixed
+            // reductions require an exact constant in both bound directions.
+            let value = if enclose_objective {
+                if fixed.quantity >= 0. {
+                    cost[1]
+                } else {
+                    cost[0]
+                }
+            } else if cost[0] == cost[1] {
+                cost[0]
+            } else {
+                return Ok(None);
+            };
+            if objective.product(value, fixed.quantity).is_none() {
                 return Ok(None);
             }
         }
@@ -609,7 +649,7 @@ pub(super) fn exact_fixed_reduction<const D: usize>(
         return Ok(true);
     }
     let Some((rows, mut objective, counts)) =
-        exact_contributions_in_domain(state, &state.fixed_routes, false)?
+        exact_contributions_in_domain(state, &state.fixed_routes, false, false)?
     else {
         return Ok(false);
     };

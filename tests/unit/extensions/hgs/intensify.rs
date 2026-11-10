@@ -36,6 +36,7 @@ fn options() -> IntensifyOptions {
             population_size: 3,
             seed: 7,
             verbose: false,
+            ..Default::default()
         },
         restart_after: 2,
         ..IntensifyOptions::default()
@@ -365,4 +366,30 @@ fn queued_jobs_respect_deadlines_and_zero_workers_are_rejected() {
         ..options()
     };
     assert!(intensify(&instance(), &[vec![1, 2], vec![3, 4]], &opts).is_err());
+}
+
+#[test]
+fn compressed_delayed_seed_subproblems_checkpoint_feasible_nonworsening_plans() {
+    let data = instance();
+    let seed = vec![vec![1, 3], vec![2, 4]];
+    let mut opts = options();
+    opts.subproblem.compression = Some(crate::extensions::hgs::CompressionOptions { interval: 1 });
+    opts.subproblem.delay_seed = true;
+    let baseline = validate_plan(&data, &seed).unwrap();
+    let mut checkpoints = 0;
+    let result = intensify_with_callback(&data, &seed, &opts, |routes, cost| {
+        assert_eq!(validate_plan(&data, routes).unwrap(), cost);
+        assert!(cost <= baseline);
+        checkpoints += 1;
+        Ok(())
+    })
+    .unwrap();
+    assert!(result.rounds > 0 && checkpoints > 0);
+    assert!(result.best_cost <= baseline);
+    assert_eq!(
+        validate_plan(&data, &result.routes).unwrap(),
+        result.best_cost
+    );
+    opts.subproblem.compression.as_mut().unwrap().interval = 0;
+    assert!(intensify(&data, &seed, &opts).is_err());
 }

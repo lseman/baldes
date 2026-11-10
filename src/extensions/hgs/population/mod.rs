@@ -51,10 +51,19 @@ pub struct Population<'p> {
     pub nb_generations: u32,
     /// Target pool size (mu); starts at the configured value and may grow.
     pub minimum_population_size: i32,
+    /// Validated seeds withheld from breeding, but protected during compression.
+    pub(crate) reserved_seeds: Vec<Individual<'p>>,
+    pub(crate) consensus: Option<super::compression::Consensus>,
+    /// Constant distance of routes frozen outside the active graph, for reporting.
+    objective_offset: f64,
+    frozen_routes: usize,
 }
 
+mod compression;
+pub(crate) use compression::Checkpoint;
 mod construction;
 mod management;
 mod patterns;
 mod routes;
+mod seeding;
 mod selection;

@@ -31,6 +31,10 @@ impl<'p> Population<'p> {
             mdm_next_pattern: 0,
             nb_generations: 0,
             minimum_population_size: params.config.minimum_population_size,
+            consensus: None,
+            reserved_seeds: Vec::new(),
+            objective_offset: 0.,
+            frozen_routes: 0,
         }
     }
 
@@ -117,9 +121,10 @@ impl<'p> Population<'p> {
             return;
         }
         let cost = |value: Option<f64>| {
-            value
-                .filter(|v| v.is_finite())
-                .map_or_else(|| "--".into(), |v| format!("{:.5}", v / 10.))
+            value.filter(|v| v.is_finite()).map_or_else(
+                || "--".into(),
+                |v| format!("{:.5}", (v + self.objective_offset) / 10.),
+            )
         };
         let best = self.get_best_found().filter(|i| i.is_feasible);
         let iteration = if nb_iter < 0 {
@@ -139,11 +144,7 @@ impl<'p> Population<'p> {
             cost(best.map(|i| f64::from(i.my_cost_sol.distance))),
             best.map_or_else(
                 || "--".into(),
-                |i| i
-                    .chrom_r
-                    .iter()
-                    .filter(|r| !r.is_empty())
-                    .count()
+                |i| (i.chrom_r.iter().filter(|r| !r.is_empty()).count() + self.frozen_routes)
                     .to_string()
             ),
             self.feasible.len(),

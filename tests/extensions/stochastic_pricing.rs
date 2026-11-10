@@ -513,3 +513,109 @@ fn arc_bounded_nonmetric_theta_tree_matches_the_tiny_oracle() {
         close(actual.bound, expected.total_cost);
     }
 }
+
+#[test]
+fn recourse_refinement_preserves_theta_column_costs_and_shares_budget() {
+    use baldes::extensions::stochastic::SolveOptions;
+    use baldes::master::model::{FixedRoute, NetworkRoute};
+    use std::time::Duration;
+    let p = Problem::new(
+        4,
+        vec![
+            Demand::new(vec![(2, 1.)]).unwrap(),
+            Demand::new(vec![(0, 0.5), (4, 0.5)]).unwrap(),
+            Demand::new(vec![(2, 1.)]).unwrap(),
+            Demand::new(vec![(0, 0.5), (4, 0.5)]).unwrap(),
+        ],
+        (0..5)
+            .map(|i| (0..5).map(|j| if i == j { 0. } else { 1. }).collect())
+            .collect(),
+    )
+    .unwrap();
+    let graph = p.theta_cut_graph(4).unwrap();
+    let initial: Vec<_> = [vec![1, 2], vec![3, 4]]
+        .into_iter()
+        .map(|customers| {
+            let nodes: Vec<_> = std::iter::once(graph.source)
+                .chain(customers)
+                .chain(std::iter::once(graph.sink))
+                .collect();
+            let arcs: Vec<_> = nodes
+                .windows(2)
+                .map(|pair| {
+                    graph
+                        .arcs
+                        .iter()
+                        .find(|a| a.tail == pair[0] && a.head == pair[1])
+                        .unwrap()
+                        .id
+                })
+                .collect();
+            let mut route = graph.elementary_route(&arcs).unwrap().unwrap();
+            // Refinement must reconstruct these from arcs, like tree validation.
+            route.nodes.clear();
+            route.original_cost = -999.;
+            FixedRoute {
+                route: NetworkRoute { network: 0, route },
+                quantity: 1.,
+            }
+        })
+        .collect();
+    let initial_cost: f64 = [vec![1, 2], vec![3, 4]]
+        .iter()
+        .map(|r| {
+            p.evaluate_route(r, Policy::OptimalRestocking)
+                .unwrap()
+                .total_cost
+        })
+        .sum();
+    for (total_budget, search_budget) in [
+        (Duration::from_secs(2), Duration::from_millis(100)),
+        (Duration::from_secs(2), Duration::ZERO),
+        (Duration::ZERO, Duration::from_secs(100)),
+    ] {
+        let mut options = SolveOptions {
+            incumbent_search_time_limit: search_budget,
+            ..Default::default()
+        };
+        options.tree.time_limit = total_budget;
+        options.tree.node_limit = 0;
+        options.tree.initial_solution = Some((initial_cost, initial.clone()));
+        let answer = p.solve(Policy::OptimalRestocking, 2, options).unwrap();
+        assert_eq!(answer.tree.nodes, 0);
+        if total_budget.is_zero() || search_budget.is_zero() {
+            assert!(answer.incumbent_search.is_none());
+            close(answer.tree.incumbent, initial_cost);
+        } else {
+            let summary = answer.incumbent_search.unwrap();
+            assert!(summary.accepted_moves > 0);
+            close(summary.initial_objective, initial_cost);
+            close(summary.final_objective, answer.tree.incumbent);
+            assert!(answer.tree.incumbent < initial_cost);
+            let columns: f64 = answer
+                .tree
+                .routes
+                .iter()
+                .map(|r| r.route.route.original_cost)
+                .sum();
+            close(columns, 6.);
+            assert!(answer.tree.incumbent > columns);
+            let replay: f64 = answer
+                .tree
+                .routes
+                .iter()
+                .map(|r| {
+                    let nodes = &r.route.route.nodes;
+                    let customers: Vec<_> = nodes[1..nodes.len() - 1]
+                        .iter()
+                        .map(|&v| v as usize)
+                        .collect();
+                    p.evaluate_route(&customers, Policy::OptimalRestocking)
+                        .unwrap()
+                        .total_cost
+                })
+                .sum();
+            close(answer.tree.incumbent, replay);
+        }
+    }
+}

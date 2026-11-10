@@ -112,6 +112,16 @@ pub(super) struct NetworkPricingAdapter<'a, const D: usize> {
 }
 
 impl<const D: usize> crate::master::pricing::Networks<D> for NetworkPricingAdapter<'_, D> {
+    fn accepts_partial_columns(&self, index: usize) -> bool {
+        self.state.oracles[index]
+            .network
+            .graph
+            .coupled_kernel()
+            .is_some_and(|k| k.bellman_pricing())
+    }
+    fn partial_minimum(&self, index: usize) -> Option<f64> {
+        self.state.oracles[index].solver.staged_minimum
+    }
     fn active(&self) -> Vec<usize> {
         self.state
             .oracles
@@ -129,6 +139,37 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkPricingAdapt
     ) -> Result<crate::master::pricing::Request> {
         use crate::master::pricing::{Envelopes, Request};
         let oracle = &mut self.state.oracles[index];
+        if oracle
+            .network
+            .graph
+            .coupled_kernel()
+            .is_some_and(|k| k.bellman_pricing())
+        {
+            oracle.solver.heuristic_seeds.clear();
+            // Search only when graph/registry replay covers every priced row.
+            if oracle.activity_rows.is_empty()
+                && oracle.knapsack_rows.is_empty()
+                && oracle.presence_rows.is_empty()
+                && oracle.resource_groups.is_empty()
+                && oracle.ryan_foster_rows.is_empty()
+                && oracle.arc_set_branch_rows.is_empty()
+            {
+                oracle.solver.heuristic_seeds.extend(
+                    self.state
+                        .routes
+                        .iter()
+                        .rev()
+                        .filter(|r| r.network == oracle.network.id && r.route.nodes.len() > 2)
+                        .take(512)
+                        .map(|r| {
+                            r.route.nodes[1..r.route.nodes.len() - 1]
+                                .iter()
+                                .map(|&v| v as usize)
+                                .collect()
+                        }),
+                );
+            }
+        }
         if self.state.universe.is_some()
             || self.state.gap_pool_cutoff.is_some()
             || oracle.solver.enumeration.is_some()

@@ -25,6 +25,10 @@ impl<const D: usize> Solver<D> {
             enumeration: None,
             enumeration_preserve_arc_paths: false,
             cutoff: f64::INFINITY,
+            staged_minimum: None,
+            exact_target: None,
+            prepricing_calls: 0,
+            heuristic_seeds: vec![],
             prepared: None,
             bucket_steps: [0.; D].into(),
             rollback_point_saved: false,
@@ -106,6 +110,10 @@ impl<const D: usize> Solver<D> {
                 || !self.ryan_foster.is_empty()
                 || !self.arc_set_branches.is_empty(),
             cutoff: self.cutoff,
+            staged_minimum: None,
+            exact_target: self.exact_target,
+            prepricing_calls: self.prepricing_calls,
+            heuristic_seeds: self.heuristic_seeds.clone(),
             prepared: if keep_cost_state {
                 self.prepared.clone()
             } else {

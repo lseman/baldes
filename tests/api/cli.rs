@@ -1580,3 +1580,222 @@ fn routing_root_and_tree_share_the_json_stdout_sink() {
         assert!(data.get("bound").is_some());
     }
 }
+
+#[test]
+fn xtw_native_cli_automatically_uses_integer_distances_and_vehicles_first_search() {
+    let directory = std::env::temp_dir().join(format!("baldes-xtw-native-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let file = directory.join("XTW-n3.vrp");
+    let seed = directory.join("seed.sol");
+    // Unit demands force two routes. sqrt(2) must be rounded to 1, not 1.4.
+    std::fs::write(&file,"NAME : XTW-n3\nTYPE : VRPTW\nDIMENSION : 3\nCAPACITY : 1\nEDGE_WEIGHT_TYPE : EUC_2D\nNODE_COORD_SECTION\n1 0 0\n2 1 1\n3 2 2\nDEMAND_SECTION\n1 0\n2 1\n3 1\nTIME_WINDOW_SECTION\n1 0 100\n2 0 100\n3 0 100\nSERVICE_TIME_SECTION\n1 0\n2 2\n3 3\nDEPOT_SECTION\n1\n-1\nEOF\n").unwrap();
+    std::fs::write(&seed, "Route #1: 1\nRoute #2: 2\nCost 8\n").unwrap();
+    let run = |flags: &[&str]| {
+        let mut cmd = command();
+        cmd.arg("hgs")
+            .arg(&file)
+            .arg("--initial-solution")
+            .arg(&seed)
+            .args([
+                "--time",
+                "0.03",
+                "--nb-iter",
+                "3",
+                "--population-size",
+                "3",
+                "--json",
+                "-",
+            ])
+            .args(flags);
+        cmd.output().unwrap()
+    };
+    let output = run(&[]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("Intensify:"),
+        "XTW must select vehicles-first search automatically"
+    );
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["cost"].as_f64(), Some(8.));
+    assert_eq!(report["routes"].as_array().unwrap().len(), 2);
+    let override_output = run(&["--rounding", "none"]);
+    assert!(override_output.status.success());
+    let report: serde_json::Value = serde_json::from_slice(&override_output.stdout).unwrap();
+    assert!((report["cost"].as_f64().unwrap() - 6. * 2_f64.sqrt()).abs() < 1e-9);
+    let distance_output = run(&["--intensify", "--objective", "distance"]);
+    assert!(distance_output.status.success());
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn hgs_compression_and_delayed_seeds_work_for_direct_and_intensified_search() {
+    use baldes::extensions::hgs::solution::{parse_solution, validate_plan};
+    let directory =
+        std::env::temp_dir().join(format!("baldes-compressed-seed-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let file = directory.join("tiny.txt");
+    let seed = directory.join("seed.sol");
+    let checkpoint = directory.join("best.sol");
+    std::fs::write(&file, "tiny\nVEHICLE\nNUMBER CAPACITY\n2 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 2 0 1 0 100 0\n3 9 0 1 0 100 0\n4 10 0 1 0 100 0\n").unwrap();
+    std::fs::write(&seed, "Route #1: 1 3\nRoute #2: 2 4\nCost 38\n").unwrap();
+    let instance = baldes::inputs::Instance::read(&file).unwrap();
+    for intensify in [false, true] {
+        let mut cmd = command();
+        cmd.arg("hgs")
+            .arg(&file)
+            .arg("--initial-solution")
+            .arg(&seed)
+            .args([
+                "--rounding",
+                "none",
+                "--time",
+                "0.1",
+                "--nb-iter",
+                "8",
+                "--population-size",
+                "3",
+                "--compression-interval",
+                "1",
+                "--delay-seed",
+                "--solution-output",
+            ])
+            .arg(&checkpoint)
+            .args(["--json", "-"]);
+        if intensify {
+            cmd.args([
+                "--intensify",
+                "--subproblem-customers",
+                "4",
+                "--subproblem-routes",
+                "2",
+                "--subproblem-time",
+                "0.03",
+            ]);
+        }
+        let output = cmd.output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        let routes = parse_solution(&std::fs::read_to_string(&checkpoint).unwrap()).unwrap();
+        let cost = validate_plan(&instance, &routes).unwrap();
+        assert!(cost <= 38.);
+        assert_eq!(report["cost"].as_f64(), Some(cost));
+    }
+    for flags in [
+        vec!["--compression-interval", "0"],
+        vec!["--compression-interval", "bad"],
+    ] {
+        let output = command()
+            .args(["hgs", "missing.txt"])
+            .args(flags)
+            .output()
+            .unwrap();
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("compression interval"));
+    }
+    let output = command()
+        .args(["ails-ii", "missing.txt", "--delay-seed"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("require hgs"));
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn hgs_best_move_credit_and_reverse_mode_preserve_seeded_feasibility() {
+    use baldes::extensions::hgs::solution::{parse_solution, validate_plan};
+    let directory =
+        std::env::temp_dir().join(format!("baldes-best-reverse-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let file = directory.join("tiny.txt");
+    let seed = directory.join("seed.sol");
+    let best = directory.join("best.sol");
+    std::fs::write(&file,"tiny\nVEHICLE\nNUMBER CAPACITY\n2 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 2 0 1 0 100 0\n3 9 0 1 0 100 0\n4 10 0 1 0 100 0\n").unwrap();
+    std::fs::write(&seed, "Route #1: 1 3\nRoute #2: 2 4\nCost 38\n").unwrap();
+    let instance = baldes::inputs::Instance::read(&file).unwrap();
+    for policy in 0..4 {
+        let mut cmd = command();
+        cmd.arg("hgs")
+            .arg(&file)
+            .arg("--initial-solution")
+            .arg(&seed)
+            .args([
+                "--rounding",
+                "none",
+                "--time",
+                "0.2",
+                "--population-size",
+                "3",
+                "--nb-iter",
+                "8",
+                "--max-generations",
+                "3",
+                "--best-move",
+                "--compression-interval",
+                "1",
+                "--delay-seed",
+                "--solution-output",
+            ])
+            .arg(&best)
+            .args(["--json", "-"]);
+        if policy > 0 {
+            cmd.args(["--deterioration-credit", "1"]);
+        }
+        if policy == 2 {
+            cmd.args(["--intensify", "--subproblem-customers", "4"]);
+        }
+        if policy == 3 {
+            cmd.args([
+                "--reverse-mode",
+                "--exploration-level",
+                "3",
+                "--decomposition-phases",
+                "1",
+                "--subproblem-customers",
+                "4",
+            ]);
+        }
+        let out = cmd.output().unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        let routes = parse_solution(&std::fs::read_to_string(&best).unwrap()).unwrap();
+        let cost = validate_plan(&instance, &routes).unwrap();
+        assert!(cost <= 38.);
+        assert_eq!(report["cost"].as_f64(), Some(cost));
+        if policy < 2 {
+            assert!(report["generations"].as_u64().unwrap() <= 3);
+        }
+        if policy == 3 {
+            assert!(String::from_utf8_lossy(&out.stderr).contains("levels=[1, 2, 3]"));
+        }
+    }
+    for flags in [
+        vec!["--deterioration-credit", "1"],
+        vec!["--best-move", "--deterioration-credit", "NaN"],
+        vec!["--reverse-mode", "--exploration-level", "7"],
+        vec!["--reverse-mode", "--decomposition-phases", "0"],
+        vec!["--reverse-mode", "--intensify"],
+        vec!["--exploration-level", "2"],
+    ] {
+        let out = command()
+            .args(["hgs", "missing.txt"])
+            .args(flags)
+            .output()
+            .unwrap();
+        assert!(!out.status.success());
+        assert!(!String::from_utf8_lossy(&out.stderr).contains("cannot read"));
+    }
+    std::fs::remove_dir_all(directory).unwrap();
+}

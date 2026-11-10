@@ -378,10 +378,16 @@ pub fn intensify_with_callback(
         || !(0.0..=1.0).contains(&options.elite_diversity)
         || !options.subproblem.time_limit.is_finite()
         || options.subproblem.time_limit < 0.0
+        || !options.subproblem.local_search.valid()
         || options.subproblem.nb_iter == 0
         || options.subproblem.nb_iter > i32::MAX as u32
         || options.subproblem.population_size == 0
         || options.subproblem.population_size > i32::MAX as u32
+        || options
+            .subproblem
+            .compression
+            .as_ref()
+            .is_some_and(|c| c.interval == 0)
     {
         return Err("invalid intensification limits, threshold or elite settings".into());
     }

@@ -33,6 +33,7 @@ fn options() -> DriOptions {
             population_size: 3,
             seed: 3,
             verbose: false,
+            ..Default::default()
         },
         ..DriOptions::default()
     }

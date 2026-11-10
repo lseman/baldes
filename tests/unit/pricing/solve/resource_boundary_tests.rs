@@ -255,3 +255,133 @@ fn raw_functor_retained_skip_does_not_require_or_refresh_objective_cache() {
     assert!(active.exact);
     assert_eq!(active.minimum_reduced_cost, -2.25);
 }
+
+#[test]
+fn bellman_threshold_stages_include_route_offsets_and_do_not_claim_full_pricing() {
+    use crate::extensions::stochastic_restocking::{Demand, Problem, RestockingResource};
+    use crate::graph::coupled::{CoupledResource, PluginResource};
+    let p = Problem::new(
+        4,
+        vec![Demand::new(vec![(0, 1.)]).unwrap()],
+        vec![vec![0., 10.], vec![10., 0.]],
+    )
+    .unwrap();
+    let mut solver = Solver::<2>::new(3, 0).unwrap();
+    solver.graph.add_arc(0, 1, 10.).unwrap();
+    solver.graph.add_arc(1, 2, 10.).unwrap();
+    solver.graph.set_reduced_costs(&[-15., -15.]).unwrap();
+    solver
+        .set_coupled_resources(&[CoupledResource::Plugin(PluginResource::new(
+            RestockingResource::new(p, vec![(0, 1), (1, 0)]).unwrap(),
+        ))])
+        .unwrap();
+    solver.exact_target = Some(-20.);
+    let controls = Controls {
+        zero_threshold: -25.,
+        ..Default::default()
+    };
+    let mut engine = solver
+        .new_engine(solver.engine_controls(true), solver.phases[0])
+        .unwrap();
+    let result = solver
+        .bellman_stages(
+            &mut engine,
+            &controls,
+            std::time::Instant::now(),
+            Duration::from_secs(2),
+        )
+        .unwrap();
+    assert!(!result.exact, "the full threshold was never priced");
+    assert_eq!(result.columns.len(), 1);
+    assert_eq!(result.columns[0].cost, -30.);
+    assert_eq!(solver.staged_minimum, Some(-30.));
+    assert_eq!(solver.exact_target, Some(-1.25));
+    let fork = solver.fork_pricing(false);
+    assert!(
+        fork.staged_minimum.is_none(),
+        "a node/cost fork cannot inherit a point-dependent proof"
+    );
+    solver.cache_variable_costs(&[]).unwrap();
+    assert!(
+        solver.staged_minimum.is_none(),
+        "a changed dual point invalidates stage minima"
+    );
+}
+
+#[test]
+fn heuristic_requested_bellman_fallback_uses_raw_costs_for_completed_minima() {
+    use crate::extensions::stochastic_restocking::{Demand, Problem, RestockingResource};
+    use crate::graph::coupled::{CoupledResource, PluginResource};
+    let p = Problem::new(
+        4,
+        vec![Demand::new(vec![(0, 1.)]).unwrap()],
+        vec![vec![0., 1.], vec![1., 0.]],
+    )
+    .unwrap();
+    let mut solver = Solver::<2>::new(3, 0).unwrap();
+    for (id, (from, to)) in [(0, 1), (1, 2)].into_iter().enumerate() {
+        let arc = solver.graph.add_arc(from, to, 0.).unwrap();
+        solver.graph.arc_mut(arc).unwrap().variables = vec![(id, 1.)];
+    }
+    solver
+        .set_coupled_resources(&[CoupledResource::Plugin(PluginResource::new(
+            RestockingResource::new(p, vec![(0, 1), (1, 0)]).unwrap(),
+        ))])
+        .unwrap();
+    solver
+        .set_option("BALDESuseRoundedHeuristicPricing", 1.)
+        .unwrap();
+    solver.cache_variable_costs(&[-4e-9, 0.]).unwrap();
+    assert_eq!(solver.graph.arcs[0].reduced_cost, 0.);
+    let priced = solver.price_functor_phase(2, 20).unwrap();
+    assert!(
+        priced.exact,
+        "the Bellman fallback completes even in a heuristic requested phase"
+    );
+    assert!((priced.minimum_reduced_cost + 4e-9).abs() < 1e-20);
+}
+
+#[test]
+fn scalar_ng_proof_refines_cycles_without_exporting_walks_or_interrupted_minima() {
+    use crate::extensions::stochastic_restocking::{Demand, Problem, RestockingResource};
+    use crate::graph::coupled::{CoupledResource, PluginResource};
+    let problem = Problem::new(
+        4,
+        vec![Demand::new(vec![(0, 1.)]).unwrap(); 4],
+        vec![vec![0.; 5]; 5],
+    )
+    .unwrap();
+    let mut solver = Solver::<2>::new(6, 1).unwrap();
+    let mut endpoints = Vec::new();
+    for (from, to, reduced) in [
+        (0, 1, 5.),
+        (1, 2, -3.),
+        (2, 3, -3.),
+        (3, 1, -3.),
+        (1, 5, 0.),
+        (2, 5, 10.),
+        (3, 5, 10.),
+    ] {
+        let id = solver.graph.add_arc(from, to, 0.).unwrap();
+        solver.graph.arc_mut(id).unwrap().reduced_cost = reduced;
+        solver.graph.arc_mut(id).unwrap().consumption[0] = 1.;
+        endpoints.push((from, if to == 5 { 0 } else { to }));
+    }
+    for vertex in 0..6 {
+        solver.graph.set_bounds(vertex, 0, 0., 5.).unwrap();
+    }
+    solver
+        .set_coupled_resources(&[CoupledResource::Plugin(PluginResource::new(
+            RestockingResource::new(problem, endpoints).unwrap(),
+        ))])
+        .unwrap();
+    // The unrefined walk 0,1,2,3,1,5 costs -4; every elementary route costs
+    // at least 5. A complete-first sweep must remove that cycle and retry.
+    assert!(solver.scalar_preprice(20, Duration::from_secs(2)).is_none());
+    let bound = solver.staged_minimum.unwrap();
+    assert!((0. ..=5.).contains(&bound), "refined bound {bound}");
+    assert!(solver.graph.vertices[2].memory == vec![2]);
+    solver.staged_minimum = None;
+    assert!(solver.scalar_preprice(20, Duration::ZERO).is_none());
+    assert!(solver.staged_minimum.is_none());
+}

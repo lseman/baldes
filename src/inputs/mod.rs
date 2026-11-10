@@ -15,7 +15,7 @@ pub struct Instance {
     pub name: String,
     pub vehicles: usize,
     pub capacity: f64,
-    /// Depot first. CVRPLIB customers have no time window: due is infinite.
+    /// Depot first. CVRP customers have no time window: due is infinite.
     pub customers: Vec<Customer>,
     /// The file's distance convention: none for Solomon, TSPLIB nint for
     /// EUC_2D, ceil for CEIL_2D. Callers may choose another.
@@ -74,7 +74,18 @@ impl Instance {
         std::borrow::Cow::Owned(cached)
     }
 
-    /// Whether every customer has a finite time window (CVRPLIB has none).
+    /// Whether this is a named XTW benchmark instance with time windows.
+    /// XTW uses a free fleet and a vehicles-first objective. The CLI recognizes
+    /// the catalog's `XTW-n<dimension>` names without changing the library HGS API.
+    pub fn is_xtw(&self) -> bool {
+        self.name
+            .to_ascii_uppercase()
+            .strip_prefix("XTW-N")
+            .is_some_and(|suffix| !suffix.is_empty() && suffix.bytes().all(|c| c.is_ascii_digit()))
+            && self.has_time_windows()
+    }
+
+    /// Whether every customer has a finite time window (CVRP has none).
     pub fn has_time_windows(&self) -> bool {
         self.customers.iter().all(|c| c.due.is_finite())
     }

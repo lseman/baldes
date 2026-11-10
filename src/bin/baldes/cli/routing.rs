@@ -109,6 +109,7 @@ struct RoutingOptions {
     tree: bool,
     node_limit: usize,
     json_path: Option<String>,
+    rounding_specified: bool,
 }
 
 fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>, String> {
@@ -425,6 +426,9 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
     }
     common.apply_routing(&mut options);
     hgs_extension.validate()?;
+    if kind == "ails-ii" && hgs_extension.genetic_controls_active() {
+        return Err("HGS search options require hgs".into());
+    }
     if kind == "ails-ii" && (hgs_extension.intensify || hgs_extension.dri) {
         return Err("ails-ii conflicts with --intensify and --dri".into());
     }
@@ -489,6 +493,7 @@ fn parse_options(kind: &str, args: Vec<String>) -> Result<Option<RoutingOptions>
         tree,
         node_limit,
         json_path,
+        rounding_specified,
     }))
 }
 
@@ -543,7 +548,7 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
         local_search,
         tree_controls,
         enumerated_mip,
-        rounding,
+        mut rounding,
         hgs_extension,
         ails_iterations,
         hgs_pop_size,
@@ -556,11 +561,15 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
         tree,
         node_limit,
         json_path,
+        rounding_specified,
     }) = parse_options(&kind, args)?
     else {
         return Ok(());
     };
     let mut instance = Instance::read(file).map_err(|e| e.to_string())?;
+    if instance.is_xtw() && !rounding_specified {
+        rounding = Some(instance.rounding);
+    }
     if let Some(n) = customers {
         instance.truncate(n).map_err(|e| e.to_string())?;
     }
@@ -590,7 +599,7 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
     if kind == "ails-ii" {
         if let Some(rounding) = rounding {
             instance.rounding = rounding;
-        } else if hgs_extension.get_bks && instance.has_time_windows() {
+        } else if hgs_extension.get_bks && instance.has_time_windows() && !instance.is_xtw() {
             instance.rounding = Rounding::Tenth;
         }
         let time = if options.cg.time_limit.is_zero() {
@@ -634,7 +643,7 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
         use baldes::extensions::hgs::HgsOptions;
         if let Some(rounding) = rounding {
             instance.rounding = rounding;
-        } else if hgs_extension.get_bks && instance.has_time_windows() {
+        } else if hgs_extension.get_bks && instance.has_time_windows() && !instance.is_xtw() {
             // Current CVRPLib Solomon/Homberger BKSs use truncated tenths.
             instance.rounding = Rounding::Tenth;
         }
@@ -649,6 +658,7 @@ pub(super) fn solve_routing(kind: String, file: String, args: Vec<String>) -> Re
             population_size: hgs_pop_size.unwrap_or(25),
             seed: hgs_seed,
             verbose: options.cg.log_interval.is_some(),
+            ..Default::default()
         };
         let started = std::time::Instant::now();
         let result = hgs_extension.run(&instance, &opts)?;

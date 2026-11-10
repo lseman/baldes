@@ -256,14 +256,21 @@ impl CoupledKernel {
         work: &mut usize,
         deadline: Option<Instant>,
     ) -> Option<(bool, [f64; 2])> {
-        // A feasibility-only plugin proof must never erase an objective.
-        if self.plugins.iter().any(|p| p.0.has_costs()) {
-            return None;
-        }
-        for plugin in &self.plugins {
+        let mut plugin_objective = Interval::point(0.);
+        for (r, definition) in self.definitions.iter().enumerate() {
+            let CoupledResource::Plugin(plugin) = definition else {
+                continue;
+            };
             debit(work, arcs.len().checked_add(1)?, deadline)?;
             let before = *work;
-            let result = plugin.0.certify(arcs, work, deadline);
+            let result = if plugin.0.has_costs() {
+                plugin.0.certify_objective(arcs, work, deadline)
+            } else {
+                plugin
+                    .0
+                    .certify(arcs, work, deadline)
+                    .map(|valid| (valid, [0.; 2]))
+            };
             if *work > before {
                 *work = before;
                 return None;
@@ -271,9 +278,21 @@ impl CoupledKernel {
             if deadline.is_some_and(|limit| Instant::now() >= limit) {
                 return None;
             }
-            if !result? {
+            let (valid, cost) = result?;
+            if !valid {
                 return Some((false, [0.; 2]));
             }
+            if cost.iter().any(|x| !x.is_finite()) || cost[0] > cost[1] {
+                return None;
+            }
+            plugin_objective = plugin_objective.add(
+                Interval {
+                    lo: cost[0],
+                    hi: cost[1],
+                }
+                .multiply(self.objective_coefficients[r])?
+                .multiply(self.cost_scale)?,
+            )?;
         }
         if !self.selection_proper(arcs) {
             return Some((false, [0.; 2]));
@@ -283,10 +302,10 @@ impl CoupledKernel {
         if !valid {
             return Some((false, [0.; 2]));
         }
-        let mut objective = Interval {
+        let mut objective = plugin_objective.add(Interval {
             lo: front_cost[0],
             hi: front_cost[1],
-        };
+        })?;
         let (valid, slope_cost) = self.certify_slope_fronts(arcs, work, deadline)?;
         if !valid {
             return Some((false, [0.; 2]));

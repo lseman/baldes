@@ -23,6 +23,8 @@
 //! ```
 
 pub mod circle_sector;
+pub mod compression;
+pub mod decomposition;
 pub mod dri;
 pub mod driver;
 pub mod genetic;
@@ -36,6 +38,13 @@ pub mod solution;
 pub mod split;
 
 pub use circle_sector::CircleSector;
+pub use compression::{
+    run_hgs_compressed, CompressedHgsResult, CompressionOptions, CompressionStats,
+};
+pub use decomposition::{
+    run_hgs_decomposed, RouteDecompositionOptions, RouteDecompositionResult,
+    RouteDecompositionStats,
+};
 pub use driver::{run_hgs, run_hgs_seeded, HgsOptions, HgsResult};
 pub use genetic::Genetic;
 pub use individual::{Individual, SortableF64};

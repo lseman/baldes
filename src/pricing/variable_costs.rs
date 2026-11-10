@@ -21,6 +21,7 @@ impl<const D: usize> Solver<D> {
         Ok(())
     }
     pub fn cache_variable_costs(&mut self, costs: &[f64]) -> Result<()> {
+        self.staged_minimum = None;
         if costs.iter().any(|v| !v.is_finite())
             || self.maximum_variable_id.is_some_and(|id| id >= costs.len())
         {
@@ -51,6 +52,7 @@ impl<const D: usize> Solver<D> {
     /// phases correct returned cached-cost routes; exact phases search the raw
     /// objective because rounding can discard the route attaining its minimum.
     pub fn price_functor_phase(&mut self, index: usize, maximum: usize) -> Result<PricingResult> {
+        self.staged_minimum = None;
         if self
             .enumeration
             .as_ref()
@@ -72,11 +74,18 @@ impl<const D: usize> Solver<D> {
         }
         let started = std::time::Instant::now();
         let budget = self.pricing_time_limit()?;
+        // Restocking falls back to a complete staged Bellman search in every
+        // requested phase. Its minima must always describe raw dual costs.
+        let bellman = self
+            .graph
+            .coupled_kernel()
+            .is_some_and(|k| k.bellman_pricing());
         let exact_phase = self
             .phases
             .get(index)
             .ok_or_else(|| invalid("pricing phase out of range"))?
-            .exact();
+            .exact()
+            || bellman;
         if !exact_phase
             && self.options.get("BALDESuseRoundedHeuristicPricing")? != 0.
             && (!self.variable_costs.is_empty() || self.raw_arc_costs.is_some())
@@ -112,7 +121,7 @@ impl<const D: usize> Solver<D> {
             .phases
             .get(index)
             .ok_or_else(|| invalid("pricing phase out of range"))?;
-        let controls = self.engine_controls(phase.exact());
+        let controls = self.engine_controls(phase.exact() || bellman);
         let previous = self.raw_pricing.take().filter(|cache| {
             cache.controls == controls
                 && cache.solver.graph.same_topology(&self.graph)
@@ -133,6 +142,9 @@ impl<const D: usize> Solver<D> {
             raw.round.clone_from(&self.round);
             raw.bucket_steps = self.bucket_steps;
             raw.cutoff = self.cutoff;
+            raw.exact_target = self.exact_target;
+            raw.prepricing_calls = self.prepricing_calls;
+            raw.heuristic_seeds.clone_from(&self.heuristic_seeds);
             raw.rollback_point_saved = self.rollback_point_saved;
             raw.maximum_variable_id = self.maximum_variable_id;
             raw.dominance_mode = self.dominance_mode;
@@ -195,12 +207,19 @@ impl<const D: usize> Solver<D> {
         std::mem::swap(&mut raw.cuts, &mut self.cuts);
         self.round = std::mem::take(&mut raw.round);
         self.requires_rollback = raw.requires_rollback;
+        self.staged_minimum = raw.staged_minimum;
+        self.exact_target = raw.exact_target;
+        self.prepricing_calls = raw.prepricing_calls;
         // Preserve the cached objective and its labels; only the raw sweep
         // contributes statistics to this logical pricing call.
-        let mut statistics = raw
-            .engine
-            .as_ref()
-            .map_or_else(Default::default, |e| e.statistics.clone());
+        let mut statistics = answer.as_ref().map_or_else(
+            |_| {
+                raw.engine
+                    .as_ref()
+                    .map_or_else(Default::default, |e| e.statistics.clone())
+            },
+            |result| result.statistics.clone(),
+        );
         statistics.elapsed = started.elapsed().as_secs_f64();
         if let Some(engine) = &mut self.engine {
             engine.statistics = statistics.clone();

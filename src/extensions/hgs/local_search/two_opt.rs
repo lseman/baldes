@@ -4,8 +4,20 @@ impl<'p> HGSLocalSearch<'p> {
     /// 2-opt within a single route.
     #[inline(always)]
     pub fn two_opt_within_trip(&mut self, u: usize, v: usize) -> bool {
+        self.evaluate_two_opt_within_trip(u, v, true).is_some()
+    }
+
+    pub(super) fn evaluate_two_opt_within_trip(
+        &mut self,
+        u: usize,
+        v: usize,
+        apply: bool,
+    ) -> Option<f64> {
+        if u == v {
+            return None;
+        }
         if self.nodes[u].position >= self.nodes[v].position - 1 {
-            return false;
+            return None;
         }
 
         let x = self.nodes[u].next as usize;
@@ -23,8 +35,8 @@ impl<'p> HGSLocalSearch<'p> {
             - self.nodes[x].cumulated_reversal_distance) as f64;
 
         let r_u = self.nodes[u].route_idx as usize;
-        if !self.route_has_tw_violation(r_u) && cost > -MY_EPSILON {
-            return false;
+        if !self.route_has_tw_violation(r_u) && cost > self.delta_limit() {
+            return None;
         }
 
         let mut route_tw = self.nodes[u].prefix_tw_data.clone();
@@ -39,9 +51,14 @@ impl<'p> HGSLocalSearch<'p> {
             + self.penalty_time_windows(&route_tw)
             - self.routes[r_u].penalty;
 
-        if cost > -MY_EPSILON {
-            return false;
+        if cost > self.delta_limit() {
+            return None;
         }
+        let delta = cost;
+        if !apply {
+            return Some(delta);
+        }
+        self.register_delta(delta);
 
         let mut it = v;
         let mut ins_point = u;
@@ -56,14 +73,31 @@ impl<'p> HGSLocalSearch<'p> {
         self.search_completed = false;
         self.update_route_data(r_u);
 
-        true
+        Some(delta)
     }
 
     /// 2-opt* between two different routes.
     #[inline(always)]
     pub fn two_opt_between_trips(&mut self, u: usize, v: usize) -> bool {
+        self.evaluate_two_opt_between_trips(u, v, true).is_some()
+    }
+
+    pub(super) fn evaluate_two_opt_between_trips(
+        &mut self,
+        u: usize,
+        v: usize,
+        apply: bool,
+    ) -> Option<f64> {
+        if u == v {
+            return None;
+        }
         let x = self.nodes[u].next as usize;
         let y = self.nodes[v].next as usize;
+        if self.nodes[u].route_idx == self.nodes[v].route_idx
+            || (self.nodes[x].is_depot && self.nodes[y].is_depot)
+        {
+            return None;
+        }
 
         let u_cour = self.nodes[u].cour as usize;
         let v_cour = self.nodes[v].cour as usize;
@@ -82,9 +116,23 @@ impl<'p> HGSLocalSearch<'p> {
             && !self.route_has_tw_violation(r_u)
             && !self.route_has_load_penalty(r_v)
             && !self.route_has_tw_violation(r_v)
-            && cost_supp_u + cost_supp_v > -MY_EPSILON
+            && cost_supp_u + cost_supp_v > self.delta_limit()
         {
-            return false;
+            return None;
+        }
+
+        let load_pen_u = self.penalty_excess_load(
+            self.nodes[u].cumulated_load + self.routes[r_v].load - self.nodes[v].cumulated_load,
+        );
+        let load_pen_v = self.penalty_excess_load(
+            self.nodes[v].cumulated_load + self.routes[r_u].load - self.nodes[u].cumulated_load,
+        );
+        if cost_supp_u + cost_supp_v + load_pen_u + load_pen_v
+            - self.routes[r_u].penalty
+            - self.routes[r_v].penalty
+            > self.bound_limit()
+        {
+            return None;
         }
 
         let route_u_tw = TimeWindowData::merge(
@@ -108,9 +156,14 @@ impl<'p> HGSLocalSearch<'p> {
         ) + self.penalty_time_windows(&route_v_tw)
             - self.routes[r_v].penalty;
 
-        if cost_supp_u + cost_supp_v > -MY_EPSILON {
-            return false;
+        if cost_supp_u + cost_supp_v > self.delta_limit() {
+            return None;
         }
+        let delta = cost_supp_u + cost_supp_v;
+        if !apply {
+            return Some(delta);
+        }
+        self.register_delta(delta);
 
         let mut it_v = y;
         let mut ins = u;
@@ -135,6 +188,6 @@ impl<'p> HGSLocalSearch<'p> {
         self.update_route_data(r_u);
         self.update_route_data(r_v);
 
-        true
+        Some(delta)
     }
 }

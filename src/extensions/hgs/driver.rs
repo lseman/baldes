@@ -13,12 +13,22 @@ pub struct HgsOptions {
     pub time_limit: f64,
     /// Number of iterations without improvement before termination or restart.
     pub nb_iter: u32,
+    /// Optional total generation cap, preserved across compression and restarts.
+    pub generation_limit: Option<u32>,
     /// Minimum population size (mu).
     pub population_size: u32,
     /// Random seed.
     pub seed: i32,
     /// Print the population state periodically.
     pub verbose: bool,
+    /// Periodic consensus compression, also used inside seeded subproblems.
+    pub compression: Option<super::CompressionOptions>,
+    /// Reserve seeds outside the breeding pool until stagnation, half the time
+    /// budget, or a generated feasible plan reaches their cost. Seeds remain
+    /// eligible as the returned incumbent from the beginning.
+    pub delay_seed: bool,
+    /// Opt-in best-move education and first-pass credit.
+    pub local_search: super::local_search::LocalSearchOptions,
 }
 
 impl Default for HgsOptions {
@@ -26,9 +36,13 @@ impl Default for HgsOptions {
         Self {
             time_limit: 60.0,
             nb_iter: 20000,
+            generation_limit: None,
             population_size: 25,
             seed: 0,
             verbose: false,
+            compression: None,
+            delay_seed: false,
+            local_search: Default::default(),
         }
     }
 }
@@ -58,9 +72,11 @@ pub fn run_hgs(
     run(instance, options, false, &[])
 }
 
-/// Populate HGS with validated complete route plans before generating other
-/// individuals. Customer indices exclude depot 0. Seeds remain eligible as
-/// the best result even when initialization consumes the search budget.
+/// Seed HGS with validated complete route plans. Customer indices exclude depot
+/// 0. With `delay_seed`, seeds remain outside the breeding pool until insertion;
+/// otherwise they are added before generating other individuals. Seeds remain
+/// eligible as the best result even when initialization consumes the budget.
+/// `compression` applies equally to seeded and unseeded search.
 pub fn run_hgs_seeded(
     instance: &Instance,
     options: &HgsOptions,
@@ -84,7 +100,12 @@ fn run(
     collect: bool,
     seeds: &[Vec<Vec<usize>>],
 ) -> std::result::Result<HgsResult, String> {
-    if !options.time_limit.is_finite()
+    if let Some(compression) = &options.compression {
+        return super::compression::run_seeded(instance, options, compression, seeds, collect)
+            .map(|result| result.solution);
+    }
+    if !options.local_search.valid()
+        || !options.time_limit.is_finite()
         || options.time_limit < 0.
         || options.population_size == 0
         || options.population_size > i32::MAX as u32
@@ -106,8 +127,10 @@ fn run(
     {
         return Err("seed exceeds the HGS fleet; set instance.vehicles explicitly".into());
     }
+    params.config.local_search = options.local_search.clone();
     params.config.time_limit = options.time_limit;
     params.config.nb_iter = options.nb_iter as i32;
+    params.config.generation_limit = options.generation_limit;
     params.config.minimum_population_size = options.population_size as i32;
     params.set_seed(options.seed);
     params.verbose = options.verbose;
@@ -150,18 +173,7 @@ fn run(
     if collect {
         population.collected_routes = Some(Default::default());
     }
-    for seed in seeds {
-        let mut individual = super::Individual::new_empty(&params);
-        let mut routes: Vec<_> = seed.iter().filter(|r| !r.is_empty()).cloned().collect();
-        routes.resize(params.nb_vehicles as usize, Vec::new());
-        individual.chrom_t = routes.iter().flatten().copied().collect();
-        individual.chrom_r = routes;
-        individual.evaluate_complete_cost();
-        population.add_individual(&individual, true);
-        if !params.is_time_limit_exceeded() {
-            population.do_hgs_local_search_and_add_individual(&mut individual, &mut local_search);
-        }
-    }
+    population.initialize_seeds(seeds, &mut local_search, options.delay_seed);
     population.generate_population(&mut split, &mut local_search);
     Genetic::new(&params, &mut split, &mut local_search)
         .run(&mut population, options.nb_iter as usize);

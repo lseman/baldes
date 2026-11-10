@@ -53,6 +53,21 @@ pub(super) fn publish_certificate(out: &mut Output, candidate: Option<f64>) -> R
     Ok(())
 }
 
+pub(super) fn publish_retained_objective(out: &mut Output, candidate: Option<f64>) -> Result<()> {
+    let Some(bound) = candidate else {
+        return Ok(());
+    };
+    publish_certificate(out, Some(bound))?;
+    // A newly supplied proof is valid in either mode. Do not copy an unrelated
+    // inherited certified channel into a numerical resume when no proof arrived.
+    out.numerical_bound = out.numerical_bound.max(bound);
+    out.bound = match out.bound_mode {
+        BoundMode::Numerical => out.numerical_bound,
+        BoundMode::Certified => out.certified_bound,
+    };
+    Ok(())
+}
+
 pub(super) fn optimality_gap(primal: f64, dual: f64) -> f64 {
     if primal.abs() <= 1e-6 && dual.abs() <= 1e-6 {
         0.

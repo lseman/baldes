@@ -440,7 +440,7 @@ pub(super) fn validate_routes<const D: usize>(
     if synchronization::witness(state, routes)?.is_none() {
         return Ok(None);
     }
-    let Some((mut rows, mut objective, counts)) = bounds::exact_contributions(state, routes)?
+    let Some((mut rows, mut objective, counts)) = bounds::witness_contributions(state, routes)?
     else {
         return Ok(None);
     };

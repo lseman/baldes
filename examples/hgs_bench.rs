@@ -1,4 +1,5 @@
 //! Fixed-work HGS benchmark: cargo run --release --example hgs_bench -- Solomon/R201 300 3
+//! An optional fourth argument sets a time limit per seed instead of fixed work.
 use baldes::extensions::hgs::driver::{run_hgs, HgsOptions};
 use baldes::inputs::Instance;
 
@@ -7,6 +8,7 @@ fn main() {
     let name = args.get(1).map(String::as_str).unwrap_or("Solomon/R201");
     let iterations = args.get(2).map(|s| s.parse().unwrap()).unwrap_or(300);
     let repeats = args.get(3).map(|s| s.parse().unwrap()).unwrap_or(3);
+    let seconds = args.get(4).map(|s| s.parse().unwrap()).unwrap_or(0.0);
     let instance = Instance::read(format!(
         "{}/instances/{name}.txt",
         env!("CARGO_MANIFEST_DIR")
@@ -14,7 +16,7 @@ fn main() {
     .unwrap();
     for seed in 0..repeats {
         let options = HgsOptions {
-            time_limit: 0.0,
+            time_limit: seconds,
             nb_iter: iterations,
             seed,
             ..Default::default()

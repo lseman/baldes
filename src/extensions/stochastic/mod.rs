@@ -9,6 +9,10 @@
 use crate::{invalid, Result};
 
 #[cfg(feature = "clp")]
+mod incumbent_search;
+#[cfg(feature = "clp")]
+pub use incumbent_search::IncumbentSearchSummary;
+#[cfg(feature = "clp")]
 mod solve;
 #[cfg(feature = "clp")]
 mod theta;

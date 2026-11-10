@@ -114,7 +114,7 @@ fn unsupported_cvrplib_features_are_rejected() {
     for (text, message) in [
         (with("DISTANCE : 100"), "DISTANCE"),
         (with("SERVICE_TIME : 10"), "SERVICE_TIME"),
-        (EUC.replace("TYPE : CVRP", "TYPE : VRPTW"), "TYPE"),
+        (EUC.replace("TYPE : CVRP", "TYPE : ATSP"), "TYPE"),
         (EUC.replace("EUC_2D", "GEO"), "EDGE_WEIGHT_TYPE"),
         (EUC.replace("2 0\n", "2 1\n"), "depot demand"),
         (
@@ -213,4 +213,90 @@ fn tenth_rounding_uses_integer_times_and_tenth_costs() {
         .unwrap();
     assert_eq!((arc.consumption[0], arc.cost), (14., 1.4));
     assert_eq!(graph.vertices[1].bounds[0].upper, 500.);
+}
+
+fn time_window_input() -> String {
+    EUC.replace("NAME : tiny-k2", "NAME : XTW-n4")
+        .replace("TYPE : CVRP", "TYPE : VRPTW")
+        .replace("DEPOT_SECTION", "TIME_WINDOW_SECTION\n4 0 70\n2 0 100\n1 10 90\n3 20 80\nSERVICE_TIME_SECTION\n3 3\n1 2\n4 4\n2 0\nDEPOT_SECTION")
+}
+
+#[test]
+fn native_vrptw_preserves_windows_services_and_depot_permutation() {
+    let instance = Instance::parse(&time_window_input()).unwrap();
+    assert!(instance.is_xtw() && instance.has_time_windows());
+    assert_eq!(instance.rounding, Rounding::Nearest);
+    assert_eq!(
+        instance.vehicles, 3,
+        "one available vehicle per customer for a free fleet"
+    );
+    let resources: Vec<_> = instance
+        .customers
+        .iter()
+        .map(|c| (c.ready, c.due, c.service))
+        .collect();
+    assert_eq!(
+        resources,
+        [
+            (0., 100., 0.),
+            (10., 90., 2.),
+            (20., 80., 3.),
+            (0., 70., 4.)
+        ]
+    );
+    assert_eq!(
+        baldes::extensions::hgs::solution::validate_plan(&instance, &[vec![1, 2], vec![3]])
+            .unwrap(),
+        20.
+    );
+    let mut other = instance.clone();
+    other.name = "other".into();
+    assert!(!other.is_xtw());
+    assert!(!Instance::parse(&EUC.replace("tiny-k2", "XTW-n4"))
+        .unwrap()
+        .is_xtw());
+}
+
+#[test]
+fn vrptw_rejects_missing_invalid_or_misidentified_resource_rows() {
+    let text = time_window_input();
+    for invalid in [
+        EUC.replace("TYPE : CVRP", "TYPE : VRPTW"),
+        text.replace("3 20 80", "3 81 80"),
+        text.replace("3 20 80", "3 NaN 80"),
+        text.replace("3 20 80", "3 20 inf"),
+        text.replace("3 20 80", "3 20"),
+        text.replace("3 20 80", "1 20 80"),
+        text.replace("3 20 80", "NaN 20 80"),
+        text.replace("3 3\n", "3 -1\n"),
+        text.replace("3 3\n", "3 inf\n"),
+        text.replace("TYPE : VRPTW", "TYPE : CVRP"),
+    ] {
+        assert!(
+            Instance::parse(&invalid).is_err(),
+            "accepted invalid VRPTW: {invalid}"
+        );
+    }
+    let without_service = text.replace("SERVICE_TIME_SECTION\n3 3\n1 2\n4 4\n2 0\n", "");
+    let instance = Instance::parse(&without_service).unwrap();
+    assert!(instance.customers.iter().all(|c| c.service == 0.));
+}
+
+#[test]
+fn explicit_vrptw_distances_and_fixed_fleet_are_preserved() {
+    let text = time_window_input()
+        .replace("CAPACITY : 10", "CAPACITY : 10\nVEHICLES : 2")
+        .replace(
+            "EDGE_WEIGHT_TYPE :\tEUC_2D",
+            "EDGE_WEIGHT_TYPE : EXPLICIT\nEDGE_WEIGHT_FORMAT : FULL_MATRIX",
+        )
+        .replace(
+            "NODE_COORD_SECTION",
+            "EDGE_WEIGHT_SECTION\n0 1 2 3\n4 0 5 6\n7 8 0 9\n10 11 12 0\nNODE_COORD_SECTION",
+        );
+    let instance = Instance::parse(&text).unwrap();
+    assert_eq!(instance.vehicles, 2);
+    assert_eq!(instance.distance(0, 1, Rounding::Nearest), 4.);
+    assert_eq!(instance.distance(1, 0, Rounding::Nearest), 1.);
+    assert_eq!(instance.customers[1].service, 2.);
 }

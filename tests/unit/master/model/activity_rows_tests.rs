@@ -60,7 +60,7 @@ fn uncertain_intrinsic_rows_do_not_authorize_exact_fixed_or_integer_contribution
         quantity: 1.,
     }];
     assert!(
-        crate::master::model::bounds::exact_contributions(&node.state, &routes)
+        crate::master::model::bounds::witness_contributions(&node.state, &routes)
             .unwrap()
             .is_none()
     );

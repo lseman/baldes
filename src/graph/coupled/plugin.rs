@@ -46,6 +46,57 @@ impl<T: Any + Debug + Send + Sync + PartialEq> PluginValue for T {
 /// A resource that an extension adds to coupled labeling. Errors abort pricing;
 /// they never prove infeasibility. Objective costs require explicit opt-in.
 pub trait CoupledPlugin: Debug + Send + Sync {
+    /// Prefer a complete backward sweep over bidirectional/forward labeling.
+    fn backward_pricing(&self) -> bool {
+        false
+    }
+    /// Use scalar candidate prepricing followed by complete threshold stages.
+    /// A reversed physical graph can implement this with forward labeling.
+    fn staged_pricing(&self) -> bool {
+        self.backward_pricing()
+    }
+    /// Optional additive surrogate for heuristic scalar prepricing. One charge
+    /// per physical arc, in vector order. Candidates are replayed with the
+    /// original resource; this hook never supplies a minimum certificate.
+    fn scalar_pricing_charges(&self) -> Option<Vec<f64>> {
+        None
+    }
+    /// Optional call-local resource with completion pruning at these additive
+    /// arc costs. Must preserve every route below threshold; forward replay
+    /// must remain unrestricted. None keeps the original resource.
+    fn prepare_pricing(
+        &self,
+        costs: &[f64],
+        threshold: f64,
+        deadline: Instant,
+    ) -> Option<PluginResource> {
+        let _ = (costs, threshold, deadline);
+        None
+    }
+    /// Directed lower bound on additive arc costs plus this resource's cost
+    /// over every complete feasible route, independently of generated columns.
+    fn certify_pricing_minimum(
+        &self,
+        costs: &[f64],
+        work: &mut usize,
+        deadline: Instant,
+    ) -> Option<f64> {
+        let _ = (costs, work, deadline);
+        None
+    }
+    /// Independent outward enclosure of the resource objective on every feasible
+    /// complete path with at most `max_arcs` physical arcs. This covers unseen
+    /// paths, not just generated columns. None leaves global bounds unknown.
+    /// Debit work, respect the deadline, and never increase the work allowance.
+    fn objective_bounds(
+        &self,
+        max_arcs: usize,
+        work: &mut usize,
+        deadline: Option<Instant>,
+    ) -> Option<[f64; 2]> {
+        let _ = (max_arcs, work, deadline);
+        None
+    }
     /// Whether this resource contributes an objective. Cost-bearing plugins
     /// default to equality dominance, canonical suffix replay for joins, and no
     /// generic objective bounds or directed cost certification.
@@ -83,6 +134,36 @@ pub trait CoupledPlugin: Debug + Send + Sync {
         let _ = forward;
         a == b
     }
+    /// Optional directed compensation for cost-bearing label dominance.
+    /// Feasibility must be preserved for every common completion. The amount
+    /// pays for the future resource-objective excess after removing the current
+    /// resource-objective difference already present in the scalar label key.
+    /// None retains both labels. Only the exclusive staged-pricing adapter
+    /// currently admits this hook; it never establishes a pricing certificate.
+    fn cost_dominance_penalty(
+        &self,
+        a: &PluginState,
+        b: &PluginState,
+        forward: bool,
+    ) -> Option<f64> {
+        self.dominates(a, b, forward).then_some(0.)
+    }
+    /// Optional independent feasibility proof and outward objective enclosure
+    /// for a complete physical-arc path. Cost-bearing plugins must implement
+    /// this to certify incumbents. The interval covers this resource's original
+    /// objective before kernel coefficients and phase-I suppression. Returning
+    /// None means unknown; numerical replay alone is not a certificate.
+    /// Debit work and respect deadlines as in `certify`.
+    fn certify_objective(
+        &self,
+        arcs: &[usize],
+        work: &mut usize,
+        deadline: Option<Instant>,
+    ) -> Option<(bool, [f64; 2])> {
+        let _ = (arcs, work, deadline);
+        None
+    }
+
     /// Optional original-domain proof for a complete physical-arc path.
     ///
     /// `Some(true)` proves that the path admits this resource; `Some(false)`
@@ -120,3 +201,7 @@ impl PartialEq for PluginResource {
 fn same<T: ?Sized>(a: &Arc<T>, b: &Arc<T>) -> bool {
     std::ptr::eq(Arc::as_ptr(a) as *const (), Arc::as_ptr(b) as *const ())
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/graph/coupled/plugin_certificate_tests.rs"]
+mod certificate_tests;

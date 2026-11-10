@@ -119,8 +119,34 @@ impl CoupledKernel {
         }
         // Numerical slope-front operators need their own directed semantics.
         // Do not reuse their computed minima as original-domain bounds.
-        if self.has_machine_cost_contracts() || self.plugins.iter().any(|p| p.0.has_costs()) {
+        if self.has_machine_cost_contracts() {
             return None;
+        }
+        let mut plugin_cost = Range::point(0.);
+        for (r, definition) in self.definitions.iter().enumerate() {
+            let CoupledResource::Plugin(plugin) = definition else {
+                continue;
+            };
+            if !plugin.0.has_costs() || self.objective_coefficients[r] == 0. {
+                continue;
+            }
+            take(work, 1, deadline)?;
+            let before = *work;
+            let bound = plugin.0.objective_bounds(max_arcs, work, Some(deadline));
+            if *work > before {
+                *work = before;
+                return None;
+            }
+            take(work, 0, deadline)?;
+            let [lo, hi] = bound?;
+            let range = finite(Range { lo, hi })?;
+            plugin_cost = finite(
+                plugin_cost.add(finite(
+                    range
+                        .multiply(Range::point(self.objective_coefficients[r]))
+                        .multiply(Range::point(self.cost_scale)),
+                )?),
+            )?;
         }
         let root = State {
             numeric: self.initial.iter().copied().map(Range::point).collect(),
@@ -307,7 +333,10 @@ impl CoupledKernel {
             previous = next;
         }
         take(work, 0, deadline)?;
-        Some(minimum)
+        Some(match minimum {
+            Some(value) => Some(crate::core::rounding::add_down(value, plugin_cost.lo)?),
+            None => None,
+        })
     }
 }
 #[cfg(test)]

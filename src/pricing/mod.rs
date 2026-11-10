@@ -9,6 +9,7 @@ mod lifecycle;
 mod presence;
 mod relaxation;
 pub mod restrictions;
+mod route_search;
 mod solve;
 mod universe;
 mod variable_costs;
@@ -46,6 +47,11 @@ pub struct Solver<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     /// Preserve arc orderings needed by current or future arc-flow branches.
     pub enumeration_preserve_arc_paths: bool,
     pub cutoff: f64,
+    /// Completed threshold-stage minimum at the current pricing point only.
+    pub(crate) staged_minimum: Option<f64>,
+    exact_target: Option<f64>,
+    prepricing_calls: usize,
+    pub(crate) heuristic_seeds: Vec<Vec<usize>>,
     prepared: Option<Arc<Graph<D>>>,
     pub bucket_steps: crate::graph::ResourceValues<D>,
     pub rollback_point_saved: bool,

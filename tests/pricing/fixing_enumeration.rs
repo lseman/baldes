@@ -628,7 +628,7 @@ fn fixing_matches_native_prepared_grid_and_selected_labels() {
                     let label = &storage.labels[id];
                     (label.cost - cost).abs() < 1e-10
                         && (label.resources[0] - resource).abs() < 1e-10
-                        && label.ng == ng
+                        && u64::from(label.ng) == u64::from(ng)
                         && !chosen.contains(&id)
                 })
                 .expect("captured native label must exist in the independently built Rust store");

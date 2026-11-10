@@ -1,14 +1,18 @@
-//! Linear split algorithm for converting giant tours to feasible routes.
+//! Split algorithms for converting giant tours to penalized vehicle routes.
 //!
 //! The Split algorithm solves the following problem: given a fixed permutation
 //! of customers (a "giant tour"), partition it into the minimum-cost set of
-//! vehicle routes subject to capacity and time-window constraints.
+//! vehicle routes under a fleet cap, with capacity and time-window penalties.
 //!
 //! This is the core decomposition routine used by HGS-CVRP to evaluate
 //! individuals represented as giant tours.
 
+use crate::extensions::hgs::local_search::TimeWindowData;
 use crate::extensions::hgs::params::MY_EPSILON;
 use crate::extensions::hgs::{Individual, Params};
+
+mod time_windows;
+use time_windows::TimeWindowSplit;
 
 /// Data for a single client during split processing.
 #[derive(Clone, Debug, Default)]
@@ -103,7 +107,8 @@ impl TrivialDeque {
     }
 }
 
-/// Linear split algorithm for converting giant tours to vehicle routes.
+/// Giant-tour partitioning: linear capacity-only Split, or a time-window-aware
+/// dynamic program using the same penalized objective as route evaluation.
 pub struct Split<'p> {
     /// Reference to problem parameters.
     params: &'p Params,
@@ -122,6 +127,7 @@ pub struct Split<'p> {
     sum_load: Vec<i32>,
     /// Cumulative service time.
     sum_service: Vec<f64>,
+    time_windows: TimeWindowSplit,
 }
 
 impl<'p> Split<'p> {
@@ -139,6 +145,7 @@ impl<'p> Split<'p> {
             sum_distance: vec![0.; nb_clients + 1],
             sum_load: vec![0; nb_clients + 1],
             sum_service: vec![0.; nb_clients + 1],
+            time_windows: TimeWindowSplit::new(nb_clients),
         }
     }
 
@@ -150,6 +157,12 @@ impl<'p> Split<'p> {
         self.max_vehicles = nb_max_vehicles
             .max(bin_packing_bound)
             .min(self.params.nb_vehicles as usize);
+
+        if self.params.is_time_window_constrained {
+            self.split_time_windows(indiv);
+            indiv.evaluate_complete_cost();
+            return;
+        }
 
         // Pre-fetch client data from the giant tour.
         for i in 1..=self.params.nb_clients as usize {
@@ -187,6 +200,119 @@ impl<'p> Split<'p> {
 
         // Re-evaluate costs on the newly built routes.
         indiv.evaluate_complete_cost();
+    }
+
+    /// Queue-based O(n) single-window Split, followed by O(K n) only when the
+    /// unlimited optimum exceeds the fleet cap. General schedules fall back to
+    /// the exhaustive program. Both retain the full soft-penalty objective.
+    fn split_time_windows(&mut self, indiv: &mut Individual<'p>) {
+        let n = indiv.chrom_t.len();
+        let fleet = self.max_vehicles.min(n);
+        let optimized = self.time_windows.prepare(self.params, &indiv.chrom_t);
+        self.time_window_potentials(indiv, None, optimized);
+        let mut routes = 0;
+        let mut end = n;
+        while end > 0 {
+            end = self.pred[0][end];
+            routes += 1;
+        }
+        let bounded = routes > fleet;
+        if bounded {
+            self.time_window_potentials(indiv, Some(fleet), optimized);
+            routes = (1..=fleet)
+                .min_by(|&a, &b| self.potential[a][n].total_cmp(&self.potential[b][n]))
+                .expect("time-window Split needs an available vehicle");
+        }
+        for route in &mut indiv.chrom_r {
+            route.clear();
+        }
+        let mut end = n;
+        for k in (1..=routes).rev() {
+            let begin = self.pred[if bounded { k } else { 0 }][end];
+            indiv.chrom_r[k - 1].extend_from_slice(&indiv.chrom_t[begin..end]);
+            end = begin;
+        }
+        assert_eq!(end, 0, "no time-window Split solution within the fleet cap");
+    }
+
+    fn time_window_potentials(
+        &mut self,
+        indiv: &Individual<'p>,
+        fleet: Option<usize>,
+        optimized: bool,
+    ) {
+        if optimized {
+            self.time_windows
+                .solve(self.params, fleet, &mut self.potential, &mut self.pred);
+            return;
+        }
+        let n = indiv.chrom_t.len();
+        let layers = fleet.unwrap_or(0);
+        for row in self.potential.iter_mut().take(layers + 1) {
+            row.fill(f64::INFINITY);
+        }
+        self.potential[0][0] = 0.;
+
+        // Multiple windows and waiting penalties need the evaluator's forward
+        // schedule (including its first-customer waiting convention). This
+        // fallback costs O(n³ + K n²), without storing a quadratic cost matrix.
+        let use_sequences = self.params.penalty_wait_time == 0.
+            && indiv.chrom_t.iter().all(|&v| self.params.cli[v].n_tw == 0);
+        let mut replay = (!use_sequences).then(|| Individual::new_empty(self.params));
+        let mut depot = TimeWindowData::single(0, self.params);
+        depot.earliest_arrival = f64::NEG_INFINITY;
+        depot.duration = 0.;
+
+        for begin in 0..n {
+            let mut sequence = TimeWindowData::single(indiv.chrom_t[begin] as i32, self.params);
+            let mut distance = self.params.time_cost.get(0, indiv.chrom_t[begin]);
+            let mut load = 0;
+            if let Some(replay) = replay.as_mut() {
+                replay.chrom_r[0].clear();
+            }
+            for end in begin + 1..=n {
+                let client = indiv.chrom_t[end - 1];
+                load += self.params.cli[client].demand;
+                if end > begin + 1 {
+                    distance += self.params.time_cost.get(indiv.chrom_t[end - 2], client);
+                    sequence = TimeWindowData::merge(
+                        &sequence,
+                        &TimeWindowData::single(client as i32, self.params),
+                        self.params,
+                    );
+                }
+                let cost = if let Some(replay) = replay.as_mut() {
+                    replay.chrom_r[0].push(client);
+                    replay.evaluate_complete_cost();
+                    replay.my_cost_sol.penalized_cost
+                } else {
+                    let route = TimeWindowData::merge(&sequence, &depot, self.params);
+                    let arrival = sequence.latest_release_time
+                        + self.params.time_cost.get(0, indiv.chrom_t[begin]);
+                    let warp = route.time_warp + (arrival - route.latest_arrival).max(0.);
+                    distance
+                        + self.params.time_cost.get(client, 0)
+                        + self.params.penalty_capacity.get()
+                            * (load - self.params.vehicle_capacity).max(0) as f64
+                        + self.params.penalty_time_warp.get() * warp
+                };
+                if let Some(fleet) = fleet {
+                    for k in 0..fleet.min(begin + 1) {
+                        let candidate = self.potential[k][begin] + cost;
+                        if candidate < self.potential[k + 1][end] {
+                            self.potential[k + 1][end] = candidate;
+                            self.pred[k + 1][end] = begin;
+                        }
+                    }
+                } else {
+                    let candidate = self.potential[0][begin] + cost;
+                    if candidate < self.potential[0][end] {
+                        self.potential[0][end] = candidate;
+                        self.pred[0][end] = begin;
+                    }
+                }
+            }
+        }
     }
 
     /// Split for unlimited fleet — O(n) algorithm using dominance pruning.

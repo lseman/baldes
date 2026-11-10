@@ -32,6 +32,12 @@ pub(crate) const RESOURCE_REPLAY_MISMATCH: &str = "reconstructed route violates 
 #[derive(Clone, Debug, PartialEq)]
 pub struct EngineControls<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub bidirectional: bool,
+    /// Complete backward sweep for resources with continuation-state pricing.
+    /// Optional plugin completion pruning caps the returned minimum at the
+    /// call's zero threshold, as with load completion pruning.
+    pub backward_only: bool,
+    /// Complete coupled threshold stages, with useful interrupted batches.
+    pub staged_pricing: bool,
     pub bidirectional_mode: i32,
     pub dominance_mode: i32,
     /// Paired experimental insertion: comparisons cannot reject or evict.
@@ -58,6 +64,8 @@ impl<const D: usize> Default for EngineControls<D> {
     fn default() -> Self {
         Self {
             bidirectional: true,
+            backward_only: false,
+            staged_pricing: false,
             bidirectional_mode: 2,
             dominance_mode: 0,
             partial_dominance: false,

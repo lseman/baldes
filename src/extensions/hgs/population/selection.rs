@@ -3,6 +3,11 @@ use super::*;
 impl<'p> Population<'p> {
     /// Add an individual to the population. Returns true if it improves the restart best.
     pub fn add_individual(&mut self, indiv: &Individual<'p>, update_feasible: bool) -> bool {
+        if indiv.is_feasible {
+            if let Some(consensus) = self.consensus.as_mut() {
+                consensus.observe(indiv);
+            }
+        }
         if let Some(routes) = self.collected_routes.as_mut() {
             routes.extend(indiv.chrom_r.iter().filter(|r| !r.is_empty()).cloned());
         }
@@ -65,7 +70,7 @@ impl<'p> Population<'p> {
             }
             self.search_progress.push((
                 self.params.elapsed_secs(),
-                self.best_overall.my_cost_sol.penalized_cost,
+                self.best_overall.my_cost_sol.penalized_cost + self.objective_offset,
             ));
             true
         } else {

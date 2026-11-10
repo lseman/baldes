@@ -64,6 +64,20 @@ impl<const D: usize> cg::Controller<ClpMaster> for ColumnGenerationController<D>
         state.pricing_master =
             (master.solved() && objective.is_finite() && master.objective_offset.is_finite())
                 .then_some((objective, master.objective_offset));
+        if !artificials.iter().any(|&i| master.values()[i] > 1e-6)
+            && state.oracles.iter().any(|o| {
+                o.network
+                    .graph
+                    .coupled_kernel()
+                    .is_some_and(|k| k.bellman_pricing())
+            })
+        {
+            if let Some(bound) =
+                bounds::certificate(&state, master, &master.duals()).filter(|b| b.is_finite())
+            {
+                state.fixing_bound = Some(state.fixing_bound.map_or(bound, |old| old.max(bound)));
+            }
+        }
         if !state.integer_primal_termination && !separation::tracks_integer_witness(&state) {
             return Ok(());
         }
@@ -361,6 +375,20 @@ impl<const D: usize> cg::Controller<ClpMaster> for ColumnGenerationController<D>
         }
         Ok(())
     }
+    fn retained_objective_bound(&self) -> Option<f64> {
+        let state = self.state.borrow();
+        state
+            .oracles
+            .iter()
+            .any(|o| {
+                o.network
+                    .graph
+                    .coupled_kernel()
+                    .is_some_and(|k| k.bellman_pricing())
+            })
+            .then_some(state.fixing_bound)
+            .flatten()
+    }
     fn preserve_enumeration_column(&self, column: &cg::Column) -> bool {
         master_variables::decode(column.tag).is_some()
     }
@@ -544,6 +572,22 @@ impl<const D: usize> cg::Controller<ClpMaster> for ColumnGenerationController<D>
             None
         }
     }
+    fn completed_stage_bound(&self, master: &ClpMaster, duals: &[f64]) -> Result<Option<f64>> {
+        let available = {
+            let state = self.state.borrow();
+            state.correction.is_some()
+                && !state.scheduler.complete
+                && state
+                    .oracles
+                    .iter()
+                    .any(|o| o.solver.staged_minimum.is_some())
+        };
+        if available {
+            self.pricing_bound(master, duals)
+        } else {
+            Ok(None)
+        }
+    }
     fn certified_pricing_bound(&self, master: &ClpMaster, duals: &[f64]) -> Result<Option<f64>> {
         Ok(Some(
             bounds::certificate(&self.state.borrow(), master, duals).unwrap_or(f64::NEG_INFINITY),
@@ -561,7 +605,13 @@ impl<const D: usize> cg::Controller<ClpMaster> for ColumnGenerationController<D>
                     })
                     + correction
             }
-            None => f64::NEG_INFINITY,
+            // Interrupted pricing may have no numerical minimum. A retained
+            // original-domain bound remains valid independently of completion
+            // and of the dual point used to derive it.
+            None => state
+                .fixing_bound
+                .or_else(|| bounds::certificate(&state, master, duals))
+                .unwrap_or(f64::NEG_INFINITY),
         };
         // Objective-dependent exclusions preserve improving integer solutions,
         // not the unrestricted LP optimum. Never publish a bound above the

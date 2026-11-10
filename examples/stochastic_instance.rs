@@ -1,4 +1,5 @@
 //! Load stochastic JSON; validate by default, solve only with --solve.
+#![recursion_limit = "256"]
 use baldes::extensions::stochastic::{Demand, HgsWarmStart, Policy, Problem, SolveOptions};
 use baldes::master::tree::{DivingOptions, LocalSearchOptions, StrongBranchingOptions};
 use serde::Deserialize;
@@ -35,14 +36,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let total_started = Instant::now();
     let mut args = std::env::args().skip(1);
     let path = args.next().ok_or(
-        "usage: stochastic_instance INSTANCE.json [--solve] [--seconds N] [--policy p1|p3] [--json] [--ng-size N] [--dynamic-ng-mode -1|0|1] [--hgs-seconds N] [--hgs-seed N] [--tree-threads N] [--strong-branching] [--strong-seconds N] [--strong-trial-seconds N] [--diving] [--local-search] [--greedy] [--heuristic-seconds N] [--heuristic-depth N] [--local-search-fixed-ratio R] [--recourse-cuts] [--rank-one-cuts] [--rank-one-cut-limit N] [--log-cg] [--no-load-completion-bound] [--completion-subset-size 0..6]",
+        "usage: stochastic_instance INSTANCE.json [--solve] [--restocking] [--seconds N] [--policy p1|p3] [--json] [--ng-size N] [--dynamic-ng-mode -1|0|1] [--hgs-seconds N] [--hgs-seed N] [--tree-threads N] [--strong-branching] [--strong-seconds N] [--strong-trial-seconds N] [--diving] [--local-search] [--greedy] [--heuristic-seconds N] [--heuristic-depth N] [--local-search-fixed-ratio R] [--recourse-cuts] [--rank-one-cuts] [--rank-one-cut-limit N] [--log-cg] [--no-load-completion-bound] [--completion-subset-size 0..6] [--incumbent-search-seconds N]",
     )?;
     let mut solve = false;
+    let mut restocking = false;
     let mut json = false;
     let mut ng_size = 8;
     let mut dynamic_ng_mode = None;
     let mut seconds = 30.0_f64;
     let mut hgs_seconds = None;
+    let mut incumbent_search_seconds = 0.;
     let mut hgs_seed = 0;
     let mut diving = false;
     let mut local_search = false;
@@ -57,11 +60,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut rank_one_cut_limit = None;
     let mut log_cg = false;
     let mut load_completion_bound = true;
-    let mut completion_subset_size = 4;
+    let mut completion_subset_size = None;
     let mut policy = Policy::OptimalRestocking;
     while let Some(option) = args.next() {
         match option.as_str() {
             "--solve" => solve = true,
+            "--restocking" => restocking = true,
             "--json" => json = true,
             "--ng-size" => ng_size = args.next().ok_or("missing NG size")?.parse()?,
             "--dynamic-ng-mode" => {
@@ -73,6 +77,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                     return Err("dynamic NG mode must be -1, 0 or 1".into());
                 }
                 dynamic_ng_mode = Some(mode);
+            }
+            "--incumbent-search-seconds" => {
+                incumbent_search_seconds = args
+                    .next()
+                    .ok_or("missing incumbent-search seconds")?
+                    .parse::<f64>()?;
             }
             "--seconds" => seconds = args.next().ok_or("missing seconds")?.parse()?,
             "--hgs-seconds" => {
@@ -126,13 +136,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             "--log-cg" => log_cg = true,
             "--no-load-completion-bound" => load_completion_bound = false,
             "--completion-subset-size" => {
-                completion_subset_size = args
+                let size = args
                     .next()
                     .ok_or("missing completion subset size")?
                     .parse::<usize>()?;
-                if completion_subset_size > 6 {
+                if size > 6 {
                     return Err("completion subset size must be between 0 and 6".into());
                 }
+                completion_subset_size = Some(size);
             }
             "--policy" => {
                 policy = match args.next().as_deref() {
@@ -144,6 +155,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             _ => return Err(format!("unknown option: {option}").into()),
         }
     }
+    let completion_subset_size = completion_subset_size.unwrap_or(if restocking { 6 } else { 4 });
+    let incumbent_search_time_limit = Duration::try_from_secs_f64(incumbent_search_seconds)?;
     let time_limit = Duration::try_from_secs_f64(seconds)?;
     if tree_threads == 0 {
         return Err("tree threads must be positive".into());
@@ -268,22 +281,37 @@ fn main() -> Result<(), Box<dyn Error>> {
             tree.node.cg.log_interval = Some(1);
         }
         let solve_started = Instant::now();
-        let result = problem
-            .solve(
-                policy,
+        let solve_options = SolveOptions {
+            tree,
+            ng_size,
+            hgs_warm_start,
+            incumbent_search_time_limit,
+        };
+        let result = if restocking {
+            if policy != Policy::OptimalRestocking {
+                return Err("--restocking requires --policy p3".into());
+            }
+            baldes::extensions::stochastic_restocking::solve(
+                &problem,
                 input.vehicles,
-                SolveOptions {
-                    tree,
-                    ng_size,
-                    hgs_warm_start,
-                },
+                solve_options,
             )
-            .map_err(|error| error.message)?;
+        } else {
+            problem.solve(policy, input.vehicles, solve_options)
+        }
+        .map_err(|error| error.message)?;
         let hgs_summary = result.hgs_warm_start.map(|s| {
             serde_json::json!({
                 "accepted_columns": s.accepted_columns, "rejected_columns": s.rejected_columns,
                 "accepted_plan": s.accepted_plan, "initial_objective": s.initial_objective,
                 "proposal_objective": s.proposal_objective, "reversed_routes": s.reversed_routes,
+                "elapsed_seconds": s.elapsed_seconds,
+            })
+        });
+        let incumbent_search = result.incumbent_search.map(|s| {
+            serde_json::json!({
+                "initial_objective": s.initial_objective, "final_objective": s.final_objective,
+                "evaluated_moves": s.evaluated_moves, "accepted_moves": s.accepted_moves,
                 "elapsed_seconds": s.elapsed_seconds,
             })
         });
@@ -305,7 +333,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!(
             "{}",
             serde_json::json!({
-                "method": "baldes_theta_cut_branch_cut_price", "backend": "Clp",
+                "method": if restocking { "baldes_bellman_restocking_branch_cut_price" } else { "baldes_theta_cut_branch_cut_price" },
+                "bound_mode": format!("{:?}", answer.bound_mode), "backend": "Clp",
+                "lower_bound_source": result.lower_bound_source,
                 "instance_id": input.instance_id, "policy": format!("{policy:?}"),
                 "status": format!("{:?}", answer.status), "objective": objective,
                 "lower_bound": lower_bound, "gap": gap, "routes": routes,
@@ -328,6 +358,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "load_completion_bound": load_completion_bound,
                 "completion_subset_size": completion_subset_size,
                 "hgs_warm_start": hgs_summary,
+                "incumbent_search": incumbent_search, "incumbent_search_seconds": incumbent_search_seconds,
                 "time_limit_seconds": seconds, "build_seconds": build_seconds,
                 "solve_seconds": solve_seconds, "total_seconds": total_started.elapsed().as_secs_f64(),
             })

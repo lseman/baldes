@@ -1,3 +1,4 @@
+use super::bounds::publish_retained_objective;
 use super::controller::apply_column_cap;
 use super::*;
 
@@ -285,6 +286,9 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             ipm_accuracy.upper = ipm_accuracy.upper.min(out.lp);
         }
         controller.master_solved(master, &out.column_tags, &out.artificials)?;
+        if !positive {
+            publish_retained_objective(&mut out, controller.retained_objective_bound())?;
+        }
         if accurate
             && !positive
             && controller.original_witness_available()
@@ -504,6 +508,12 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                         // The incomplete call supplies no pricing bound. Keep
                         // only earlier bounds and the current restricted master.
                         // Owners with a rollback point recover it outside CG.
+                        if !positive {
+                            publish_retained_objective(
+                                &mut out,
+                                controller.retained_objective_bound(),
+                            )?;
+                        }
                         out.pricing_calls += 1;
                         out.status = Status::TimeLimit;
                         return finish(out, loaded, cut_artificials, pool, smoothing);
@@ -568,6 +578,18 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     let slack = phase_walk.bound.abs().max(pass_bound.abs()) * 1e-10 + 1e-6;
                     if !(phase_walk.bound - slack > pass_bound) {
                         phase_walk.bound = pass_bound;
+                    }
+                }
+                if !columns_only && !positive {
+                    if let Some(bound) = controller.completed_stage_bound(master, &current)? {
+                        if !bound.is_finite() && bound != f64::NEG_INFINITY {
+                            return Err(invalid("invalid completed-stage pricing bound"));
+                        }
+                        out.numerical_bound = out.numerical_bound.max(bound);
+                        out.bound = match options.bound_mode {
+                            BoundMode::Numerical => out.numerical_bound,
+                            BoundMode::Certified => out.certified_bound,
+                        };
                     }
                 }
                 if answer.exact {
@@ -922,6 +944,9 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             }
             if !positive && !converged {
                 controller.fix_pricing(master, &raw)?;
+                // Publish independent domain proofs before an expensive oracle
+                // call can time out. These do not assert pricing completion.
+                publish_retained_objective(&mut out, controller.retained_objective_bound())?;
             }
             if !positive && controller.request_enumeration_checkpoint(master)? {
                 out.enumeration_requested = true;

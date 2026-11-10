@@ -64,6 +64,226 @@ impl<const D: usize> Solver<D> {
         self.price_phase_internal(index, maximum, negative_only, true)
     }
 
+    /// Recovered scalar NG candidate stages. A fork preserves branch and cut
+    /// pricing state, while removing the expensive coupled objective. Every
+    /// exported route is elementary and replayed with the original resource.
+    pub(super) fn scalar_preprice(
+        &mut self,
+        maximum: usize,
+        budget: Duration,
+    ) -> Option<PricingResult> {
+        if maximum == 0
+            || !self.accumulated_branches.is_empty()
+            || !self.accumulated_original_bounds.is_empty()
+        {
+            return None;
+        }
+        let charges = self.graph.coupled_kernel()?.scalar_pricing_charges()?;
+        if charges.len() != self.graph.arcs.len() || charges.iter().any(|v| !v.is_finite()) {
+            return None;
+        }
+        let started = std::time::Instant::now();
+        let mut scalar = self.fork_pricing(false);
+        scalar.graph.set_coupled_resources(&[]).ok()?;
+        scalar.ng_baseline = None;
+        scalar.options.set("BALDESdynamicNGmode", 0.).ok()?;
+        scalar.graph.edit().elementary = false;
+        if scalar.graph.resources.len() > 1
+            && scalar.graph.arcs.iter().any(|arc| arc.consumption[1] > 0.)
+        {
+            scalar.graph.edit().main_resource = Some(1);
+        }
+        for (arc, charge) in scalar.graph.edit().arcs.iter_mut().zip(charges) {
+            arc.cost += charge;
+            arc.reduced_cost += charge;
+        }
+        scalar.controls.max_labels = scalar.controls.max_labels.min(100_000);
+        scalar.controls.max_route_arcs = Some(self.graph.vertices.len().saturating_sub(1));
+        scalar.controls.max_columns = maximum.min(20);
+        let mut columns = Vec::new();
+        // The historical workflow starts with a complete relaxation every
+        // eighth call. Cyclic minima then refine NG memory before Bellman.
+        let complete_first = self.prepricing_calls % 8 == 0;
+        let mut stages = if complete_first {
+            vec![i64::MAX]
+        } else {
+            vec![16, 4, 1, i64::MAX]
+        }
+        .into_iter();
+        let mut labels = stages.next()?;
+        let mut labels_left = scalar.controls.max_labels;
+        loop {
+            scalar.controls.time_limit = budget.saturating_sub(started.elapsed());
+            scalar.controls.max_labels = labels_left;
+            if scalar.controls.time_limit.is_zero() || labels_left == 0 {
+                break;
+            }
+            scalar.phases = vec![phases::Phase {
+                check_ng: true,
+                jump_arcs: labels == 16 || labels == i64::MAX,
+                labels_per_bucket: labels,
+            }];
+            let priced = scalar.price_phase_partial(0, maximum.min(20), true).ok()?;
+            labels_left = labels_left.saturating_sub(priced.statistics.generated.max(1));
+            if priced.exact && priced.minimum_reduced_cost.is_finite() {
+                let bound = priced.minimum_reduced_cost;
+                self.staged_minimum = Some(self.staged_minimum.map_or(bound, |old| old.max(bound)));
+            }
+            let mut tightened = false;
+            for candidate in priced.columns {
+                let mut previous = vec![None; scalar.graph.vertices.len()];
+                for (position, &node) in candidate.nodes.iter().enumerate() {
+                    let node = usize::try_from(node).ok()?;
+                    if let Some(before) = previous[node] {
+                        let elements = scalar.graph.vertices[node].elements.clone();
+                        for &vertex in &candidate.nodes[before..=position] {
+                            let vertex = usize::try_from(vertex).ok()?;
+                            let memory = &mut scalar.graph.edit().vertices[vertex].memory;
+                            for &element in &elements {
+                                if !memory.contains(&element)
+                                    && memory.len() < crate::graph::ng::NG_MEMORY_CAPACITY
+                                {
+                                    memory.push(element);
+                                    tightened = true;
+                                }
+                            }
+                        }
+                    }
+                    previous[node] = Some(position);
+                }
+                let Some(mut route) = self.graph.elementary_route(&candidate.arcs).ok()? else {
+                    continue;
+                };
+                // Preserve the scalar walk's branch and cut prices, replacing
+                // only its surrogate original objective after elementary replay.
+                route.cost = candidate.cost + route.original_cost - candidate.original_cost;
+                if route.cost < self.controls.zero_threshold - crate::labeling::EPSILON
+                    && !columns
+                        .iter()
+                        .any(|old: &crate::labeling::Route| old.arcs == route.arcs)
+                {
+                    columns.push(route);
+                }
+            }
+            if !columns.is_empty() {
+                break;
+            }
+            if labels == i64::MAX {
+                if !priced.exact || !tightened {
+                    break;
+                }
+                // Rebuild preparation after tightening. All elementary routes
+                // remain feasible, so completed minima still bound the model.
+                scalar.restore_arcs();
+            } else if let Some(next) = stages.next() {
+                labels = next;
+            } else {
+                break;
+            }
+        }
+        if columns.is_empty() {
+            return None;
+        }
+        Some(PricingResult {
+            columns,
+            minimum_reduced_cost: 0.,
+            exact: false,
+            statistics: Default::default(),
+        })
+    }
+
+    /// Exact searches below progressively relaxed negative targets recover
+    /// useful columns without exhausting the full zero-threshold domain. Only
+    /// a finished stage supplies a minimum; it survives later interruptions.
+    fn bellman_stages(
+        &mut self,
+        engine: &mut LabelingEngine<D>,
+        controls: &Controls,
+        started: std::time::Instant,
+        budget: Duration,
+    ) -> Result<PricingResult> {
+        let mut targets = Vec::new();
+        let initial = self.exact_target.or_else(|| {
+            let remaining = budget.saturating_sub(started.elapsed());
+            let deadline = std::time::Instant::now()
+                .checked_add((remaining / 4).min(Duration::from_millis(200)))?;
+            let costs: Vec<_> = self.graph.arcs.iter().map(|a| a.reduced_cost).collect();
+            self.graph
+                .coupled_kernel()?
+                .plugin_pricing_minimum(&costs, &mut 1_000_000, deadline)
+                .filter(|v| *v < controls.zero_threshold)
+                .map(|v| (v - controls.zero_threshold) / 4.)
+        });
+        if let Some(target) = initial {
+            for delta in [target, target / 8.] {
+                let threshold = controls.zero_threshold + delta;
+                if threshold.is_finite() && threshold < controls.zero_threshold - 1e-6 {
+                    targets.push(threshold);
+                }
+            }
+        }
+        targets.push(controls.zero_threshold);
+        let mut statistics = crate::labeling::Statistics::default();
+        let mut outcome = None;
+        for threshold in targets {
+            let mut stage = controls.clone();
+            stage.zero_threshold = threshold;
+            stage.time_limit = budget.saturating_sub(started.elapsed());
+            if stage.time_limit.is_zero() {
+                break;
+            }
+            let result = engine.solve_partial(&self.graph, &stage);
+            match result {
+                Ok(mut result) => {
+                    statistics.absorb(&result.statistics);
+                    if result.exact {
+                        let bound = result.minimum_reduced_cost.min(threshold);
+                        if bound.is_finite() {
+                            self.staged_minimum =
+                                Some(self.staged_minimum.map_or(bound, |old| old.max(bound)));
+                        }
+                    }
+                    let best = result
+                        .columns
+                        .iter()
+                        .map(|r| r.cost)
+                        .filter(|&v| v < controls.zero_threshold - crate::labeling::EPSILON)
+                        .min_by(f64::total_cmp);
+                    if let Some(best) = best {
+                        self.exact_target = Some((best - controls.zero_threshold) / 4.);
+                    }
+                    let stop =
+                        best.is_some() || !result.exact || threshold == controls.zero_threshold;
+                    if threshold != controls.zero_threshold {
+                        result.exact = false;
+                    }
+                    outcome = Some(result);
+                    if stop {
+                        break;
+                    }
+                }
+                Err(error) => {
+                    let exhausted = error.kind == crate::core::error::ErrorKind::Runtime
+                        && (error.message.contains("time limit")
+                            || error.message.contains("label limit"));
+                    if self.staged_minimum.is_none() || !exhausted {
+                        return Err(error);
+                    }
+                    break;
+                }
+            }
+        }
+        let mut result = outcome.unwrap_or(PricingResult {
+            columns: vec![],
+            minimum_reduced_cost: 0.,
+            exact: false,
+            statistics: Default::default(),
+        });
+        result.statistics = statistics.clone();
+        engine.statistics = statistics;
+        Ok(result)
+    }
+
     fn price_phase_internal(
         &mut self,
         index: usize,
@@ -71,6 +291,7 @@ impl<const D: usize> Solver<D> {
         negative_only: bool,
         allow_partial: bool,
     ) -> Result<PricingResult> {
+        self.staged_minimum = None;
         if self
             .graph
             .coupled_kernel()
@@ -171,7 +392,46 @@ impl<const D: usize> Solver<D> {
         controls.negative_only = negative_only;
         let call_time_limit = self.pricing_time_limit()?;
         let started = std::time::Instant::now();
-        let engine_controls = self.engine_controls(phase.exact());
+        let bellman = self
+            .graph
+            .coupled_kernel()
+            .is_some_and(|k| k.bellman_pricing());
+        let engine_controls = self.engine_controls(phase.exact() || bellman);
+        let search_phase = if bellman {
+            phases::Phase {
+                check_ng: true,
+                jump_arcs: true,
+                labels_per_bucket: i64::MAX,
+            }
+        } else {
+            phase
+        };
+        if engine_controls.staged_pricing {
+            self.prepricing_calls = self.prepricing_calls.wrapping_add(1);
+            let budget = (call_time_limit / 4).min(Duration::from_secs(2));
+            if let Some(result) = self.scalar_preprice(controls.max_columns, budget) {
+                if let Some(best) = result.columns.iter().map(|r| r.cost).min_by(f64::total_cmp) {
+                    self.exact_target = Some((best - controls.zero_threshold) / 4.);
+                }
+                return Ok(result);
+            }
+            let remaining = call_time_limit.saturating_sub(started.elapsed());
+            if let Some(result) = self.search_route_columns(
+                controls.max_columns.min(20),
+                (remaining / 4).min(Duration::from_millis(250)),
+            ) {
+                if let Some(best) = result.columns.iter().map(|r| r.cost).min_by(f64::total_cmp) {
+                    self.exact_target = Some((best - controls.zero_threshold) / 4.);
+                }
+                return Ok(result);
+            }
+        }
+        // Recovered Bellman pricing returns useful improving batches promptly.
+        // A batch limit never establishes pricing completion or its minimum.
+        let allow_partial = allow_partial || engine_controls.staged_pricing;
+        if engine_controls.staged_pricing {
+            controls.max_columns = controls.max_columns.min(20);
+        }
         // refresh_cuts already validated topology and clears prepared/engine
         // on a mismatch. Nothing above mutates the graph after that check.
         let reuse = self.prepared.is_some()
@@ -182,13 +442,15 @@ impl<const D: usize> Solver<D> {
         let mut engine = if reuse {
             self.engine.take().unwrap()
         } else {
-            self.new_engine(engine_controls.clone(), phase)?
+            self.new_engine(engine_controls.clone(), search_phase)?
         };
-        engine.phase = phase;
+        engine.phase = search_phase;
         engine.controls = engine_controls;
         self.requires_rollback = false;
         controls.time_limit = call_time_limit.saturating_sub(started.elapsed());
-        let mut answer = if allow_partial {
+        let mut answer = if engine.controls.staged_pricing && controls.max_columns > 0 {
+            self.bellman_stages(&mut engine, &controls, started, call_time_limit)
+        } else if allow_partial {
             engine.solve_partial(&self.graph, &controls)
         } else {
             engine.solve(&self.graph, &controls)
@@ -204,10 +466,12 @@ impl<const D: usize> Solver<D> {
             // have displaced valid paths in the bounded pool: discarding it
             // alone cannot establish the minimum. Rebuild the full forward
             // search, retaining logical cuts/branches and physical exclusions.
+            self.staged_minimum = None;
             let mut forward = engine.controls.clone();
             forward.bidirectional = false;
+            forward.backward_only = false;
             forward.use_symmetric_execution = false;
-            match self.new_engine(forward, phase) {
+            match self.new_engine(forward, search_phase) {
                 Ok(mut retry) => {
                     controls.time_limit = call_time_limit.saturating_sub(started.elapsed());
                     answer = if allow_partial {

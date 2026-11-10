@@ -2,6 +2,42 @@
 use super::*;
 
 impl CoupledKernel {
+    pub(crate) fn backward_pricing(&self) -> bool {
+        self.bellman_pricing() && self.plugins[0].0.backward_pricing()
+    }
+    pub(crate) fn bellman_pricing(&self) -> bool {
+        self.cost_scale == 1.
+            && self.pricing_activities.is_empty()
+            && self.plugins.len() == 1
+            && self.definitions.len() == 1
+            && self.objective_coefficients[0] == 1.
+            && self.plugins[0].0.staged_pricing()
+    }
+    pub(crate) fn scalar_pricing_charges(&self) -> Option<Vec<f64>> {
+        if !self.bellman_pricing() {
+            return None;
+        }
+        self.plugins[0].0.scalar_pricing_charges()
+    }
+    pub(crate) fn plugin_pricing_minimum(
+        &self,
+        costs: &[f64],
+        work: &mut usize,
+        deadline: std::time::Instant,
+    ) -> Option<f64> {
+        if !self.bellman_pricing() || self.objective_coefficients[0] != 1. {
+            return None;
+        }
+        let before = *work;
+        let result = self.plugins[0]
+            .0
+            .certify_pricing_minimum(costs, work, deadline);
+        if *work > before {
+            *work = before;
+            return None;
+        }
+        result.filter(|v| v.is_finite() && std::time::Instant::now() < deadline)
+    }
     fn refresh_bounds<const D: usize>(&mut self, graph: &Graph<D>) {
         self.optimization =
             PreparedBounds::new(graph, &self.definitions, &self.slots, &self.initial);
@@ -385,6 +421,25 @@ impl CoupledKernel {
 }
 
 impl<const D: usize> Graph<D> {
+    pub(crate) fn with_pricing_plugins(
+        &self,
+        threshold: f64,
+        deadline: std::time::Instant,
+    ) -> Option<Self> {
+        let original = self.coupled_kernel()?;
+        if !original.bellman_pricing() {
+            return None;
+        }
+        let costs: Vec<_> = self.arcs.iter().map(|a| a.reduced_cost).collect();
+        let plugin = original.plugins[0]
+            .0
+            .prepare_pricing(&costs, threshold, deadline)?;
+        let mut graph = self.clone();
+        let kernel = graph.edit().coupled.as_mut()?;
+        kernel.plugins[0] = plugin;
+        kernel.identity = std::sync::Arc::new(());
+        Some(graph)
+    }
     pub(crate) fn refresh_coupled_bounds(&mut self) {
         if let Some(mut kernel) = self.edit().coupled.take() {
             kernel.refresh_bounds(self);

@@ -19,3 +19,5 @@ pub mod robust;
 pub mod robust_pd;
 /// Stochastic demands with replenishment recourse and a tiny exact baseline.
 pub mod stochastic;
+/// Stochastic demands with Bellman continuation states inside pricing.
+pub mod stochastic_restocking;

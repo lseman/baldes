@@ -483,6 +483,18 @@ impl<'a, const D: usize> Sweep<'a, D> {
                                 let group = from_vertex;
                                 let target = self.storage.retain_for::<R>(label);
                                 self.terminals.push((group, cost, target));
+                                if (self.ctx.controls.backward_only
+                                    || self.ctx.controls.staged_pricing)
+                                    && cost < controls.zero_threshold - 1e-6
+                                    && self
+                                        .terminals
+                                        .iter()
+                                        .filter(|(_, c, _)| *c < controls.zero_threshold - 1e-6)
+                                        .count()
+                                        >= controls.max_columns
+                                {
+                                    return Err(incomplete("pricing column batch limit reached"));
+                                }
                                 continue;
                             }
                             // Keep the unsplit label in place. Moving it through

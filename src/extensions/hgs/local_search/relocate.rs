@@ -4,12 +4,24 @@ impl<'p> HGSLocalSearch<'p> {
     /// Move single client U and insert it after V.
     #[inline(always)]
     pub fn move_single_client(&mut self, u: usize, v: usize) -> bool {
+        self.evaluate_move_single_client(u, v, true).is_some()
+    }
+
+    pub(super) fn evaluate_move_single_client(
+        &mut self,
+        u: usize,
+        v: usize,
+        apply: bool,
+    ) -> Option<f64> {
+        if u == v {
+            return None;
+        }
         let u_prev = self.nodes[u].prev as usize;
         let x = self.nodes[u].next as usize;
         let y = self.nodes[v].next as usize;
 
         if u == y {
-            return false;
+            return None;
         }
 
         let u_cour = self.nodes[u].cour as usize;
@@ -33,8 +45,12 @@ impl<'p> HGSLocalSearch<'p> {
         let route_u_tw_pen = self.route_has_tw_violation(r_u);
 
         if r_u != r_v {
-            if !route_u_load_pen && !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
-                return false;
+            if !self.params.config.local_search.best_move
+                && !route_u_load_pen
+                && !route_u_tw_pen
+                && cost_supp_u + cost_supp_v > self.delta_limit()
+            {
+                return None;
             }
 
             // Time-window penalties are nonnegative. Reject using distance and
@@ -43,8 +59,8 @@ impl<'p> HGSLocalSearch<'p> {
             let load_pen_v = self.penalty_excess_load(self.routes[r_v].load + load_u);
             let lower_bound = (cost_supp_u + (load_pen_u - self.routes[r_u].penalty))
                 + (cost_supp_v + (load_pen_v - self.routes[r_v].penalty));
-            if lower_bound > MY_EPSILON {
-                return false;
+            if lower_bound > self.bound_limit() {
+                return None;
             }
 
             let route_u_tw = TimeWindowData::merge(
@@ -65,15 +81,17 @@ impl<'p> HGSLocalSearch<'p> {
             cost_supp_v +=
                 load_pen_v + self.penalty_time_windows(&route_v_tw) - self.routes[r_v].penalty;
         } else {
-            if !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
-                return false;
+            if !route_u_tw_pen && cost_supp_u + cost_supp_v > self.delta_limit() {
+                return None;
             }
 
             // A candidate cannot improve if its distance and load cost alone
             // exceed the current route penalty, even with zero time warp.
             let load_pen = self.penalty_excess_load(self.routes[r_u].load);
-            if cost_supp_u + cost_supp_v + (load_pen - self.routes[r_u].penalty) > MY_EPSILON {
-                return false;
+            if cost_supp_u + cost_supp_v + (load_pen - self.routes[r_u].penalty)
+                > self.bound_limit()
+            {
+                return None;
             }
 
             let route_u_tw = if self.nodes[u].position < self.nodes[v].position {
@@ -98,9 +116,14 @@ impl<'p> HGSLocalSearch<'p> {
                 - self.routes[r_u].penalty;
         }
 
-        if cost_supp_u + cost_supp_v > -MY_EPSILON {
-            return false;
+        if cost_supp_u + cost_supp_v > self.delta_limit() {
+            return None;
         }
+        let delta = cost_supp_u + cost_supp_v;
+        if !apply {
+            return Some(delta);
+        }
+        self.register_delta(delta);
 
         self.insert_node(u, v);
         self.nb_moves += 1;
@@ -110,19 +133,31 @@ impl<'p> HGSLocalSearch<'p> {
             self.update_route_data(r_v);
         }
 
-        true
+        Some(delta)
     }
 
     /// Move two clients (U, X) and insert them after V.
     #[inline(always)]
     pub fn move_two_clients(&mut self, u: usize, v: usize) -> bool {
+        self.evaluate_move_two_clients(u, v, true).is_some()
+    }
+
+    pub(super) fn evaluate_move_two_clients(
+        &mut self,
+        u: usize,
+        v: usize,
+        apply: bool,
+    ) -> Option<f64> {
+        if u == v {
+            return None;
+        }
         let x = self.nodes[u].next as usize;
         if self.nodes[x].is_depot {
-            return false;
+            return None;
         }
         let y = self.nodes[v].next as usize;
         if u == y || x == v {
-            return false;
+            return None;
         }
 
         let u_prev = self.nodes[u].prev as usize;
@@ -150,8 +185,12 @@ impl<'p> HGSLocalSearch<'p> {
         let route_u_tw_pen = self.route_has_tw_violation(r_u);
 
         if r_u != r_v {
-            if !route_u_load_pen && !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
-                return false;
+            if !self.params.config.local_search.best_move
+                && !route_u_load_pen
+                && !route_u_tw_pen
+                && cost_supp_u + cost_supp_v > self.delta_limit()
+            {
+                return None;
             }
 
             // Time-window penalties are nonnegative. Reject using distance and
@@ -160,8 +199,8 @@ impl<'p> HGSLocalSearch<'p> {
             let load_pen_v = self.penalty_excess_load(self.routes[r_v].load + load_ux);
             let lower_bound = (cost_supp_u + (load_pen_u - self.routes[r_u].penalty))
                 + (cost_supp_v + (load_pen_v - self.routes[r_v].penalty));
-            if lower_bound > MY_EPSILON {
-                return false;
+            if lower_bound > self.bound_limit() {
+                return None;
             }
 
             let route_u_tw = TimeWindowData::merge(
@@ -180,8 +219,8 @@ impl<'p> HGSLocalSearch<'p> {
             cost_supp_v +=
                 load_pen_v + self.penalty_time_windows(&route_v_tw) - self.routes[r_v].penalty;
         } else {
-            if !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
-                return false;
+            if !route_u_tw_pen && cost_supp_u + cost_supp_v > self.delta_limit() {
+                return None;
             }
 
             let ux_tw =
@@ -189,8 +228,10 @@ impl<'p> HGSLocalSearch<'p> {
             // A candidate cannot improve if its distance and load cost alone
             // exceed the current route penalty, even with zero time warp.
             let load_pen = self.penalty_excess_load(self.routes[r_u].load);
-            if cost_supp_u + cost_supp_v + (load_pen - self.routes[r_u].penalty) > MY_EPSILON {
-                return false;
+            if cost_supp_u + cost_supp_v + (load_pen - self.routes[r_u].penalty)
+                > self.bound_limit()
+            {
+                return None;
             }
 
             let route_u_tw = if self.nodes[u].position < self.nodes[v].position {
@@ -211,9 +252,14 @@ impl<'p> HGSLocalSearch<'p> {
                 - self.routes[r_u].penalty;
         }
 
-        if cost_supp_u + cost_supp_v > -MY_EPSILON {
-            return false;
+        if cost_supp_u + cost_supp_v > self.delta_limit() {
+            return None;
         }
+        let delta = cost_supp_u + cost_supp_v;
+        if !apply {
+            return Some(delta);
+        }
+        self.register_delta(delta);
 
         self.insert_node(u, v);
         self.insert_node(x, u);
@@ -224,19 +270,32 @@ impl<'p> HGSLocalSearch<'p> {
             self.update_route_data(r_v);
         }
 
-        true
+        Some(delta)
     }
 
     /// Move two clients (X, U) reversed and insert them after V.
     #[inline(always)]
     pub fn move_two_clients_reversed(&mut self, u: usize, v: usize) -> bool {
+        self.evaluate_move_two_clients_reversed(u, v, true)
+            .is_some()
+    }
+
+    pub(super) fn evaluate_move_two_clients_reversed(
+        &mut self,
+        u: usize,
+        v: usize,
+        apply: bool,
+    ) -> Option<f64> {
+        if u == v {
+            return None;
+        }
         let x = self.nodes[u].next as usize;
         if self.nodes[x].is_depot {
-            return false;
+            return None;
         }
         let y = self.nodes[v].next as usize;
         if u == y || x == v {
-            return false;
+            return None;
         }
 
         let u_prev = self.nodes[u].prev as usize;
@@ -266,8 +325,12 @@ impl<'p> HGSLocalSearch<'p> {
         let route_u_tw_pen = self.route_has_tw_violation(r_u);
 
         if r_u != r_v {
-            if !route_u_load_pen && !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
-                return false;
+            if !self.params.config.local_search.best_move
+                && !route_u_load_pen
+                && !route_u_tw_pen
+                && cost_supp_u + cost_supp_v > self.delta_limit()
+            {
+                return None;
             }
 
             // Time-window penalties are nonnegative. Reject using distance and
@@ -276,8 +339,8 @@ impl<'p> HGSLocalSearch<'p> {
             let load_pen_v = self.penalty_excess_load(self.routes[r_v].load + load_ux);
             let lower_bound = (cost_supp_u + (load_pen_u - self.routes[r_u].penalty))
                 + (cost_supp_v + (load_pen_v - self.routes[r_v].penalty));
-            if lower_bound > MY_EPSILON {
-                return false;
+            if lower_bound > self.bound_limit() {
+                return None;
             }
 
             let route_u_tw = TimeWindowData::merge(
@@ -296,8 +359,8 @@ impl<'p> HGSLocalSearch<'p> {
             cost_supp_v +=
                 load_pen_v + self.penalty_time_windows(&route_v_tw) - self.routes[r_v].penalty;
         } else {
-            if !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
-                return false;
+            if !route_u_tw_pen && cost_supp_u + cost_supp_v > self.delta_limit() {
+                return None;
             }
 
             let xu_tw =
@@ -305,8 +368,10 @@ impl<'p> HGSLocalSearch<'p> {
             // A candidate cannot improve if its distance and load cost alone
             // exceed the current route penalty, even with zero time warp.
             let load_pen = self.penalty_excess_load(self.routes[r_u].load);
-            if cost_supp_u + cost_supp_v + (load_pen - self.routes[r_u].penalty) > MY_EPSILON {
-                return false;
+            if cost_supp_u + cost_supp_v + (load_pen - self.routes[r_u].penalty)
+                > self.bound_limit()
+            {
+                return None;
             }
 
             let route_u_tw = if self.nodes[u].position < self.nodes[v].position {
@@ -327,9 +392,14 @@ impl<'p> HGSLocalSearch<'p> {
                 - self.routes[r_u].penalty;
         }
 
-        if cost_supp_u + cost_supp_v > -MY_EPSILON {
-            return false;
+        if cost_supp_u + cost_supp_v > self.delta_limit() {
+            return None;
         }
+        let delta = cost_supp_u + cost_supp_v;
+        if !apply {
+            return Some(delta);
+        }
+        self.register_delta(delta);
 
         self.insert_node(x, v);
         self.insert_node(u, x);
@@ -340,6 +410,6 @@ impl<'p> HGSLocalSearch<'p> {
             self.update_route_data(r_v);
         }
 
-        true
+        Some(delta)
     }
 }

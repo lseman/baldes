@@ -460,10 +460,20 @@ impl CoupledKernel {
         // Paired checks are deliberately last among these necessary
         // preconditions: rejected scalar/discrete/program pairs need no walk
         // through the retained function and backward-adjoint pieces.
-        if !self.plugins_dominate(a, b, forward) {
+        let plugin_penalty = if self.bellman_pricing() {
+            self.plugins[0]
+                .0
+                .cost_dominance_penalty(&a.plugins[0], &b.plugins[0], forward)?
+        } else {
+            if !self.plugins_dominate(a, b, forward) {
+                return None;
+            }
+            0.
+        };
+        if !plugin_penalty.is_finite() || plugin_penalty < 0. {
             return None;
         }
-        let relation_penalty = slope_penalty;
+        let relation_penalty = add_up(slope_penalty, plugin_penalty)?;
         let relation_penalty = add_up(
             relation_penalty,
             self.slope_relations_dominate(a, b, forward, tracked_order)?,
@@ -551,7 +561,7 @@ impl CoupledKernel {
             return !self.transitions.deferred;
         }
         !self.transitions.deferred
-            && self.plugins.is_empty()
+            && (self.plugins.is_empty() || self.backward_pricing())
             && self.slope_indices.is_empty()
             && self.slope_paired.is_empty()
     }

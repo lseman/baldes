@@ -92,13 +92,14 @@ impl Instance {
             distances: None,
         })
     }
-    /// CVRPLIB (TSPLIB) CVRP: DIMENSION, CAPACITY, EDGE_WEIGHT_TYPE EUC_2D,
+    /// CVRPLIB (TSPLIB) CVRP/VRPTW: DIMENSION, CAPACITY, EDGE_WEIGHT_TYPE EUC_2D,
     /// CEIL_2D or EXPLICIT (FULL_MATRIX, LOWER_ROW, LOWER_DIAG_ROW, UPPER_ROW,
     /// UPPER_DIAG_ROW), NODE_COORD/DISPLAY_DATA, DEMAND and DEPOT sections.
     /// The depot becomes customer 0, the others keep their order. `vehicles`
-    /// is VEHICLES when given, otherwise DIMENSION, as in the converted
-    /// Solomon-format files. Route-length limits (DISTANCE) and service times
-    /// are not supported.
+    /// is VEHICLES when given, otherwise DIMENSION for CVRP and DIMENSION - 1
+    /// for VRPTW (a free fleet). VRPTW additionally requires TIME_WINDOW_SECTION
+    /// and supports per-node SERVICE_TIME_SECTION (zero when omitted).
+    /// Route-length limits (DISTANCE) and uniform SERVICE_TIME are unsupported.
     fn parse_cvrplib(text: &str) -> Result<Self> {
         let mut headers = std::collections::HashMap::new();
         let mut sections: std::collections::HashMap<String, Vec<f64>> = Default::default();
@@ -146,10 +147,11 @@ impl Instance {
                 .parse::<f64>()
                 .map_err(|_| invalid(format!("CVRPLIB: invalid {key}")))
         };
+        let vrptw = header("TYPE").is_some_and(|kind| kind.eq_ignore_ascii_case("VRPTW"));
         if let Some(kind) = header("TYPE") {
-            if !kind.eq_ignore_ascii_case("CVRP") {
+            if !kind.eq_ignore_ascii_case("CVRP") && !vrptw {
                 return Err(invalid(format!(
-                    "CVRPLIB: TYPE {kind} is not supported, only CVRP"
+                    "CVRPLIB: TYPE {kind} is not supported, only CVRP and VRPTW"
                 )));
             }
         }
@@ -165,8 +167,24 @@ impl Instance {
         }
         let n = dimension as usize;
         let vehicles = match header("VEHICLES") {
-            Some(_) => number("VEHICLES")? as usize,
-            None => n,
+            Some(_) => {
+                let value = number("VEHICLES")?;
+                if !value.is_finite()
+                    || value < 1.
+                    || value.fract() != 0.
+                    || value > usize::MAX as f64
+                {
+                    return Err(invalid("CVRPLIB: invalid VEHICLES"));
+                }
+                value as usize
+            }
+            None => {
+                if vrptw {
+                    n - 1
+                } else {
+                    n
+                }
+            }
         };
         // (id, values...) rows of a section, by 1-based node id.
         let rows = |name: &str, width: usize| -> Result<Option<Vec<Vec<f64>>>> {
@@ -179,7 +197,8 @@ impl Instance {
             let mut table = vec![vec![]; n];
             for row in values.chunks(width + 1) {
                 let id = row[0];
-                if id < 1.
+                if !id.is_finite()
+                    || id < 1.
                     || id > n as f64
                     || id.fract() != 0.
                     || !table[id as usize - 1].is_empty()
@@ -192,6 +211,16 @@ impl Instance {
         };
         let demands = rows("DEMAND_SECTION", 1)?
             .ok_or_else(|| invalid("CVRPLIB: DEMAND_SECTION is missing"))?;
+        let windows = rows("TIME_WINDOW_SECTION", 2)?;
+        let services = rows("SERVICE_TIME_SECTION", 1)?;
+        if vrptw && windows.is_none() {
+            return Err(invalid("CVRPLIB: VRPTW requires TIME_WINDOW_SECTION"));
+        }
+        if !vrptw && (windows.is_some() || services.is_some()) {
+            return Err(invalid(
+                "CVRPLIB: time windows and service sections require TYPE VRPTW",
+            ));
+        }
         let coordinates = match rows("NODE_COORD_SECTION", 2)? {
             Some(c) => Some(c),
             None => rows("DISPLAY_DATA_SECTION", 2)?,
@@ -249,13 +278,23 @@ impl Instance {
             if !(demand >= 0. && demand.is_finite() && x.is_finite() && y.is_finite()) {
                 return Err(invalid("CVRPLIB: invalid demand or coordinates"));
             }
+            let (ready, due) = windows
+                .as_ref()
+                .map_or((0., f64::INFINITY), |w| (w[i][0], w[i][1]));
+            let service = services.as_ref().map_or(0., |s| s[i][0]);
+            if (vrptw && (!ready.is_finite() || !due.is_finite() || ready > due))
+                || !service.is_finite()
+                || service < 0.
+            {
+                return Err(invalid("CVRPLIB: invalid time window or service time"));
+            }
             customers.push(Customer {
                 x,
                 y,
                 demand,
-                ready: 0.,
-                due: f64::INFINITY,
-                service: 0.,
+                ready,
+                due,
+                service,
             });
         }
         if customers[0].demand != 0. {

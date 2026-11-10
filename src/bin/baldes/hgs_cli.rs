@@ -11,6 +11,15 @@ use baldes::inputs::Instance;
 pub const HELP: &str = "HGS extensions (all opt-in):
   --get-bks                 Download and seed from the current CVRPLib BKS (Python 3 + internet)
   --initial-solution FILE   Seed from a local CVRPLib route file instead
+  --compression-interval N  Compress consensus chains every N generations (also in subproblems)
+  --delay-seed              Reserve seeds until stagnation, half time, or generated cost catches up
+  --best-move              Compare candidates and apply the best move per customer
+  --deterioration-credit X  First-pass credit cap in instance cost units (requires --best-move)
+  --max-generations N      Total generation cap across restarts and compression stages
+  --reverse-mode           Spatial route groups with progressive HGS and post-merge education
+  --exploration-level N    Reverse-mode maximum depth, 0..6 (default: 4; 0 = constant)
+  --decomposition-phases N Regroupings per exploration level (default: 2)
+  --no-master-local-search Disable reverse-mode post-merge education for comparisons
   --intensify               Re-solve route subsets with threshold acceptance and elite restarts
   --dri                     Cluster customers, solve clusters and improve across clusters
   --dri-vicinity N          Neighboring clusters per cluster (default: 3)
@@ -33,8 +42,9 @@ pub const HELP: &str = "HGS extensions (all opt-in):
   --elite-diversity X       Minimum fraction of differing directed arcs (default: 0.05)
   --restart-after N         Restart from an elite after N stalled rounds (default: 30)
   --objective MODE          auto (default), distance, or vehicles-distance
-Seeded/intensified runs use the instance metric; --get-bks uses tenths for VRPTW.
---rounding overrides this. The auto objective is distance for current CVRPLib sets.
+Seeded/intensified runs use the instance metric; --get-bks uses tenths for Solomon/Homberger.
+XTW uses nearest-integer distances and vehicles-first route intensification automatically.
+--rounding and --objective override these defaults. Other sets default to distance.
 The --time budget covers search; downloading the BKS happens before it.";
 
 #[derive(Default)]
@@ -54,9 +64,30 @@ pub struct ExtensionOptions {
     dri_iterations: Option<usize>,
     dri_routing_fraction: Option<f64>,
     route_controls: bool,
+    compression_interval: Option<usize>,
+    delay_seed: bool,
+    best_move: bool,
+    deterioration_credit: Option<f64>,
+    generation_limit: Option<u32>,
+    reverse_mode: bool,
+    exploration_level: Option<usize>,
+    decomposition_phases: Option<usize>,
+    master_local_search: Option<bool>,
 }
 
 impl ExtensionOptions {
+    pub fn genetic_controls_active(&self) -> bool {
+        self.compression_interval.is_some()
+            || self.delay_seed
+            || self.best_move
+            || self.deterioration_credit.is_some()
+            || self.generation_limit.is_some()
+            || self.reverse_mode
+            || self.exploration_level.is_some()
+            || self.decomposition_phases.is_some()
+            || self.master_local_search.is_some()
+    }
+
     pub fn active(&self) -> bool {
         self.get_bks
             || self.initial_solution.is_some()
@@ -64,6 +95,7 @@ impl ExtensionOptions {
             || self.dri
             || self.output.is_some()
             || self.controls
+            || self.genetic_controls_active()
     }
 
     pub fn parse(
@@ -75,6 +107,51 @@ impl ExtensionOptions {
             "--get-bks" => self.get_bks = true,
             "--initial-solution" => {
                 self.initial_solution = Some(args.next().ok_or("missing solution file")?)
+            }
+            "--compression-interval" => {
+                self.compression_interval = Some(
+                    args.next()
+                        .ok_or("missing compression interval")?
+                        .parse()
+                        .map_err(|_| "invalid compression interval")?,
+                );
+            }
+            "--delay-seed" => self.delay_seed = true,
+            "--best-move" => self.best_move = true,
+            "--reverse-mode" => self.reverse_mode = true,
+            "--master-local-search" => self.master_local_search = Some(true),
+            "--no-master-local-search" => self.master_local_search = Some(false),
+            "--deterioration-credit" => {
+                self.deterioration_credit = Some(
+                    args.next()
+                        .ok_or("missing deterioration credit")?
+                        .parse()
+                        .map_err(|_| "invalid deterioration credit")?,
+                );
+            }
+            "--max-generations" => {
+                self.generation_limit = Some(
+                    args.next()
+                        .ok_or("missing generation limit")?
+                        .parse()
+                        .map_err(|_| "invalid generation limit")?,
+                );
+            }
+            "--exploration-level" => {
+                self.exploration_level = Some(
+                    args.next()
+                        .ok_or("missing exploration level")?
+                        .parse()
+                        .map_err(|_| "invalid exploration level")?,
+                );
+            }
+            "--decomposition-phases" => {
+                self.decomposition_phases = Some(
+                    args.next()
+                        .ok_or("missing decomposition phases")?
+                        .parse()
+                        .map_err(|_| "invalid decomposition phases")?,
+                );
             }
             "--intensify" => self.intensify = true,
             "--dri" => self.dri = true,
@@ -199,6 +276,40 @@ impl ExtensionOptions {
     }
 
     pub fn validate(&self) -> Result<(), String> {
+        if self
+            .deterioration_credit
+            .is_some_and(|x| !x.is_finite() || !(0. ..=f64::MAX / 10.).contains(&x))
+        {
+            return Err("deterioration credit must be finite and nonnegative".into());
+        }
+        if self.deterioration_credit.is_some_and(|x| x > 0.) && !self.best_move {
+            return Err("deterioration credit requires --best-move".into());
+        }
+        if self.reverse_mode && (self.dri || self.intensify) {
+            return Err("--reverse-mode conflicts with --intensify and --dri".into());
+        }
+        if self.reverse_mode && (self.config.workers != 1 || self.config.batch_size != 0) {
+            return Err("--reverse-mode uses sequential route groups; --workers and --batch-size require --intensify or --dri".into());
+        }
+        if !self.reverse_mode
+            && (self.exploration_level.is_some()
+                || self.decomposition_phases.is_some()
+                || self.master_local_search.is_some())
+        {
+            return Err(
+                "exploration and master-local-search controls require --reverse-mode".into(),
+            );
+        }
+        if self.exploration_level.is_some_and(|level| level > 6)
+            || self.decomposition_phases == Some(0)
+        {
+            return Err(
+                "exploration level must be 0..6 and decomposition phases must be positive".into(),
+            );
+        }
+        if self.compression_interval == Some(0) {
+            return Err("compression interval must be positive".into());
+        }
         if self.config.barycenter && self.config.std_similarity {
             return Err("--barycenter conflicts with --std-similarity".into());
         }
@@ -208,7 +319,7 @@ impl ExtensionOptions {
         if self.dri && self.intensify {
             return Err("--dri conflicts with --intensify".into());
         }
-        if self.dri && self.route_controls {
+        if (self.dri || self.reverse_mode) && self.route_controls {
             return Err("route-intensification controls require --intensify".into());
         }
         if self
@@ -229,7 +340,7 @@ impl ExtensionOptions {
         if self.dri_iterations == Some(0) {
             return Err("--dri-iterations must be positive".into());
         }
-        if self.controls && !self.intensify && !self.dri {
+        if self.controls && !self.intensify && !self.dri && !self.reverse_mode {
             return Err(
                 "decomposition/threshold/elite controls require --intensify or --dri".into(),
             );
@@ -252,7 +363,30 @@ impl ExtensionOptions {
 
     pub fn run(&self, instance: &Instance, options: &HgsOptions) -> Result<HgsResult, String> {
         self.validate()?;
-        if !self.active() {
+        let mut configured = options.clone();
+        if let Some(interval) = self.compression_interval {
+            configured.compression = Some(baldes::extensions::hgs::CompressionOptions { interval });
+        }
+        configured.delay_seed |= self.delay_seed;
+        configured.local_search.best_move |= self.best_move;
+        if let Some(credit) = self.deterioration_credit {
+            configured.local_search.max_deterioration = credit;
+        }
+        if let Some(limit) = self.generation_limit {
+            configured.generation_limit = Some(limit);
+        }
+        let options = &configured;
+        let objective = self.objective.unwrap_or(if instance.is_xtw() {
+            Objective::VehiclesThenDistance
+        } else {
+            Objective::Distance
+        });
+        let intensify =
+            self.intensify || (instance.is_xtw() && objective == Objective::VehiclesThenDistance);
+        if self.dri && objective == Objective::VehiclesThenDistance {
+            return Err("--dri supports distance only; use --objective distance --dri or XTW route intensification".into());
+        }
+        if !self.active() && !intensify {
             return run_hgs(instance, options);
         }
         let text = if self.get_bks {
@@ -276,6 +410,31 @@ impl ExtensionOptions {
             }
             Ok(())
         };
+        if self.reverse_mode {
+            if let Some(routes) = &seed {
+                checkpoint(routes, validate_plan(instance, routes)?)?;
+            }
+            let config = baldes::extensions::hgs::RouteDecompositionOptions {
+                time_limit: options.time_limit,
+                target_customers: self.config.max_customers,
+                phases: self.decomposition_phases.unwrap_or(2),
+                exploration_levels: self.exploration_level.unwrap_or(4),
+                master_local_search: self.master_local_search.unwrap_or(true),
+                objective,
+                hgs: options.clone(),
+                ..Default::default()
+            };
+            let found =
+                baldes::extensions::hgs::run_hgs_decomposed(instance, seed.as_deref(), &config)?;
+            if let Some(cost) = found.solution.best_cost {
+                checkpoint(&found.solution.routes, cost)?;
+            }
+            eprintln!("Reverse: phases={} subproblems={} levels={:?} master_passes={} master_improvements={}",
+                found.decomposition.phases_completed, found.decomposition.subproblems,
+                found.decomposition.exploration_schedule, found.decomposition.master_passes,
+                found.decomposition.master_improvements);
+            return Ok(found.solution);
+        }
         if self.dri {
             if let Some(routes) = &seed {
                 checkpoint(routes, validate_plan(instance, routes)?)?;
@@ -298,7 +457,7 @@ impl ExtensionOptions {
             }
             return Ok(result);
         }
-        if !self.intensify {
+        if !intensify {
             if let Some(routes) = &seed {
                 checkpoint(routes, validate_plan(instance, routes)?)?;
             }
@@ -339,7 +498,11 @@ impl ExtensionOptions {
         config.subproblem.nb_iter = options.nb_iter;
         config.subproblem.population_size = options.population_size;
         config.subproblem.verbose = options.verbose;
-        config.objective = self.objective.unwrap_or(Objective::Distance);
+        config.subproblem.compression = options.compression.clone();
+        config.subproblem.delay_seed = options.delay_seed;
+        config.subproblem.local_search = options.local_search.clone();
+        config.subproblem.generation_limit = options.generation_limit;
+        config.objective = objective;
         if options.time_limit > 0.0 && config.time_limit == 0.0 {
             let cost = validate_plan(instance, &seed)?;
             checkpoint(&seed, cost)?;

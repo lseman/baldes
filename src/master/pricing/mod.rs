@@ -110,6 +110,16 @@ pub(crate) struct Retained {
 /// Scheduling, oracle invocation, proof admission and batch accounting live
 /// in `price`, including for the one-element collection.
 pub(crate) trait Networks<const D: usize> {
+    /// Opt-in column batches from unfinished exact pricing. These carry no
+    /// minimum, bound correction, completion flag or pricing subgradient.
+    fn accepts_partial_columns(&self, _index: usize) -> bool {
+        false
+    }
+    /// Independent numerical minimum from completed stages at these duals.
+    /// It never turns unfinished pricing into an exact/certified sweep.
+    fn partial_minimum(&self, _index: usize) -> Option<f64> {
+        None
+    }
     fn active(&self) -> Vec<usize>;
     fn prepare(
         &mut self,
@@ -324,7 +334,32 @@ pub(crate) fn price<const D: usize>(
                 return Err(incomplete("network pricing time limit"));
             }
             let result = networks.price(index, request.phase, remaining)?;
-            if request.exact && !result.exact {
+            if !result.exact && (request.exact || networks.accepts_partial_columns(index)) {
+                if networks.accepts_partial_columns(index) {
+                    let collected =
+                        networks.collect(index, result.columns, request.offset, context.duals)?;
+                    columns.extend(collected.columns);
+                    scheduler.complete = false;
+                    let contribution = if order.len() == 1 && networks.active().len() == 1 {
+                        networks.partial_minimum(index).and_then(|bound| {
+                            let minimum = crate::core::rounding::add_down(bound, request.offset)?;
+                            let estimate =
+                                Estimate::contribution(minimum, request.lower, request.upper)?;
+                            let (static_value, _) = networks.static_contribution(context.duals)?;
+                            crate::core::rounding::add_down(estimate.correction, static_value)
+                        })
+                    } else {
+                        None
+                    };
+                    if columns.is_empty() && contribution.is_none() {
+                        return Err(incomplete("network pricing time limit"));
+                    }
+                    return Ok(Batch {
+                        answer: answer(context.phase, columns, 0., false),
+                        correction: contribution,
+                        gradient: None,
+                    });
+                }
                 return Err(incomplete("network exact pricing did not finish"));
             }
             exact &= result.exact;
@@ -504,3 +539,7 @@ fn answer(phase: usize, columns: Vec<cg::Column>, minimum: f64, exact: bool) -> 
         bound_minimum: None,
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/master/pricing/partial_columns_tests.rs"]
+mod partial_columns_tests;
