@@ -2049,20 +2049,22 @@ fn paired_fractional_rate_nonzero_suffix_wait_matches_native_recording() {
                 panic!("retained paired recorder unavailable")
             };
             let recorded = *retained.path.dependent.last().unwrap();
-            // Reference pricing joins at the sink; enumeration may retain a
-            // different split of the same path with a different recorder value.
+            // Enumeration exports the retained join's own candidate value, as
+            // the reference enumeration store does; only pricing replays the
+            // recorder, whose value for the same split can differ.
+            let FrontierOutcome::Complete(raw) =
+                solver.machine_enumeration_paired_selection(&routes[0].arcs, None, budget)
+            else {
+                panic!("retained paired selection unavailable")
+            };
+            let raw = raw.dependent.unwrap();
             let reference = baldes::labeling::reference_price(&graph, &Default::default()).unwrap();
             assert_eq!(reference.columns.len(), 1);
             assert_eq!(reference.columns[0].coupled_values, [(0, values[12])]);
             assert_eq!(reference.columns[0].original_cost, values[12]);
             if rates == [1.25, 0.25] {
                 assert_eq!(recorded, 4.75);
-                let FrontierOutcome::Complete(raw) =
-                    solver.machine_enumeration_paired_selection(&routes[0].arcs, None, budget)
-                else {
-                    panic!("retained paired selection unavailable")
-                };
-                assert_eq!(raw.dependent, Some(4.));
+                assert_eq!(raw, 4.);
                 assert_eq!(routes[0].cost, 4.);
                 let mut sibling = solver.fork_for_node();
                 solver
@@ -2072,13 +2074,13 @@ fn paired_fractional_rate_nonzero_suffix_wait_matches_native_recording() {
                 let shifted = solver.price_phase(0, 10, false).unwrap();
                 assert_eq!(shifted.columns.len(), 1);
                 assert_eq!(shifted.columns[0].cost, 2.);
-                assert_eq!(shifted.columns[0].original_cost, 4.75);
-                assert_eq!(shifted.columns[0].coupled_values, [(0, 4.75)]);
+                assert_eq!(shifted.columns[0].original_cost, 4.);
+                assert_eq!(shifted.columns[0].coupled_values, [(0, 4.)]);
                 let sibling_result = sibling.price_phase(0, 10, false).unwrap();
                 assert_eq!(sibling_result.columns.len(), 1);
                 assert_eq!(sibling_result.columns[0].cost, 4.);
-                assert_eq!(sibling_result.columns[0].original_cost, 4.75);
-                assert_eq!(sibling_result.columns[0].coupled_values, [(0, 4.75)]);
+                assert_eq!(sibling_result.columns[0].original_cost, 4.);
+                assert_eq!(sibling_result.columns[0].coupled_values, [(0, 4.)]);
                 solver
                     .graph
                     .update_reduced_costs(&[0., 0.], &[0., 0., 0.], false)
@@ -2106,8 +2108,8 @@ fn paired_fractional_rate_nonzero_suffix_wait_matches_native_recording() {
                 }
                 let weighted_routes = weighted.enumerate(100.).unwrap();
                 assert_eq!(weighted_routes.len(), 1);
-                assert_eq!(weighted_routes[0].coupled_values, [(0, 4.75)]);
-                assert_eq!(weighted_routes[0].original_cost, 9.75);
+                assert_eq!(weighted_routes[0].coupled_values, [(0, 4.)]);
+                assert_eq!(weighted_routes[0].original_cost, 0.25 + 2. * 4.);
 
                 let mut bound_solver = baldes::pricing::Solver::<2>::new(3, 1).unwrap();
                 for (vertex, window) in windows.iter().enumerate() {
@@ -2163,8 +2165,9 @@ fn paired_fractional_rate_nonzero_suffix_wait_matches_native_recording() {
                 else {
                     panic!("bound paired recorder unavailable")
                 };
-                assert_eq!(bound_routes[0].coupled_values, [(0, 4.75)]);
-                assert_eq!(bound_routes[0].original_cost, 4.75);
+                assert_eq!(bound_record.path.dependent.last(), Some(&4.75));
+                assert_eq!(bound_routes[0].coupled_values, [(0, 4.)]);
+                assert_eq!(bound_routes[0].original_cost, 4.);
                 assert_eq!(bound_routes[0].resources, [6.]);
                 assert_eq!(
                     bound_routes[0]
@@ -2172,11 +2175,13 @@ fn paired_fractional_rate_nonzero_suffix_wait_matches_native_recording() {
                         .iter()
                         .map(|q| q[0])
                         .collect::<Vec<_>>(),
-                    bound_record.path.base
+                    [0., 3., 6.]
                 );
+                assert_eq!(bound_record.path.base, [1., 3., 6.]);
             }
-            assert_eq!(routes[0].coupled_values, [(0, recorded)], "rates={rates:?}");
-            assert_eq!(routes[0].original_cost, recorded);
+            assert_eq!(routes[0].coupled_values, [(0, raw)], "rates={rates:?}");
+            assert_eq!(routes[0].original_cost, raw);
+            assert_eq!(routes[0].cost, raw);
             let repriced = solver.price_phase(0, 10, false).unwrap();
             assert_eq!(repriced.columns.len(), 1, "rates={rates:?}");
             assert_eq!(repriced.columns[0].coupled_values, routes[0].coupled_values);
