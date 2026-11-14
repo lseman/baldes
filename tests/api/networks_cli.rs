@@ -613,9 +613,21 @@ fn resource_group_files_restrict_both_pricing_networks_and_tree_descendants() {
                 String::from_utf8_lossy(&output.stderr)
             );
             let result: Value = serde_json::from_slice(&output.stdout).unwrap();
-            assert_eq!(result["status"], "Optimal");
-            assert_eq!(result["bound"], 4.);
-            assert_eq!(result[if tree { "incumbent" } else { "lp" }], 4.);
+            // Master-only branches leave pricing relaxed, so only a complete
+            // route universe closes the bound.
+            if baldes::master::branching::ACCUMULATED_RESOURCE_IN_PRICING || enumerate {
+                assert_eq!(result["status"], "Optimal");
+                assert_eq!(result["bound"], 4.);
+                assert_eq!(result[if tree { "incumbent" } else { "lp" }], 4.);
+            } else {
+                assert_eq!(
+                    result["status"],
+                    if tree { "Incomplete" } else { "Stalled" }
+                );
+                assert!(result["bound"].as_f64().unwrap() <= 4.);
+                // The integer LP point is still a validated solution.
+                assert_eq!(result[if tree { "incumbent" } else { "lp" }], 4.);
+            }
             for route in result["routes"].as_array().unwrap() {
                 if route["value"].as_f64().unwrap() <= 1e-6 {
                     continue;

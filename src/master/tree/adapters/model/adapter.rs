@@ -313,6 +313,29 @@ impl<const D: usize> Model for NetworkSearch<'_, D> {
             return Ok(Decision::Continue);
         }
         if output.master.status != cg::Status::Optimal {
+            // A stalled node proves no bound, but its LP was solved under this
+            // node's restrictions and may be integer. The replay validates it
+            // against the original model. An interrupted node may still hold
+            // its parent's point, so it claims nothing.
+            if let Some((objective, routes, master_values)) = (output.master.status
+                == cg::Status::Stalled)
+                .then(|| output.snapshot.integer_witness(options.tolerance))
+                .transpose()?
+                .flatten()
+            {
+                if objective < result.incumbent {
+                    result.incumbent = objective;
+                    result.routes = routes;
+                    result.master_values = master_values;
+                }
+                if bound.is_finite() && options.closes(bound, result.incumbent) {
+                    *closed_bound = closed_bound.min(bound);
+                    if let Some(history) = &mut subtree_history {
+                        history.close(lineage);
+                    }
+                    return Ok(Decision::Continue);
+                }
+            }
             result.status = if output.master.status == cg::Status::TimeLimit {
                 TreeStatus::TimeLimit
             } else {
