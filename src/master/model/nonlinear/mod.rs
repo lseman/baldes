@@ -68,7 +68,7 @@ pub(super) fn deterministic_entries<const D: usize>(
     // A shared row may contain several kernels from the same oracle. Replay
     // must publish one summed coefficient, as pricing applies the row dual to
     // every kernel. Keep integer accumulation exact before converting to LP.
-    let mut sums = std::collections::BTreeMap::<usize, i64>::new();
+    let mut sums = Vec::<(usize, i64)>::with_capacity(oracle.nonlinear_rows.len());
     let enumerated = !oracle.nonlinear_rows.is_empty() && oracle.is_enumerated(route);
     for &(cut, row) in &oracle.nonlinear_rows {
         let coefficient = i64::from(oracle.solver.cuts.route_coefficient(
@@ -77,7 +77,7 @@ pub(super) fn deterministic_entries<const D: usize>(
             &physical,
             enumerated,
         )?);
-        let sum = sums.entry(row).or_default();
+        let sum = super::accumulate(&mut sums, row, 0, 0);
         *sum = sum
             .checked_add(coefficient)
             .filter(|&v| v >= 0 && v <= (1_i64 << 53))

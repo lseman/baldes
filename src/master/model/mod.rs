@@ -450,17 +450,43 @@ impl<const D: usize> Default for CheckpointStore<D> {
     }
 }
 
+/// `*map.entry(row).or_insert(zero) += value` on a row-sorted vector. Route
+/// rows are few and cut rows arrive ascending, so most updates append.
+fn accumulate<T: Copy + std::ops::AddAssign>(
+    values: &mut Vec<(usize, T)>,
+    row: usize,
+    zero: T,
+    value: T,
+) -> &mut T {
+    let at = if values.last().is_none_or(|&(last, _)| last < row) {
+        values.push((row, zero));
+        values.len() - 1
+    } else {
+        match values.binary_search_by_key(&row, |&(row, _)| row) {
+            Ok(at) => at,
+            Err(at) => {
+                values.insert(at, (row, zero));
+                at
+            }
+        }
+    };
+    let slot = &mut values[at].1;
+    *slot += value;
+    slot
+}
+
+/// Row-sorted coefficients, including explicit zeros.
 fn entries_base<const D: usize>(
     oracle: &Oracle<D>,
     route: &Route,
     offset: usize,
-) -> Result<BTreeMap<usize, f64>> {
-    let mut values = BTreeMap::new();
+) -> Result<Vec<(usize, f64)>> {
+    let mut values = Vec::new();
     for &(row, value) in &oracle.route_entries {
-        *values.entry(row).or_insert(0.) += value;
+        accumulate(&mut values, row, 0., value);
     }
     for &(row, value) in oracle.network.route_entries.iter() {
-        *values.entry(offset + row).or_insert(0.) += value;
+        accumulate(&mut values, offset + row, 0., value);
     }
     for id in &route.arcs {
         let index = *oracle
@@ -468,14 +494,14 @@ fn entries_base<const D: usize>(
             .get(id)
             .ok_or_else(|| invalid("unknown network route arc"))?;
         for &(row, value) in &oracle.network.arc_entries[index] {
-            *values.entry(offset + row).or_insert(0.) += value;
+            accumulate(&mut values, offset + row, 0., value);
         }
     }
-    if values.values().any(|value: &f64| !value.is_finite()) {
+    if values.iter().any(|(_, value)| !value.is_finite()) {
         return Err(invalid("network route coefficient overflow"));
     }
     for (row, coefficient) in nonlinear::deterministic_entries(oracle, route)? {
-        *values.entry(offset + row).or_insert(0.) += coefficient;
+        accumulate(&mut values, offset + row, 0., coefficient);
     }
     Ok(values)
 }
@@ -486,15 +512,13 @@ fn entries<const D: usize>(
 ) -> Result<Vec<(usize, f64)>> {
     let mut values = entries_base(oracle, route, offset)?;
     for (row, coefficient) in activity_rows::paired_entries(oracle, route)? {
-        *values.entry(offset + row).or_insert(0.) += coefficient;
+        accumulate(&mut values, offset + row, 0., coefficient);
     }
-    if values.values().any(|value| !value.is_finite()) {
+    if values.iter().any(|(_, value)| !value.is_finite()) {
         return Err(invalid("paired row accumulation overflow"));
     }
-    Ok(values
-        .into_iter()
-        .filter(|(_, value)| *value != 0.)
-        .collect())
+    values.retain(|(_, value)| *value != 0.);
+    Ok(values)
 }
 
 #[cfg(test)]
