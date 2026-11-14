@@ -393,6 +393,14 @@ mod network {
         }
         // The removed routing root also rejected this before pricing (a
         // BALDES transitive-closure rule, not native); phase I proves it here.
+        // Exhausted relaxed pricing is no proof under master-only branches;
+        // a complete route universe is.
+        let node = if baldes::master::branching::RYAN_FOSTER_IN_PRICING {
+            node
+        } else {
+            node.enumerate(&model::EnumerationOptions::default())
+                .unwrap()
+        };
         let output = node.solve(options).unwrap();
         assert_eq!(output.master.status, Status::Infeasible, "{output:?}");
         assert_eq!(output.master.bound, f64::INFINITY);
