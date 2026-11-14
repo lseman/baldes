@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Bellman restocking pricing extensions::stochastic_restocking is an alternative to the existingextensions::stochastic Theta-cut formulation. It uses optimal preventiverestocking dec">
+<meta name="theme-color" content="#0b0e11">
+<title>Bellman restocking pricing — BALDES docs</title>
+<link rel="canonical" href="https://baldes.laioseman.com/docs/extensions/stochastic_restocking.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/solve.html">Unified solve interface</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/architecture.html">Solver architecture and ownership</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/concepts.html">Solver concepts and interface choices</a><a href="../guides/documentation.html">Maintaining the documentation</a><a href="../guides/python.html">Python: pyBaldes</a><a href="../guides/ails-ii.html">Standalone AILS-II search</a><a href="../guides/releases.html">Python wheels and releases</a><a href="../guides/background-ils.html">Background AILS-II</a><a href="../guides/savings-initial-columns.html">Clarke–Wright initial columns</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="../pybaldes/index.html">pyBaldes documentation</a><a href="../pybaldes/networks.html">Shared-master network models</a><a href="../pybaldes/installation.html">Install pyBaldes</a><a href="../pybaldes/quickstart.html">pyBaldes quickstart</a><a href="../pybaldes/routing.html">Routing inputs and options</a><a href="../pybaldes/pricing.html">Stateful pricing with Solver</a><a href="../pybaldes/resources.html">Coupled resources and function encodings</a><a href="../pybaldes/results.html">Results, bounds, and exactness</a><a href="../pybaldes/api.html">pyBaldes API reference</a><a href="../pybaldes/troubleshooting.html">pyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/models.html">Network models and shared masters</a><a href="../solver/column-imports.html">Finite column imports</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a><a href="../solver/branch-family-registration.html">Branching family registration order</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="hgs-intensify.html">BKS-seeded HGS intensification</a><a href="hgs-dri.html">Customer decomposition for HGS</a><a href="coupled-resources.html">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="pstep.html">P-step CVRP and VRPTW extension</a><a href="evrp.html">EVRP implementation status</a><a href="robust.html">Robust vehicle routing</a><a href="robust-pd.html">Robust pickup and delivery with time windows</a><a href="ipm.html">BALDES IPM in Rust</a><a href="ce.html">Column elimination</a><a href="stochastic.html">Stochastic demands and replenishment recourse</a><a href="stochastic_restocking.html" aria-current="page">Bellman restocking pricing</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a><a href="../benchmarks/stochastic.html">Stochastic branch-and-cut versus branch-and-price</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/stochastic_restocking.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Extensions</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="bellman-restocking-pricing">Bellman restocking pricing</h1>
+<p><code>extensions::stochastic_restocking</code> is an alternative to the existing
+<code>extensions::stochastic</code> Theta-cut formulation. It uses optimal preventive
+restocking decisions inside pricing, with Q+1 continuation values in each label.
+Do not add Theta recourse costs to a network using this resource: that would
+charge recourse twice.</p>
+<p>Run the complete example with <code>cargo run -p baldes --example stochastic_restocking</code>.</p>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">stochastic_restocking</span><span class="p">::{</span><span class="n">Demand</span><span class="p">,</span><span class="w"> </span><span class="n">Problem</span><span class="p">,</span><span class="w"> </span><span class="n">RestockingResource</span><span class="p">};</span>
+<span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">graph</span><span class="p">::</span><span class="n">coupled</span><span class="p">::{</span><span class="n">CoupledResource</span><span class="p">,</span><span class="w"> </span><span class="n">PluginResource</span><span class="p">};</span>
+<span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">Graph</span><span class="p">;</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="n">demand</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Demand</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="fm">vec!</span><span class="p">[(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.5</span><span class="p">),</span><span class="w"> </span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mf">0.5</span><span class="p">)])</span><span class="o">?</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">problem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Problem</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="fm">vec!</span><span class="p">[</span><span class="n">demand</span><span class="p">.</span><span class="n">clone</span><span class="p">(),</span><span class="w"> </span><span class="n">demand</span><span class="p">],</span><span class="w"> </span><span class="fm">vec!</span><span class="p">[</span>
+<span class="w">    </span><span class="fm">vec!</span><span class="p">[</span><span class="mf">0.</span><span class="p">,</span><span class="w"> </span><span class="mf">3.</span><span class="p">,</span><span class="w"> </span><span class="mf">7.</span><span class="p">],</span><span class="w"> </span><span class="fm">vec!</span><span class="p">[</span><span class="mf">3.</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">,</span><span class="w"> </span><span class="mf">4.</span><span class="p">],</span><span class="w"> </span><span class="fm">vec!</span><span class="p">[</span><span class="mf">7.</span><span class="p">,</span><span class="w"> </span><span class="mf">4.</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">],</span>
+<span class="p">])</span><span class="o">?</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">graph</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Graph</span><span class="p">::</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="o">?</span><span class="p">;</span><span class="w"> </span><span class="c1">// source 0, customers 1/2, sink 3</span>
+<span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">endpoints</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">tail</span><span class="p">,</span><span class="w"> </span><span class="n">head</span><span class="p">,</span><span class="w"> </span><span class="n">model_tail</span><span class="p">,</span><span class="w"> </span><span class="n">model_head</span><span class="p">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span><span class="w"> </span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">2</span><span class="p">),</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">),</span><span class="w"> </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span><span class="w"> </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span>
+<span class="p">]</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">graph</span><span class="p">.</span><span class="n">add_arc</span><span class="p">(</span><span class="n">tail</span><span class="p">,</span><span class="w"> </span><span class="n">head</span><span class="p">,</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">costs</span><span class="p">()[</span><span class="n">model_tail</span><span class="p">][</span><span class="n">model_head</span><span class="p">])</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">endpoints</span><span class="p">.</span><span class="n">push</span><span class="p">((</span><span class="n">model_tail</span><span class="p">,</span><span class="w"> </span><span class="n">model_head</span><span class="p">));</span>
+<span class="p">}</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">resource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RestockingResource</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">problem</span><span class="p">,</span><span class="w"> </span><span class="n">endpoints</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="n">graph</span><span class="p">.</span><span class="n">set_coupled_resources</span><span class="p">(</span><span class="o">&amp;</span><span class="p">[</span><span class="n">CoupledResource</span><span class="p">::</span><span class="n">Plugin</span><span class="p">(</span><span class="n">PluginResource</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">resource</span><span class="p">))])</span><span class="o">?</span><span class="p">;</span>
+</code></pre></div>
+<p>The endpoint array uses physical arc <strong>positions</strong>, in graph arc-vector order.
+Both depot copies map to model ID 0. Rebuild the resource after topology changes.
+Keep original arc objectives equal to planned travel; apply master duals through
+normal reduced-cost updates. The coupled kernel adds expected recourse to both
+original and reduced objectives, including replay at joins and reconstruction.
+It also suppresses this cost during phase-I feasibility pricing.</p>
+<p>Backward extensions prepend one Bellman transition using contiguous load slices
+for each demand outcome. A state holds recourse-only continuation costs after
+its first customer's service for every residual load. Planned suffix travel is
+tracked separately; literal probability-mass deviations receive a travel
+correction. Closing the route uses the shared model's canonical evaluation.
+The transition chooses the cheaper direct trip or preventive depot trip before
+the next customer. Running out during service causes a depot round trip.
+Forward extensions recompute the prefix continuation; this is more expensive
+than backward extension. Joins replay the suffix from the prefix. Backward
+dominance requires visited-set inclusion. An inexpensive recourse-vector proposal
+uses a uniform forward-error enclosure rather than replaying interval Bellman
+vectors for every comparison. Planned travel, literal probability mass and
+roundoff in suffix/prefix evaluations are included in a compensation paid
+against the scalar label cost. The shared kernel admits this
+proof for the exclusive backward resource even when physical suffix histories
+differ. Forward states retain equality dominance.</p>
+<p>The solve adapter reverses the private pricing graph and runs a complete forward
+sweep, matching the earlier Bellman pricer. Bellman transitions still prepend
+customers in the original problem direction. HGS/initial routes are adapted on
+entry, certificates reverse the physical arc sequence, and returned routes are
+replayed in their original direction. This avoids generic backward suffix
+programs while recovering load-walk and subset completion machinery from
+<code>abd74267</code>. Each extension prepends one Bellman operator. Up to four influential
+customers condition the prefix tables; best/second predecessor values exclude
+immediate two-cycles. Completion checks run before and after Bellman evaluation.
+Packing cut penalties may be relaxed away; unsupported cut families retain
+unpruned labeling. Prepared completion resources are local to a pricing call,
+so model replay and incumbent certification remain unrestricted. Pruned searches
+report a minimum capped at the pricing threshold and cannot supply full-domain
+fixing/enumeration labels. Subset completion currently supports up to 63
+customers and includes an outward correction for literal probability mass;
+unsupported cases keep backward labeling without this pruning. Knapsack completion is recovered
+in the module but disabled pending timing evidence.</p>
+<p>A separate directed load-indexed q-route relaxation supplies a reduced-cost
+bound even before exact labeling finishes. It includes a conservative global
+recourse envelope, covers branch-restricted route domains by relaxation, and
+feeds the current master's dual correction. Work/deadline exhaustion, zero-load
+negative cycles and unsupported row/resource combinations remain unknown.
+An additional adaptive NG relaxation recovers the old scalar bound sweeps and
+DSSR cycle refinement. It starts with two nearest neighbours, grows memory
+along forgotten cycles up to 15 customers, and retains only completed sweeps.
+Arc additions round downward. Rounded positive mean loads give an acyclic
+sweep capped at 512 load levels; zero rounded loads and more than 63 customers
+keep the q-route fallback. Each call is capped at 200 ms, 100,000 states and
+the remaining shared proof-work budget. Separate scalar candidate stages use
+16, 4 and 1 labels per bucket, preserve the current NG memory, cuts and branch
+restrictions, and replay elementary candidates with the full Bellman objective.
+Their surrogate cost is replaced while retaining the cut penalties. If these
+heuristic stages find no useful route, a complete scalar sweep attempts to
+establish a minimum over the relaxed domain. The candidate/proof sequence has a
+two-second/100,000-label budget. Only a completed scalar sweep supplies a
+numerical bound; it does not establish completion of Bellman pricing.</p>
+<p>The Bellman solve adapter enables shared scalar mean-load completion bounds by
+default (<code>BALDESloadCompletionResource = 1</code>) with six selected NG elements
+(<code>BALDESloadCompletionSubsetSize = 6</code>). These bounds run in the scalar fork,
+where the coupled Bellman resource has been removed; they do not replace the
+Bellman continuation bounds above. Explicit pricing options take precedence:
+resource <code>-1</code> disables shared load completion, subset size <code>0</code> keeps its
+unconditional bounds, and sizes <code>1..=6</code> condition the scalar NG completion.
+The example uses these Bellman defaults unless overridden by
+<code>--no-load-completion-bound</code> or <code>--completion-subset-size N</code>.</p>
+<p>Before exact labeling, a 250 ms local search uses the current master route pool.
+Insertion, removal, replacement, relocation and reversal moves are ranked by
+scalar reduced cost. The best moves receive full Bellman replay, explicit raw
+arc-price adjustments and registered cut coefficients. Branch-incompatible moves
+are rejected. Unsupported row types disable this search. Improving columns are
+heuristic results and never supply a minimum. Public route replay evaluates
+original objectives, so its result alone cannot identify improving reduced-cost
+columns. If neither candidate stage finds a useful route, pricing continues
+with Bellman labeling.
+This tree bound supersedes the assignment fallback whenever stronger.
+The exact graph uses an advancing hop-count coordinate, as in the historical
+pricer; scalar NG candidates use mean load as their main coordinate. If scalar
+prepricing finds no useful route, every requested CG phase falls back to staged
+exact Bellman search. It does not spend the budget in truncated coupled-label
+phases first. The functor uses raw arc and cut prices for that fallback even
+when the master requested a heuristic phase, so completed minima never describe
+rounded heuristic costs.</p>
+<p>Exact Bellman pricing remembers targets from both replayed heuristic columns
+and exact columns. It tries a remembered negative reduced-cost target, then a
+target eight times closer to zero, before the full pricing threshold. The first
+target can be seeded from the independent route relaxation. Targets include the
+route-constant dual offset. Only completed stages contribute a numerical
+minimum, which survives later interrupted stages. A single active network can
+publish the associated multiplicity-weighted master correction even with no
+new columns. It supplies neither a completion signal, a subgradient nor a
+directed pricing certificate. New pricing points and forks clear these minima.</p>
+<p>The solver returns batches of up to 20 improving Bellman columns without
+waiting for pricing exhaustion. These batches and interrupted sweeps are
+explicitly incomplete; their observed minima never prove convergence.</p>
+<p>The shared model assumes independent finite integer demands, each supported in
+0..=Q, a positive integer capacity, and a directed metric travel-cost matrix.
+Routes must be elementary and their total expected demand cannot exceed Q.
+The plugin enforces both conditions itself, independently of scalar resources.
+Restocking changes expected cost; stochastic travel time, recourse time windows,
+correlated demands and demand support above Q are not implemented here.
+Complete routes have an independent outward Bellman cost certificate for master
+incumbent validation. A separate global objective envelope covers unseen routes
+and feeds the master's lower-bound relaxation even when Bellman pricing times
+out. Depot-triangle costs give a nearly zero recourse lower bound, with an
+outward correction for literal probability mass; nonmetric costs subtract the
+maximum depot-triangle saving per edge. Unsupported arithmetic and
+exhausted proof budgets remain unknown. Inspect the reported bound mode and
+status before claiming certified tree bounds; this envelope does not establish
+pricing completion or optimality.
+The solve adapter also computes a deterministic assignment relaxation with depot
+copies, then corrects it with the global recourse envelope. Hungarian potentials
+are independently checked using directed arithmetic. This bound survives an
+interrupted first pricing pass; the instance runner labels it
+<code>RestockingAssignmentRelaxation</code> in <code>lower_bound_source</code>. It may be substantially
+weaker than a completed stochastic pricing bound. Its bounded computation counts
+against the solve budget; if unavailable, nonnegative total travel gives zero.
+The existing Theta solve entry point remains a separate formulation. With Clp,
+<code>stochastic_restocking::solve(&amp;problem, vehicles, options)</code> uses the same tree and
+HGS warm-start controls with Bellman pricing and no Theta recourse cuts.
+The instance runner selects it with <code>--solve --restocking --policy p3</code>.</p>
+<p>For a timed comparison on the repository's original SGJR files, build first:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--features<span class="w"> </span>clp,ng-memory-63<span class="w"> </span>--example<span class="w"> </span>stochastic_instance
+python3<span class="w"> </span>scripts/benchmarks/compare_stochastic_restocking.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>instances/CVRPSD/SGJR/20_2_0.94_1_0.05_2<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>instances/CVRPSD/SGJR/30_2_0.94_1_0.05_2<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>instances/CVRPSD/SGJR/40_2_0.94_1_0.05_2<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--seconds<span class="w"> </span><span class="m">30</span><span class="w"> </span>--hgs-seconds<span class="w"> </span><span class="m">2</span><span class="w"> </span>--output<span class="w"> </span>internal/benchmarks/stochastic-comparison
+</code></pre></div>
+<p>The <code>ng-memory-63</code> feature lets the exact engine retain all customers in its
+NG word for these cases, matching the historical build. Larger instances still
+use the plugin's visited set for elementarity.</p>
+<p>The harness preserves the literal matrices, uses one thread and seed 0, counts
+HGS inside each budget, independently validates solutions, and saves raw results,
+input hashes and a CSV summary. It applies no additional failure penalty.</p>
+<p>Algorithm reference: Florio et al.'s
+<a href="https://github.com/amflorio/vrpsd-optimal-restocking/blob/main/src/Label.cpp">VRPSD optimal-restocking solver</a>.
+The implementation shares model inputs with BALDES's existing stochastic route
+evaluator; it does not depend on the reference solver's CPLEX or CVRPSEP code.</p>
+<p>The local historical recovery audit
+records the initial 6.18%/5.72% gaps on 29/39 customers. The subsequent
+NG-refinement recovery audit
+closed 29 at 503.826971. The
+mean-load completion audit
+records the current defaults, validated 39-customer bounds, actual elapsed times,
+source provenance and remaining numerical/certified boundaries. These audits
+are local investigation artifacts under <code>internal/benchmarks/</code> and are not
+published with the documentation.</p>
+<h2 id="optional-initial-plan-refinement-for-theta">Optional initial-plan refinement for Theta</h2>
+<p>The default Theta-cut solver can reuse true-recourse plan improvement without
+moving Bellman recourse into pricing. Set
+<code>SolveOptions::incumbent_search_time_limit</code> to a positive duration, or pass
+<code>--incumbent-search-seconds 0.25</code> to <code>stochastic_instance</code>. The default is zero.
+The search requires an existing complete initial plan, supplied explicitly or
+by HGS. HGS, refinement, and the tree share <code>tree.time_limit</code>.</p>
+<p>The search considers customer relocations, reversals, and swaps, keeps at most
+48 travel-ranked candidates per step, and replays affected routes with the
+selected stochastic policy. It accepts a move only after replaying the whole
+plan, preserving exact coverage, mean-load feasibility, and the fleet limit.
+It stops after 64 improving steps or its cooperative deadline. A route replay
+already in progress may overrun that deadline.</p>
+<p>Improved Theta routes retain their relaxed column objectives. Existing seed
+validation supplies exact recourse through Theta variables, so recourse is
+counted once. <code>SolveResult::incumbent_search</code> reports replayed before/after
+objectives, evaluated and accepted moves, and elapsed time. This is a primal
+heuristic; it provides no pricing certificate or lower bound.</p>
+<p>Theta retains completion subset size 4. Controlled size-4/size-6 comparisons
+on SGJR 19, 29, and 39 gave identical final bounds; see the
+local Theta transfer audit.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="stochastic.html"><small>Previous guide</small>Stochastic demands and replenishment recourse <span aria-hidden="true">↗</span></a><a href="../guides/background-ils.html"><small>Next guide</small>Background AILS-II <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#optional-initial-plan-refinement-for-theta">Optional initial-plan refinement for Theta</a></nav></aside>
+</div>
+</body></html>
