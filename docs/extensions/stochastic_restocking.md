@@ -184,13 +184,15 @@ Algorithm reference: Florio et al.'s
 The implementation shares model inputs with BALDES's existing stochastic route
 evaluator; it does not depend on the reference solver's CPLEX or CVRPSEP code.
 
-The [historical recovery audit](../../internal/benchmarks/stochastic-restocking-20261108-recovered-workflow/README.md)
+The local historical recovery audit
 records the initial 6.18%/5.72% gaps on 29/39 customers. The subsequent
-[NG-refinement recovery](../../internal/benchmarks/stochastic-restocking-20261108-ng-refinement/README.md)
+NG-refinement recovery audit
 closed 29 at 503.826971. The
-[mean-load completion audit](../../internal/benchmarks/stochastic-restocking-20261109-load-completion/README.md)
+mean-load completion audit
 records the current defaults, validated 39-customer bounds, actual elapsed times,
-source provenance and remaining numerical/certified boundaries.
+source provenance and remaining numerical/certified boundaries. These audits
+are local investigation artifacts under `internal/benchmarks/` and are not
+published with the documentation.
 
 ## Optional initial-plan refinement for Theta
 
@@ -216,4 +218,4 @@ heuristic; it provides no pricing certificate or lower bound.
 
 Theta retains completion subset size 4. Controlled size-4/size-6 comparisons
 on SGJR 19, 29, and 39 gave identical final bounds; see the
-[Theta transfer audit](../../internal/benchmarks/stochastic-theta-transfer-20261109/README.md).
+local Theta transfer audit.
