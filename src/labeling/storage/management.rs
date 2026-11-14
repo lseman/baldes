@@ -1,18 +1,21 @@
 use super::*;
 
 impl<const D: usize> LabelStorage<D> {
+    /// Release the peak-sized label arena, but keep the small per-bucket
+    /// index and hot-column allocations. The raw-objective workspace is
+    /// re-swept on each pricing call; dropping the bucket vectors as well
+    /// made every call regrow all of them from empty.
     pub(crate) fn release_records(&mut self) {
         self.labels.release_records();
         for bucket in self.buckets.iter_mut().flatten() {
-            *bucket = LabelBucket {
-                lower_cost: 1e12,
-                knapsack_lower_cost: 1e12,
-                ..Default::default()
-            };
+            bucket.active.clear();
+            bucket.hot.truncate(0);
+            bucket.archived.clear();
+            bucket.next_id = 0;
+            bucket.lower_cost = 1e12;
+            bucket.knapsack_lower_cost = 1e12;
         }
-        for crossing in &mut self.crossing {
-            *crossing = Vec::new();
-        }
+        self.crossing.iter_mut().for_each(Vec::clear);
         self.root = None;
     }
 
